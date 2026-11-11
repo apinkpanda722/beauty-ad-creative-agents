@@ -1,0 +1,165 @@
+# 수집 대상 공식 계정 목록 (2026-11-12 확정)
+# verified 값: official_site_link = 브랜드 공식 사이트에 걸린 링크와 일치,
+#   channel_description = 채널 설명·핸들로 판단(사이트 대조 안 함), owner_watched_video = 영상 내용으로 확인,
+#   profile_only = 프로필 소개 문구로만 판단(사이트에서 링크를 읽지 못함)
+# 제외: 라네즈·이니스프리(대기업 계열, 건수 쏠림), 유튜브 @anua_global·@roundlab(공식 여부 미확인)
+
+youtube:
+  - brand: mediheal
+    handle: "@mediheal_official"
+    channel_id: UC_D8GKHYrlKlNqK3HI2plcQ
+    verified: channel_description
+  - brand: cosrx
+    handle: "@cosrxcosmetic"
+    channel_id: UC8_qETGWRNIH01-QEjWYBKw
+    verified: channel_description
+  - brand: skin1004
+    handle: "@skinkorea"
+    channel_id: UCCRqP9LF4DXBypTg3s-tNXw
+    verified: channel_description
+  - brand: torriden
+    handle: "@torriden-official"
+    channel_id: UC3wmXZAsLYGINtBuZZOonLQ
+    verified: owner_watched_video
+  - brand: beauty_of_joseon
+    handle: "@beautyofjoseon_official"
+    channel_id: UCWIbaNjCXGVJZdpQlR23-Mw
+    verified: channel_description
+  - brand: numbuzin
+    handle: "@numbuzin_official"
+    channel_id: UCR7KlsfF3nJViQl4BxpyShw
+    verified: channel_description
+  - brand: numbuzin
+    handle: "@numbuzin_global"
+    channel_id: UCPqWFGSkHAQ9E9WgQcQC2Hw
+    verified: channel_description
+  - brand: isntree
+    handle: "@isntree_official"
+    channel_id: UCIZePui25Qae-Y8qlekzskw
+    verified: channel_description
+  - brand: mixsoon
+    handle: "@mixsoon_official"
+    channel_id: UCOkIUJVM9PtvFcbPSCLesAQ
+    verified: channel_description
+  - brand: dalba
+    handle: "@dalba"
+    channel_id: UC5aDl92qZxBDGphaeAVLfCw
+    verified: channel_description
+  - brand: dalba
+    handle: "@dalba_global"
+    channel_id: UC69BsUtBVQg3yV0DV7MaRHw
+    verified: channel_description
+  - brand: medicube
+    handle: "@medicube4772"
+    channel_id: UCuFt1CbFdc2vIuXSO0U6B0Q
+    verified: official_site_link
+  - brand: medicube
+    handle: "@medicube_global_official"
+    channel_id: UCa8pMUKdiOLQqAKtD6oWrQg
+    verified: official_site_link
+  - brand: abib
+    handle: "@abib6165"
+    channel_id: UCcwzyp1IKuDT0tDWInfIi9w
+    verified: official_site_link
+  - brand: biodance
+    handle: "@biodance.official"
+    channel_id: UCllh95XDgsK9vnhkclEiBFA
+    verified: official_site_link
+  - brand: anua
+    handle: "@anua3185"
+    channel_id: UCRxwmI8qwn9nWMzHGsOjNEg
+    verified: official_site_link
+  - brand: round_lab
+    handle: "@roundlab.official"
+    channel_id: UCH-GEdKDs-xWJnySXxXqFRA
+    verified: official_site_link
+
+instagram:
+  - brand: medicube
+    username: medicube_global_official
+    region: global
+    verified: official_site_link
+  - brand: medicube
+    username: medicube_korea
+    region: kr
+    verified: official_site_link
+  - brand: beauty_of_joseon
+    username: beautyofjoseon_official
+    region: global
+    verified: official_site_link
+  - brand: skin1004
+    username: skin1004official
+    region: global
+    verified: official_site_link
+  - brand: skin1004
+    username: skin1004_korea
+    region: kr
+    verified: official_site_link
+  - brand: cosrx
+    username: cosrx
+    region: global
+    verified: official_site_link
+  - brand: cosrx
+    username: cosrx_korea
+    region: kr
+    verified: official_site_link
+  - brand: anua
+    username: anua_global
+    region: global
+    verified: official_site_link
+  - brand: anua
+    username: anua_kr
+    region: kr
+    verified: official_site_link
+  - brand: biodance
+    username: biodance_official
+    region: global
+    verified: official_site_link
+  - brand: mixsoon
+    username: mixsoon_official
+    region: global
+    verified: official_site_link
+  - brand: dalba
+    username: dalba_global
+    region: global
+    verified: official_site_link
+  - brand: dalba
+    username: dalba_piedmont
+    region: kr
+    verified: official_site_link
+  - brand: torriden
+    username: torriden
+    region: global
+    verified: official_site_link
+  - brand: torriden
+    username: torriden_official
+    region: kr
+    verified: official_site_link
+  - brand: mediheal
+    username: mediheal_usa
+    region: global
+    verified: official_site_link
+  - brand: mediheal
+    username: mediheal_official
+    region: kr
+    verified: official_site_link
+  - brand: abib
+    username: abib.official
+    region: kr
+    verified: official_site_link
+  - brand: round_lab
+    username: round.lab
+    region: kr
+    verified: official_site_link
+  - brand: isntree
+    username: isntree_kr
+    region: kr
+    verified: official_site_link
+  - brand: numbuzin
+    username: numbuzin_official
+    region: kr
+    verified: profile_only
+  - brand: numbuzin
+    username: numbuzin_global
+    region: global
+    verified: profile_only
