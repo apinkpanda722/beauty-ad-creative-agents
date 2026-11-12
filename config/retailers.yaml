@@ -1,0 +1,8 @@
+# 사용자 확인이 필요한 초안: 계약 원본에서 관측한 판매처 시드이며 확정 목록이 아니다.
+# sephora는 CONTRACTS.md에서 언급되었으며 이번 광고 응답 원본에는 없다.
+retailers:
+  - sephora
+  - etos
+  - cosibella
+  - pilulka
+  - pharmacontinente
