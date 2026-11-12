@@ -49,6 +49,13 @@ description: 이 프로젝트(beauty-ad-creative-agents)와 앞선 프로젝트 
 - **강제 수단**: /review 체크(테스트 기대값에 모델이 생성한 문장·분류 값이 들어 있지 않은가).
 - **출처**: 2026-11-11~12 실측, `docs/TROUBLESHOOTING_LOG.md`
 
+### FP-C04 린트 결과가 캐시와 설정 미고정에 따라 달라져 머지 뒤 검증이 깨짐
+- **증상**: P1 브랜치에서 통과하던 `make verify`가 머지 직후 main에서 ruff I001 6건으로 실패했다.
+- **원인**: ruff 0.17.4의 기본 규칙에 import 정렬이 있고, first-party 분류가 `pyproject.toml`에 고정돼 있지 않았다. `.ruff_cache`가 이전 결과를 가려 브랜치에서는 통과로 보였다.
+- **규칙**: 린트·포맷 설정은 결과가 환경과 캐시에 따라 달라지지 않게 `pyproject.toml`에 고정한다(first-party 분류 포함). 머지 전 검증은 캐시 없이(`uv run ruff check . --no-cache`)도 통과해야 한다. 도구 버전이 올라가면 기본 규칙이 바뀔 수 있다고 본다.
+- **강제 수단**: `pyproject.toml`의 `known-first-party`(PR #20). 머지 전 `--no-cache` 점검은 /review 체크.
+- **출처**: 2026-11-12 P1 머지 직후, `docs/TROUBLESHOOTING_LOG.md`, 이슈 #19
+
 ---
 
 ## B에서 이식한 항목 (프로젝트 B `failure-patterns`의 번호)
