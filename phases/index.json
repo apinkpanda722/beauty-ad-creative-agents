@@ -7,7 +7,8 @@
     },
     {
       "dir": "2-sources-pilot",
-      "status": "pending"
+      "status": "completed",
+      "completed_at": "2026-11-13T00:13:35+0900"
     }
   ]
 }
