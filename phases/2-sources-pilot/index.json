@@ -89,7 +89,16 @@
     {
       "step": 6,
       "name": "gemini-files",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-12T22:36:32+0900",
+      "summary": "Gemini Files 업로드·처리 대기·삭제 래퍼, 파일 오류 코드와 video_part MIME 인자 및 계약 기반 회귀 테스트 구현; 아키텍처 가드 포함 make verify 통과(935 tests), 실제 서비스 미호출.",
+      "completed_at": "2026-11-12T22:40:04+0900",
+      "usage": {
+        "input_tokens": 679115,
+        "cached_input_tokens": 604928,
+        "output_tokens": 7958,
+        "attempts": 1
+      }
     },
     {
       "step": 7,
