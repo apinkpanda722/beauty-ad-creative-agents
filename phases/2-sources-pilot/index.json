@@ -61,7 +61,16 @@
     {
       "step": 4,
       "name": "instagram-source",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-12T22:11:43+0900",
+      "summary": "Instagram 설정 로더·Business Discovery 수집·오류 격리·사용량 방어·미디어 URL 만료 판정 및 재조회 구현; 아키텍처 가드 포함 make verify 통과(831 tests).",
+      "completed_at": "2026-11-12T22:17:56+0900",
+      "usage": {
+        "input_tokens": 867247,
+        "cached_input_tokens": 787200,
+        "output_tokens": 14606,
+        "attempts": 1
+      }
     },
     {
       "step": 5,
