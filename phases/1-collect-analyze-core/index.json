@@ -19,7 +19,16 @@
     {
       "step": 1,
       "name": "settings-domain",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-12T18:03:19+0900",
+      "summary": "settings 환경 설정 로더와 domain 모델·Protocol 및 테스트 구현, pydantic 2.14.3 추가; make verify에서 계층 가드 포함 247개 테스트 통과.",
+      "completed_at": "2026-11-12T18:07:15+0900",
+      "usage": {
+        "input_tokens": 627478,
+        "cached_input_tokens": 568576,
+        "output_tokens": 8419,
+        "attempts": 1
+      }
     },
     {
       "step": 2,
