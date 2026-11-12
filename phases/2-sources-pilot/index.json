@@ -19,7 +19,16 @@
     {
       "step": 1,
       "name": "brand-split",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-12T22:02:32+0900",
+      "summary": "결정적 브랜드 dev/test 분할·수집량 검사·1회 재분할 CLI 및 테스트 구현, CLI로 brand_split.yaml 생성(history 비움); make verify 통과(706 tests).",
+      "completed_at": "2026-11-12T22:07:19+0900",
+      "usage": {
+        "input_tokens": 574712,
+        "cached_input_tokens": 506880,
+        "output_tokens": 10980,
+        "attempts": 1
+      }
     },
     {
       "step": 2,
