@@ -75,7 +75,16 @@
     {
       "step": 5,
       "name": "collect-runner",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-12T22:17:56+0900",
+      "summary": "YouTube·Instagram 전체 수집 실행기와 live-collect 타깃, 재시도·계정별 저장·재개·환경 점검·분할 보고 및 사용 안내 구현; 아키텍처 가드 포함 make verify 통과(892 tests), 실제 서비스 미호출.",
+      "completed_at": "2026-11-12T22:24:04+0900",
+      "usage": {
+        "input_tokens": 1066860,
+        "cached_input_tokens": 981248,
+        "output_tokens": 14899,
+        "attempts": 1
+      }
     },
     {
       "step": 6,
