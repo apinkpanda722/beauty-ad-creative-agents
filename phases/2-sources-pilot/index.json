@@ -5,7 +5,16 @@
     {
       "step": 0,
       "name": "live-fixes-config",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-12T22:00:45+0900",
+      "summary": "_read 헬퍼로 get_creative·next_pending의 읽기 트랜잭션을 rollback으로 종료하고 회귀 테스트 추가; SQL·쓰기 경로 유지, make verify 통과(658 tests).",
+      "completed_at": "2026-11-12T22:02:32+0900",
+      "usage": {
+        "input_tokens": 464649,
+        "cached_input_tokens": 398848,
+        "output_tokens": 2842,
+        "attempts": 1
+      }
     },
     {
       "step": 1,
@@ -82,5 +91,6 @@
       "name": "tiktok-source",
       "status": "pending"
     }
-  ]
+  ],
+  "created_at": "2026-11-12T22:00:45+0900"
 }
