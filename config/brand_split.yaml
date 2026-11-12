@@ -1,0 +1,48 @@
+registered_on: '2026-11-12'
+seed: 20261112
+attempt: 0
+dev_size: 5
+brands:
+- abib
+- anua
+- beauty_of_joseon
+- biodance
+- cosrx
+- dalba
+- isntree
+- medicube
+- mediheal
+- mixsoon
+- numbuzin
+- round_lab
+- skin1004
+- torriden
+dev:
+- cosrx
+- medicube
+- abib
+- dalba
+- mixsoon
+test:
+- beauty_of_joseon
+- skin1004
+- numbuzin
+- mediheal
+- isntree
+- round_lab
+- torriden
+- anua
+- biodance
+static_constraints:
+- dev와 test는 겹치지 않고 합집합은 등록한 전체 브랜드와 같다.
+- dev 브랜드 수는 dev_size와 같다.
+- dev와 test 각각은 후보 정보 기준 mask_pack, serum_ampoule, sun_care를 모두 포함한다.
+- dev와 test 각각은 YouTube 계정 브랜드와 Instagram 계정 브랜드를 하나 이상 포함한다.
+volume:
+  test_analyzable_min_total: 300
+  test_analyzable_min_per_source: 100
+  dev_analyzable_min_total: 60
+resplit:
+  max_times: 1
+  allowed_until: E1 1단계 라벨링 시작 전
+history: []
