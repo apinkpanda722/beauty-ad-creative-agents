@@ -1,0 +1,15 @@
+{
+  "_meta": {
+    "recorded_at": "2026-11-11T16:18:16Z",
+    "http_status": 400,
+    "note": "잘못된 토큰의 오류 형태"
+  },
+  "response": {
+    "error": {
+      "message": "Invalid OAuth access token - Cannot parse access token",
+      "code": 190,
+      "type": "OAuthException",
+      "fbtrace_id": "AQ9I7inL--BZs1l-UNFYi11"
+    }
+  }
+}

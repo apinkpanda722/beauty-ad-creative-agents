@@ -18,6 +18,7 @@
 | `AGENTS.md` | 에이전트 규칙 단일 원본. `CLAUDE.md`는 `@AGENTS.md` import만 한다 |
 | `Makefile` | `make verify` — Stop hook, execute.py, step AC가 공통으로 부르는 검증 진입점 |
 | `scripts/execute.py` | step 순차 실행기 (Codex 호출, 검증, 재시도, 커밋) |
+| `scripts/step_file_checks.py`, `scripts/test_step_files.py` | step 파일 형식 v2 기계 검사: 열람 금지 ↔ 읽기 목록, 실행 금지 대상 명시, 수정할 파일 ↔ 수정 허용 경로, 소비자 테스트 경고(`python scripts/step_file_checks.py phases/<phase>/step*.md`) |
 | `scripts/step-result.schema.json` | Codex 최종 응답 스키마 (`status`, `summary`, `reason`) |
 | `scripts/hooks/` | 위험 명령 차단, `make verify` Stop hook (스택 중립) |
 | `.codex/config.toml`, `.claude/settings.json` | 두 도구가 같은 hook 스크립트를 가리킨다 |
@@ -47,6 +48,7 @@
 - 에이전트는 index.json을 직접 고치지 않고 스키마가 고정된 최종 응답만 돌려준다. 상태 기록과 커밋은 실행기만 한다.
 - 실패/차단된 step의 코드는 커밋하지 않는다(원본은 실패 코드도 `feat` 커밋).
 - 타임아웃을 크래시가 아닌 시도 실패로 처리한다.
+- Codex 사용량 한도 오류(`You've hit your usage limit ... try again at HH:MM`)는 재시도하지 않고 재개 시각을 출력한 뒤 종료 코드 3으로 멈춘다. step은 `error`로 기록하지 않고 `pending`으로 둔다.
 - 실행 전 작업 트리 청결 검사로 무관한 변경이 step 커밋에 섞이지 않게 한다.
 - `--steps N`으로 일부 step만 실행할 수 있다.
 - step별 토큰 사용량과 시도 횟수를 index.json `usage`에 기록한다.

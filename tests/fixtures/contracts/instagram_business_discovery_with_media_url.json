@@ -1,0 +1,70 @@
+{
+  "_meta": {
+    "recorded_at": "2026-11-11T16:18:14Z",
+    "http_status": 200,
+    "note": "릴스에 media_url이 대부분 있는 계정"
+  },
+  "response": {
+    "business_discovery": {
+      "username": "torriden_official",
+      "followers_count": 128941,
+      "media_count": 612,
+      "media": {
+        "data": [
+          {
+            "id": "18358902202170725",
+            "media_type": "CAROUSEL_ALBUM",
+            "media_product_type": "FEED",
+            "permalink": "https://www.instagram.com/p/DfiyYeikzz-/",
+            "timestamp": "2026-11-10T02:02:20+0000",
+            "like_count": 172,
+            "comments_count": 5,
+            "media_url": "https://scontent-ssn1-1.cdninstagram.com/v/t51.82787-15/901641557_18500724340097703_6139063655765875466_n.jpg?<signed-query omitted>",
+            "caption": "추워질수록 더 꼼꼼하게 장벽 케어²⁾! 🍂❄️\n\n건조한 계절을 위한\n다이브인 인텐시브 3 STEP 루틴 💙\n\n① 토너로 산뜻하게 겉/속 수분 충전*\n② 크림으로 판테놀 캡슐 4.5만 개¹⁾의 장벽 케어²⁾\n③ 크림 랩핑 마스크로 탄력 케어³⁾\n\n올겨울 스킨케어 루틴은\n다이브인 인텐시브로 완성해 보세요. 🫧"
+          },
+          {
+            "id": "17992470050859768",
+            "media_type": "CAROUSEL_ALBUM",
+            "media_product_type": "FEED",
+            "permalink": "https://www.instagram.com/p/DfTZpx9EyGd/",
+            "timestamp": "2026-11-04T02:37:38+0000",
+            "like_count": 21094,
+            "comments_count": 185,
+            "media_url": "https://scontent-ssn1-1.cdninstagram.com/v/t51.82787-15/886657023_18499329019097703_2826215798390883285_n.jpg?<signed-query omitted>",
+            "caption": "피부 위에 콕콕, 수분 장벽 케어의 비밀은?\n\n45,000개*의 작은 캡슐에 담긴\n특별한 수분 장벽 케어 솔루션💙\n\n프리미엄 판테놀 5%를 담아\n민감해진 피부의 수분 장벽을 탄탄하게!\n\n지금 바로 주훈 & 건호가 선택한\n다이브인 인텐시브 크림을 만나보세요.🫧"
+          },
+          {
+            "id": "18100742798433091",
+            "media_type": "CAROUSEL_ALBUM",
+            "media_product_type": "FEED",
+            "permalink": "https://www.instagram.com/p/DfLiHF4E6T2/",
+            "timestamp": "2026-11-01T01:17:37+0000",
+            "like_count": 154,
+            "comments_count": 8,
+            "media_url": "https://scontent-ssn1-1.cdninstagram.com/v/t51.82787-15/870273181_18498703216097703_2772741420517487677_n.jpg?<signed-query omitted>",
+            "caption": "피지 고민은 컨트롤하고,\n블프 혜택은 제대로 챙기고! 💚🖤\n\n속 피지 집중 개선¹⁾부터\n유수분 밸런스 & 피부 장벽 강화²⁾³⁾까지 💧\n\n트러블* 고민 집중 케어템\n밸런스풀 컨트롤 세럼 31% OFF!\n\n11/1~11/7 올리브영 블랙프라이데이에서\n특별한 혜택으로 만나보세요. 🛒"
+          },
+          {
+            "id": "18490507270129236",
+            "media_type": "VIDEO",
+            "media_product_type": "REELS",
+            "permalink": "https://www.instagram.com/reel/DfEx111Tz0e/",
+            "timestamp": "2026-10-29T10:21:31+0000",
+            "like_count": 261,
+            "comments_count": 6,
+            "view_count": 12466,
+            "media_url": "https://scontent-ssn1-1.cdninstagram.com/o1/v/t2/f2/m86/AQNV7lhEngzj8R1VJonHzEEQfb-aNI-lM4z5maR8b_JaeoQkPhlD9uOKnLodTLrCWJChWXhzGHQMoF0ZinWVkXuuh7xdAfxCpzQ1KYc.mp4?<signed-query omitted>",
+            "caption": "아침 저녁으로 쌀쌀해진 요즘,\n따뜻한 쉼의 공간에서 만나는\n피부 장벽 집중 케어*💦\n\nTOVA × Torriden\n\n사우나에서 즐기는 편안한 휴식부터\n건강한 피부를 위한\n수분 장벽 케어*까지🫧\n\n몸과 마음이 쉬어가는 토바에서\n다이브인 인텐시브 라인과 함께\n더욱 특별해진 쉼을 경험해 보세요.💙"
+          }
+        ],
+        "paging": {
+          "cursors": {
+            "after": "QVFIVFJQVjhyREtxRU5oc1ZADeFZAGcGhSQS1OZATVLSlg2V2dqSG15ZAE9MU2dHTmRoWUk1a20zU1RISEsxX0Npc2c3QlFFTTJnRnEtYXFZAUzZArLWh3T1Azenh3"
+          }
+        }
+      },
+      "id": "17841402931080457"
+    },
+    "id": "17841423923684858"
+  }
+}

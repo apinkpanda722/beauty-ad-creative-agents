@@ -1,0 +1,31 @@
+{
+  "_meta": {
+    "recorded_at": "2026-11-11T16:18:23Z",
+    "http_status": 400,
+    "note": "잘못된 키의 오류 형태"
+  },
+  "response": [
+    {
+      "error": {
+        "code": 400,
+        "message": "API key not valid. Please pass a valid API key.",
+        "status": "INVALID_ARGUMENT",
+        "details": [
+          {
+            "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+            "reason": "API_KEY_INVALID",
+            "domain": "googleapis.com",
+            "metadata": {
+              "service": "generativelanguage.googleapis.com"
+            }
+          },
+          {
+            "@type": "type.googleapis.com/google.rpc.LocalizedMessage",
+            "locale": "en-US",
+            "message": "API key not valid. Please pass a valid API key."
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -22,3 +22,10 @@ __pycache__/
 .env
 .env.*
 !.env.example
+
+# local data (never committed)
+data/raw/
+data/interim/
+
+# harness execution lock (execute.py)
+.harness/

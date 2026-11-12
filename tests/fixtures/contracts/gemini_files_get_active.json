@@ -1,0 +1,23 @@
+{
+  "_meta": {
+    "recorded_at": "2026-11-11T16:18:32Z",
+    "http_status": 200,
+    "note": "files.get, state=ACTIVE가 될 때까지 대기 후"
+  },
+  "response": {
+    "name": "files/x5v1xehcigo6",
+    "displayName": "contract-fixture",
+    "mimeType": "video/mp4",
+    "sizeBytes": "3957426",
+    "createTime": "2026-11-11T16:18:27.523767Z",
+    "updateTime": "2026-11-11T16:18:30.285187Z",
+    "expirationTime": "2026-11-13T16:18:26.626876693Z",
+    "sha256Hash": "NTNmNDY0YzEzZTkzNjAyODJiNzg1MDI2ZTk4MDM1ODMyNzVlMTdhMDVmMjMxNWExMWI0OWZjMzlkOWU1OTViZg==",
+    "uri": "https://generativelanguage.googleapis.com/v1beta/files/x5v1xehcigo6",
+    "state": "ACTIVE",
+    "videoMetadata": {
+      "videoDuration": "29s"
+    },
+    "source": "UPLOADED"
+  }
+}
