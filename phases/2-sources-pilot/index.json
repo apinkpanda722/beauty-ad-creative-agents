@@ -215,7 +215,16 @@
     {
       "step": 15,
       "name": "tiktok-source",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-13T00:07:56+0900",
+      "summary": "TikTok 설정·판매처 초안·토큰 캐시·광고 수집·쪽 넘김·중복 제거·집행 주체 분류·영상 URL 재조회 구현; 아키텍처 가드 포함 make verify 통과(1432 tests), 실제 서비스 미호출.",
+      "completed_at": "2026-11-13T00:13:35+0900",
+      "usage": {
+        "input_tokens": 863442,
+        "cached_input_tokens": 792320,
+        "output_tokens": 13369,
+        "attempts": 1
+      }
     }
   ],
   "created_at": "2026-11-12T22:00:45+0900"
