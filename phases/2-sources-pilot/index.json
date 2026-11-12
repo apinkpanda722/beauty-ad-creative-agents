@@ -145,7 +145,16 @@
     {
       "step": 10,
       "name": "media-flow",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-12T22:53:10+0900",
+      "summary": "Instagram 계정별 URL 계획·미디어 분석·결과 저장 흐름과 finally 삭제 보장·한도 예외 전파 구현; 아키텍처 가드 포함 make verify 통과(1228 tests), 실제 서비스 미호출.",
+      "completed_at": "2026-11-12T22:59:14+0900",
+      "usage": {
+        "input_tokens": 1313243,
+        "cached_input_tokens": 1219712,
+        "output_tokens": 13377,
+        "attempts": 1
+      }
     },
     {
       "step": 11,
