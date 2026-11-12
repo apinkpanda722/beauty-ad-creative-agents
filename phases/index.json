@@ -2,7 +2,8 @@
   "phases": [
     {
       "dir": "1-collect-analyze-core",
-      "status": "pending"
+      "status": "completed",
+      "completed_at": "2026-11-12T18:41:09+0900"
     }
   ]
 }

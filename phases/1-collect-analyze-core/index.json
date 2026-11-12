@@ -5,47 +5,130 @@
     {
       "step": 0,
       "name": "architecture-guard",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-12T17:58:47+0900",
+      "summary": "tests/test_architecture.py에 AST 기반 계층·SDK 가드, 임시 모듈 검출 테스트, AGENTS.md 표 일치 검사를 구현했으며 make verify에서 176개 테스트가 통과했습니다.",
+      "completed_at": "2026-11-12T18:03:19+0900",
+      "usage": {
+        "input_tokens": 701181,
+        "cached_input_tokens": 632832,
+        "output_tokens": 9397,
+        "attempts": 1
+      }
     },
     {
       "step": 1,
       "name": "settings-domain",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-12T18:03:19+0900",
+      "summary": "settings 환경 설정 로더와 domain 모델·Protocol 및 테스트 구현, pydantic 2.14.3 추가; make verify에서 계층 가드 포함 247개 테스트 통과.",
+      "completed_at": "2026-11-12T18:07:15+0900",
+      "usage": {
+        "input_tokens": 627478,
+        "cached_input_tokens": 568576,
+        "output_tokens": 8419,
+        "attempts": 1
+      }
     },
     {
       "step": 2,
       "name": "compose",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-12T18:07:15+0900",
+      "summary": "PostgreSQL·Neo4j compose와 db-up·db-down·확인 필수 graph-reset 타깃 및 파싱 테스트 구현, PyYAML 6.0.3 추가; make verify에서 261개 테스트 통과.",
+      "completed_at": "2026-11-12T18:09:26+0900",
+      "usage": {
+        "input_tokens": 662342,
+        "cached_input_tokens": 589056,
+        "output_tokens": 4468,
+        "attempts": 1
+      }
     },
     {
       "step": 3,
       "name": "store",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-12T18:09:26+0900",
+      "summary": "PostgreSQL store 연결·멱등 마이그레이션·소재 및 분석 저장소와 가짜 연결 테스트 구현, psycopg[binary] 3.3.9 추가; 아키텍처 가드 포함 make verify 316개 테스트 통과.",
+      "completed_at": "2026-11-12T18:15:04+0900",
+      "usage": {
+        "input_tokens": 750192,
+        "cached_input_tokens": 676864,
+        "output_tokens": 12996,
+        "attempts": 1
+      }
     },
     {
       "step": 4,
       "name": "obs-ledger",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-12T18:15:04+0900",
+      "summary": "JSONL 비용 원장·손상 줄 집계·스레드 안전 추가와 공급사별 누적 상한 검사 및 환경 설정 구현; 의존성 추가 없이 make verify 369개 테스트 통과.",
+      "completed_at": "2026-11-12T18:19:06+0900",
+      "usage": {
+        "input_tokens": 927769,
+        "cached_input_tokens": 853504,
+        "output_tokens": 8382,
+        "attempts": 1
+      }
     },
     {
       "step": 5,
       "name": "llm-wrapper",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-12T18:19:06+0900",
+      "summary": "Gemini Interactions 래퍼·오류 분류·제한적 재시도·원장/상한 검사·로컬 가격표·테스트 구현; make verify 446개 통과. 주요 버전: litellm 1.103.3, pydantic 2.14.3, pydantic-settings 2.16.2, openai 2.54.0, httpx 0.28.1.",
+      "completed_at": "2026-11-12T18:24:29+0900",
+      "usage": {
+        "input_tokens": 1095123,
+        "cached_input_tokens": 1021824,
+        "output_tokens": 12473,
+        "attempts": 1
+      }
     },
     {
       "step": 6,
       "name": "youtube-source",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-12T18:24:29+0900",
+      "summary": "YouTube 설정 로더·수집 어댑터와 테스트 구현(페이지 처리, 50개 분할, 통계·길이 판정, 채널별 오류·전체 중단); httpx 0.28.1 직접 의존성 추가, make verify 551개 테스트 통과.",
+      "completed_at": "2026-11-12T18:29:54+0900",
+      "usage": {
+        "input_tokens": 980660,
+        "cached_input_tokens": 897280,
+        "output_tokens": 12590,
+        "attempts": 1
+      }
     },
     {
       "step": 7,
       "name": "analysis-hook",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-12T18:29:54+0900",
+      "summary": "첫 3초 훅 분석·방어 선별·스키마 검증·재요청/보류·한도 중단 배치와 가짜 기반 테스트 구현; 의존성 추가 없이 아키텍처 가드 포함 make verify 601개 테스트 통과.",
+      "completed_at": "2026-11-12T18:34:07+0900",
+      "usage": {
+        "input_tokens": 732683,
+        "cached_input_tokens": 658944,
+        "output_tokens": 9372,
+        "attempts": 1
+      }
     },
     {
       "step": 8,
       "name": "slice-live-target",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-12T18:34:07+0900",
+      "summary": "환경 선점검·YouTube 수집→훅 분석→PostgreSQL 저장 CLI와 live-slice 타깃·README·가짜 테스트 구현; 의존성 추가 없이 아키텍처 가드 포함 make verify 648개 테스트 통과, 실제 서비스 미호출.",
+      "completed_at": "2026-11-12T18:41:08+0900",
+      "usage": {
+        "input_tokens": 1471583,
+        "cached_input_tokens": 1372544,
+        "output_tokens": 16051,
+        "attempts": 1
+      }
     }
-  ]
+  ],
+  "created_at": "2026-11-12T17:58:47+0900",
+  "completed_at": "2026-11-12T18:41:09+0900"
 }
