@@ -5,7 +5,16 @@
     {
       "step": 0,
       "name": "architecture-guard",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-12T17:58:47+0900",
+      "summary": "tests/test_architecture.py에 AST 기반 계층·SDK 가드, 임시 모듈 검출 테스트, AGENTS.md 표 일치 검사를 구현했으며 make verify에서 176개 테스트가 통과했습니다.",
+      "completed_at": "2026-11-12T18:03:19+0900",
+      "usage": {
+        "input_tokens": 701181,
+        "cached_input_tokens": 632832,
+        "output_tokens": 9397,
+        "attempts": 1
+      }
     },
     {
       "step": 1,
@@ -47,5 +56,6 @@
       "name": "slice-live-target",
       "status": "pending"
     }
-  ]
+  ],
+  "created_at": "2026-11-12T17:58:47+0900"
 }
