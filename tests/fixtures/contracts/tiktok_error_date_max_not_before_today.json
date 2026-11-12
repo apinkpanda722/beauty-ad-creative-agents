@@ -1,0 +1,14 @@
+{
+  "_meta": {
+    "recorded_at": "2026-11-12T02:16:32Z",
+    "http_status": 400,
+    "note": "search_term=medicube, country_code_list 6개국, 날짜는 문자열, max_count 10"
+  },
+  "response": {
+    "error": {
+      "code": "invalid_params",
+      "message": "`filters.ad_published_date_range.max: 20261112` is invalid. Please provide a value before today's date.",
+      "log_id": "202611120216328A9F6118A3D9150BA6BF"
+    }
+  }
+}

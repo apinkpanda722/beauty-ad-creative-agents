@@ -163,3 +163,27 @@ instagram:
     username: numbuzin_global
     region: global
     verified: profile_only
+
+# TikTok Commercial Content API: 계정이 아니라 검색어로 가져온다(EU 게재 광고만 조회된다).
+# 검색어는 광고 내용에 걸리므로 판매처·개인 광고가 섞인다. 집행 주체는 수집 뒤 따로 분류한다.
+# 날짜 범위의 끝은 오늘보다 앞이어야 하고 문자열 "YYYYMMDD"로 보낸다(docs/CONTRACTS.md).
+tiktok:
+  countries: [DE, FR, IT, ES, NL, PL]
+  lookback_days: 330
+  search_type: exact_phrase
+  brands:
+    - {brand: medicube, search_term: medicube}
+    - {brand: anua, search_term: anua}
+    - {brand: beauty_of_joseon, search_term: beauty of joseon}
+    - {brand: cosrx, search_term: cosrx}
+    - {brand: skin1004, search_term: skin1004}
+    - {brand: torriden, search_term: torriden}
+    - {brand: biodance, search_term: biodance}
+    - {brand: mediheal, search_term: mediheal}
+    - {brand: numbuzin, search_term: numbuzin}
+    - {brand: mixsoon, search_term: mixsoon}
+    - {brand: dalba, search_term: dalba}
+    - {brand: round_lab, search_term: round lab}
+    - {brand: abib, search_term: abib}
+    - {brand: isntree, search_term: isntree}
+

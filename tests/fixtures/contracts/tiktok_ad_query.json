@@ -1,0 +1,271 @@
+{
+  "_meta": {
+    "recorded_at": "2026-11-12T02:16:45Z",
+    "http_status": 200,
+    "note": "search_term=medicube, country_code_list 6개국, 날짜는 문자열, max_count 10"
+  },
+  "response": {
+    "data": {
+      "ads": [
+        {
+          "ad": {
+            "id": 1852330880319601,
+            "image_urls": [
+              "https://p16-common-sign.tiktokcdn.com/tos-alisg-p-0051c001-sg/oIE9QQffoj5I9ZDNSHQpmBF8s4hDbCgBAv7gFB~tplv-tiktokx-origin.jpeg?<query omitted>"
+            ],
+            "last_shown_date": "20260331",
+            "reach": {
+              "unique_users_seen": "700K-800K"
+            },
+            "status": "active",
+            "status_statement": "N/A",
+            "videos": [
+              {
+                "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-no1a-p-51c710-no/osDEKrfaBmuvpFeD5YgBA5QwESQB9IQgNLB8lm~tplv-noop.image?<query omitted>",
+                "url": "https://v16m.tiktokcdn.com/95d9c3d4b656656b7ee4af8fa79f4547/6af57602/video/tos/no1a/tos-no1a-ve-51c710-no/os28mQQDpBj78B3FEBooCAImDBeCfQDgbNEyhS/?<query omitted>"
+              }
+            ],
+            "first_shown_date": "20251223"
+          },
+          "advertiser": {
+            "business_id": 7202634486813605889,
+            "business_name": "Cosibella",
+            "paid_for_by": "Cosibella"
+          }
+        },
+        {
+          "ad": {
+            "id": 1878880696457474,
+            "last_shown_date": "20261014",
+            "reach": {
+              "unique_users_seen": "500K-600K"
+            },
+            "status": "active",
+            "status_statement": "N/A",
+            "videos": [
+              {
+                "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-useast2a-p-0037-euttp/o0Yd7gDeIEZ9ZmlDUTqEND2BzIZ5mb9fQA4FzR~tplv-noop.image?<query omitted>",
+                "url": "https://v16m.tiktokcdn.com/dad191b88b562cf4429ffcfe63ae7195/6af57600/video/tos/useast2a/tos-useast2a-ve-0068c001-euttp/okHTZfEIQDQqdMzf5nFma5mb8t79oEA4DBURgg/?<query omitted>"
+              }
+            ],
+            "first_shown_date": "20261012"
+          },
+          "advertiser": {
+            "business_id": 7517303749384126465,
+            "business_name": "7517303783878033430",
+            "paid_for_by": "7517303783878033430"
+          }
+        },
+        {
+          "ad": {
+            "status": "active",
+            "status_statement": "N/A",
+            "videos": [
+              {
+                "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-useast2a-p-0051c799-euttp/oIOEGJ1fILA1wECAIbgGoZevIURgqnVI1DyeCU~tplv-noop.image?<query omitted>",
+                "url": "https://v16m.tiktokcdn.com/7b10a9c7a38b8290ef5fd2b9c9a1147c/6af575ff/video/tos/useast2a/tos-useast2a-ve-0051c799-euttp/oo4hdSAQgIIvFfIDIDVGhGfCER4mg8aeAAoLob/?<query omitted>"
+              }
+            ],
+            "first_shown_date": "20260824",
+            "id": 1874327942903058,
+            "image_urls": [
+              "https://p16-common-sign.tiktokcdn.com/tos-alisg-p-0051c001-sg/oABqAQCivFOgUDECEqEDp9fEIJTcgOXTBQIwfN~tplv-tiktokx-origin.jpeg?<query omitted>"
+            ],
+            "last_shown_date": "20260829",
+            "reach": {
+              "unique_users_seen": "400K-500K"
+            }
+          },
+          "advertiser": {
+            "business_id": 7403698761815490576,
+            "business_name": "Etos B.V.",
+            "paid_for_by": "Dentsu Netherlands B.V."
+          }
+        },
+        {
+          "ad": {
+            "id": 1851753311654033,
+            "image_urls": [
+              "https://p19-common-sign.tiktokcdn.com/tos-alisg-p-0051c001-sg/oIE9QQffoj5I9ZDNSHQpmBF8s4hDbCgBAv7gFB~tplv-tiktokx-origin.jpeg?<query omitted>"
+            ],
+            "last_shown_date": "20260226",
+            "reach": {
+              "unique_users_seen": "400K-500K"
+            },
+            "status": "active",
+            "status_statement": "N/A",
+            "videos": [
+              {
+                "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-no1a-p-51c710-no/ooEeQQ4fpgzIILDNJkQpaBFIO89DoBgBAL8nCB~tplv-noop.image?<query omitted>",
+                "url": "https://v16m.tiktokcdn.com/95d9c3d4b656656b7ee4af8fa79f4547/6af57602/video/tos/no1a/tos-no1a-ve-51c710-no/os28mQQDpBj78B3FEBooCAImDBeCfQDgbNEyhS/?<query omitted>"
+              }
+            ],
+            "first_shown_date": "20251217"
+          },
+          "advertiser": {
+            "business_id": 7202634486813605889,
+            "business_name": "Cosibella",
+            "paid_for_by": "Cosibella"
+          }
+        },
+        {
+          "ad": {
+            "id": 1872801420696897,
+            "image_urls": [
+              "https://p16-common-sign.tiktokcdn.com/tos-alisg-p-0051c001-sg/owoKIcQNzDQNWZDfBlgFQdxoEf3BqEEBTB870A~tplv-tiktokx-origin.jpeg?<query omitted>"
+            ],
+            "last_shown_date": "20260812",
+            "reach": {
+              "unique_users_seen": "400K-500K"
+            },
+            "status": "active",
+            "status_statement": "N/A",
+            "videos": [
+              {
+                "url": "https://v16m.tiktokcdn.com/e40b4aba1bac6eda511544b5bd3d9a8d/6af57610/video/tos/useast2a/tos-useast2a-ve-0051c799-euttp/oQfB0qEABQBEZfgW7BDQQqExdIC8R3N5NFcDZT/?<query omitted>",
+                "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-useast2a-p-0051c799-euttp/o8nIri5BQ1nGoZ6CUTfGeDcbQPALGNcAXPeUgy~tplv-noop.image?<query omitted>"
+              }
+            ],
+            "first_shown_date": "20260810"
+          },
+          "advertiser": {
+            "business_id": 7129449241696535297,
+            "business_name": "Pilulka Lékárny a.s.",
+            "paid_for_by": "Pilulka Lékárny a.s."
+          }
+        },
+        {
+          "ad": {
+            "reach": {
+              "unique_users_seen": "300K-400K"
+            },
+            "status": "active",
+            "status_statement": "N/A",
+            "videos": [
+              {
+                "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-alisg-p-0051c001-sg/o8urJpdSfABpAYDkDWr9V4IgeFNRSvryVQEEBg~tplv-noop.image?<query omitted>",
+                "url": "https://v16m.tiktokcdn.com/b9ecbdf734810b0d84ce2b06be076267/6af57646/video/tos/alisg/tos-alisg-ve-0051c001-sg/ocG9yXw3fAIyOIyBQBm0qIAsJiAoiBhnvpEEg8/?<query omitted>"
+              }
+            ],
+            "first_shown_date": "20260324",
+            "id": 1860177115769906,
+            "image_urls": [
+              "https://p16-common-sign.tiktokcdn.com/tos-alisg-p-0051c001-sg/ocHBA3yojIApXyzqnnJI9fALswi8vABS0EGmdi~tplv-tiktokx-origin.jpeg?<query omitted>"
+            ],
+            "last_shown_date": "20260416"
+          },
+          "advertiser": {
+            "business_id": 7112381089636860674,
+            "business_name": "PHARMACONTINENTE - SAÚDE E HIGIENE, S.A.",
+            "paid_for_by": "ARN Media PT"
+          }
+        },
+        {
+          "ad": {
+            "videos": [
+              {
+                "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-alisg-p-0037/ogh0UDALIWMxA7A9BeIICvqeZ4XcjjyQkke38O~tplv-noop.image?<query omitted>",
+                "url": "https://v16m.tiktokcdn.com/692b79e5e5aad646c62294aa4273cf32/6af575f7/video/tos/alisg/tos-alisg-ve-0068c800-sg/ocUH4lH9eCOI0AFjyDeE6XQQBjIuAofpyIoDET/?<query omitted>"
+              }
+            ],
+            "first_shown_date": "20260703",
+            "id": 1869700045888514,
+            "last_shown_date": "20260705",
+            "reach": {
+              "unique_users_seen": "200K-300K"
+            },
+            "status": "active",
+            "status_statement": "N/A"
+          },
+          "advertiser": {
+            "business_id": 7582133114290487313,
+            "business_name": "1851106730972161",
+            "paid_for_by": "1851106730972161"
+          }
+        },
+        {
+          "ad": {
+            "last_shown_date": "20260311",
+            "reach": {
+              "unique_users_seen": "200K-300K"
+            },
+            "status": "active",
+            "status_statement": "N/A",
+            "videos": [
+              {
+                "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-useast2a-p-0051c799-euttp/ooLkJebSrAaZDl1BI2q2BbtCgoXeQXf8GGmAIG~tplv-noop.image?<query omitted>",
+                "url": "https://v16m.tiktokcdn.com/3422828927cb310138e03db78223a3bb/6af57602/video/tos/useast2a/tos-useast2a-ve-0051c799-euttp/os28mQQDpBj78B3FEBooCAImDBeCfQDgbNEyhS/?<query omitted>"
+              }
+            ],
+            "first_shown_date": "20260116",
+            "id": 1854498782492210,
+            "image_urls": [
+              "https://p19-common-sign.tiktokcdn.com/tos-alisg-p-0051c001-sg/oIE9QQffoj5I9ZDNSHQpmBF8s4hDbCgBAv7gFB~tplv-tiktokx-origin.jpeg?<query omitted>"
+            ]
+          },
+          "advertiser": {
+            "business_id": 7202634486813605889,
+            "business_name": "Cosibella",
+            "paid_for_by": "Cosibella"
+          }
+        },
+        {
+          "ad": {
+            "id": 1873424304861521,
+            "last_shown_date": "20260814",
+            "reach": {
+              "unique_users_seen": "200K-300K"
+            },
+            "status": "active",
+            "status_statement": "N/A",
+            "videos": [
+              {
+                "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-no1a-p-0037-no/oIpIwq5EpNdBC3zI7iYsCqi0LB6gf6AzIBALTy~tplv-noop.image?<query omitted>",
+                "url": "https://v16m.tiktokcdn.com/da8ee45f0703dda2d72dd6e7b1240ffd/6af57603/video/tos/useast2a/tos-useast2a-ve-68c810-euttp/oMyXQkQTZDADD2HaQwF1FRngWETgmBfyIbfcWE/?<query omitted>"
+              }
+            ],
+            "first_shown_date": "20260813"
+          },
+          "advertiser": {
+            "business_id": 7416009823109791745,
+            "business_name": "1810549286062095",
+            "paid_for_by": "1810549286062095"
+          }
+        },
+        {
+          "ad": {
+            "status": "active",
+            "status_statement": "N/A",
+            "videos": [
+              {
+                "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-no1a-p-51c710-no/ogMQHlyaQNlGgFMCezeM8DMbWJAXH95AeVmRgE~tplv-noop.image?<query omitted>",
+                "url": "https://v16m.tiktokcdn.com/76e070a7948f48702ae3687dbbdc1b30/6af5763b/video/tos/no1a/tos-no1a-ve-51c710-no/oMDzRQEEIB8mBQEmdfNlDC5BerdGcgvRgTANFo/?<query omitted>"
+              }
+            ],
+            "first_shown_date": "20250925",
+            "id": 1844240909809666,
+            "image_urls": [
+              "https://p16-common-sign.tiktokcdn.com/tos-alisg-p-0051c001-sg/b01e2810c43b12b9fcb28efc896328b3~tplv-tiktokx-origin.jpeg?<query omitted>"
+            ],
+            "last_shown_date": "20260827",
+            "reach": {
+              "unique_users_seen": "200K-300K"
+            }
+          },
+          "advertiser": {
+            "business_id": 7406319005088137233,
+            "business_name": "Dalora",
+            "paid_for_by": "Httpool SK (EUR)"
+          }
+        }
+      ],
+      "has_more": true,
+      "search_id": "eyJsYXN0X3NvcnQiOlsyNDQ2NzldLCJuZXh0X2N1cnNvciI6MTB9"
+    },
+    "error": {
+      "code": "ok",
+      "message": "",
+      "log_id": "20261112021643D3537D7638289709397C"
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "_meta": {
+    "recorded_at": "2026-11-12T02:16:46Z",
+    "http_status": 401,
+    "note": "잘못된 토큰의 오류 형태"
+  },
+  "response": {
+    "error": {
+      "code": "access_token_invalid",
+      "message": "The access token is invalid or not found in the request.",
+      "log_id": "202611120216466A2CEF1A44ED8D091C2C"
+    },
+    "data": {}
+  }
+}
