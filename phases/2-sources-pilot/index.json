@@ -33,7 +33,16 @@
     {
       "step": 2,
       "name": "creative-brand",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-12T22:07:19+0900",
+      "summary": "Creative에 선택적 brand·account, CollectionStat·조회 Protocol, v2 마이그레이션과 저장·복원·수집 통계 구현; _read 트랜잭션 종료 유지, make verify 통과(721 tests).",
+      "completed_at": "2026-11-12T22:10:08+0900",
+      "usage": {
+        "input_tokens": 772986,
+        "cached_input_tokens": 686848,
+        "output_tokens": 5664,
+        "attempts": 1
+      }
     },
     {
       "step": 3,
