@@ -103,7 +103,16 @@
     {
       "step": 7,
       "name": "media-download",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-12T22:40:04+0900",
+      "summary": "메모리 전용 영상 다운로드·스트리밍 크기 제한·응답 순차 검증·URL 비노출 오류 코드와 가짜 MediaGet 테스트 구현; 아키텍처 가드 포함 make verify 통과(953 tests), 실제 다운로드 미실행.",
+      "completed_at": "2026-11-12T22:42:25+0900",
+      "usage": {
+        "input_tokens": 563165,
+        "cached_input_tokens": 493184,
+        "output_tokens": 4402,
+        "attempts": 1
+      }
     },
     {
       "step": 8,
