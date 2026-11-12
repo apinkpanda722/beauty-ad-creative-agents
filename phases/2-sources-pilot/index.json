@@ -131,7 +131,16 @@
     {
       "step": 9,
       "name": "analysis-full",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-12T22:46:36+0900",
+      "summary": "TAXONOMY v0 콘텐츠 유형·전체 축 모델과 분석·재요청·보류, 성분 원문 보존, 모델 ID·버전 상수 및 훅 선택 영상 입력 구현; 기존 테스트 불변·아키텍처 가드 포함 make verify 통과(1127 tests), 실제 서비스 미호출.",
+      "completed_at": "2026-11-12T22:53:10+0900",
+      "usage": {
+        "input_tokens": 1395241,
+        "cached_input_tokens": 1299200,
+        "output_tokens": 15351,
+        "attempts": 1
+      }
     },
     {
       "step": 10,
