@@ -47,7 +47,16 @@
     {
       "step": 3,
       "name": "store",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-12T18:09:26+0900",
+      "summary": "PostgreSQL store 연결·멱등 마이그레이션·소재 및 분석 저장소와 가짜 연결 테스트 구현, psycopg[binary] 3.3.9 추가; 아키텍처 가드 포함 make verify 316개 테스트 통과.",
+      "completed_at": "2026-11-12T18:15:04+0900",
+      "usage": {
+        "input_tokens": 750192,
+        "cached_input_tokens": 676864,
+        "output_tokens": 12996,
+        "attempts": 1
+      }
     },
     {
       "step": 4,
