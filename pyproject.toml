@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "httpx>=0.28.1",
     "litellm==1.103.3",
     "psycopg[binary]>=3.3.9",
     "pydantic>=2.14.3",

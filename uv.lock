@@ -206,6 +206,7 @@ name = "beautyads"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "httpx" },
     { name = "litellm" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic" },
@@ -222,6 +223,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "litellm", specifier = "==1.103.3" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3.9" },
     { name = "pydantic", specifier = ">=2.14.3" },
