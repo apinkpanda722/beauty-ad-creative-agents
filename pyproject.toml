@@ -35,6 +35,10 @@ python-preference = "only-managed"
 # 하네스(scripts)·phase 산출물(phases)·웹(web)은 린트 대상이 아니다.
 extend-exclude = ["phases", "scripts", "web"]
 
+[tool.ruff.lint.isort]
+# first-party 분류를 고정한다(환경·캐시에 따라 import 정렬 결과가 달라지지 않게).
+known-first-party = ["beautyads"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests", "scripts"]
 addopts = "-n auto"

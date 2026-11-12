@@ -1,6 +1,8 @@
 from datetime import UTC, datetime
 
 import pytest
+from pydantic import ValidationError
+
 from beautyads.domain import (
     Creative,
     CreativeKey,
@@ -11,7 +13,6 @@ from beautyads.domain import (
     Source,
     is_analyzable,
 )
-from pydantic import ValidationError
 
 
 @pytest.fixture
