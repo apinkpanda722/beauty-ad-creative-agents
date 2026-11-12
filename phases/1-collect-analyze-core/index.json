@@ -103,7 +103,16 @@
     {
       "step": 7,
       "name": "analysis-hook",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-12T18:29:54+0900",
+      "summary": "첫 3초 훅 분석·방어 선별·스키마 검증·재요청/보류·한도 중단 배치와 가짜 기반 테스트 구현; 의존성 추가 없이 아키텍처 가드 포함 make verify 601개 테스트 통과.",
+      "completed_at": "2026-11-12T18:34:07+0900",
+      "usage": {
+        "input_tokens": 732683,
+        "cached_input_tokens": 658944,
+        "output_tokens": 9372,
+        "attempts": 1
+      }
     },
     {
       "step": 8,
