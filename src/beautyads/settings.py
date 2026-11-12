@@ -2,6 +2,7 @@
 
 import os
 from collections.abc import Mapping
+from math import isfinite
 from pathlib import Path
 from typing import Literal
 
@@ -95,6 +96,9 @@ class Settings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     ledger_path: Path = Path("data/manifest/costs.jsonl")
+    provider_caps_usd: dict[str, float] = Field(
+        default_factory=lambda: {"gemini": 12.0, "openai": 10.0, "anthropic": 8.0}
+    )
     analysis_window_max_s: int = Field(default=60, gt=0)
     video_length_cut_s: int = Field(default=600, gt=0)
     thinking_level: ThinkingLevel = "minimal"
@@ -121,6 +125,19 @@ def load_settings(
                 except ValueError:
                     raise InvalidSetting(name) from None
             values[field] = value
+    caps = Settings().provider_caps_usd
+    for provider in caps:
+        name = f"BEAUTYADS_CAP_{provider.upper()}_USD"
+        value = get_setting(name, environ=environ, env_file=env_file)
+        if value is not None:
+            try:
+                cap = float(value)
+            except ValueError:
+                raise InvalidSetting(name) from None
+            if not isfinite(cap) or cap < 0:
+                raise InvalidSetting(name)
+            caps[provider] = cap
+    values["provider_caps_usd"] = caps
     try:
         return Settings.model_validate(values)
     except ValidationError as error:
