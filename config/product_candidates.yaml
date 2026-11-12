@@ -1,0 +1,103 @@
+# 1층 대표 단품 후보 (2026-11-12, 임시)
+# 공식몰 첫 화면에 노출된 상품에서 카테고리 키워드로 고른 후보다. 확정 목록이 아니다.
+# 확정 규칙(M1): 광고 소재 분석 뒤, 카테고리별로 광고에 가장 많이 등장한 단품을 브랜드당 최대 2개 고른다.
+#   세트·기획·증정·N+1·용량 묶음, 패드·클렌저·미스트·토너는 제외한다. 가격은 메타 태그의 정가를 쓴다.
+# 제외 몰: 토리든(robots.txt가 AI 크롤러 차단), 넘버즈인(접근 401). 확인 필요: 믹순·달바(상품 페이지 형식 미확인), 조선미녀(국내 공식몰 미확인, beautyofjoseon.com은 미국 스토어).
+
+candidates:
+  - brand: abib
+    category: mask_pack
+    title: "부활초 탄력 시트 마스크 데일리 픽"
+    url: "https://abib.com/product/부활초-탄력-시트-마스크-데일리-픽/630/"
+  - brand: abib
+    category: mask_pack
+    title: "pdrn 광채 시트 마스크 데일리 픽"
+    url: "https://abib.com/product/pdrn-광채-시트-마스크-데일리-픽/775/"
+  - brand: abib
+    category: serum_ampoule
+    title: "pdrn 글로우 세럼 40 펌프"
+    url: "https://abib.com/product/pdrn-글로우-세럼-40-펌프/660/"
+  - brand: abib
+    category: sun_care
+    title: "수분초 히알루론 선세럼 워터리 튜브 spf50 pa"
+    url: "https://abib.com/product/수분초-히알루론-선세럼-워터리-튜브-spf50-pa/551/"
+  - brand: abib
+    category: sun_care
+    title: "어성초 마일드 선크림 릴리프 튜브 spf50 pa"
+    url: "https://abib.com/product/어성초-마일드-선크림-릴리프-튜브-spf50-pa/552/"
+  - brand: anua
+    category: mask_pack
+    title: "PDRN 히알루론산 캡슐 100 세럼 마스크"
+    url: "https://anua.kr/product/detail.html?product_no=390"
+  - brand: anua
+    category: serum_ampoule
+    title: "PDRN 히알루론산 캡슐 100 세럼 30ml"
+    url: "https://anua.kr/product/detail.html?product_no=359"
+  - brand: anua
+    category: serum_ampoule
+    title: "7 라이스 세라마이드 하이드레이팅 베리어 세럼"
+    url: "https://anua.kr/product/detail.html?product_no=349"
+  - brand: cosrx
+    category: serum_ampoule
+    title: "더 6 펩타이드 스킨 부스터 세럼 150ml"
+    url: "https://www.cosrx.co.kr/product/더-6-펩타이드-스킨-부스터-세럼-150ml/732/"
+  - brand: cosrx
+    category: serum_ampoule
+    title: "어드밴스드 더 비타민 씨 23 세럼"
+    url: "https://www.cosrx.co.kr/product/어드밴스드-더-비타민-씨-23-세럼/763/"
+  - brand: isntree
+    category: mask_pack
+    title: "리뉴얼 초저분자 히아루론산 마스크 25g 10매"
+    url: "https://www.isntree.com/product/리뉴얼-초저분자-히아루론산-마스크-25g-10매/46/"
+  - brand: isntree
+    category: serum_ampoule
+    title: "어니언 뉴페어 앰플 플러스 50ml"
+    url: "https://www.isntree.com/product/어니언-뉴페어-앰플-플러스-50ml/36/"
+  - brand: isntree
+    category: serum_ampoule
+    title: "하이퍼 나이아신아마이드 20 세럼 20ml"
+    url: "https://www.isntree.com/product/하이퍼-나이아신아마이드-20-세럼-20ml/25/"
+  - brand: isntree
+    category: sun_care
+    title: "new 히알루론산 프레쉬 선 세럼 50ml"
+    url: "https://www.isntree.com/product/new-히알루론산-프레쉬-선-세럼-50ml/366/"
+  - brand: mediheal
+    category: mask_pack
+    title: "마데카소사이드 에센셜 마스크 흔적 리페어 10매"
+    url: "https://www.medihealshop.com/product/마데카소사이드-에센셜-마스크-흔적-리페어-10매/1035/"
+  - brand: mediheal
+    category: mask_pack
+    title: "티트리 에센셜 마스크 진정 수분 10매"
+    url: "https://www.medihealshop.com/product/티트리-에센셜-마스크-진정-수분-10매/1396/"
+  - brand: mediheal
+    category: serum_ampoule
+    title: "마데카소사이드 더마 세럼 50ml"
+    url: "https://www.medihealshop.com/product/마데카소사이드-더마-세럼-50ml/1861/"
+  - brand: mediheal
+    category: serum_ampoule
+    title: "피디알엔 더마 세럼 50ml"
+    url: "https://www.medihealshop.com/product/피디알엔-더마-세럼-50ml/1863/"
+  - brand: mediheal
+    category: sun_care
+    title: "마데카소사이드 수분 선세럼 흔적 리페어"
+    url: "https://www.medihealshop.com/product/마데카소사이드-수분-선세럼-흔적-리페어/1731/"
+  - brand: mediheal
+    category: sun_care
+    title: "마데카소사이드 수분 선세럼 흔적 리페어 15g"
+    url: "https://www.medihealshop.com/product/마데카소사이드-수분-선세럼-흔적-리페어-15g/1758/"
+  - brand: round_lab
+    category: sun_care
+    title: "자작나무 수분 선크림 50ml"
+    url: "https://roundlab.co.kr/product/자작나무-수분-선크림-50ml/138/"
+  - brand: round_lab
+    category: sun_care
+    title: "자작나무 수분 톤업 선크림 50ml"
+    url: "https://roundlab.co.kr/product/자작나무-수분-톤업-선크림-50ml/199/"
+  - brand: skin1004
+    category: serum_ampoule
+    title: "마다가스카르 센텔라 매트릭실 10 부스팅샷 앰플 30ml"
+    url: "https://skin1004korea.com/product/마다가스카르-센텔라-매트릭실-10-부스팅샷-앰플-30ml/363/"
+  - brand: skin1004
+    category: serum_ampoule
+    title: "마다가스카르 센텔라 나이아신아마이드 10 부스팅샷 앰플 30ml"
+    url: "https://skin1004korea.com/product/마다가스카르-센텔라-나이아신아마이드-10-부스팅샷-앰플-30ml/367/"
