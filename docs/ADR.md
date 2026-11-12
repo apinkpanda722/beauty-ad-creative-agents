@@ -80,7 +80,7 @@
 ### ADR-015: 모델 호출은 LiteLLM 파이썬 SDK, proxy 없음 (2026-11-12)
 **결정**: 모델 호출은 LiteLLM **파이썬 SDK**를 `llm/` 한 곳에서 쓴다(Gemini Interactions, OpenAI, Anthropic 모두). proxy 컨테이너와 가상 키는 두지 않는다. `litellm==1.103.3`으로 고정한다. 응답마다 `response_cost`와 usage를 비용 원장(`data/manifest/costs.jsonl`)에 적고(공급사, 응답이 알려 준 실제 모델 이름, 입력·출력·thought·캐시 토큰, 비용, 실행 유형, 비용 출처), 유료 호출 직전에 공급사별 누적액을 검사한다. 상한은 Gemini $12, OpenAI $10, Anthropic $8(합 $30, 월 5만 원 안)이다. 재시도는 503·연결 실패·시간 초과에만 하고, 일일 한도 429(`retry-after`가 수 시간)는 재시도하지 않고 배치를 멈춘다.
 **이유**: 팀별 키나 Guardrail 훅처럼 proxy가 필요한 요구가 없다. Interactions의 구간 지정과 구조화 출력이 SDK 경유로 실측에서 통과했고(`docs/CONTRACTS.md`의 Gemini), 비용을 응답마다 받을 수 있다. thought 토큰이 `response_cost`에 포함됨을 확인했다.
-**트레이드오프**: proxy가 주는 중앙 키 관리와 호출 로그를 쓰지 못하고 비용 원장을 직접 쓴다. 응답 객체 형태가 SDK 버전에 묶여 버전을 고정한다. SDK의 Gemini Files API 업로드 지원과 OpenAI·Anthropic 응답 형태는 아직 실측 전이다. 프로젝트 B에서 LiteLLM 응답 본문의 `model`이 별칭으로 오는 문제가 있었으므로 실제 모델 이름 기록 방식은 M2 전에 다시 확인한다.
+**트레이드오프**: proxy가 주는 중앙 키 관리와 호출 로그를 쓰지 못하고 비용 원장을 직접 쓴다. 응답 객체 형태가 SDK 버전에 묶여 버전을 고정한다. Gemini Files API 업로드는 SDK가 지원함을 실측했고(`create_file`, `file_delete`), OpenAI·Anthropic도 실제 모델 이름을 응답 `model`로 돌려줬다(2026-11-12, `docs/CONTRACTS.md`). Router나 별칭을 도입하면 `model` 필드를 다시 확인한다. luna는 `reasoning_effort`에 따라 비용이 약 100배 달라지고 `temperature` 지정은 거부된다.
 **이전 결정**: ADR-005의 "프로젝트 B의 LiteLLM 구성을 재사용한다" 중 proxy 구성은 가져오지 않는다. 호출이 LiteLLM을 거친다는 부분은 그대로다.
 
 ### ADR-016: 관측 — 로컬 JSONL trace, Langfuse는 선택 profile (2026-11-12)

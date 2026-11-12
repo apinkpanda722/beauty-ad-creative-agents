@@ -4,6 +4,7 @@
 
 - 지운 것: API 키·토큰, Gemini `signature` 문자열, Instagram CDN 주소의 서명 쿼리
 - 그 밖의 필드와 값은 응답 그대로다
+- `litellm_*`·`langgraph_*`·`langfuse_probe` 6건은 HTTP 원문이 아니라 SDK 객체의 `model_dump`나 실행 결과다(LiteLLM 1.103.3, LangGraph 1.2.20, langfuse 3.15.0). 헤더와 본문 그대로가 아니므로 HTTP 형태의 근거로 쓰지 않는다
 - 파일마다 `_meta`(기록 시각, HTTP 상태, 무엇을 호출했는지)와 `response`가 있다
 
 규칙:

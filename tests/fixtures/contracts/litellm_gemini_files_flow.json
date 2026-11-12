@@ -1,0 +1,97 @@
+{
+ "_meta": {
+  "recorded_at": "2026-11-12",
+  "note": "LiteLLM 1.103.3 SDK로 Gemini Files 업로드→조회→interactions 분석→삭제 흐름(시험 영상은 ffmpeg testsrc 3초 생성물). SDK 객체의 model_dump이며 원본 HTTP 응답이 아님. signature 제거",
+  "litellm": "1.103.3"
+ },
+ "create_file": {
+  "id": "https://generativelanguage.googleapis.com/v1beta/files/zgocnylz2t4w",
+  "bytes": 15063,
+  "created_at": 1794436728,
+  "filename": "test3s.mp4",
+  "object": "file",
+  "purpose": "user_data",
+  "status": "uploaded",
+  "expires_at": null,
+  "status_details": null
+ },
+ "retrieve_first": {
+  "id": "https://generativelanguage.googleapis.com/v1beta/files/zgocnylz2t4w",
+  "bytes": 15063,
+  "created_at": 1794436728,
+  "filename": "test3s.mp4",
+  "object": "file",
+  "purpose": "user_data",
+  "status": "uploaded",
+  "expires_at": null,
+  "status_details": null
+ },
+ "retrieve_processed": {
+  "id": "https://generativelanguage.googleapis.com/v1beta/files/zgocnylz2t4w",
+  "bytes": 15063,
+  "created_at": 1794436728,
+  "filename": "test3s.mp4",
+  "object": "file",
+  "purpose": "user_data",
+  "status": "processed",
+  "expires_at": null,
+  "status_details": null
+ },
+ "interactions": {
+  "id": "v1_ChdERzMxYXBHVEZ0RE9yZmNQNmNEaTZBZxIXREczMWFwR1RGdERPcmZjUDZjRGk2QWc",
+  "object": "interaction",
+  "model": "gemini-3.6-flash",
+  "agent": null,
+  "status": "completed",
+  "created": "2026-11-12T07:38:55Z",
+  "updated": "2026-11-12T07:38:55Z",
+  "outputs": null,
+  "steps": [
+   {
+    "signature": "<signature omitted>",
+    "type": "thought"
+   },
+   {
+    "content": [
+     {
+      "text": "A color test pattern screen displays numbers counting up from zero to two.",
+      "type": "text"
+     }
+    ],
+    "type": "model_output"
+   }
+  ],
+  "usage": {
+   "total_tokens": 469,
+   "total_input_tokens": 198,
+   "input_tokens_by_modality": [
+    {
+     "modality": "text",
+     "tokens": 9
+    },
+    {
+     "modality": "video",
+     "tokens": 189
+    }
+   ],
+   "total_cached_tokens": 0,
+   "total_output_tokens": 14,
+   "total_tool_use_tokens": 0,
+   "total_thought_tokens": 257,
+   "initial_input_tokens": 198
+  },
+  "service_tier": "standard"
+ },
+ "file_delete": {
+  "id": "files/zgocnylz2t4w",
+  "deleted": true,
+  "object": "file"
+ },
+ "retrieve_after_delete": {
+  "ok": false,
+  "elapsed_s": 0.3,
+  "exc": "ValueError",
+  "status": null,
+  "msg": "Error parsing file retrieve response: 'createTime'"
+ }
+}
