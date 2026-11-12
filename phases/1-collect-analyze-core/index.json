@@ -61,7 +61,16 @@
     {
       "step": 4,
       "name": "obs-ledger",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-12T18:15:04+0900",
+      "summary": "JSONL 비용 원장·손상 줄 집계·스레드 안전 추가와 공급사별 누적 상한 검사 및 환경 설정 구현; 의존성 추가 없이 make verify 369개 테스트 통과.",
+      "completed_at": "2026-11-12T18:19:06+0900",
+      "usage": {
+        "input_tokens": 927769,
+        "cached_input_tokens": 853504,
+        "output_tokens": 8382,
+        "attempts": 1
+      }
     },
     {
       "step": 5,
