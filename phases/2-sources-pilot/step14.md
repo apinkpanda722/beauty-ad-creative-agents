@@ -20,7 +20,7 @@
 **수정할 파일**: `src/beautyads/domain/creative.py`, `src/beautyads/store/schema.py`, `src/beautyads/store/repository.py`, `tests/test_domain.py`, `tests/test_store.py`
 
 열람 금지 경로: `data/interim/`
-수정 허용 경로: `src/beautyads/domain/creative.py`(필드 추가에 한함), `src/beautyads/store/schema.py`(마이그레이션 v3 추가와 `CHANGE_COLUMNS` 확장에 한함), `src/beautyads/store/repository.py`(새 열 처리 추가에 한함), `tests/test_domain.py`(추가·갱신에 한함, 단언 약화 금지), `tests/test_store.py`(추가·갱신에 한함, 단언 약화 금지)
+수정 허용 경로: `src/beautyads/domain/creative.py`(필드 추가에 한함), `src/beautyads/store/schema.py`(마이그레이션 v3 추가와 `CHANGE_COLUMNS`·`INSERT_COLUMNS`·`_INSERT_TYPES` 확장에 한함, 기존 열 순서·타입 변경 금지), `src/beautyads/store/repository.py`(새 열 처리 추가에 한함), `tests/test_domain.py`(추가·갱신에 한함, 단언 약화 금지), `tests/test_store.py`(추가·갱신에 한함, 단언 약화 금지)
 열람 금지의 범위: 이 금지는 **Codex 세션이 해당 경로의 파일을 직접 열람·출력·인용하는 것**에 대한 것이다. 이 step의 코드가 런타임에 그 경로를 다루는 것(예: 라벨 키 파일을 읽는 채점 함수, 기본 출력 경로)은 대상이 아니다. 테스트가 그 경로의 실제 파일 **내용**을 읽는 것은 여전히 금지이며 테스트는 임시 디렉터리와 합성 데이터만 쓴다.
 
 TikTok 광고에는 `Creative`로 담을 수 없는 **출처 고유 정보**가 있다: 게재 시작·종료일, 도달 구간 문자열(`"600K-700K"`), 광고주 정보(`business_id`, `business_name`, `paid_for_by`), 집행 주체 판정. 출처마다 지표의 뜻이 달라 공통 열로 만들면 안 되므로 **자유 형식 속성 하나**(`attributes`)를 추가한다. 이 step은 `domain`과 `store` 두 계층을 함께 바꾼다(P2 step 2와 같은 이유로 한 step으로 둔다). 다음 step(TikTok 어댑터)이 이 필드를 채운다.
