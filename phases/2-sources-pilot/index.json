@@ -201,7 +201,16 @@
     {
       "step": 14,
       "name": "creative-attributes",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-13T00:05:35+0900",
+      "summary": "Creative.attributes·마이그레이션 v3·정렬된 JSON 매개변수 저장·NULL→{} 복원과 회귀 테스트 구현; 아키텍처 가드 포함 make verify 통과(1364 tests), 실제 서비스 미호출.",
+      "completed_at": "2026-11-13T00:07:56+0900",
+      "usage": {
+        "input_tokens": 786851,
+        "cached_input_tokens": 707584,
+        "output_tokens": 4380,
+        "attempts": 1
+      }
     },
     {
       "step": 15,
