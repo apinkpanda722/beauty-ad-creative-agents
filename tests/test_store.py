@@ -262,7 +262,7 @@ def test_get_creative_restores_nulls_and_explicit_false(analyzable):
     assert result.analyzable is analyzable
     assert result.metrics == Metrics()
     assert conn.calls[0][1] == ("youtube", "video-1")
-    assert conn.commits == conn.rollbacks == 0
+    assert conn.rollbacks == 1 and conn.commits == 0
 
 
 def test_get_missing_creative_returns_none():
@@ -451,3 +451,81 @@ def test_connect_does_not_hide_unrelated_errors():
 
     with pytest.raises(ValueError, match="programming error"):
         connect("synthetic", connect_fn=fail)
+
+
+@pytest.mark.parametrize("operation", ["get_creative", "next_pending"])
+@pytest.mark.parametrize("has_rows", [False, True])
+def test_reads_close_transaction_without_committing(operation, has_rows):
+    item = creative()
+    rows = [creative_row(item)] if has_rows else []
+    conn = FakeConnection([FakeCursor(rows)])
+    store = PostgresCreativeStore(conn)
+    if operation == "get_creative":
+        assert store.get_creative(item.key) == (item if has_rows else None)
+    else:
+        assert store.next_pending("hook", 7) == ([item] if has_rows else [])
+    assert conn.rollbacks == 1 and conn.commits == 0
+
+
+@pytest.mark.parametrize("operation", ["get_creative", "next_pending"])
+def test_reads_fetch_results_before_rollback(operation):
+    conn = FakeConnection()
+
+    class TransactionCursor(FakeCursor):
+        def fetchone(self):
+            assert conn.rollbacks == 0, "fetchone called after rollback"
+            return super().fetchone()
+
+        def fetchall(self):
+            assert conn.rollbacks == 0, "fetchall called after rollback"
+            return super().fetchall()
+
+    items = [creative(), creative(source_id="second")]
+    conn.replies.append(TransactionCursor([creative_row(item) for item in items]))
+    store = PostgresCreativeStore(conn)
+    if operation == "get_creative":
+        assert store.get_creative(items[0].key) == items[0]
+    else:
+        assert store.next_pending("hook", 7) == items
+    assert conn.rollbacks == 1 and conn.commits == 0
+
+
+@pytest.mark.parametrize("operation", ["get_creative", "next_pending"])
+def test_reads_rollback_and_propagate_execute_failure(operation):
+    failure = RuntimeError("scripted read SQL failure")
+
+    def fail_on(query):
+        assert query.startswith("SELECT ")
+        raise failure
+
+    conn = FakeConnection(fail_on=fail_on)
+    store = PostgresCreativeStore(conn)
+    with pytest.raises(RuntimeError) as caught:
+        if operation == "get_creative":
+            store.get_creative(creative().key)
+        else:
+            store.next_pending("hook", 7)
+    assert caught.value is failure
+    assert conn.rollbacks == 1 and conn.commits == 0
+
+
+@pytest.mark.parametrize("operation", ["get_creative", "next_pending"])
+def test_reads_rollback_and_propagate_fetch_failure(operation):
+    failure = RuntimeError("scripted fetch failure")
+
+    class FailingCursor(FakeCursor):
+        def fetchone(self):
+            raise failure
+
+        def fetchall(self):
+            raise failure
+
+    conn = FakeConnection([FailingCursor()])
+    store = PostgresCreativeStore(conn)
+    with pytest.raises(RuntimeError) as caught:
+        if operation == "get_creative":
+            store.get_creative(creative().key)
+        else:
+            store.next_pending("hook", 7)
+    assert caught.value is failure
+    assert conn.rollbacks == 1 and conn.commits == 0

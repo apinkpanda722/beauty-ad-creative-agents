@@ -59,6 +59,22 @@ class PostgresCreativeStore(CreativeRepository, AnalysisRepository):
     def __init__(self, conn: SqlConnection):
         self.conn = conn
 
+    def _read(self, query: str, params: Sequence[Any], *, one: bool = False):
+        """읽기 메서드는 이 헬퍼로 트랜잭션을 닫는다.
+
+        연결을 여러 스레드가 공유하면 호출자가 모든 저장소 호출(읽기 포함)을
+        직렬화해야 한다. 읽기의 rollback()은 연결 단위라 다른 스레드가 쓰기
+        도중에 열어 둔 트랜잭션을 끝낸다.
+        """
+        try:
+            cursor = self.conn.execute(query, params)
+            rows = cursor.fetchone() if one else cursor.fetchall()
+        except Exception:
+            self.conn.rollback()
+            raise
+        self.conn.rollback()
+        return rows
+
     def upsert_creatives(self, creatives: Sequence[Creative]) -> int:
         try:
             unique = {creative.key: creative for creative in creatives}
@@ -106,10 +122,11 @@ class PostgresCreativeStore(CreativeRepository, AnalysisRepository):
 
     def get_creative(self, key: CreativeKey) -> Creative | None:
         columns = ", ".join(CREATIVE_COLUMNS)
-        row = self.conn.execute(
+        row = self._read(
             f"SELECT {columns} FROM creatives WHERE source = %s AND source_id = %s",
             (key.source.value, key.source_id),
-        ).fetchone()
+            one=True,
+        )
         return None if row is None else _restore_creative(row)
 
     def enqueue_analysis(self, kind: str, creatives: Sequence[Creative]) -> int:
@@ -138,14 +155,14 @@ class PostgresCreativeStore(CreativeRepository, AnalysisRepository):
 
     def next_pending(self, kind: str, limit: int) -> list[Creative]:
         columns = ", ".join(f"c.{column}" for column in CREATIVE_COLUMNS)
-        rows = self.conn.execute(
+        rows = self._read(
             f"""SELECT {columns} FROM creatives AS c
                 JOIN analysis_jobs AS j ON c.source = j.source AND c.source_id = j.source_id
                 WHERE j.kind = %s AND j.status = %s
                 ORDER BY c.published_at DESC NULLS LAST
                 LIMIT %s""",
             (kind, JobStatus.pending.value, limit),
-        ).fetchall()
+        )
         return [_restore_creative(row) for row in rows]
 
     def record_analysis(
