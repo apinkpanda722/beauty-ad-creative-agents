@@ -381,3 +381,36 @@ def test_empty_batch_does_not_call_model(call_kwargs):
     assert summary.stopped is None
     assert summary.counts == {status.value: 0 for status in JobStatus}
     assert fake.calls == []
+
+
+@pytest.mark.parametrize("source", list(Source))
+@pytest.mark.parametrize("url", [None, "https://example.invalid/permalink"])
+def test_hook_accepts_explicit_video_for_any_source(source, url, call_kwargs):
+    from beautyads.analysis.models import ANALYSIS_MODEL_ID, VideoInput
+
+    video = VideoInput("files/synthetic", "video/mp4")
+    fake = FakeInteract(valid_text())
+    item = creative(source=source, url=url)
+    result = analyze_hook(item, video=video, interact=fake, **call_kwargs)
+    assert result.status is JobStatus.done
+    assert fake.calls[0]["input_parts"][1] == video_part(
+        video.uri, start_s=0, end_s=3, fps=1, mime_type=video.mime_type
+    )
+    assert fake.calls[0]["model"] == ANALYSIS_MODEL_ID
+
+
+@pytest.mark.parametrize(
+    "source,url,code",
+    [(Source.instagram, None, "UNSUPPORTED_SOURCE"), (Source.youtube, None, "NO_URL")],
+)
+def test_hook_explicit_none_retains_original_input_errors(
+    source, url, code, call_kwargs
+):
+    fake = FakeInteract()
+    result = analyze_hook(
+        creative(source=source, url=url), video=None, interact=fake, **call_kwargs
+    )
+    assert result.status is JobStatus.failed
+    assert result.error_code == code
+    assert result.attempts == 0
+    assert fake.calls == []

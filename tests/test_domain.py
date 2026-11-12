@@ -4,17 +4,108 @@ import pytest
 from pydantic import ValidationError
 
 from beautyads.domain import (
+    Angle,
+    Category,
+    Claim,
     CollectionStat,
+    ContentType,
+    ContentTypeResult,
     Creative,
     CreativeKey,
     CreativeRepository,
+    CtaType,
+    Format,
+    FullResult,
     HookResult,
     HookType,
     JobStatus,
     Metrics,
+    PlatformFitFlags,
     Source,
+    StructureFlags,
+    Talent,
     is_analyzable,
 )
+
+FULL_ENUM_FIELDS = {
+    "angle": Angle,
+    "format": Format,
+    "talent": Talent,
+    "cta_type": CtaType,
+    "claims": Claim,
+}
+CONTENT_ENUM_FIELDS = {"content_type": ContentType, "category": Category}
+
+
+def axis_data(model):
+    if model in (StructureFlags, PlatformFitFlags):
+        return {name: False for name in model.model_fields}
+    enums = CONTENT_ENUM_FIELDS if model is ContentTypeResult else FULL_ENUM_FIELDS
+    data = {name: next(iter(enum)).value for name, enum in enums.items()}
+    if model is FullResult:
+        data.update(
+            claims=[data["claims"]],
+            ingredients=["  시카 ", "nIaCiNaMiDe", " 병풀\t추출물\n", "Unknown Mix"],
+            structure=axis_data(StructureFlags),
+            platform_fit=axis_data(PlatformFitFlags),
+        )
+    return data
+
+
+@pytest.mark.parametrize(
+    "model,enums",
+    [(ContentTypeResult, CONTENT_ENUM_FIELDS), (FullResult, FULL_ENUM_FIELDS)],
+)
+def test_new_label_models_accept_all_enum_members_and_reject_outside_values(
+    model, enums
+):
+    for name, enum in enums.items():
+        for member in enum:
+            data = axis_data(model)
+            data[name] = [member.value] if name == "claims" else member.value
+            assert model.model_validate(data).model_dump(mode="json") == data
+        data = axis_data(model)
+        data[name] = ["outside-taxonomy"] if name == "claims" else "outside-taxonomy"
+        with pytest.raises(ValidationError):
+            model.model_validate(data)
+
+
+@pytest.mark.parametrize(
+    "model", [ContentTypeResult, FullResult, StructureFlags, PlatformFitFlags]
+)
+def test_new_models_forbid_unknown_fields_and_require_every_field(model):
+    data = axis_data(model)
+    with pytest.raises(ValidationError) as caught:
+        model.model_validate({**data, "unknown": True})
+    assert any(error["type"] == "extra_forbidden" for error in caught.value.errors())
+    for name in model.model_fields:
+        with pytest.raises(ValidationError) as caught:
+            model.model_validate(
+                {key: value for key, value in data.items() if key != name}
+            )
+        assert any(error["type"] == "missing" for error in caught.value.errors())
+
+
+@pytest.mark.parametrize("model", [StructureFlags, PlatformFitFlags])
+@pytest.mark.parametrize("value", [False, True])
+def test_structure_and_platform_flags_are_booleans(model, value):
+    data = {name: value for name in model.model_fields}
+    assert model.model_validate(data).model_dump(mode="json") == data
+    for name in model.model_fields:
+        with pytest.raises(ValidationError):
+            model.model_validate({**data, name: "not-a-boolean"})
+
+
+def test_full_result_preserves_ingredients_verbatim_and_accepts_empty_lists():
+    data = axis_data(FullResult)
+    result = FullResult.model_validate(data)
+    assert result.ingredients == data["ingredients"]
+    assert (
+        FullResult.model_validate_json(result.model_dump_json()).ingredients
+        == data["ingredients"]
+    )
+    data.update(ingredients=[], claims=[])
+    assert FullResult.model_validate(data).model_dump(mode="json") == data
 
 
 @pytest.fixture
