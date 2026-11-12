@@ -11,35 +11,42 @@
 | 확인한 것 | 실제 형태 | 원본 |
 |---|---|---|
 | 핸들로 채널 찾기 | `channels?forHandle=@핸들`. `items[0].id`가 채널 ID, `contentDetails.relatedPlaylists.uploads`가 업로드 목록 | `youtube_channels_forhandle.json` |
+| 채널 통계 | `channels` 응답 항목에 `statistics`가 있고 값은 문자열이다(`viewCount`, `subscriberCount`, `videoCount: "107"`, `hiddenSubscriberCount`). 업로드 영상 수를 분할·진행률 판정에 쓰지 않는다(참고 값) | `youtube_channels_forhandle.json` |
 | **없는 핸들** | 오류가 아니라 **200**이고 **`items` 키 자체가 없다**(빈 배열이 아님) | `youtube_channels_forhandle_missing.json` |
-| 업로드 목록 | `playlistItems`의 `items[].contentDetails.videoId`, 다음 쪽은 `nextPageToken`. 마지막 쪽에서 이 키가 어떻게 오는지는 원본으로 확인하지 못했다(**미확인**, 없을 수 있다고 보고 읽는다) | `youtube_playlistitems.json` |
+| 업로드 목록 | `playlistItems`의 `items[].contentDetails.videoId`(와 `videoPublishedAt`), 다음 쪽은 `nextPageToken`. **마지막 쪽에는 `nextPageToken` 키가 없다**(`null`이 아니라 키 부재. 마지막 쪽에 도달한 8개 채널 모두. 150개 상한에서 멈춘 채널은 마지막 쪽을 확인하지 않았다). 항상 `.get`으로 읽는다 | `youtube_playlistitems.json`, `instagram_mfds_youtube_probe.json` |
 | 영상 상세 | `statistics`의 값이 **전부 문자열**(`"viewCount": "1973746"`). `contentDetails.duration`은 `PT2M14S` 형식 | `youtube_videos.json` |
 | 잘못된 키 | 400, `error.code`는 정수, `error.status`는 `INVALID_ARGUMENT` | `youtube_error_bad_key.json` |
 
 주의:
-- `statistics`의 키는 영상마다 빠질 수 있다(좋아요·댓글을 숨긴 영상). 이번 표본에서는 전부 있었고, 빠진 사례는 **미확인**이다. 없을 수 있다고 보고 읽는다.
+- `statistics`의 키는 영상마다 빠질 수 있다. 17개 채널 업로드 영상 1,349개를 확인한 결과 **`likeCount` 없음 26개(1.9%), `commentCount` 없음 7개, `viewCount` 없음 0개**였다(키가 빠진 영상의 다른 필드는 정상). 좋아요·댓글은 선택 필드로 읽고 없으면 `null`(0이 아님)로 저장한다. 조회수 기반 백분위에는 영향이 없다(`instagram_mfds_youtube_probe.json`).
 - 채널을 이름으로 검색(`search?type=channel`)하면 공식 채널이 아닌 것이 섞인다. 8곳 중 3곳이 틀렸다. 채널은 `config/sources.yaml`의 ID로만 찾는다.
-- 쿼터: 호출별 단위 비용과 하루 한도는 **미확인**이다(문서 요약과 기억이 서로 달랐다). 채널 이름 검색은 쓰지 않으므로 수집은 `channels`·`playlistItems`·`videos` 세 호출만 쓴다. M1 설계 전에 콘솔에서 실제 사용량을 확인한다.
+- 쿼터: 호출별 단위 비용과 하루 한도는 **미확인**이다(문서 요약과 기억이 서로 달랐고, 응답에 사용량이 나오지 않는다. 2026-11-12 약 60회 호출 중 `quotaExceeded`는 나오지 않아 그 오류 형태도 미실측이다). 채널 이름 검색은 쓰지 않으므로 수집은 `channels`·`playlistItems`·`videos` 세 호출만 쓴다. 사용량은 Cloud 콘솔에서 확인한다. 오류 파서는 HTTP 상태를 먼저 보고 `error.errors[0].reason`을 읽는다.
 
 ## Instagram Graph API (Business Discovery)
 
 | 확인한 것 | 실제 형태 | 원본 |
 |---|---|---|
-| 호출 주체 | `GET /{내 IG 사용자 ID}?fields=business_discovery.username(대상){...}`. 앱 심사를 신청하지 않은 새 앱에서 동작했다(앱의 모드 표시는 직접 확인하지 않았다) | `instagram_business_discovery_with_media_url.json` |
+| 호출 주체와 기본 URL | `GET https://graph.facebook.com/v21.0/{내 IG 사용자 ID}`에 `fields=business_discovery.username(대상){followers_count,media_count,media.limit(100){id,media_type,media_product_type,media_url,permalink,timestamp,caption,like_count,comments_count,view_count}}`와 `access_token`을 쿼리로 보낸다. v21.0·v23.0·버전 없는 URL 모두 같은 요청에 200이었다. 호출 주체 ID는 `.env`의 **`INSTAGRAM_USER_ID`**(2026-11-12 현재 `.env`에 없다. 사용자가 추가해야 한다). 앱 심사를 신청하지 않은 새 앱에서 동작했다 | `instagram_business_discovery_with_media_url.json` |
 | **`media_url`이 없을 때** | `null`이 아니라 **키 자체가 빠진다**. 같은 계정 안에서도 게시물마다 다르다 | `instagram_business_discovery_without_media_url.json` |
 | `view_count` | 묶음 게시물에는 **키가 없다**. 영상이라도 없을 수 있다(바이오던스 계정은 릴스 24건 모두 없었다. 이 사례의 원본은 저장하지 않았다) | `instagram_business_discovery_with_media_url.json` |
 | 게시물 유형 | 원본에서 본 `media_type`은 `VIDEO`·`CAROUSEL_ALBUM`, `media_product_type`은 `REELS`·`FEED`다. `IMAGE` 등 다른 값은 **미확인**이므로 모르는 값이 와도 죽지 않게 읽는다. 묶음 게시물에도 `media_url`이 올 수 있다(영상이 아님) | 위와 같음 |
-| 다음 쪽 | `media.paging.cursors.after`만 준다. `next` 주소는 없다 | 위와 같음 |
+| 다음 쪽 | `media.paging.cursors.after`만 준다. `next` 주소는 없다. **다음 쪽은 `media.after(<커서>).limit(100){...}`로 요청한다**(`media.limit(N).after(<커서>)`도 같게 동작하고 쪽 사이 겹침이 0건이었다). 한 번에 **100건**이 반환된다. torriden_official을 끝까지 넘기면 쪽당 100건으로 8쪽, 고유 ID 650건이었고 **마지막 쪽(20건)에는 `cursors.after` 키가 없다**(종료 조건) | `instagram_requery_probe.json` |
 | **없는 계정** | 400, `error.code` 110, `error_subcode` 포함 | `instagram_error_invalid_user.json` |
 | 잘못된 토큰 | 400, `error.code` 190 | `instagram_error_bad_token.json` |
 | **`me/accounts`** | 권한이 다 있어도 **빈 배열**이 온다. 연결된 IG 계정 ID는 페이지 ID로 직접 조회해야 나온다 | `instagram_me_accounts.json` |
+| `permalink` | 4계정 × 최근 50건(200건) **모두**에 있었다. 키 부재 사례는 미확인이므로 없을 수 있다고 보고 읽는다. 블라인드 라벨링 시트의 링크로 쓴다(`media_url`은 만료되므로 쓰지 않는다) | `instagram_requery_probe.json` |
+| **`media_count`는 참고 값** | 응답의 `media_count`는 612였는데 실제로 650건이 반환됐다. 수집 완료 판정·분할·진행률에 쓰지 않는다 | `instagram_requery_probe.json` |
+| **`media_url` 반환 여부는 재조회해도 일관된다** | 4계정 × 50건에서 즉시(5초 뒤)·15분 뒤 재조회의 반환 여부 변화가 0건이었고, 전날 기록한 원본 8건과 약 20시간 뒤 값도 8/8 같았다. 계정 단위 편차가 크다: torriden_official 96%, skin1004official 100%, mediheal_official 0%(릴스 23건 모두 키 없음), beautyofjoseon_official 100%. 3일 뒤의 일관성은 미실측 | `instagram_requery_probe.json` |
+| **`media_url` 만료** | URL의 쿼리 파라미터 `oe`(16진 Unix 시각)에 만료 시각이 있다. 49건 모두 받는 시점 기준 남은 시간이 **32~108시간**이었다. 재조회 직후 URL(199개)의 남은 시간은 최소 32.1시간, 대부분 약 104~108시간이었고, 재조회할 때 `oe`는 일부 게시물만 갱신되며(약 4시간 단위로 이동) 나머지는 같은 URL이 유지됐다. 바로 받으면 `Range` 요청에 206, `video/mp4`. 묶음 게시물의 `media_url`은 이미지(`.jpg`)다. **만료된 URL의 응답은 미확인** | `instagram_mfds_youtube_probe.json`, `instagram_requery_probe.json` |
+| 계정 재스캔 | 특정 게시물만 조회하는 방법은 없다(Business Discovery는 계정 단위). 계정 재스캔은 `media.limit(100)`으로 계정당 1~2호출이다 | `instagram_requery_probe.json` |
+| 사용량 헤더 | 응답 헤더 `x-app-usage`(JSON 문자열: `call_count`, `total_cputime`, `total_time`)가 온다. 9호출 뒤 `call_count`가 4(%)였다 → **호출당 약 0.5%로 추정**(시간당 창 기준 추정이며 정확한 한도 정의는 미확인, 병렬 호출 없이 잰 값) | `instagram_requery_probe.json` |
 
 주의:
 - 릴스 영상 주소 반환율은 표본 195건 중 101건(52%)이었고 계정마다 0%~100%로 갈린다.
-- `media_url`은 서명이 붙은 임시 주소다. 저장해 두고 나중에 받으면 만료돼 있을 수 있다. 만료 시간은 **미확인**이다. 받을 때마다 새로 조회한다.
+- `media_url`은 서명이 붙은 임시 주소다. 저장해 두고 나중에 쓰지 않는다. 목록을 조회한 뒤 수 시간 안에 받아 처리하고, 분석이 며칠 뒤면 분석 직전에 계정을 다시 조회해 새 주소를 받는다(위 표). `oe`가 임박(예: 남은 6시간 미만)하면 재조회한다.
 - 영상 여부는 `media_type == "VIDEO"`로 판단한다. `media_url` 유무로 판단하면 묶음 게시물이 섞인다.
 - 장기 토큰은 약 60일 뒤 만료된다(교환 응답의 `expires_in` 약 5,183,755초). 만료 전 재발급이 필요하다.
-- 호출 한도는 **미확인**이다.
+- 호출 한도는 **미확인**이다(위 `x-app-usage` 추정만 있다). Graph API의 앱·계정 사용량 오류로 알려진 코드(4, 17, 32, 613)는 이 프로젝트에서 **실측하지 못했다**.
 
 ## TikTok Commercial Content API
 
@@ -47,7 +54,7 @@
 |---|---|---|
 | 자격 증명 위치 | 승인되면 연구용 클라이언트가 자동으로 생긴다. 개발자 포털의 **My research**에 있고 **Manage apps**에는 없다. Manage apps에서 앱을 새로 만들면 그 키로도 토큰은 발급되지만 조회는 401로 거부된다 | `tiktok_error_bad_token.json`과 같은 형태 |
 | 토큰 발급 | `POST /v2/oauth/token/`, 폼 인코딩(`client_key`, `client_secret`, `grant_type=client_credentials`). `expires_in` 7200초, 리프레시 토큰 없음. 만료되면 다시 발급한다 | `tiktok_oauth_token.json` |
-| 광고 조회 | `POST /v2/research/adlib/ad/query/?fields=...`, 본문 JSON. `max_count` 최대 10, 다음 쪽은 응답의 `search_id`를 다시 넣는다 | `tiktok_ad_query.json` |
+| 광고 조회 | `POST https://open.tiktokapis.com/v2/research/adlib/ad/query/?fields=<쉼표로 이은 경로>`, 본문 JSON. `fields`는 `ad.id,ad.first_shown_date,ad.last_shown_date,ad.status,ad.videos,ad.image_urls,ad.reach,advertiser.business_id,advertiser.business_name,advertiser.paid_for_by`로 200을 확인했다. 본문 최상위: `filters`(`ad_published_date_range`, `country_code_list`), **`search_term`, `search_type`**(`"exact_phrase"`가 유효, 잘못된 값은 400 `invalid_params`로 "`search_type: <값>` is not recognized"), **`max_count`(최대 10)와 `search_id`도 본문 최상위**(`filters`와 같은 층)다. 토큰은 `POST /v2/oauth/token/`을 `application/x-www-form-urlencoded`로 | `tiktok_ad_query.json` |
 | **성공 응답에도 `error`가 있다** | 200이어도 `{"data": ..., "error": {"code": "ok", "message": "", "log_id"}}`. `error` 키의 존재로 실패를 판단하면 안 된다. HTTP 상태와 `error.code == "ok"`로 판단한다 | 위와 같음 |
 | **날짜는 문자열** | `ad_published_date_range`의 `min`·`max`는 `"YYYYMMDD"` 문자열이어야 한다. 숫자로 보내면 400 | `tiktok_error_date_as_number.json` |
 | **`max`는 오늘보다 앞** | 오늘 날짜를 넣으면 400("Please provide a value before today's date"). 기준일은 어제 이전으로 둔다 | `tiktok_error_date_max_not_before_today.json` |
@@ -55,15 +62,18 @@
 | 국가 필터 | `country_code_list` 배열이 동작한다(문서 예시의 `country_code`는 쓰지 않았다) | `tiktok_ad_query.json` |
 | 잘못된 토큰 | 401, `error.code` = `access_token_invalid` | `tiktok_error_bad_token.json` |
 | 응답 항목 | `ad.id`(숫자), `first_shown_date`·`last_shown_date`(`"YYYYMMDD"` 문자열), `status`(소문자), `videos[].url`·`cover_image_url`, `image_urls[]`, `reach.unique_users_seen`(구간 문자열), `advertiser.business_id`(숫자)·`business_name`·`paid_for_by` | `tiktok_ad_query.json` |
-| 영상 파일 | `videos[].url`로 mp4를 직접 받을 수 있다. 3건 확인: 4.3~10.0MB, `Content-Length`와 받은 바이트 수가 같았다(잘리지 않음). 10MB 파일 하나에 약 12초 | 원본 미저장(파일이 큼) |
+| 영상 파일 | **`ad.videos[].url`**(`videos`는 최상위가 아니라 `ad` 안)로 mp4를 직접 받을 수 있다. 광고 한 건은 `{"ad": {...}, "advertiser": {...}}`다. 검색어 dalba 광고 10건 모두 `videos[].url`이 있었고 3건을 받았다: 모두 200, `Content-Type: video/mp4`, 리다이렉트 없음, 매직 바이트 `ftypisom`, 크기 **29,172,979바이트(29.2MB)·1,450,844(1.4MB)·29,495,861(29.5MB)**. 앞선 3건 표본의 4.3~10.0MB는 표본이 작았다. 영상 URL 만료 시각은 미확인 | `tiktok_video_download_headers.json` |
+| **쪽 넘김** | 모든 쪽의 `data` 키는 `ads`, `has_more`, `search_id` 세 개다. 종료는 **`has_more == false`**인 쪽이다. **마지막 쪽에도 `search_id`가 온다**(그 유무로 종료를 판정하지 않는다). 마지막 쪽은 10건보다 적을 수 있다(9건). 다음 쪽은 같은 본문에 직전 `search_id`를 더해 보낸다. 쪽당 2~3초. 최근 330일·6개국 기준 dalba 3쪽, mixsoon 5쪽 | `tiktok_ad_query_mixsoon_page2.json`, `tiktok_ad_query_mixsoon_last.json`, `tiktok_ad_query_dalba_last.json`, `tiktok_pagination_report.json` |
+| **쪽 사이 중복** | 같은 광고 ID가 다른 쪽에 다시 온다(dalba 29건 받아 28 고유, mixsoon 49건 받아 43 고유). `ad.id`로 중복을 제거한다 | `tiktok_pagination_report.json` |
+| `image_urls` 키 부재 | 요청한 `ad.image_urls`는 이미지가 없는 광고에서 **키 자체가 없다**(`ad`의 키가 광고마다 다르다) | `tiktok_ad_query_*.json` |
 
 주의:
 - **도달 수는 숫자가 아니라 구간 문자열**이다(`"600K-700K"`, `"1M-10M"`). 정렬·비교하려면 구간의 하한이나 중앙값으로 바꿔 쓰고, 바꾼 방식을 결과 문서에 적는다.
-- **광고주 이름이 숫자 문자열로 오는 경우가 많다.** 브랜드 3곳 30건 중 12건이 `"7648220666696564758"` 같은 숫자였다. 빈 문자열과 `null`도 다른 검색에서 관측됐다. 광고주 이름으로 브랜드를 판정하지 않는다.
-- **검색어는 광고 내용에 걸린다.** 브랜드 이름으로 찾으면 그 브랜드가 집행한 광고뿐 아니라 그 제품을 파는 소매점(세포라, 에토스 등) 광고와 일반인 광고가 섞인다. 코스알엑스는 광고주 이름이 브랜드와 일치했지만 메디큐브·바이오던스는 대부분 소매점이었다.
+- **광고주 이름이 숫자 문자열로 오는 경우가 많다.** 브랜드 3곳 30건 중 12건이 `"7648220666696564758"` 같은 숫자였다. 저장된 원본 38건의 분포: 숫자 이름 16건, 빈 이름 1건, 대행사로 보이는 `"JJ Media Ltd"` 12건, 나머지는 판매처·브랜드 법인(`"Mixsoon Limited"`, `"Etos B.V."`, `"Cosibella"`, `"Pilulka Lékárny a.s."`, `"PHARMACONTINENTE - SAÚDE E HIGIENE, S.A."` 등). **법인 접미사(`Limited`, `B.V.`, `a.s.`)가 붙어 전체 일치로는 브랜드·판매처를 알아볼 수 없다.** 빈 이름과 `null`도 다른 검색에서 관측됐다. 광고주 이름으로 브랜드를 판정하지 않는다.
+- **검색어는 광고 내용에 걸린다.** 브랜드 이름으로 찾으면 그 브랜드가 집행한 광고뿐 아니라 그 제품을 파는 소매점(세포라, `Etos` 등. 문서 초안의 "에토스(Ethos)"는 원본의 광고주 이름 `Etos B.V.`와 다르다) 광고와 일반인 광고가 섞인다. 코스알엑스는 광고주 이름이 브랜드와 일치했지만 메디큐브·바이오던스는 대부분 소매점이었다.
 - **서버 오류(500 `internal_error`)가 간헐적으로 난다.** 아비브 조회가 한 번 500으로 실패했고 다시 보내자 성공했다. 503·429와 함께 대기 후 재시도 대상으로 둔다.
-- 영상 파일이 최대 10MB 정도라 Gemini 인라인 입력이 아니라 Files API 업로드 경로를 쓴다.
-- 영상 주소의 만료 시간은 **미확인**이다(주소에 만료 표시 인자가 보이지 않았다). 받을 때마다 새로 조회한다.
+- 영상 파일이 최대 29.5MB까지 있고(실측) Gemini 인라인 입력이 아니라 Files API 업로드 경로를 쓴다. 영상 바이트를 메모리에서 다루는 코드는 동시 다운로드 수를 제한한다.
+- 영상 주소의 만료 시간은 **미확인**이다(주소에 만료 표시 인자가 보이지 않았다. 경로에 16진 토큰이 들어 있으나 의미는 확인하지 못했다). 받을 때마다 새로 조회한다.
 - 호출 한도는 **미확인**이다. 응답 헤더에 한도 정보가 없었다.
 - EU 게재 광고만 조회된다(신청 페이지 기준). 조회 가능 기간은 최근 1년이다.
 
@@ -86,8 +96,10 @@
 주의:
 - **성분 별칭 사전은 직접 만들어야 한다.** 공공 API에 통용명→표준명 연결이 없다(`INGR_SYNONYM` 비어 있음). 상세페이지의 전성분 표기는 대부분 표준명이라 그대로 묶일 것으로 보이지만(미확인), 광고의 "시카", "히알루론산" 같은 표기는 별칭 표로 연결한다.
 - 부분 일치라 정확히 같은 표준명만 고르는 처리가 필요하다.
-- **기능성 종류는 `EE_NAME`(효능효과명)으로 판정한다.** 포털 명세상 `EFFECT_YN1`~`3`은 "2호효능효과_미백/주름개선/자외선"으로 다른 구분이고, 상세페이지에 "주름개선 / 미백 기능성"이라 적힌 코스알엑스 세럼은 세 값이 모두 `N`이었지만 `EE_NAME`이 "피부의 미백에 도움을 준다. 피부의 주름개선에 도움을 준다."였다. 브랜드 3곳 표본에서 `EE_NAME`은 미백, 주름 개선, 둘 다, `null` 중 하나였다. 자외선 차단 제품은 `SPF`·`PA`로 판정한다(표본 확인 전).
+- **기능성 종류는 `EE_NAME`(효능효과명)으로 판정한다.** 포털 명세상 `EFFECT_YN1`~`3`은 "2호효능효과_미백/주름개선/자외선"으로 다른 구분이고, 상세페이지에 "주름개선 / 미백 기능성"이라 적힌 코스알엑스 세럼은 세 값이 모두 `N`이었지만 `EE_NAME`이 "피부의 미백에 도움을 준다. 피부의 주름개선에 도움을 준다."였다. 브랜드 3곳 표본에서 `EE_NAME`은 미백, 주름 개선, 둘 다, `null` 중 하나였다. 자외선 차단 제품은 `SPF`·`PA`로 판정하되 **값이 있을 때만** 인증으로 인정한다(아래 선케어 실측).
 - 이 API는 보고품목만 다룬다. 심사품목은 별도 API이고(아래 "심사품목 API" 절) 같은 제품이 두 쪽에 모두 있는지, 한쪽에만 있는지는 **미확인**이다. 코스알엑스 색소침착케어세럼은 심사품목에 있었다.
+- **선케어 `SPF`·`PA`(2026-11-12 실측, 보고품목)**: 값은 **문자열**이다(`SPF` 예: `"30"`, `"33"`, `"50+"`, `"83"`, `PA` 예: `"0"`, `"2"`, `"3"`, `"4"`. `"4"`가 PA++++인지는 미확인). **대부분 비어 있다(null)**: "선크림" 검색 첫 30건과 "선스크린" 30건은 전부 null, "선스틱" 30건 중 11건만 값이 있다. 제품명에 "에스피에프33"이 있어도 필드가 null인 품목이 있다. `EE_NAME`·`EE_CODE`·`EE_DOC_DATA`·`EFFECT_YN1~3`으로 보완되지 않는다. **null은 "인증 없음"이 아니라 "판정 불가(`unknown`)"로 둔다.** 취하(`CANCEL_APPROVAL_YN`)는 이번 표본에서 모두 `"N"`(`instagram_mfds_youtube_probe.json`).
+- **보고품목과 심사품목은 겹치지 않는 모집단으로 보인다**: "선크림" 보고품목 4,837건, 심사품목 1,222건이고 첫 쪽(30건)끼리 품목명이 겹친 것이 0건이었다. 제품마다 두 API를 모두 조회한다(겹침의 전체 규모는 미확인).
 - **품목명은 띄어쓰기가 없다.** "코스알엑스더6펩타이드스킨부스터세럼"처럼 붙어 있어, "펩타이드 스킨 부스터"(띄어 씀)는 0건, "펩타이드스킨부스터"는 11건이었다. 검색어의 공백을 지우고 보낸다.
 - 취하된 품목(`CANCEL_APPROVAL_YN`)을 걸러야 한다.
 - 일일 한도는 **미확인**이다.
@@ -191,8 +203,23 @@
 - 같은 영상의 분류가 호출마다 달라진 사례가 있다(`question`과 `problem`). 모델도 달랐다.
 - 업로드한 파일은 약 48시간 뒤 만료된다(`expirationTime`). 분석 직후 삭제를 요청한다.
 - **일일 한도 429는 재시도하지 않는다.** `retry-after`가 수 시간이면 고정 간격 재시도는 한도만 깎는다. 래퍼는 429를 본문·`retry-after`로 일일 한도와 분당 한도로 가르고, 일일 한도면 배치를 멈춰 남은 소재를 대기 상태로 둔다(실측 중 실제로 그렇게 당일 한도를 소진했다).
-- 유료 단가는 2027-01-01부터 두 배가 된다(가격 페이지, 2026-11-12 확인). 소재 분석은 12월 안에 끝낸다. thought가 호출당 260~490토큰이라 분석 1건 비용이 견적(출력 600)보다 커질 수 있다. thinking 수준을 낮추는 설정은 **미확인**이다(M1 분석 시범에서 실측).
+- 유료 단가는 2027-01-01부터 두 배가 된다(가격 페이지, 2026-11-12 확인). 소재 분석은 12월 안에 끝낸다. thought가 호출당 260~490토큰이라 분석 1건 비용이 견적(출력 600)보다 커질 수 있다. thinking 수준은 `generation_config.thinking_level`로 낮출 수 있다(아래 "Gemini 분석 비용·Files 실측 2차").
 - LiteLLM SDK가 Gemini **Files API 업로드**(Instagram·TikTok 영상 경로)를 지원하는지는 **미확인**이다.
+
+## Gemini 분석 비용·Files 실측 2차 (2026-11-12)
+
+| 확인한 것 | 결과 | 원본 |
+|---|---|---|
+| **영상 입력 토큰은 길이에 비례, 약 91토큰/초** | TikTok 광고 23.6초 → 2,173토큰, 42.0초 → 3,822토큰, YouTube 14분 33초(873초) 영상 전체 → 79,435토큰, 같은 영상 0~60초 구간(fps 1) → 5,461토큰. 오디오는 별도 항목 없이 영상 토큰에 포함돼 보인다. 기본 샘플링과 `fps: 1`이 같은 밀도, `fps: 2`는 약 1.7배(10초에 910 대 1,570) | `gemini_video_tokens_per_second_probe.json` |
+| 구간 지정 | `processing: {type: static, start_offset, end_offset, fps}`가 **Files로 올린 파일에서도** 동작한다(10초 구간 910토큰) | `gemini_video_tokens_per_second_probe.json` |
+| **thinking 설정** | `generation_config: {"thinking_level": ...}`. 같은 3초 영상(각 1회) thought 토큰: 기본 186, `minimal` 0, `low` 26, `medium` 187, `high` 164. LiteLLM `generation_config`로도 전달된다. **`thinking_budget`은 400** `invalid_request`("Unknown parameter 'thinking_budget'"). 기본값은 `medium`과 비슷하다 | `gemini_files_failures_thinking_burst_probe.json` |
+| 큰 파일 한 건의 전 과정(8.19MB TikTok 광고) | 다운로드 9.9초, `create_file` 3.9초, `processed`까지 4.9초, 분석 16.6초(입력 5,560토큰), 전체 약 25초 | `gemini_files_failures_thinking_burst_probe.json` |
+| **삭제됐거나 없는 파일로 분석** | **403** `{"error": {"message": "You do not have permission to access the File <id> or it may not exist.", "code": "permission_denied"}}`(404가 아니다) | 위와 같음 |
+| **영상이 아닌 바이트 업로드** | 업로드는 성공하고 `file_retrieve`의 `status`가 **`error`**가 된다. 이 파일로 분석하면 **400** `invalid_request`("The File <id> is not in an ACTIVE state and usage is not allowed.") | 위와 같음 |
+| **빈 파일 업로드** | 깨끗한 오류가 아니라 LiteLLM이 `ValueError("Error parsing file upload response: 'sizeBytes'")`를 올린다 | 위와 같음 |
+| 병렬 호출 | 텍스트 호출 60개를 동시 30개로 보냈을 때 전부 200(총 8.5초). 유료 등급의 실제 분당 한도 수치는 알 수 없다(응답에 한도 헤더 없음) | 위와 같음 |
+
+- 분석 비용 영향(추정, 실측 값 아님): 소재 1건은 콘텐츠 유형·훅·전체 호출의 입력(길이 × 91토큰/초, 구간 상한 적용)과 출력·thought로 이루어진다. 45초 광고 두 호출을 가정하면 `minimal` 약 $0.0062, 기본 약 $0.0085이고 호출이 세 번이면 더 크다. 1,500건이면 $9.3~$12.8 범위의 추정이다. 시범 직후 `cost-recalc`가 원장으로 다시 계산한다.
 
 ## LiteLLM SDK 경유 OpenAI·Anthropic·Gemini Files (2026-11-12 실측, `litellm==1.103.3`)
 
@@ -214,7 +241,7 @@
 | **Gemini Files (SDK 지원)** | `litellm.create_file(file=(이름, 바이트, "video/mp4"), purpose="user_data", custom_llm_provider="gemini", api_key=...)`, `file_retrieve`, `file_delete`. 반환 `id`가 **전체 주소**(`https://generativelanguage.googleapis.com/v1beta/files/<id>`)라 그대로 `interactions` 입력의 `{"type":"video","uri": id,"mime_type":"video/mp4"}`에 넣으면 분석된다(3.6-flash, 영상 토큰 189). `expires_at`은 `null`. 처리 대기: `status`가 `uploaded` → `processed`(3초 영상에서 2초 간격 조회 2번째). 시험 영상은 ffmpeg가 만든 3초 생성물 | `litellm_gemini_files_flow.json` |
 | **삭제와 삭제 뒤 조회** | `file_delete`는 `{"id": "files/<id>", "deleted": true}`(id가 업로드 때와 다른 형태). 삭제 뒤 `file_retrieve`는 깨끗한 NotFound가 아니라 **`ValueError("Error parsing file retrieve response: 'createTime'")`**이고 LiteLLM이 ERROR 로그를 남긴다 → 삭제 확인에 `file_retrieve`를 쓰지 않고 `file_delete`의 `deleted`로 판단한다 | 위와 같음 |
 
-- Gemini Files의 큰 파일(4~10MB) 업로드 소요와 업로드 실패의 오류 형태는 **미확인**이다.
+- Gemini Files의 큰 파일 소요와 실패 형태는 "Gemini 분석 비용·Files 실측 2차" 절에 있다(8.19MB 한 건 약 25초, 비영상은 `status: error`, 없는 파일 403, 빈 파일 `ValueError`).
 - 이 실측으로 `llm`에서 `httpx`를 직접 쓸 필요가 없어졌다(Files도 SDK로 된다). `AGENTS.md`의 SDK 허용 표에서 `llm`의 `httpx`를 뺐다.
 
 ## LangGraph (2026-11-12 실측, 외부 API 호출 없음)
@@ -277,21 +304,21 @@
 |---|---|
 | Python HTTPS | uv 관리 파이썬 3.12.13은 `SSL_CERT_FILE` 없이 `urllib`(·httpx)가 HTTPS를 통과한다(2026-11-12, 이 저장소 `.venv`에서 `urllib.request.urlopen("https://pypi.org/simple/")` 200 확인). python.org 3.12.10은 `urllib`만 `CERTIFICATE_VERIFY_FAILED`(httpx는 certifi로 통과). 그래서 `pyproject.toml`에 `python-preference = "only-managed"`를 둔다 |
 | 셸 | 기본 셸이 zsh다. 변수의 공백 분리가 bash와 다르다. 스크립트는 `#!/usr/bin/env bash`를 명시한다 |
-| `.env` | 키 이름은 `.env.example`이 기준이다(출처 7개, 모델 3개, 로컬 compose 2개). 빈 값이 기본값을 덮지 않게 읽는다 |
+| `.env` | 키 이름은 `.env.example`이 기준이다(출처 7개, 모델 3개, 로컬 compose 2개). **Instagram 호출 주체 ID는 `INSTAGRAM_USER_ID`로 정했고(2026-11-12) 값은 사용자가 `.env`에 추가해야 한다.** 빈 값이 기본값을 덮지 않게 읽는다 |
 | OrbStack | docker 데몬이 꺼져 있으면 `docker.sock` 오류가 난다(2026-11-12 실제로 꺼져 있었음). compose를 쓰는 live 전에 켠다 |
 
 ## 미확인 (쓰기 전에 실측할 것)
 
 | 외부 지점 | 무엇을 모르는가 | 언제 필요한가 |
 |---|---|---|
-| Gemini thinking 수준 | thought 토큰(호출당 260~490)을 줄이는 설정 | M1 분석 시범 |
-| Gemini Files 큰 파일 | 4~10MB 업로드 소요, 업로드 실패의 오류 형태 | M1 Instagram·TikTok 분석 |
 | OpenAI·Anthropic 오류 | 429·503의 예외 형태(유도하지 못함), Anthropic thinking 설정, 캐시 최소 길이, OpenAI의 캐시 쓰기 가산 청구 여부 | M2 에이전트 |
 | LangGraph | `interrupt`, 병렬 노드, 동시 요청에서의 체크포인터, 압축 요약 저장 방식 | M2 에이전트 |
 | Langfuse | 컨테이너 5개의 메모리, 처음 이미지 받는 시간, 대량 trace 지연, SDK 5.x 상세 호환 | M2 관측 |
-| YouTube `statistics` 누락 | 좋아요·댓글을 숨긴 영상의 형태 | M1 수집 |
-| Instagram `media_url` 만료 | 주소의 유효 시간 | M1 수집 |
 | 이미지 생성 | 요청·응답 형태와 비용 | M2 기획 |
-| 식약처 공공 API | 보고품목에서 자외선 차단 제품의 `SPF`·`PA` 값, 일일 한도, 잘못된 키의 오류 형태(보고품목) | M1 1층 구축 |
+| Instagram 사용 | 만료된 `media_url`의 응답 형태, 3일 뒤 `media_url` 반환 여부 일관성, 앱·계정 사용량 오류 코드(4·17·32·613은 알려진 코드이며 미실측), 호출 한도의 정확한 정의(호출당 약 0.5%는 추정) | M1 수집·분석 |
+| TikTok 영상 URL | 만료 시각과 만료 뒤 응답 형태 | M1 분석 |
+| YouTube 쿼터 | 호출별 단위 비용·하루 한도, `quotaExceeded` 응답 형태 | M1 수집 |
+| Gemini 유료 한도 | 실제 분당·일일 한도 수치(동시 30개 60호출은 전부 200) | M1 분석 일괄 |
+| 식약처 공공 API | 보고·심사 두 API 겹침의 전체 규모, 일일 한도, 잘못된 키의 오류 형태(보고품목), `PA` 값(`"4"` 등)의 PA++++ 대응 | M1 1층 구축 |
 
 프로젝트 B에서 겪은 것: LiteLLM 응답 본문의 `model`이 별칭이나 제공자 ID로 와서 실제 모델을 헤더로 확인해야 했다. 이 프로젝트의 SDK 직접 호출 실측(2026-11-12)에서는 실제 모델 이름이 왔다. Router나 별칭을 도입하면 같은 지점을 다시 실측한다.

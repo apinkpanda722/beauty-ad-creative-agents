@@ -1,0 +1,5081 @@
+{
+ "started": "2026-11-12T08:36:39.637148+00:00",
+ "accounts": {
+  "torriden_official": {
+   "s1": {
+    "status": 200,
+    "error": null,
+    "count": 50,
+    "posts": {
+     "18358902202170725": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794847422,
+      "has_permalink": true,
+      "ts": "2026-11-10T02:02:20+0000"
+     },
+     "17992470050859768": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849870,
+      "has_permalink": true,
+      "ts": "2026-11-04T02:37:38+0000"
+     },
+     "18100742798433091": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794851771,
+      "has_permalink": true,
+      "ts": "2026-11-01T01:17:37+0000"
+     },
+     "18490507270129236": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794599886,
+      "has_permalink": true,
+      "ts": "2026-10-29T10:21:31+0000"
+     },
+     "18061763792562735": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794594836,
+      "has_permalink": true,
+      "ts": "2026-10-22T05:24:30+0000"
+     },
+     "18149381398563562": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794589425,
+      "has_permalink": true,
+      "ts": "2026-10-19T08:27:47+0000"
+     },
+     "17935264890401935": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849580,
+      "has_permalink": true,
+      "ts": "2026-10-11T02:14:55+0000"
+     },
+     "17972390238172823": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794851047,
+      "has_permalink": true,
+      "ts": "2026-10-10T00:00:53+0000"
+     },
+     "18136902415588768": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794595063,
+      "has_permalink": true,
+      "ts": "2026-10-08T02:27:22+0000"
+     },
+     "17870083359645966": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794850032,
+      "has_permalink": true,
+      "ts": "2026-10-02T01:59:42+0000"
+     },
+     "18097732460644352": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794854026,
+      "has_permalink": true,
+      "ts": "2026-10-01T08:05:14+0000"
+     },
+     "18121741897972466": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794860044,
+      "has_permalink": true,
+      "ts": "2026-10-01T02:06:42+0000"
+     },
+     "17959928439210156": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794847839,
+      "has_permalink": true,
+      "ts": "2026-09-23T01:59:25+0000"
+     },
+     "17908607538304374": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794592914,
+      "has_permalink": true,
+      "ts": "2026-09-22T08:49:58+0000"
+     },
+     "18628551409056710": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794856397,
+      "has_permalink": true,
+      "ts": "2026-09-21T01:59:18+0000"
+     },
+     "18014283206943961": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794589716,
+      "has_permalink": true,
+      "ts": "2026-09-14T01:17:02+0000"
+     },
+     "18088986899273698": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794589266,
+      "has_permalink": true,
+      "ts": "2026-09-11T01:50:39+0000"
+     },
+     "18150673984524207": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794601513,
+      "has_permalink": true,
+      "ts": "2026-09-04T01:42:25+0000"
+     },
+     "18172568929444479": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-08-31T09:13:13+0000"
+     },
+     "18333330574285099": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794597069,
+      "has_permalink": true,
+      "ts": "2026-08-30T01:56:42+0000"
+     },
+     "18026851295893931": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794593220,
+      "has_permalink": true,
+      "ts": "2026-08-29T01:51:27+0000"
+     },
+     "17943396567341394": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794847400,
+      "has_permalink": true,
+      "ts": "2026-08-28T01:54:13+0000"
+     },
+     "18374095981239039": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794592585,
+      "has_permalink": true,
+      "ts": "2026-08-27T01:57:21+0000"
+     },
+     "17976208281094163": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794852338,
+      "has_permalink": true,
+      "ts": "2026-08-26T09:23:28+0000"
+     },
+     "17889200157609910": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794859348,
+      "has_permalink": true,
+      "ts": "2026-08-26T07:54:34+0000"
+     },
+     "18110708207047037": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794592014,
+      "has_permalink": true,
+      "ts": "2026-08-25T08:08:01+0000"
+     },
+     "18348157912222615": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794858085,
+      "has_permalink": true,
+      "ts": "2026-08-23T02:01:11+0000"
+     },
+     "17965722261153157": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794853665,
+      "has_permalink": true,
+      "ts": "2026-08-23T02:00:21+0000"
+     },
+     "18112899790813905": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794854472,
+      "has_permalink": true,
+      "ts": "2026-08-23T01:58:09+0000"
+     },
+     "17897800734568954": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794592329,
+      "has_permalink": true,
+      "ts": "2026-08-22T01:59:06+0000"
+     },
+     "18624800266009973": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794600457,
+      "has_permalink": true,
+      "ts": "2026-08-19T09:43:16+0000"
+     },
+     "17892670053607584": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794847549,
+      "has_permalink": true,
+      "ts": "2026-08-18T02:00:45+0000"
+     },
+     "18349949707219385": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849372,
+      "has_permalink": true,
+      "ts": "2026-08-14T02:23:14+0000"
+     },
+     "18121274866848348": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794852638,
+      "has_permalink": true,
+      "ts": "2026-08-11T02:08:52+0000"
+     },
+     "18112052411072803": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794601590,
+      "has_permalink": true,
+      "ts": "2026-08-04T01:58:10+0000"
+     },
+     "18433299187123485": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794859713,
+      "has_permalink": true,
+      "ts": "2026-08-03T07:32:53+0000"
+     },
+     "18108547805009168": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794599996,
+      "has_permalink": true,
+      "ts": "2026-07-28T02:07:20+0000"
+     },
+     "18118781821881544": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794600024,
+      "has_permalink": true,
+      "ts": "2026-07-27T08:09:36+0000"
+     },
+     "18121899772818475": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794856273,
+      "has_permalink": true,
+      "ts": "2026-07-23T02:00:10+0000"
+     },
+     "18148136263524697": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794598576,
+      "has_permalink": true,
+      "ts": "2026-07-22T02:18:10+0000"
+     },
+     "18069976634416761": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794859026,
+      "has_permalink": true,
+      "ts": "2026-07-13T02:11:57+0000"
+     },
+     "18021142820689915": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794848837,
+      "has_permalink": true,
+      "ts": "2026-07-13T02:10:12+0000"
+     },
+     "18302913091303473": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794860109,
+      "has_permalink": true,
+      "ts": "2026-07-13T02:07:23+0000"
+     },
+     "18150324772505838": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794852250,
+      "has_permalink": true,
+      "ts": "2026-07-13T02:05:21+0000"
+     },
+     "17888511288596836": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794858892,
+      "has_permalink": true,
+      "ts": "2026-07-13T02:01:44+0000"
+     },
+     "18335985580266692": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794601894,
+      "has_permalink": true,
+      "ts": "2026-07-10T04:59:28+0000"
+     },
+     "18609404032062849": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794591714,
+      "has_permalink": true,
+      "ts": "2026-07-08T04:59:42+0000"
+     },
+     "18105229511012053": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794595551,
+      "has_permalink": true,
+      "ts": "2026-07-03T02:00:06+0000"
+     },
+     "18086759540103384": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794597576,
+      "has_permalink": true,
+      "ts": "2026-06-17T06:33:39+0000"
+     },
+     "18155327977480309": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794594527,
+      "has_permalink": true,
+      "ts": "2026-06-14T01:58:09+0000"
+     }
+    },
+    "has_after": true,
+    "usage": {
+     "x-app-usage": "{\"call_count\":0,\"total_cputime\":0,\"total_time\":2}"
+    }
+   },
+   "s2": {
+    "status": 200,
+    "error": null,
+    "count": 50,
+    "posts": {
+     "18358902202170725": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794847422,
+      "has_permalink": true,
+      "ts": "2026-11-10T02:02:20+0000"
+     },
+     "17992470050859768": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849870,
+      "has_permalink": true,
+      "ts": "2026-11-04T02:37:38+0000"
+     },
+     "18100742798433091": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794851771,
+      "has_permalink": true,
+      "ts": "2026-11-01T01:17:37+0000"
+     },
+     "18490507270129236": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794599886,
+      "has_permalink": true,
+      "ts": "2026-10-29T10:21:31+0000"
+     },
+     "18061763792562735": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794594836,
+      "has_permalink": true,
+      "ts": "2026-10-22T05:24:30+0000"
+     },
+     "18149381398563562": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794589425,
+      "has_permalink": true,
+      "ts": "2026-10-19T08:27:47+0000"
+     },
+     "17935264890401935": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849580,
+      "has_permalink": true,
+      "ts": "2026-10-11T02:14:55+0000"
+     },
+     "17972390238172823": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794851047,
+      "has_permalink": true,
+      "ts": "2026-10-10T00:00:53+0000"
+     },
+     "18136902415588768": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794595063,
+      "has_permalink": true,
+      "ts": "2026-10-08T02:27:22+0000"
+     },
+     "17870083359645966": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794850032,
+      "has_permalink": true,
+      "ts": "2026-10-02T01:59:42+0000"
+     },
+     "18097732460644352": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794854026,
+      "has_permalink": true,
+      "ts": "2026-10-01T08:05:14+0000"
+     },
+     "18121741897972466": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794860044,
+      "has_permalink": true,
+      "ts": "2026-10-01T02:06:42+0000"
+     },
+     "17959928439210156": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794847839,
+      "has_permalink": true,
+      "ts": "2026-09-23T01:59:25+0000"
+     },
+     "17908607538304374": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794592914,
+      "has_permalink": true,
+      "ts": "2026-09-22T08:49:58+0000"
+     },
+     "18628551409056710": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794856397,
+      "has_permalink": true,
+      "ts": "2026-09-21T01:59:18+0000"
+     },
+     "18014283206943961": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794589716,
+      "has_permalink": true,
+      "ts": "2026-09-14T01:17:02+0000"
+     },
+     "18088986899273698": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794589266,
+      "has_permalink": true,
+      "ts": "2026-09-11T01:50:39+0000"
+     },
+     "18150673984524207": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794601513,
+      "has_permalink": true,
+      "ts": "2026-09-04T01:42:25+0000"
+     },
+     "18172568929444479": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-08-31T09:13:13+0000"
+     },
+     "18333330574285099": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794597069,
+      "has_permalink": true,
+      "ts": "2026-08-30T01:56:42+0000"
+     },
+     "18026851295893931": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794593220,
+      "has_permalink": true,
+      "ts": "2026-08-29T01:51:27+0000"
+     },
+     "17943396567341394": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794847400,
+      "has_permalink": true,
+      "ts": "2026-08-28T01:54:13+0000"
+     },
+     "18374095981239039": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794592585,
+      "has_permalink": true,
+      "ts": "2026-08-27T01:57:21+0000"
+     },
+     "17976208281094163": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794852338,
+      "has_permalink": true,
+      "ts": "2026-08-26T09:23:28+0000"
+     },
+     "17889200157609910": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794859348,
+      "has_permalink": true,
+      "ts": "2026-08-26T07:54:34+0000"
+     },
+     "18110708207047037": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794592014,
+      "has_permalink": true,
+      "ts": "2026-08-25T08:08:01+0000"
+     },
+     "18348157912222615": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794858085,
+      "has_permalink": true,
+      "ts": "2026-08-23T02:01:11+0000"
+     },
+     "17965722261153157": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794853665,
+      "has_permalink": true,
+      "ts": "2026-08-23T02:00:21+0000"
+     },
+     "18112899790813905": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794854472,
+      "has_permalink": true,
+      "ts": "2026-08-23T01:58:09+0000"
+     },
+     "17897800734568954": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794592329,
+      "has_permalink": true,
+      "ts": "2026-08-22T01:59:06+0000"
+     },
+     "18624800266009973": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794600457,
+      "has_permalink": true,
+      "ts": "2026-08-19T09:43:16+0000"
+     },
+     "17892670053607584": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794847549,
+      "has_permalink": true,
+      "ts": "2026-08-18T02:00:45+0000"
+     },
+     "18349949707219385": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849372,
+      "has_permalink": true,
+      "ts": "2026-08-14T02:23:14+0000"
+     },
+     "18121274866848348": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794852638,
+      "has_permalink": true,
+      "ts": "2026-08-11T02:08:52+0000"
+     },
+     "18112052411072803": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794601590,
+      "has_permalink": true,
+      "ts": "2026-08-04T01:58:10+0000"
+     },
+     "18433299187123485": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794859713,
+      "has_permalink": true,
+      "ts": "2026-08-03T07:32:53+0000"
+     },
+     "18108547805009168": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794599996,
+      "has_permalink": true,
+      "ts": "2026-07-28T02:07:20+0000"
+     },
+     "18118781821881544": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794600024,
+      "has_permalink": true,
+      "ts": "2026-07-27T08:09:36+0000"
+     },
+     "18121899772818475": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794856273,
+      "has_permalink": true,
+      "ts": "2026-07-23T02:00:10+0000"
+     },
+     "18148136263524697": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794598576,
+      "has_permalink": true,
+      "ts": "2026-07-22T02:18:10+0000"
+     },
+     "18069976634416761": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794859026,
+      "has_permalink": true,
+      "ts": "2026-07-13T02:11:57+0000"
+     },
+     "18021142820689915": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794848837,
+      "has_permalink": true,
+      "ts": "2026-07-13T02:10:12+0000"
+     },
+     "18302913091303473": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794860109,
+      "has_permalink": true,
+      "ts": "2026-07-13T02:07:23+0000"
+     },
+     "18150324772505838": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794852250,
+      "has_permalink": true,
+      "ts": "2026-07-13T02:05:21+0000"
+     },
+     "17888511288596836": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794858892,
+      "has_permalink": true,
+      "ts": "2026-07-13T02:01:44+0000"
+     },
+     "18335985580266692": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794601894,
+      "has_permalink": true,
+      "ts": "2026-07-10T04:59:28+0000"
+     },
+     "18609404032062849": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794591714,
+      "has_permalink": true,
+      "ts": "2026-07-08T04:59:42+0000"
+     },
+     "18105229511012053": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794595551,
+      "has_permalink": true,
+      "ts": "2026-07-03T02:00:06+0000"
+     },
+     "18086759540103384": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794597576,
+      "has_permalink": true,
+      "ts": "2026-06-17T06:33:39+0000"
+     },
+     "18155327977480309": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794594527,
+      "has_permalink": true,
+      "ts": "2026-06-14T01:58:09+0000"
+     }
+    },
+    "has_after": true,
+    "usage": {
+     "x-app-usage": "{\"call_count\":1,\"total_cputime\":0,\"total_time\":2}"
+    }
+   },
+   "s1_vs_s2": {
+    "label": "immediate_repeat",
+    "common": 50,
+    "new_in_second": 0,
+    "missing_in_second": 0,
+    "has_url_flips": 0,
+    "oe_changed_among_both_have": 0,
+    "video_common": 24,
+    "video_flips": 0
+   },
+   "summary": {
+    "posts": 50,
+    "videos": 24,
+    "video_with_url": 23,
+    "reels": 24,
+    "reels_with_url": 23,
+    "permalink_all": true,
+    "has_after": true,
+    "usage": {
+     "x-app-usage": "{\"call_count\":0,\"total_cputime\":0,\"total_time\":2}"
+    }
+   },
+   "s3": {
+    "status": 200,
+    "error": null,
+    "count": 50,
+    "posts": {
+     "18358902202170725": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794861822,
+      "has_permalink": true,
+      "ts": "2026-11-10T02:02:20+0000"
+     },
+     "17992470050859768": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849870,
+      "has_permalink": true,
+      "ts": "2026-11-04T02:37:38+0000"
+     },
+     "18100742798433091": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794851771,
+      "has_permalink": true,
+      "ts": "2026-11-01T01:17:37+0000"
+     },
+     "18490507270129236": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794599886,
+      "has_permalink": true,
+      "ts": "2026-10-29T10:21:31+0000"
+     },
+     "18061763792562735": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794594836,
+      "has_permalink": true,
+      "ts": "2026-10-22T05:24:30+0000"
+     },
+     "18149381398563562": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794589425,
+      "has_permalink": true,
+      "ts": "2026-10-19T08:27:47+0000"
+     },
+     "17935264890401935": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849580,
+      "has_permalink": true,
+      "ts": "2026-10-11T02:14:55+0000"
+     },
+     "17972390238172823": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794851047,
+      "has_permalink": true,
+      "ts": "2026-10-10T00:00:53+0000"
+     },
+     "18136902415588768": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794595063,
+      "has_permalink": true,
+      "ts": "2026-10-08T02:27:22+0000"
+     },
+     "17870083359645966": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794850032,
+      "has_permalink": true,
+      "ts": "2026-10-02T01:59:42+0000"
+     },
+     "18097732460644352": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794854026,
+      "has_permalink": true,
+      "ts": "2026-10-01T08:05:14+0000"
+     },
+     "18121741897972466": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794860044,
+      "has_permalink": true,
+      "ts": "2026-10-01T02:06:42+0000"
+     },
+     "17959928439210156": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794862239,
+      "has_permalink": true,
+      "ts": "2026-09-23T01:59:25+0000"
+     },
+     "17908607538304374": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794592914,
+      "has_permalink": true,
+      "ts": "2026-09-22T08:49:58+0000"
+     },
+     "18628551409056710": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794856397,
+      "has_permalink": true,
+      "ts": "2026-09-21T01:59:18+0000"
+     },
+     "18014283206943961": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794589716,
+      "has_permalink": true,
+      "ts": "2026-09-14T01:17:02+0000"
+     },
+     "18088986899273698": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794589266,
+      "has_permalink": true,
+      "ts": "2026-09-11T01:50:39+0000"
+     },
+     "18150673984524207": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794601513,
+      "has_permalink": true,
+      "ts": "2026-09-04T01:42:25+0000"
+     },
+     "18172568929444479": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-08-31T09:13:13+0000"
+     },
+     "18333330574285099": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794597069,
+      "has_permalink": true,
+      "ts": "2026-08-30T01:56:42+0000"
+     },
+     "18026851295893931": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794593220,
+      "has_permalink": true,
+      "ts": "2026-08-29T01:51:27+0000"
+     },
+     "17943396567341394": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794861800,
+      "has_permalink": true,
+      "ts": "2026-08-28T01:54:13+0000"
+     },
+     "18374095981239039": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794592585,
+      "has_permalink": true,
+      "ts": "2026-08-27T01:57:21+0000"
+     },
+     "17976208281094163": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794852338,
+      "has_permalink": true,
+      "ts": "2026-08-26T09:23:28+0000"
+     },
+     "17889200157609910": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794859348,
+      "has_permalink": true,
+      "ts": "2026-08-26T07:54:34+0000"
+     },
+     "18110708207047037": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794592014,
+      "has_permalink": true,
+      "ts": "2026-08-25T08:08:01+0000"
+     },
+     "18348157912222615": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794858085,
+      "has_permalink": true,
+      "ts": "2026-08-23T02:01:11+0000"
+     },
+     "17965722261153157": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794853665,
+      "has_permalink": true,
+      "ts": "2026-08-23T02:00:21+0000"
+     },
+     "18112899790813905": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794854472,
+      "has_permalink": true,
+      "ts": "2026-08-23T01:58:09+0000"
+     },
+     "17897800734568954": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794592329,
+      "has_permalink": true,
+      "ts": "2026-08-22T01:59:06+0000"
+     },
+     "18624800266009973": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794600457,
+      "has_permalink": true,
+      "ts": "2026-08-19T09:43:16+0000"
+     },
+     "17892670053607584": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794861949,
+      "has_permalink": true,
+      "ts": "2026-08-18T02:00:45+0000"
+     },
+     "18349949707219385": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849372,
+      "has_permalink": true,
+      "ts": "2026-08-14T02:23:14+0000"
+     },
+     "18121274866848348": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794852638,
+      "has_permalink": true,
+      "ts": "2026-08-11T02:08:52+0000"
+     },
+     "18112052411072803": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794601590,
+      "has_permalink": true,
+      "ts": "2026-08-04T01:58:10+0000"
+     },
+     "18433299187123485": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794859713,
+      "has_permalink": true,
+      "ts": "2026-08-03T07:32:53+0000"
+     },
+     "18108547805009168": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794599996,
+      "has_permalink": true,
+      "ts": "2026-07-28T02:07:20+0000"
+     },
+     "18118781821881544": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794600024,
+      "has_permalink": true,
+      "ts": "2026-07-27T08:09:36+0000"
+     },
+     "18121899772818475": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794856273,
+      "has_permalink": true,
+      "ts": "2026-07-23T02:00:10+0000"
+     },
+     "18148136263524697": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794598576,
+      "has_permalink": true,
+      "ts": "2026-07-22T02:18:10+0000"
+     },
+     "18069976634416761": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794859026,
+      "has_permalink": true,
+      "ts": "2026-07-13T02:11:57+0000"
+     },
+     "18021142820689915": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794848837,
+      "has_permalink": true,
+      "ts": "2026-07-13T02:10:12+0000"
+     },
+     "18302913091303473": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794860109,
+      "has_permalink": true,
+      "ts": "2026-07-13T02:07:23+0000"
+     },
+     "18150324772505838": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794852250,
+      "has_permalink": true,
+      "ts": "2026-07-13T02:05:21+0000"
+     },
+     "17888511288596836": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794858892,
+      "has_permalink": true,
+      "ts": "2026-07-13T02:01:44+0000"
+     },
+     "18335985580266692": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794601894,
+      "has_permalink": true,
+      "ts": "2026-07-10T04:59:28+0000"
+     },
+     "18609404032062849": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794591714,
+      "has_permalink": true,
+      "ts": "2026-07-08T04:59:42+0000"
+     },
+     "18105229511012053": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794595551,
+      "has_permalink": true,
+      "ts": "2026-07-03T02:00:06+0000"
+     },
+     "18086759540103384": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794597576,
+      "has_permalink": true,
+      "ts": "2026-06-17T06:33:39+0000"
+     },
+     "18155327977480309": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794594527,
+      "has_permalink": true,
+      "ts": "2026-06-14T01:58:09+0000"
+     }
+    },
+    "has_after": true,
+    "usage": {
+     "x-app-usage": "{\"call_count\":4,\"total_cputime\":0,\"total_time\":8}"
+    }
+   },
+   "s1_vs_s3": {
+    "label": "after_900s",
+    "common": 50,
+    "new_in_second": 0,
+    "missing_in_second": 0,
+    "has_url_flips": 0,
+    "oe_changed_among_both_have": 4,
+    "video_common": 24,
+    "video_flips": 0
+   }
+  },
+  "skin1004official": {
+   "s1": {
+    "status": 200,
+    "error": null,
+    "count": 50,
+    "posts": {
+     "18106108769198022": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794597373,
+      "has_permalink": true,
+      "ts": "2026-11-12T07:00:03+0000"
+     },
+     "18035584379907190": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794850629,
+      "has_permalink": true,
+      "ts": "2026-11-12T01:00:10+0000"
+     },
+     "18388882249231933": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794601094,
+      "has_permalink": true,
+      "ts": "2026-11-11T07:00:03+0000"
+     },
+     "18149116849573915": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794859840,
+      "has_permalink": true,
+      "ts": "2026-11-11T00:51:31+0000"
+     },
+     "17965603455231678": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794597762,
+      "has_permalink": true,
+      "ts": "2026-11-10T01:00:05+0000"
+     },
+     "17966743416241494": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794596055,
+      "has_permalink": true,
+      "ts": "2026-11-09T01:00:08+0000"
+     },
+     "17967185156982557": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794599586,
+      "has_permalink": true,
+      "ts": "2026-11-07T01:00:05+0000"
+     },
+     "18109222685367344": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794857475,
+      "has_permalink": true,
+      "ts": "2026-11-06T01:00:18+0000"
+     },
+     "18410540332091972": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794595594,
+      "has_permalink": true,
+      "ts": "2026-11-05T03:19:52+0000"
+     },
+     "17887076247622510": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794848533,
+      "has_permalink": true,
+      "ts": "2026-11-04T01:00:07+0000"
+     },
+     "18167351374477901": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794599342,
+      "has_permalink": true,
+      "ts": "2026-11-03T01:00:11+0000"
+     },
+     "18108553484627260": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794847366,
+      "has_permalink": true,
+      "ts": "2026-11-02T01:00:07+0000"
+     },
+     "18284223274295558": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794600426,
+      "has_permalink": true,
+      "ts": "2026-11-01T01:00:06+0000"
+     },
+     "18019756799736358": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794848250,
+      "has_permalink": true,
+      "ts": "2026-10-30T01:00:04+0000"
+     },
+     "17898925914399237": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794860384,
+      "has_permalink": true,
+      "ts": "2026-10-26T01:00:07+0000"
+     },
+     "18109008506353680": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794851132,
+      "has_permalink": true,
+      "ts": "2026-10-22T01:00:05+0000"
+     },
+     "18175126666455464": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794588240,
+      "has_permalink": true,
+      "ts": "2026-10-17T01:00:06+0000"
+     },
+     "18034891064896188": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794591172,
+      "has_permalink": true,
+      "ts": "2026-10-16T02:31:43+0000"
+     },
+     "18022106513870112": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794853260,
+      "has_permalink": true,
+      "ts": "2026-10-16T01:00:05+0000"
+     },
+     "18350728771218271": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794860252,
+      "has_permalink": true,
+      "ts": "2026-10-15T01:00:02+0000"
+     },
+     "18067842941758713": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794599625,
+      "has_permalink": true,
+      "ts": "2026-10-14T01:00:06+0000"
+     },
+     "18078538382710147": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794850056,
+      "has_permalink": true,
+      "ts": "2026-10-14T01:00:04+0000"
+     },
+     "17949605910297665": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849388,
+      "has_permalink": true,
+      "ts": "2026-10-13T01:00:03+0000"
+     },
+     "18143554207571207": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794856402,
+      "has_permalink": true,
+      "ts": "2026-10-12T01:00:03+0000"
+     },
+     "17927525856183650": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794860980,
+      "has_permalink": true,
+      "ts": "2026-10-11T01:00:15+0000"
+     },
+     "18127765753865649": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794594571,
+      "has_permalink": true,
+      "ts": "2026-10-10T01:00:17+0000"
+     },
+     "18067793810794550": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794855265,
+      "has_permalink": true,
+      "ts": "2026-10-09T01:00:02+0000"
+     },
+     "18628129666003093": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794847841,
+      "has_permalink": true,
+      "ts": "2026-10-08T01:00:04+0000"
+     },
+     "17914922352264558": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794858584,
+      "has_permalink": true,
+      "ts": "2026-10-07T01:00:04+0000"
+     },
+     "18121209091910744": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794854124,
+      "has_permalink": true,
+      "ts": "2026-10-06T01:00:01+0000"
+     },
+     "18092995190417284": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849466,
+      "has_permalink": true,
+      "ts": "2026-10-05T01:00:01+0000"
+     },
+     "18016652030957033": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794595867,
+      "has_permalink": true,
+      "ts": "2026-10-04T01:00:15+0000"
+     },
+     "18088923095226925": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794589581,
+      "has_permalink": true,
+      "ts": "2026-10-03T01:00:05+0000"
+     },
+     "17924636514199339": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794592459,
+      "has_permalink": true,
+      "ts": "2026-10-02T17:02:03+0000"
+     },
+     "18053486243800576": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794597531,
+      "has_permalink": true,
+      "ts": "2026-10-02T08:02:32+0000"
+     },
+     "17946076971317472": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794858155,
+      "has_permalink": true,
+      "ts": "2026-10-02T01:00:02+0000"
+     },
+     "18129850813741248": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794858620,
+      "has_permalink": true,
+      "ts": "2026-10-01T01:00:01+0000"
+     },
+     "17886126375478911": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794847146,
+      "has_permalink": true,
+      "ts": "2026-09-30T01:00:03+0000"
+     },
+     "18131625037662561": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794592072,
+      "has_permalink": true,
+      "ts": "2026-09-29T01:00:05+0000"
+     },
+     "17977847880004131": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794860108,
+      "has_permalink": true,
+      "ts": "2026-09-28T01:00:04+0000"
+     },
+     "18115753495796281": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794593304,
+      "has_permalink": true,
+      "ts": "2026-09-27T14:51:32+0000"
+     },
+     "18121841788916253": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794598298,
+      "has_permalink": true,
+      "ts": "2026-09-26T15:10:03+0000"
+     },
+     "18409067506089848": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794601142,
+      "has_permalink": true,
+      "ts": "2026-09-24T17:34:20+0000"
+     },
+     "18051211139805877": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794848776,
+      "has_permalink": true,
+      "ts": "2026-09-23T01:00:01+0000"
+     },
+     "17909087268542921": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794851297,
+      "has_permalink": true,
+      "ts": "2026-09-22T01:00:04+0000"
+     },
+     "18424389337199724": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794589792,
+      "has_permalink": true,
+      "ts": "2026-09-21T13:00:07+0000"
+     },
+     "18111136649032175": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794854517,
+      "has_permalink": true,
+      "ts": "2026-09-21T01:00:02+0000"
+     },
+     "18085266503302053": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794589835,
+      "has_permalink": true,
+      "ts": "2026-09-19T13:00:14+0000"
+     },
+     "18043323983816675": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849521,
+      "has_permalink": true,
+      "ts": "2026-09-19T01:00:14+0000"
+     },
+     "17931712836142139": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794854467,
+      "has_permalink": true,
+      "ts": "2026-09-18T01:00:03+0000"
+     }
+    },
+    "has_after": true,
+    "usage": {
+     "x-app-usage": "{\"call_count\":1,\"total_cputime\":0,\"total_time\":2}"
+    }
+   },
+   "s2": {
+    "status": 200,
+    "error": null,
+    "count": 50,
+    "posts": {
+     "18106108769198022": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794597373,
+      "has_permalink": true,
+      "ts": "2026-11-12T07:00:03+0000"
+     },
+     "18035584379907190": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794850629,
+      "has_permalink": true,
+      "ts": "2026-11-12T01:00:10+0000"
+     },
+     "18388882249231933": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794601094,
+      "has_permalink": true,
+      "ts": "2026-11-11T07:00:03+0000"
+     },
+     "18149116849573915": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794859840,
+      "has_permalink": true,
+      "ts": "2026-11-11T00:51:31+0000"
+     },
+     "17965603455231678": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794597762,
+      "has_permalink": true,
+      "ts": "2026-11-10T01:00:05+0000"
+     },
+     "17966743416241494": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794596055,
+      "has_permalink": true,
+      "ts": "2026-11-09T01:00:08+0000"
+     },
+     "17967185156982557": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794599586,
+      "has_permalink": true,
+      "ts": "2026-11-07T01:00:05+0000"
+     },
+     "18109222685367344": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794857475,
+      "has_permalink": true,
+      "ts": "2026-11-06T01:00:18+0000"
+     },
+     "18410540332091972": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794595594,
+      "has_permalink": true,
+      "ts": "2026-11-05T03:19:52+0000"
+     },
+     "17887076247622510": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794848533,
+      "has_permalink": true,
+      "ts": "2026-11-04T01:00:07+0000"
+     },
+     "18167351374477901": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794599342,
+      "has_permalink": true,
+      "ts": "2026-11-03T01:00:11+0000"
+     },
+     "18108553484627260": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794847366,
+      "has_permalink": true,
+      "ts": "2026-11-02T01:00:07+0000"
+     },
+     "18284223274295558": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794600426,
+      "has_permalink": true,
+      "ts": "2026-11-01T01:00:06+0000"
+     },
+     "18019756799736358": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794848250,
+      "has_permalink": true,
+      "ts": "2026-10-30T01:00:04+0000"
+     },
+     "17898925914399237": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794860384,
+      "has_permalink": true,
+      "ts": "2026-10-26T01:00:07+0000"
+     },
+     "18109008506353680": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794851132,
+      "has_permalink": true,
+      "ts": "2026-10-22T01:00:05+0000"
+     },
+     "18175126666455464": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794588240,
+      "has_permalink": true,
+      "ts": "2026-10-17T01:00:06+0000"
+     },
+     "18034891064896188": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794591172,
+      "has_permalink": true,
+      "ts": "2026-10-16T02:31:43+0000"
+     },
+     "18022106513870112": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794853260,
+      "has_permalink": true,
+      "ts": "2026-10-16T01:00:05+0000"
+     },
+     "18350728771218271": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794860252,
+      "has_permalink": true,
+      "ts": "2026-10-15T01:00:02+0000"
+     },
+     "18067842941758713": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794599625,
+      "has_permalink": true,
+      "ts": "2026-10-14T01:00:06+0000"
+     },
+     "18078538382710147": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794850056,
+      "has_permalink": true,
+      "ts": "2026-10-14T01:00:04+0000"
+     },
+     "17949605910297665": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849388,
+      "has_permalink": true,
+      "ts": "2026-10-13T01:00:03+0000"
+     },
+     "18143554207571207": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794856402,
+      "has_permalink": true,
+      "ts": "2026-10-12T01:00:03+0000"
+     },
+     "17927525856183650": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794860980,
+      "has_permalink": true,
+      "ts": "2026-10-11T01:00:15+0000"
+     },
+     "18127765753865649": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794594571,
+      "has_permalink": true,
+      "ts": "2026-10-10T01:00:17+0000"
+     },
+     "18067793810794550": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794855265,
+      "has_permalink": true,
+      "ts": "2026-10-09T01:00:02+0000"
+     },
+     "18628129666003093": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794847841,
+      "has_permalink": true,
+      "ts": "2026-10-08T01:00:04+0000"
+     },
+     "17914922352264558": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794858584,
+      "has_permalink": true,
+      "ts": "2026-10-07T01:00:04+0000"
+     },
+     "18121209091910744": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794854124,
+      "has_permalink": true,
+      "ts": "2026-10-06T01:00:01+0000"
+     },
+     "18092995190417284": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849466,
+      "has_permalink": true,
+      "ts": "2026-10-05T01:00:01+0000"
+     },
+     "18016652030957033": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794595867,
+      "has_permalink": true,
+      "ts": "2026-10-04T01:00:15+0000"
+     },
+     "18088923095226925": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794589581,
+      "has_permalink": true,
+      "ts": "2026-10-03T01:00:05+0000"
+     },
+     "17924636514199339": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794592459,
+      "has_permalink": true,
+      "ts": "2026-10-02T17:02:03+0000"
+     },
+     "18053486243800576": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794597531,
+      "has_permalink": true,
+      "ts": "2026-10-02T08:02:32+0000"
+     },
+     "17946076971317472": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794858155,
+      "has_permalink": true,
+      "ts": "2026-10-02T01:00:02+0000"
+     },
+     "18129850813741248": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794858620,
+      "has_permalink": true,
+      "ts": "2026-10-01T01:00:01+0000"
+     },
+     "17886126375478911": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794847146,
+      "has_permalink": true,
+      "ts": "2026-09-30T01:00:03+0000"
+     },
+     "18131625037662561": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794592072,
+      "has_permalink": true,
+      "ts": "2026-09-29T01:00:05+0000"
+     },
+     "17977847880004131": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794860108,
+      "has_permalink": true,
+      "ts": "2026-09-28T01:00:04+0000"
+     },
+     "18115753495796281": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794593304,
+      "has_permalink": true,
+      "ts": "2026-09-27T14:51:32+0000"
+     },
+     "18121841788916253": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794598298,
+      "has_permalink": true,
+      "ts": "2026-09-26T15:10:03+0000"
+     },
+     "18409067506089848": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794601142,
+      "has_permalink": true,
+      "ts": "2026-09-24T17:34:20+0000"
+     },
+     "18051211139805877": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794848776,
+      "has_permalink": true,
+      "ts": "2026-09-23T01:00:01+0000"
+     },
+     "17909087268542921": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794851297,
+      "has_permalink": true,
+      "ts": "2026-09-22T01:00:04+0000"
+     },
+     "18424389337199724": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794589792,
+      "has_permalink": true,
+      "ts": "2026-09-21T13:00:07+0000"
+     },
+     "18111136649032175": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794854517,
+      "has_permalink": true,
+      "ts": "2026-09-21T01:00:02+0000"
+     },
+     "18085266503302053": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794589835,
+      "has_permalink": true,
+      "ts": "2026-09-19T13:00:14+0000"
+     },
+     "18043323983816675": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849521,
+      "has_permalink": true,
+      "ts": "2026-09-19T01:00:14+0000"
+     },
+     "17931712836142139": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794854467,
+      "has_permalink": true,
+      "ts": "2026-09-18T01:00:03+0000"
+     }
+    },
+    "has_after": true,
+    "usage": {
+     "x-app-usage": "{\"call_count\":2,\"total_cputime\":0,\"total_time\":4}"
+    }
+   },
+   "s1_vs_s2": {
+    "label": "immediate_repeat",
+    "common": 50,
+    "new_in_second": 0,
+    "missing_in_second": 0,
+    "has_url_flips": 0,
+    "oe_changed_among_both_have": 0,
+    "video_common": 23,
+    "video_flips": 0
+   },
+   "summary": {
+    "posts": 50,
+    "videos": 23,
+    "video_with_url": 23,
+    "reels": 23,
+    "reels_with_url": 23,
+    "permalink_all": true,
+    "has_after": true,
+    "usage": {
+     "x-app-usage": "{\"call_count\":1,\"total_cputime\":0,\"total_time\":2}"
+    }
+   },
+   "s3": {
+    "status": 200,
+    "error": null,
+    "count": 50,
+    "posts": {
+     "18106108769198022": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794597373,
+      "has_permalink": true,
+      "ts": "2026-11-12T07:00:03+0000"
+     },
+     "18035584379907190": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794850629,
+      "has_permalink": true,
+      "ts": "2026-11-12T01:00:10+0000"
+     },
+     "18388882249231933": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794601094,
+      "has_permalink": true,
+      "ts": "2026-11-11T07:00:03+0000"
+     },
+     "18149116849573915": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794859840,
+      "has_permalink": true,
+      "ts": "2026-11-11T00:51:31+0000"
+     },
+     "17965603455231678": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794597762,
+      "has_permalink": true,
+      "ts": "2026-11-10T01:00:05+0000"
+     },
+     "17966743416241494": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794596055,
+      "has_permalink": true,
+      "ts": "2026-11-09T01:00:08+0000"
+     },
+     "17967185156982557": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794599586,
+      "has_permalink": true,
+      "ts": "2026-11-07T01:00:05+0000"
+     },
+     "18109222685367344": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794857475,
+      "has_permalink": true,
+      "ts": "2026-11-06T01:00:18+0000"
+     },
+     "18410540332091972": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794595594,
+      "has_permalink": true,
+      "ts": "2026-11-05T03:19:52+0000"
+     },
+     "17887076247622510": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794848533,
+      "has_permalink": true,
+      "ts": "2026-11-04T01:00:07+0000"
+     },
+     "18167351374477901": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794599342,
+      "has_permalink": true,
+      "ts": "2026-11-03T01:00:11+0000"
+     },
+     "18108553484627260": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794861766,
+      "has_permalink": true,
+      "ts": "2026-11-02T01:00:07+0000"
+     },
+     "18284223274295558": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794600426,
+      "has_permalink": true,
+      "ts": "2026-11-01T01:00:06+0000"
+     },
+     "18019756799736358": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794848250,
+      "has_permalink": true,
+      "ts": "2026-10-30T01:00:04+0000"
+     },
+     "17898925914399237": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794860384,
+      "has_permalink": true,
+      "ts": "2026-10-26T01:00:07+0000"
+     },
+     "18109008506353680": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794851132,
+      "has_permalink": true,
+      "ts": "2026-10-22T01:00:05+0000"
+     },
+     "18175126666455464": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794602640,
+      "has_permalink": true,
+      "ts": "2026-10-17T01:00:06+0000"
+     },
+     "18034891064896188": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794591172,
+      "has_permalink": true,
+      "ts": "2026-10-16T02:31:43+0000"
+     },
+     "18022106513870112": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794853260,
+      "has_permalink": true,
+      "ts": "2026-10-16T01:00:05+0000"
+     },
+     "18350728771218271": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794860252,
+      "has_permalink": true,
+      "ts": "2026-10-15T01:00:02+0000"
+     },
+     "18067842941758713": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794599625,
+      "has_permalink": true,
+      "ts": "2026-10-14T01:00:06+0000"
+     },
+     "18078538382710147": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794850056,
+      "has_permalink": true,
+      "ts": "2026-10-14T01:00:04+0000"
+     },
+     "17949605910297665": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849388,
+      "has_permalink": true,
+      "ts": "2026-10-13T01:00:03+0000"
+     },
+     "18143554207571207": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794856402,
+      "has_permalink": true,
+      "ts": "2026-10-12T01:00:03+0000"
+     },
+     "17927525856183650": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794860980,
+      "has_permalink": true,
+      "ts": "2026-10-11T01:00:15+0000"
+     },
+     "18127765753865649": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794594571,
+      "has_permalink": true,
+      "ts": "2026-10-10T01:00:17+0000"
+     },
+     "18067793810794550": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794855265,
+      "has_permalink": true,
+      "ts": "2026-10-09T01:00:02+0000"
+     },
+     "18628129666003093": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794862241,
+      "has_permalink": true,
+      "ts": "2026-10-08T01:00:04+0000"
+     },
+     "17914922352264558": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794858584,
+      "has_permalink": true,
+      "ts": "2026-10-07T01:00:04+0000"
+     },
+     "18121209091910744": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794854124,
+      "has_permalink": true,
+      "ts": "2026-10-06T01:00:01+0000"
+     },
+     "18092995190417284": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849466,
+      "has_permalink": true,
+      "ts": "2026-10-05T01:00:01+0000"
+     },
+     "18016652030957033": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794595867,
+      "has_permalink": true,
+      "ts": "2026-10-04T01:00:15+0000"
+     },
+     "18088923095226925": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794589581,
+      "has_permalink": true,
+      "ts": "2026-10-03T01:00:05+0000"
+     },
+     "17924636514199339": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794592459,
+      "has_permalink": true,
+      "ts": "2026-10-02T17:02:03+0000"
+     },
+     "18053486243800576": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794597531,
+      "has_permalink": true,
+      "ts": "2026-10-02T08:02:32+0000"
+     },
+     "17946076971317472": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794858155,
+      "has_permalink": true,
+      "ts": "2026-10-02T01:00:02+0000"
+     },
+     "18129850813741248": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794858620,
+      "has_permalink": true,
+      "ts": "2026-10-01T01:00:01+0000"
+     },
+     "17886126375478911": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794861546,
+      "has_permalink": true,
+      "ts": "2026-09-30T01:00:03+0000"
+     },
+     "18131625037662561": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794592072,
+      "has_permalink": true,
+      "ts": "2026-09-29T01:00:05+0000"
+     },
+     "17977847880004131": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794860108,
+      "has_permalink": true,
+      "ts": "2026-09-28T01:00:04+0000"
+     },
+     "18115753495796281": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794593304,
+      "has_permalink": true,
+      "ts": "2026-09-27T14:51:32+0000"
+     },
+     "18121841788916253": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794598298,
+      "has_permalink": true,
+      "ts": "2026-09-26T15:10:03+0000"
+     },
+     "18409067506089848": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794601142,
+      "has_permalink": true,
+      "ts": "2026-09-24T17:34:20+0000"
+     },
+     "18051211139805877": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794848776,
+      "has_permalink": true,
+      "ts": "2026-09-23T01:00:01+0000"
+     },
+     "17909087268542921": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794851297,
+      "has_permalink": true,
+      "ts": "2026-09-22T01:00:04+0000"
+     },
+     "18424389337199724": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794589792,
+      "has_permalink": true,
+      "ts": "2026-09-21T13:00:07+0000"
+     },
+     "18111136649032175": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794854517,
+      "has_permalink": true,
+      "ts": "2026-09-21T01:00:02+0000"
+     },
+     "18085266503302053": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794589835,
+      "has_permalink": true,
+      "ts": "2026-09-19T13:00:14+0000"
+     },
+     "18043323983816675": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849521,
+      "has_permalink": true,
+      "ts": "2026-09-19T01:00:14+0000"
+     },
+     "17931712836142139": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794854467,
+      "has_permalink": true,
+      "ts": "2026-09-18T01:00:03+0000"
+     }
+    },
+    "has_after": true,
+    "usage": {
+     "x-app-usage": "{\"call_count\":5,\"total_cputime\":0,\"total_time\":8}"
+    }
+   },
+   "s1_vs_s3": {
+    "label": "after_900s",
+    "common": 50,
+    "new_in_second": 0,
+    "missing_in_second": 0,
+    "has_url_flips": 0,
+    "oe_changed_among_both_have": 4,
+    "video_common": 23,
+    "video_flips": 0
+   }
+  },
+  "mediheal_official": {
+   "s1": {
+    "status": 200,
+    "error": null,
+    "count": 50,
+    "posts": {
+     "18139411297625727": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794861287,
+      "has_permalink": true,
+      "ts": "2026-10-20T08:58:12+0000"
+     },
+     "18230698459327284": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794856301,
+      "has_permalink": true,
+      "ts": "2026-10-16T04:40:36+0000"
+     },
+     "17863533447694676": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-10-15T05:23:53+0000"
+     },
+     "17962253031206636": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-10-13T06:17:01+0000"
+     },
+     "18567684679076951": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-10-13T06:11:20+0000"
+     },
+     "18098131895450862": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-10-13T06:06:34+0000"
+     },
+     "18170782276463169": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-10-13T06:01:21+0000"
+     },
+     "18110865545525066": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794848690,
+      "has_permalink": true,
+      "ts": "2026-10-12T02:00:32+0000"
+     },
+     "17930561016166153": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-10-09T06:01:21+0000"
+     },
+     "17937124230123045": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-10-08T11:02:05+0000"
+     },
+     "18139534109497774": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794847805,
+      "has_permalink": true,
+      "ts": "2026-10-07T08:16:12+0000"
+     },
+     "17911192590500138": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794858951,
+      "has_permalink": true,
+      "ts": "2026-10-03T06:00:32+0000"
+     },
+     "18094724969448480": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-10-02T11:01:42+0000"
+     },
+     "18113000671994597": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794852920,
+      "has_permalink": true,
+      "ts": "2026-10-02T08:00:12+0000"
+     },
+     "18106727885462131": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794855562,
+      "has_permalink": true,
+      "ts": "2026-10-02T06:51:55+0000"
+     },
+     "18190643557408214": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849382,
+      "has_permalink": true,
+      "ts": "2026-10-02T06:51:06+0000"
+     },
+     "18117334363974331": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794858734,
+      "has_permalink": true,
+      "ts": "2026-10-02T06:50:28+0000"
+     },
+     "18390296515201000": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-10-01T11:01:28+0000"
+     },
+     "17936473944124770": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-10-01T08:00:10+0000"
+     },
+     "18097873391530083": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794853952,
+      "has_permalink": true,
+      "ts": "2026-09-30T08:08:29+0000"
+     },
+     "18106208912238548": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-09-28T09:00:36+0000"
+     },
+     "17863991166679813": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-09-21T09:01:36+0000"
+     },
+     "18627632422033368": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-09-18T04:18:41+0000"
+     },
+     "18142887883569818": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794857281,
+      "has_permalink": true,
+      "ts": "2026-09-11T06:00:44+0000"
+     },
+     "18117389161944333": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794858059,
+      "has_permalink": true,
+      "ts": "2026-09-07T01:00:25+0000"
+     },
+     "18143013211586364": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794860622,
+      "has_permalink": true,
+      "ts": "2026-09-04T23:30:06+0000"
+     },
+     "18091690994542835": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794855212,
+      "has_permalink": true,
+      "ts": "2026-08-31T23:30:07+0000"
+     },
+     "18090302027176131": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794854392,
+      "has_permalink": true,
+      "ts": "2026-08-30T01:00:15+0000"
+     },
+     "18037981796822697": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-08-26T01:01:01+0000"
+     },
+     "18102574367190853": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-08-25T10:01:16+0000"
+     },
+     "18456619027188681": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794850642,
+      "has_permalink": true,
+      "ts": "2026-08-24T01:00:12+0000"
+     },
+     "18149841280517960": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794857702,
+      "has_permalink": true,
+      "ts": "2026-08-22T06:00:02+0000"
+     },
+     "18186363682398355": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794852090,
+      "has_permalink": true,
+      "ts": "2026-08-21T06:16:02+0000"
+     },
+     "17895550920663745": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-08-17T08:21:57+0000"
+     },
+     "18112880842953262": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-08-15T08:01:08+0000"
+     },
+     "18104566046145224": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-08-14T06:01:48+0000"
+     },
+     "18085971317673335": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794850112,
+      "has_permalink": true,
+      "ts": "2026-08-13T08:00:42+0000"
+     },
+     "18113865976743703": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794860285,
+      "has_permalink": true,
+      "ts": "2026-08-12T08:00:10+0000"
+     },
+     "18381269851225537": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849001,
+      "has_permalink": true,
+      "ts": "2026-08-10T01:17:27+0000"
+     },
+     "18405575827080027": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-08-06T06:01:58+0000"
+     },
+     "18121665220832193": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-08-03T06:01:35+0000"
+     },
+     "18167134192459559": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-07-30T07:00:47+0000"
+     },
+     "18120681166645723": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794857421,
+      "has_permalink": true,
+      "ts": "2026-07-28T07:00:18+0000"
+     },
+     "17897408694483288": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794852953,
+      "has_permalink": true,
+      "ts": "2026-07-27T01:00:02+0000"
+     },
+     "17962336373962089": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794851474,
+      "has_permalink": true,
+      "ts": "2026-07-22T09:00:03+0000"
+     },
+     "18107315363095896": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-07-16T09:00:06+0000"
+     },
+     "18069361136414200": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794855420,
+      "has_permalink": true,
+      "ts": "2026-07-15T07:00:01+0000"
+     },
+     "18148151266516026": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-07-10T07:56:26+0000"
+     },
+     "18106242446043343": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794860213,
+      "has_permalink": true,
+      "ts": "2026-07-01T03:20:02+0000"
+     },
+     "18097833290191107": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794854914,
+      "has_permalink": true,
+      "ts": "2026-07-01T03:10:29+0000"
+     }
+    },
+    "has_after": true,
+    "usage": {
+     "x-app-usage": "{\"call_count\":2,\"total_cputime\":0,\"total_time\":4}"
+    }
+   },
+   "s2": {
+    "status": 200,
+    "error": null,
+    "count": 50,
+    "posts": {
+     "18139411297625727": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794861287,
+      "has_permalink": true,
+      "ts": "2026-10-20T08:58:12+0000"
+     },
+     "18230698459327284": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794856301,
+      "has_permalink": true,
+      "ts": "2026-10-16T04:40:36+0000"
+     },
+     "17863533447694676": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-10-15T05:23:53+0000"
+     },
+     "17962253031206636": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-10-13T06:17:01+0000"
+     },
+     "18567684679076951": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-10-13T06:11:20+0000"
+     },
+     "18098131895450862": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-10-13T06:06:34+0000"
+     },
+     "18170782276463169": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-10-13T06:01:21+0000"
+     },
+     "18110865545525066": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794848690,
+      "has_permalink": true,
+      "ts": "2026-10-12T02:00:32+0000"
+     },
+     "17930561016166153": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-10-09T06:01:21+0000"
+     },
+     "17937124230123045": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-10-08T11:02:05+0000"
+     },
+     "18139534109497774": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794847805,
+      "has_permalink": true,
+      "ts": "2026-10-07T08:16:12+0000"
+     },
+     "17911192590500138": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794858951,
+      "has_permalink": true,
+      "ts": "2026-10-03T06:00:32+0000"
+     },
+     "18094724969448480": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-10-02T11:01:42+0000"
+     },
+     "18113000671994597": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794852920,
+      "has_permalink": true,
+      "ts": "2026-10-02T08:00:12+0000"
+     },
+     "18106727885462131": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794855562,
+      "has_permalink": true,
+      "ts": "2026-10-02T06:51:55+0000"
+     },
+     "18190643557408214": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849382,
+      "has_permalink": true,
+      "ts": "2026-10-02T06:51:06+0000"
+     },
+     "18117334363974331": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794858734,
+      "has_permalink": true,
+      "ts": "2026-10-02T06:50:28+0000"
+     },
+     "18390296515201000": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-10-01T11:01:28+0000"
+     },
+     "17936473944124770": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-10-01T08:00:10+0000"
+     },
+     "18097873391530083": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794853952,
+      "has_permalink": true,
+      "ts": "2026-09-30T08:08:29+0000"
+     },
+     "18106208912238548": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-09-28T09:00:36+0000"
+     },
+     "17863991166679813": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-09-21T09:01:36+0000"
+     },
+     "18627632422033368": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-09-18T04:18:41+0000"
+     },
+     "18142887883569818": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794857281,
+      "has_permalink": true,
+      "ts": "2026-09-11T06:00:44+0000"
+     },
+     "18117389161944333": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794858059,
+      "has_permalink": true,
+      "ts": "2026-09-07T01:00:25+0000"
+     },
+     "18143013211586364": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794860622,
+      "has_permalink": true,
+      "ts": "2026-09-04T23:30:06+0000"
+     },
+     "18091690994542835": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794855212,
+      "has_permalink": true,
+      "ts": "2026-08-31T23:30:07+0000"
+     },
+     "18090302027176131": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794854392,
+      "has_permalink": true,
+      "ts": "2026-08-30T01:00:15+0000"
+     },
+     "18037981796822697": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-08-26T01:01:01+0000"
+     },
+     "18102574367190853": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-08-25T10:01:16+0000"
+     },
+     "18456619027188681": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794850642,
+      "has_permalink": true,
+      "ts": "2026-08-24T01:00:12+0000"
+     },
+     "18149841280517960": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794857702,
+      "has_permalink": true,
+      "ts": "2026-08-22T06:00:02+0000"
+     },
+     "18186363682398355": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794852090,
+      "has_permalink": true,
+      "ts": "2026-08-21T06:16:02+0000"
+     },
+     "17895550920663745": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-08-17T08:21:57+0000"
+     },
+     "18112880842953262": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-08-15T08:01:08+0000"
+     },
+     "18104566046145224": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-08-14T06:01:48+0000"
+     },
+     "18085971317673335": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794850112,
+      "has_permalink": true,
+      "ts": "2026-08-13T08:00:42+0000"
+     },
+     "18113865976743703": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794860285,
+      "has_permalink": true,
+      "ts": "2026-08-12T08:00:10+0000"
+     },
+     "18381269851225537": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849001,
+      "has_permalink": true,
+      "ts": "2026-08-10T01:17:27+0000"
+     },
+     "18405575827080027": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-08-06T06:01:58+0000"
+     },
+     "18121665220832193": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-08-03T06:01:35+0000"
+     },
+     "18167134192459559": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-07-30T07:00:47+0000"
+     },
+     "18120681166645723": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794857421,
+      "has_permalink": true,
+      "ts": "2026-07-28T07:00:18+0000"
+     },
+     "17897408694483288": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794852953,
+      "has_permalink": true,
+      "ts": "2026-07-27T01:00:02+0000"
+     },
+     "17962336373962089": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794851474,
+      "has_permalink": true,
+      "ts": "2026-07-22T09:00:03+0000"
+     },
+     "18107315363095896": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-07-16T09:00:06+0000"
+     },
+     "18069361136414200": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794855420,
+      "has_permalink": true,
+      "ts": "2026-07-15T07:00:01+0000"
+     },
+     "18148151266516026": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-07-10T07:56:26+0000"
+     },
+     "18106242446043343": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794860213,
+      "has_permalink": true,
+      "ts": "2026-07-01T03:20:02+0000"
+     },
+     "18097833290191107": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794854914,
+      "has_permalink": true,
+      "ts": "2026-07-01T03:10:29+0000"
+     }
+    },
+    "has_after": true,
+    "usage": {
+     "x-app-usage": "{\"call_count\":2,\"total_cputime\":0,\"total_time\":5}"
+    }
+   },
+   "s1_vs_s2": {
+    "label": "immediate_repeat",
+    "common": 50,
+    "new_in_second": 0,
+    "missing_in_second": 0,
+    "has_url_flips": 0,
+    "oe_changed_among_both_have": 0,
+    "video_common": 23,
+    "video_flips": 0
+   },
+   "summary": {
+    "posts": 50,
+    "videos": 23,
+    "video_with_url": 0,
+    "reels": 23,
+    "reels_with_url": 0,
+    "permalink_all": true,
+    "has_after": true,
+    "usage": {
+     "x-app-usage": "{\"call_count\":2,\"total_cputime\":0,\"total_time\":4}"
+    }
+   },
+   "s3": {
+    "status": 200,
+    "error": null,
+    "count": 50,
+    "posts": {
+     "18139411297625727": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794861287,
+      "has_permalink": true,
+      "ts": "2026-10-20T08:58:12+0000"
+     },
+     "18230698459327284": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794856301,
+      "has_permalink": true,
+      "ts": "2026-10-16T04:40:36+0000"
+     },
+     "17863533447694676": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-10-15T05:23:53+0000"
+     },
+     "17962253031206636": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-10-13T06:17:01+0000"
+     },
+     "18567684679076951": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-10-13T06:11:20+0000"
+     },
+     "18098131895450862": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-10-13T06:06:34+0000"
+     },
+     "18170782276463169": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-10-13T06:01:21+0000"
+     },
+     "18110865545525066": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794848690,
+      "has_permalink": true,
+      "ts": "2026-10-12T02:00:32+0000"
+     },
+     "17930561016166153": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-10-09T06:01:21+0000"
+     },
+     "17937124230123045": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-10-08T11:02:05+0000"
+     },
+     "18139534109497774": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794862205,
+      "has_permalink": true,
+      "ts": "2026-10-07T08:16:12+0000"
+     },
+     "17911192590500138": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794858951,
+      "has_permalink": true,
+      "ts": "2026-10-03T06:00:32+0000"
+     },
+     "18094724969448480": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-10-02T11:01:42+0000"
+     },
+     "18113000671994597": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794852920,
+      "has_permalink": true,
+      "ts": "2026-10-02T08:00:12+0000"
+     },
+     "18106727885462131": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794855562,
+      "has_permalink": true,
+      "ts": "2026-10-02T06:51:55+0000"
+     },
+     "18190643557408214": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849382,
+      "has_permalink": true,
+      "ts": "2026-10-02T06:51:06+0000"
+     },
+     "18117334363974331": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794858734,
+      "has_permalink": true,
+      "ts": "2026-10-02T06:50:28+0000"
+     },
+     "18390296515201000": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-10-01T11:01:28+0000"
+     },
+     "17936473944124770": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-10-01T08:00:10+0000"
+     },
+     "18097873391530083": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794853952,
+      "has_permalink": true,
+      "ts": "2026-09-30T08:08:29+0000"
+     },
+     "18106208912238548": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-09-28T09:00:36+0000"
+     },
+     "17863991166679813": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-09-21T09:01:36+0000"
+     },
+     "18627632422033368": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-09-18T04:18:41+0000"
+     },
+     "18142887883569818": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794857281,
+      "has_permalink": true,
+      "ts": "2026-09-11T06:00:44+0000"
+     },
+     "18117389161944333": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794858059,
+      "has_permalink": true,
+      "ts": "2026-09-07T01:00:25+0000"
+     },
+     "18143013211586364": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794860622,
+      "has_permalink": true,
+      "ts": "2026-09-04T23:30:06+0000"
+     },
+     "18091690994542835": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794855212,
+      "has_permalink": true,
+      "ts": "2026-08-31T23:30:07+0000"
+     },
+     "18090302027176131": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794854392,
+      "has_permalink": true,
+      "ts": "2026-08-30T01:00:15+0000"
+     },
+     "18037981796822697": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-08-26T01:01:01+0000"
+     },
+     "18102574367190853": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-08-25T10:01:16+0000"
+     },
+     "18456619027188681": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794850642,
+      "has_permalink": true,
+      "ts": "2026-08-24T01:00:12+0000"
+     },
+     "18149841280517960": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794857702,
+      "has_permalink": true,
+      "ts": "2026-08-22T06:00:02+0000"
+     },
+     "18186363682398355": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794852090,
+      "has_permalink": true,
+      "ts": "2026-08-21T06:16:02+0000"
+     },
+     "17895550920663745": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-08-17T08:21:57+0000"
+     },
+     "18112880842953262": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-08-15T08:01:08+0000"
+     },
+     "18104566046145224": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-08-14T06:01:48+0000"
+     },
+     "18085971317673335": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794850112,
+      "has_permalink": true,
+      "ts": "2026-08-13T08:00:42+0000"
+     },
+     "18113865976743703": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794860285,
+      "has_permalink": true,
+      "ts": "2026-08-12T08:00:10+0000"
+     },
+     "18381269851225537": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849001,
+      "has_permalink": true,
+      "ts": "2026-08-10T01:17:27+0000"
+     },
+     "18405575827080027": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-08-06T06:01:58+0000"
+     },
+     "18121665220832193": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-08-03T06:01:35+0000"
+     },
+     "18167134192459559": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-07-30T07:00:47+0000"
+     },
+     "18120681166645723": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794857421,
+      "has_permalink": true,
+      "ts": "2026-07-28T07:00:18+0000"
+     },
+     "17897408694483288": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794852953,
+      "has_permalink": true,
+      "ts": "2026-07-27T01:00:02+0000"
+     },
+     "17962336373962089": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794851474,
+      "has_permalink": true,
+      "ts": "2026-07-22T09:00:03+0000"
+     },
+     "18107315363095896": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-07-16T09:00:06+0000"
+     },
+     "18069361136414200": {
+      "type": "IMAGE",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794855420,
+      "has_permalink": true,
+      "ts": "2026-07-15T07:00:01+0000"
+     },
+     "18148151266516026": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": false,
+      "oe": null,
+      "has_permalink": true,
+      "ts": "2026-07-10T07:56:26+0000"
+     },
+     "18106242446043343": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794860213,
+      "has_permalink": true,
+      "ts": "2026-07-01T03:20:02+0000"
+     },
+     "18097833290191107": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794854914,
+      "has_permalink": true,
+      "ts": "2026-07-01T03:10:29+0000"
+     }
+    },
+    "has_after": true,
+    "usage": {
+     "x-app-usage": "{\"call_count\":5,\"total_cputime\":0,\"total_time\":8}"
+    }
+   },
+   "s1_vs_s3": {
+    "label": "after_900s",
+    "common": 50,
+    "new_in_second": 0,
+    "missing_in_second": 0,
+    "has_url_flips": 0,
+    "oe_changed_among_both_have": 1,
+    "video_common": 23,
+    "video_flips": 0
+   }
+  },
+  "beautyofjoseon_official": {
+   "s1": {
+    "status": 200,
+    "error": null,
+    "count": 50,
+    "posts": {
+     "17925983457223100": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794596842,
+      "has_permalink": true,
+      "ts": "2026-11-10T13:00:07+0000"
+     },
+     "18642579784061969": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794851420,
+      "has_permalink": true,
+      "ts": "2026-11-08T13:31:33+0000"
+     },
+     "18489678448128292": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794599300,
+      "has_permalink": true,
+      "ts": "2026-11-06T13:01:00+0000"
+     },
+     "18375743497300336": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794853077,
+      "has_permalink": true,
+      "ts": "2026-11-05T13:07:05+0000"
+     },
+     "18100497566656520": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794591729,
+      "has_permalink": true,
+      "ts": "2026-11-04T13:03:03+0000"
+     },
+     "18347638384264201": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849581,
+      "has_permalink": true,
+      "ts": "2026-11-02T13:00:02+0000"
+     },
+     "17924185746220367": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794595593,
+      "has_permalink": true,
+      "ts": "2026-11-01T13:00:08+0000"
+     },
+     "17990413683065336": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794851876,
+      "has_permalink": true,
+      "ts": "2026-10-30T13:00:02+0000"
+     },
+     "18129297541889124": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849997,
+      "has_permalink": true,
+      "ts": "2026-10-29T13:19:04+0000"
+     },
+     "18140910916619004": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794852934,
+      "has_permalink": true,
+      "ts": "2026-10-28T12:59:49+0000"
+     },
+     "18168082360465647": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794851947,
+      "has_permalink": true,
+      "ts": "2026-10-25T13:00:10+0000"
+     },
+     "18169801900479061": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794853207,
+      "has_permalink": true,
+      "ts": "2026-10-23T13:00:33+0000"
+     },
+     "18361530595219995": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794595827,
+      "has_permalink": true,
+      "ts": "2026-10-22T13:02:11+0000"
+     },
+     "18143385961586178": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794857916,
+      "has_permalink": true,
+      "ts": "2026-10-19T13:06:46+0000"
+     },
+     "18084565244705135": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794856220,
+      "has_permalink": true,
+      "ts": "2026-10-18T12:56:44+0000"
+     },
+     "18483731974117091": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794600452,
+      "has_permalink": true,
+      "ts": "2026-10-16T13:00:35+0000"
+     },
+     "18118516682517389": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794856139,
+      "has_permalink": true,
+      "ts": "2026-10-15T13:00:02+0000"
+     },
+     "18101898155545179": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794847335,
+      "has_permalink": true,
+      "ts": "2026-10-13T13:40:58+0000"
+     },
+     "18125274373687371": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794601303,
+      "has_permalink": true,
+      "ts": "2026-10-11T13:06:33+0000"
+     },
+     "18146225092516320": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794599504,
+      "has_permalink": true,
+      "ts": "2026-10-10T13:00:15+0000"
+     },
+     "17975708489934535": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794857437,
+      "has_permalink": true,
+      "ts": "2026-10-09T13:00:10+0000"
+     },
+     "18105731734973352": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794591087,
+      "has_permalink": true,
+      "ts": "2026-10-06T13:00:07+0000"
+     },
+     "18167683738485613": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794594406,
+      "has_permalink": true,
+      "ts": "2026-10-05T13:00:06+0000"
+     },
+     "18438667435181677": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794850010,
+      "has_permalink": true,
+      "ts": "2026-10-03T13:00:13+0000"
+     },
+     "18115982306004706": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794853255,
+      "has_permalink": true,
+      "ts": "2026-10-01T13:00:02+0000"
+     },
+     "18452038036192026": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794848848,
+      "has_permalink": true,
+      "ts": "2026-09-30T13:18:00+0000"
+     },
+     "18155621965449953": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794598624,
+      "has_permalink": true,
+      "ts": "2026-09-29T13:00:06+0000"
+     },
+     "17887155279683991": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794595898,
+      "has_permalink": true,
+      "ts": "2026-09-27T13:40:41+0000"
+     },
+     "17992043991029684": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794589111,
+      "has_permalink": true,
+      "ts": "2026-09-26T13:01:12+0000"
+     },
+     "18215758954343766": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794601914,
+      "has_permalink": true,
+      "ts": "2026-09-25T13:09:39+0000"
+     },
+     "18128185357827105": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794597276,
+      "has_permalink": true,
+      "ts": "2026-09-24T13:00:21+0000"
+     },
+     "18112532009518969": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794850648,
+      "has_permalink": true,
+      "ts": "2026-09-23T13:00:01+0000"
+     },
+     "18056388044557818": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794601110,
+      "has_permalink": true,
+      "ts": "2026-09-22T13:00:09+0000"
+     },
+     "17931653970401475": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794860279,
+      "has_permalink": true,
+      "ts": "2026-09-20T12:57:58+0000"
+     },
+     "17968917063140969": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794595012,
+      "has_permalink": true,
+      "ts": "2026-09-17T13:00:06+0000"
+     },
+     "17880491514687836": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794853025,
+      "has_permalink": true,
+      "ts": "2026-09-15T13:08:27+0000"
+     },
+     "18143808838577262": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794850573,
+      "has_permalink": true,
+      "ts": "2026-09-13T05:52:06+0000"
+     },
+     "18066116054737747": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794851478,
+      "has_permalink": true,
+      "ts": "2026-09-09T05:22:16+0000"
+     },
+     "18215626690351548": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849681,
+      "has_permalink": true,
+      "ts": "2026-09-08T00:40:33+0000"
+     },
+     "18090257294424563": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794847507,
+      "has_permalink": true,
+      "ts": "2026-09-05T13:00:03+0000"
+     },
+     "17867780358645846": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794589794,
+      "has_permalink": true,
+      "ts": "2026-09-04T13:00:07+0000"
+     },
+     "18087657653207260": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794857969,
+      "has_permalink": true,
+      "ts": "2026-09-03T13:11:59+0000"
+     },
+     "18142609021573070": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794597784,
+      "has_permalink": true,
+      "ts": "2026-09-02T13:03:11+0000"
+     },
+     "18115517981514020": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794848680,
+      "has_permalink": true,
+      "ts": "2026-08-30T13:00:02+0000"
+     },
+     "18386113606161779": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794590140,
+      "has_permalink": true,
+      "ts": "2026-08-25T13:00:05+0000"
+     },
+     "17900200515352518": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794854282,
+      "has_permalink": true,
+      "ts": "2026-08-22T13:00:01+0000"
+     },
+     "18059630942610954": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794590894,
+      "has_permalink": true,
+      "ts": "2026-08-21T13:00:07+0000"
+     },
+     "18613322836013109": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794594674,
+      "has_permalink": true,
+      "ts": "2026-08-19T13:00:05+0000"
+     },
+     "17878647252686541": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794854562,
+      "has_permalink": true,
+      "ts": "2026-08-18T13:00:02+0000"
+     },
+     "18058593848784548": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794592111,
+      "has_permalink": true,
+      "ts": "2026-08-16T13:00:06+0000"
+     }
+    },
+    "has_after": true,
+    "usage": {
+     "x-app-usage": "{\"call_count\":3,\"total_cputime\":0,\"total_time\":5}"
+    }
+   },
+   "s2": {
+    "status": 200,
+    "error": null,
+    "count": 50,
+    "posts": {
+     "17925983457223100": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794596842,
+      "has_permalink": true,
+      "ts": "2026-11-10T13:00:07+0000"
+     },
+     "18642579784061969": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794851420,
+      "has_permalink": true,
+      "ts": "2026-11-08T13:31:33+0000"
+     },
+     "18489678448128292": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794599300,
+      "has_permalink": true,
+      "ts": "2026-11-06T13:01:00+0000"
+     },
+     "18375743497300336": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794853077,
+      "has_permalink": true,
+      "ts": "2026-11-05T13:07:05+0000"
+     },
+     "18100497566656520": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794591729,
+      "has_permalink": true,
+      "ts": "2026-11-04T13:03:03+0000"
+     },
+     "18347638384264201": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849581,
+      "has_permalink": true,
+      "ts": "2026-11-02T13:00:02+0000"
+     },
+     "17924185746220367": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794595593,
+      "has_permalink": true,
+      "ts": "2026-11-01T13:00:08+0000"
+     },
+     "17990413683065336": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794851876,
+      "has_permalink": true,
+      "ts": "2026-10-30T13:00:02+0000"
+     },
+     "18129297541889124": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849997,
+      "has_permalink": true,
+      "ts": "2026-10-29T13:19:04+0000"
+     },
+     "18140910916619004": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794852934,
+      "has_permalink": true,
+      "ts": "2026-10-28T12:59:49+0000"
+     },
+     "18168082360465647": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794851947,
+      "has_permalink": true,
+      "ts": "2026-10-25T13:00:10+0000"
+     },
+     "18169801900479061": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794853207,
+      "has_permalink": true,
+      "ts": "2026-10-23T13:00:33+0000"
+     },
+     "18361530595219995": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794595827,
+      "has_permalink": true,
+      "ts": "2026-10-22T13:02:11+0000"
+     },
+     "18143385961586178": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794857916,
+      "has_permalink": true,
+      "ts": "2026-10-19T13:06:46+0000"
+     },
+     "18084565244705135": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794856220,
+      "has_permalink": true,
+      "ts": "2026-10-18T12:56:44+0000"
+     },
+     "18483731974117091": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794600452,
+      "has_permalink": true,
+      "ts": "2026-10-16T13:00:35+0000"
+     },
+     "18118516682517389": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794856139,
+      "has_permalink": true,
+      "ts": "2026-10-15T13:00:02+0000"
+     },
+     "18101898155545179": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794847335,
+      "has_permalink": true,
+      "ts": "2026-10-13T13:40:58+0000"
+     },
+     "18125274373687371": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794601303,
+      "has_permalink": true,
+      "ts": "2026-10-11T13:06:33+0000"
+     },
+     "18146225092516320": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794599504,
+      "has_permalink": true,
+      "ts": "2026-10-10T13:00:15+0000"
+     },
+     "17975708489934535": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794857437,
+      "has_permalink": true,
+      "ts": "2026-10-09T13:00:10+0000"
+     },
+     "18105731734973352": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794591087,
+      "has_permalink": true,
+      "ts": "2026-10-06T13:00:07+0000"
+     },
+     "18167683738485613": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794594406,
+      "has_permalink": true,
+      "ts": "2026-10-05T13:00:06+0000"
+     },
+     "18438667435181677": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794850010,
+      "has_permalink": true,
+      "ts": "2026-10-03T13:00:13+0000"
+     },
+     "18115982306004706": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794853255,
+      "has_permalink": true,
+      "ts": "2026-10-01T13:00:02+0000"
+     },
+     "18452038036192026": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794848848,
+      "has_permalink": true,
+      "ts": "2026-09-30T13:18:00+0000"
+     },
+     "18155621965449953": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794598624,
+      "has_permalink": true,
+      "ts": "2026-09-29T13:00:06+0000"
+     },
+     "17887155279683991": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794595898,
+      "has_permalink": true,
+      "ts": "2026-09-27T13:40:41+0000"
+     },
+     "17992043991029684": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794589111,
+      "has_permalink": true,
+      "ts": "2026-09-26T13:01:12+0000"
+     },
+     "18215758954343766": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794601914,
+      "has_permalink": true,
+      "ts": "2026-09-25T13:09:39+0000"
+     },
+     "18128185357827105": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794597276,
+      "has_permalink": true,
+      "ts": "2026-09-24T13:00:21+0000"
+     },
+     "18112532009518969": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794850648,
+      "has_permalink": true,
+      "ts": "2026-09-23T13:00:01+0000"
+     },
+     "18056388044557818": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794601110,
+      "has_permalink": true,
+      "ts": "2026-09-22T13:00:09+0000"
+     },
+     "17931653970401475": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794860279,
+      "has_permalink": true,
+      "ts": "2026-09-20T12:57:58+0000"
+     },
+     "17968917063140969": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794595012,
+      "has_permalink": true,
+      "ts": "2026-09-17T13:00:06+0000"
+     },
+     "17880491514687836": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794853025,
+      "has_permalink": true,
+      "ts": "2026-09-15T13:08:27+0000"
+     },
+     "18143808838577262": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794850573,
+      "has_permalink": true,
+      "ts": "2026-09-13T05:52:06+0000"
+     },
+     "18066116054737747": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794851478,
+      "has_permalink": true,
+      "ts": "2026-09-09T05:22:16+0000"
+     },
+     "18215626690351548": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849681,
+      "has_permalink": true,
+      "ts": "2026-09-08T00:40:33+0000"
+     },
+     "18090257294424563": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794847507,
+      "has_permalink": true,
+      "ts": "2026-09-05T13:00:03+0000"
+     },
+     "17867780358645846": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794589794,
+      "has_permalink": true,
+      "ts": "2026-09-04T13:00:07+0000"
+     },
+     "18087657653207260": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794857969,
+      "has_permalink": true,
+      "ts": "2026-09-03T13:11:59+0000"
+     },
+     "18142609021573070": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794597784,
+      "has_permalink": true,
+      "ts": "2026-09-02T13:03:11+0000"
+     },
+     "18115517981514020": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794848680,
+      "has_permalink": true,
+      "ts": "2026-08-30T13:00:02+0000"
+     },
+     "18386113606161779": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794590140,
+      "has_permalink": true,
+      "ts": "2026-08-25T13:00:05+0000"
+     },
+     "17900200515352518": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794854282,
+      "has_permalink": true,
+      "ts": "2026-08-22T13:00:01+0000"
+     },
+     "18059630942610954": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794590894,
+      "has_permalink": true,
+      "ts": "2026-08-21T13:00:07+0000"
+     },
+     "18613322836013109": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794594674,
+      "has_permalink": true,
+      "ts": "2026-08-19T13:00:05+0000"
+     },
+     "17878647252686541": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794854562,
+      "has_permalink": true,
+      "ts": "2026-08-18T13:00:02+0000"
+     },
+     "18058593848784548": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794592111,
+      "has_permalink": true,
+      "ts": "2026-08-16T13:00:06+0000"
+     }
+    },
+    "has_after": true,
+    "usage": {
+     "x-app-usage": "{\"call_count\":3,\"total_cputime\":0,\"total_time\":6}"
+    }
+   },
+   "s1_vs_s2": {
+    "label": "immediate_repeat",
+    "common": 50,
+    "new_in_second": 0,
+    "missing_in_second": 0,
+    "has_url_flips": 0,
+    "oe_changed_among_both_have": 0,
+    "video_common": 23,
+    "video_flips": 0
+   },
+   "summary": {
+    "posts": 50,
+    "videos": 23,
+    "video_with_url": 23,
+    "reels": 23,
+    "reels_with_url": 23,
+    "permalink_all": true,
+    "has_after": true,
+    "usage": {
+     "x-app-usage": "{\"call_count\":3,\"total_cputime\":0,\"total_time\":5}"
+    }
+   },
+   "s3": {
+    "status": 200,
+    "error": null,
+    "count": 50,
+    "posts": {
+     "17925983457223100": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794596842,
+      "has_permalink": true,
+      "ts": "2026-11-10T13:00:07+0000"
+     },
+     "18642579784061969": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794851420,
+      "has_permalink": true,
+      "ts": "2026-11-08T13:31:33+0000"
+     },
+     "18489678448128292": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794599300,
+      "has_permalink": true,
+      "ts": "2026-11-06T13:01:00+0000"
+     },
+     "18375743497300336": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794853077,
+      "has_permalink": true,
+      "ts": "2026-11-05T13:07:05+0000"
+     },
+     "18100497566656520": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794591729,
+      "has_permalink": true,
+      "ts": "2026-11-04T13:03:03+0000"
+     },
+     "18347638384264201": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849581,
+      "has_permalink": true,
+      "ts": "2026-11-02T13:00:02+0000"
+     },
+     "17924185746220367": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794595593,
+      "has_permalink": true,
+      "ts": "2026-11-01T13:00:08+0000"
+     },
+     "17990413683065336": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794851876,
+      "has_permalink": true,
+      "ts": "2026-10-30T13:00:02+0000"
+     },
+     "18129297541889124": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849997,
+      "has_permalink": true,
+      "ts": "2026-10-29T13:19:04+0000"
+     },
+     "18140910916619004": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794852934,
+      "has_permalink": true,
+      "ts": "2026-10-28T12:59:49+0000"
+     },
+     "18168082360465647": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794851947,
+      "has_permalink": true,
+      "ts": "2026-10-25T13:00:10+0000"
+     },
+     "18169801900479061": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794853207,
+      "has_permalink": true,
+      "ts": "2026-10-23T13:00:33+0000"
+     },
+     "18361530595219995": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794595827,
+      "has_permalink": true,
+      "ts": "2026-10-22T13:02:11+0000"
+     },
+     "18143385961586178": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794857916,
+      "has_permalink": true,
+      "ts": "2026-10-19T13:06:46+0000"
+     },
+     "18084565244705135": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794856220,
+      "has_permalink": true,
+      "ts": "2026-10-18T12:56:44+0000"
+     },
+     "18483731974117091": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794600452,
+      "has_permalink": true,
+      "ts": "2026-10-16T13:00:35+0000"
+     },
+     "18118516682517389": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794856139,
+      "has_permalink": true,
+      "ts": "2026-10-15T13:00:02+0000"
+     },
+     "18101898155545179": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794861735,
+      "has_permalink": true,
+      "ts": "2026-10-13T13:40:58+0000"
+     },
+     "18125274373687371": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794601303,
+      "has_permalink": true,
+      "ts": "2026-10-11T13:06:33+0000"
+     },
+     "18146225092516320": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794599504,
+      "has_permalink": true,
+      "ts": "2026-10-10T13:00:15+0000"
+     },
+     "17975708489934535": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794857437,
+      "has_permalink": true,
+      "ts": "2026-10-09T13:00:10+0000"
+     },
+     "18105731734973352": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794591087,
+      "has_permalink": true,
+      "ts": "2026-10-06T13:00:07+0000"
+     },
+     "18167683738485613": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794594406,
+      "has_permalink": true,
+      "ts": "2026-10-05T13:00:06+0000"
+     },
+     "18438667435181677": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794850010,
+      "has_permalink": true,
+      "ts": "2026-10-03T13:00:13+0000"
+     },
+     "18115982306004706": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794853255,
+      "has_permalink": true,
+      "ts": "2026-10-01T13:00:02+0000"
+     },
+     "18452038036192026": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794848848,
+      "has_permalink": true,
+      "ts": "2026-09-30T13:18:00+0000"
+     },
+     "18155621965449953": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794598624,
+      "has_permalink": true,
+      "ts": "2026-09-29T13:00:06+0000"
+     },
+     "17887155279683991": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794595898,
+      "has_permalink": true,
+      "ts": "2026-09-27T13:40:41+0000"
+     },
+     "17992043991029684": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794589111,
+      "has_permalink": true,
+      "ts": "2026-09-26T13:01:12+0000"
+     },
+     "18215758954343766": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794601914,
+      "has_permalink": true,
+      "ts": "2026-09-25T13:09:39+0000"
+     },
+     "18128185357827105": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794597276,
+      "has_permalink": true,
+      "ts": "2026-09-24T13:00:21+0000"
+     },
+     "18112532009518969": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794850648,
+      "has_permalink": true,
+      "ts": "2026-09-23T13:00:01+0000"
+     },
+     "18056388044557818": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794601110,
+      "has_permalink": true,
+      "ts": "2026-09-22T13:00:09+0000"
+     },
+     "17931653970401475": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794860279,
+      "has_permalink": true,
+      "ts": "2026-09-20T12:57:58+0000"
+     },
+     "17968917063140969": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794595012,
+      "has_permalink": true,
+      "ts": "2026-09-17T13:00:06+0000"
+     },
+     "17880491514687836": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794853025,
+      "has_permalink": true,
+      "ts": "2026-09-15T13:08:27+0000"
+     },
+     "18143808838577262": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794850573,
+      "has_permalink": true,
+      "ts": "2026-09-13T05:52:06+0000"
+     },
+     "18066116054737747": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794851478,
+      "has_permalink": true,
+      "ts": "2026-09-09T05:22:16+0000"
+     },
+     "18215626690351548": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794849681,
+      "has_permalink": true,
+      "ts": "2026-09-08T00:40:33+0000"
+     },
+     "18090257294424563": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794861907,
+      "has_permalink": true,
+      "ts": "2026-09-05T13:00:03+0000"
+     },
+     "17867780358645846": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794589794,
+      "has_permalink": true,
+      "ts": "2026-09-04T13:00:07+0000"
+     },
+     "18087657653207260": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794857969,
+      "has_permalink": true,
+      "ts": "2026-09-03T13:11:59+0000"
+     },
+     "18142609021573070": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794597784,
+      "has_permalink": true,
+      "ts": "2026-09-02T13:03:11+0000"
+     },
+     "18115517981514020": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794848680,
+      "has_permalink": true,
+      "ts": "2026-08-30T13:00:02+0000"
+     },
+     "18386113606161779": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794590140,
+      "has_permalink": true,
+      "ts": "2026-08-25T13:00:05+0000"
+     },
+     "17900200515352518": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794854282,
+      "has_permalink": true,
+      "ts": "2026-08-22T13:00:01+0000"
+     },
+     "18059630942610954": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794590894,
+      "has_permalink": true,
+      "ts": "2026-08-21T13:00:07+0000"
+     },
+     "18613322836013109": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794594674,
+      "has_permalink": true,
+      "ts": "2026-08-19T13:00:05+0000"
+     },
+     "17878647252686541": {
+      "type": "CAROUSEL_ALBUM",
+      "product": "FEED",
+      "has_url": true,
+      "oe": 1794854562,
+      "has_permalink": true,
+      "ts": "2026-08-18T13:00:02+0000"
+     },
+     "18058593848784548": {
+      "type": "VIDEO",
+      "product": "REELS",
+      "has_url": true,
+      "oe": 1794592111,
+      "has_permalink": true,
+      "ts": "2026-08-16T13:00:06+0000"
+     }
+    },
+    "has_after": true,
+    "usage": {
+     "x-app-usage": "{\"call_count\":5,\"total_cputime\":0,\"total_time\":10}"
+    }
+   },
+   "s1_vs_s3": {
+    "label": "after_900s",
+    "common": 50,
+    "new_in_second": 0,
+    "missing_in_second": 0,
+    "has_url_flips": 0,
+    "oe_changed_among_both_have": 2,
+    "video_common": 23,
+    "video_flips": 0
+   }
+  }
+ },
+ "limit100": {
+  "status": 200,
+  "returned": 100,
+  "error": null,
+  "usage": {
+   "x-app-usage": "{\"call_count\":4,\"total_cputime\":0,\"total_time\":6}"
+  }
+ }
+}

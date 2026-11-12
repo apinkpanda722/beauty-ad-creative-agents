@@ -1,0 +1,168 @@
+{
+ "tiktok_small": {
+  "bytes": 3043431,
+  "duration_s": 23.6,
+  "has_audio": true,
+  "video_res": "576x1024",
+  "fps": "30/1",
+  "default": {
+   "http": 200,
+   "video_tokens": 2173,
+   "audio_tokens": null,
+   "modalities": [
+    {
+     "modality": "text",
+     "tokens": 10
+    },
+    {
+     "modality": "video",
+     "tokens": 2173
+    }
+   ],
+   "input": 2183,
+   "output": 28,
+   "thought": 0,
+   "error": null
+  },
+  "processing_0_10s_fps1": {
+   "http": 200,
+   "video_tokens": 910,
+   "audio_tokens": null,
+   "modalities": [
+    {
+     "modality": "video",
+     "tokens": 910
+    },
+    {
+     "modality": "text",
+     "tokens": 10
+    }
+   ],
+   "input": 920,
+   "output": 17,
+   "thought": 0,
+   "error": null
+  },
+  "processing_0_10s_fps2": {
+   "http": 200,
+   "video_tokens": 1570,
+   "audio_tokens": null,
+   "modalities": [
+    {
+     "modality": "text",
+     "tokens": 10
+    },
+    {
+     "modality": "video",
+     "tokens": 1570
+    }
+   ],
+   "input": 1580,
+   "output": 12,
+   "thought": 0,
+   "error": null
+  }
+ },
+ "tiktok_big": {
+  "bytes": 5856841,
+  "duration_s": 42.0,
+  "has_audio": true,
+  "video_res": "576x1024",
+  "fps": "30/1",
+  "default": {
+   "http": 200,
+   "video_tokens": 3822,
+   "audio_tokens": null,
+   "modalities": [
+    {
+     "modality": "text",
+     "tokens": 10
+    },
+    {
+     "modality": "video",
+     "tokens": 3822
+    }
+   ],
+   "input": 3832,
+   "output": 11,
+   "thought": 0,
+   "error": null
+  },
+  "processing_0_10s_fps1": {
+   "http": 200,
+   "video_tokens": 910,
+   "audio_tokens": null,
+   "modalities": [
+    {
+     "modality": "text",
+     "tokens": 10
+    },
+    {
+     "modality": "video",
+     "tokens": 910
+    }
+   ],
+   "input": 920,
+   "output": 26,
+   "thought": 0,
+   "error": null
+  },
+  "processing_0_10s_fps2": {
+   "http": 200,
+   "video_tokens": 1570,
+   "audio_tokens": null,
+   "modalities": [
+    {
+     "modality": "video",
+     "tokens": 1570
+    },
+    {
+     "modality": "text",
+     "tokens": 10
+    }
+   ],
+   "input": 1580,
+   "output": 14,
+   "thought": 0,
+   "error": null
+  }
+ },
+ "youtube_14m_0_60s_fps1": {
+  "http": 200,
+  "video_tokens": 5461,
+  "audio_tokens": null,
+  "modalities": [
+   {
+    "modality": "text",
+    "tokens": 10
+   },
+   {
+    "modality": "video",
+    "tokens": 5461
+   }
+  ],
+  "input": 5471,
+  "output": 21,
+  "thought": 0,
+  "error": null
+ },
+ "youtube_14m_full": {
+  "http": 200,
+  "video_tokens": 79435,
+  "audio_tokens": null,
+  "modalities": [
+   {
+    "modality": "video",
+    "tokens": 79435
+   },
+   {
+    "modality": "text",
+    "tokens": 10
+   }
+  ],
+  "input": 79445,
+  "output": 22,
+  "thought": 0,
+  "error": null
+ }
+}

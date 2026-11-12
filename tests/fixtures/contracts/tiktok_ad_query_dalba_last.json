@@ -1,0 +1,221 @@
+{
+ "_meta": {
+  "recorded_at": "2026-11-12",
+  "http_status": 200,
+  "term": "dalba",
+  "page": 3,
+  "of": 3,
+  "note": "search_id를 이어 받은 쪽 원본(조언 세션 실측)"
+ },
+ "response": {
+  "data": {
+   "has_more": false,
+   "search_id": "eyJsYXN0X3NvcnQiOls0MjM3XSwibmV4dF9jdXJzb3IiOjMwfQ==",
+   "ads": [
+    {
+     "ad": {
+      "last_shown_date": "20260804",
+      "reach": {
+       "unique_users_seen": "1K-10K"
+      },
+      "status": "active",
+      "videos": [
+       {
+        "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-no1a-p-0037-no/oIvw4HaTrpB0lYZALCdtZ9hAAiPAnB8iIEupF~tplv-noop.image?<query omitted>",
+        "url": "https://v77.tiktokcdn.com/9dc27e29c83d4034ef90d6663046cb3a/6af5cbeb/video/tos/no1a/tos-no1a-ve-0068c001-no/oEtuU4pAYClAFBB15NHT6Ei0ZaiCwZnKIiRQv/?<query omitted>"
+       }
+      ],
+      "first_shown_date": "20260803",
+      "id": 1872510194745937
+     },
+     "advertiser": {
+      "business_id": 7470172133407195153,
+      "business_name": "7470172143632777238",
+      "paid_for_by": "7470172143632777238"
+     }
+    },
+    {
+     "ad": {
+      "first_shown_date": "20260108",
+      "id": 1853783458463761,
+      "last_shown_date": "20260109",
+      "reach": {
+       "unique_users_seen": "1K-10K"
+      },
+      "status": "active",
+      "videos": [
+       {
+        "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-maliva-p-0068c799-us/ogFHIOypTAWHDvoEE1CtSRuBSfdfQC1CE4SgQD~tplv-noop.image?<query omitted>",
+        "url": "https://v77.tiktokcdn.com/84563c2bbf1915c96e7596fae7b8290f/6af5cb81/video/tos/alisg/tos-alisg-ve-37c799-sg/oUEgBpgPRAQi6aHEa67qUB8O0UiIjrJ43FQBW/?<query omitted>"
+       }
+      ]
+     },
+     "advertiser": {
+      "business_id": 7320704897354186753,
+      "business_name": "1787281496853506",
+      "paid_for_by": "1787281496853506"
+     }
+    },
+    {
+     "ad": {
+      "first_shown_date": "20260801",
+      "id": 1872278923114498,
+      "last_shown_date": "20260801",
+      "reach": {
+       "unique_users_seen": "1K-10K"
+      },
+      "status": "active",
+      "videos": [
+       {
+        "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-no1a-p-0037-no/oM3pI1frA1GjAgafUwglJKLBIBLaITegD7NsG3~tplv-noop.image?<query omitted>",
+        "url": "https://v77.tiktokcdn.com/3d35998f898c0d3123092f66b79341db/6af5cb65/video/tos/useast2a/tos-useast2a-ve-68c810-euttp/oIEEEkqfpQeIt7ER7oVqaQF676lDkxgFAAj0WB/?<query omitted>"
+       }
+      ]
+     },
+     "advertiser": {
+      "business_id": 0,
+      "business_name": "",
+      "paid_for_by": ""
+     }
+    },
+    {
+     "ad": {
+      "first_shown_date": "20260527",
+      "id": 1866350258572290,
+      "last_shown_date": "20260528",
+      "reach": {
+       "unique_users_seen": "1K-10K"
+      },
+      "status": "active",
+      "videos": [
+       {
+        "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-useast2a-p-0037-euttp/oYpGAEUGEIjSEfjIFSAY6QQDhgtMIwCDmff5k8~tplv-noop.image?<query omitted>",
+        "url": "https://v77.tiktokcdn.com/35ef7a15a88fee886a6d9c68e28bba50/6af5cb5e/video/tos/useast2a/tos-useast2a-ve-0068c001-euttp/ogfAQXfAGQDEHBgRe4DJMUETIIDE6kj9SFTIEj/?<query omitted>"
+       }
+      ]
+     },
+     "advertiser": {
+      "business_id": 7569989411904110593,
+      "business_name": "7569989477494423574",
+      "paid_for_by": "7569989477494423574"
+     }
+    },
+    {
+     "ad": {
+      "first_shown_date": "20260617",
+      "id": 1868255496314386,
+      "last_shown_date": "20260619",
+      "reach": {
+       "unique_users_seen": "1K-10K"
+      },
+      "status": "active",
+      "videos": [
+       {
+        "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-useast2a-p-0037-euttp/okg8HLDjMGUpYtIM1gHgA1SfQen5h8GIeKQ7NG~tplv-noop.image?<query omitted>",
+        "url": "https://v77.tiktokcdn.com/219be294a2eb05fa88ac1cf8a686f4a4/6af5cb4a/video/tos/useast2a/tos-useast2a-ve-0068-euttp/oAIBEMieNpnItrIj5aYUhQLMeMBGgUgGAfH3wD/?<query omitted>"
+       }
+      ]
+     },
+     "advertiser": {
+      "business_id": 7569989411904110593,
+      "business_name": "7569989477494423574",
+      "paid_for_by": "7569989477494423574"
+     }
+    },
+    {
+     "advertiser": {
+      "business_id": 7569989411904110593,
+      "business_name": "7569989477494423574",
+      "paid_for_by": "7569989477494423574"
+     },
+     "ad": {
+      "videos": [
+       {
+        "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-useast2a-p-0037-euttp/owEVU0I8fCCwazDEBQfuFiAmBtIo0hnGDGvpaC~tplv-noop.image?<query omitted>",
+        "url": "https://v77.tiktokcdn.com/bd2b9a5b5c853ff18e84215fb582a7f1/6af5cb64/video/tos/useast2a/tos-useast2a-ve-68c810-euttp/oooFuCBEIkVmStCGMffi8EGUp1SawDaDvQEQAD/?<query omitted>"
+       }
+      ],
+      "first_shown_date": "20260327",
+      "id": 1860819071345154,
+      "last_shown_date": "20260328",
+      "reach": {
+       "unique_users_seen": "1K-10K"
+      },
+      "status": "active"
+     }
+    },
+    {
+     "advertiser": {
+      "business_id": 7636332081840390161,
+      "business_name": "7636332122826866720",
+      "paid_for_by": "7636332122826866720"
+     },
+     "ad": {
+      "videos": [
+       {
+        "url": "https://v77.tiktokcdn.com/826d9ae5456f9a10aa0454d780a32f5f/6af5cb4f/video/tos/useast2a/tos-useast2a-ve-0068-euttp/osV5BBoiKzLfuJlcxoQGbEjNIAP1iwB0mYMBiA/?<query omitted>",
+        "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-useast2a-p-0037-euttp/osiJLpD1NAZuB5YBiwLGxKxAzLofILijBPcoEB~tplv-noop.image?<query omitted>"
+       }
+      ],
+      "first_shown_date": "20260728",
+      "id": 1871971527499809,
+      "last_shown_date": "20260730",
+      "reach": {
+       "unique_users_seen": "1K-10K"
+      },
+      "status": "active"
+     }
+    },
+    {
+     "ad": {
+      "first_shown_date": "20260319",
+      "id": 1860090454971410,
+      "last_shown_date": "20260320",
+      "reach": {
+       "unique_users_seen": "1K-10K"
+      },
+      "status": "active",
+      "videos": [
+       {
+        "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-no1a-p-0037-no/oYddIQzQGEunRDGNAIeoA8GzeL95zTLICuGjf1~tplv-noop.image?<query omitted>",
+        "url": "https://v77.tiktokcdn.com/6e39e4a8fc6458072975635b468644ce/6af5cb97/video/tos/useast2a/tos-useast2a-ve-68c810-euttp/ocjIJIGGANaDEneLe9TjLgAuQ965ZdITRz1eDI/?<query omitted>"
+       }
+      ]
+     },
+     "advertiser": {
+      "business_id": 7490912763586494480,
+      "business_name": "7490912784343891990",
+      "paid_for_by": "7490912784343891990"
+     }
+    },
+    {
+     "ad": {
+      "first_shown_date": "20260112",
+      "id": 1854142297692226,
+      "last_shown_date": "20260113",
+      "reach": {
+       "unique_users_seen": "1K-10K"
+      },
+      "status": "active",
+      "videos": [
+       {
+        "cover_image_url": "https://p19-common-sign.tiktokcdn.com/tos-no1a-p-0037-no/oEIGYlI2CoVeRVQGRJqfOeAgGeA8LWP1mGAlSg~tplv-noop.image?<query omitted>",
+        "url": "https://v77.tiktokcdn.com/7c5a7f9cba9bc38269b4dfa70279b0a6/6af5cb6c/video/tos/useast2a/tos-useast2a-ve-68c810-euttp/oUDKKGfqghaUpFREfMsBAvkkEZIFnQkgRTTxZs/?<query omitted>"
+       }
+      ]
+     },
+     "advertiser": {
+      "business_id": 7555494495811354640,
+      "business_name": "7555494495777718294",
+      "paid_for_by": "7555494495777718294"
+     }
+    }
+   ]
+  },
+  "error": {
+   "code": "ok",
+   "message": "",
+   "log_id": "2026111208204542E62172297FE6000858"
+  }
+ }
+}
