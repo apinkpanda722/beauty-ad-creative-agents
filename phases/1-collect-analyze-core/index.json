@@ -89,7 +89,16 @@
     {
       "step": 6,
       "name": "youtube-source",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-12T18:24:29+0900",
+      "summary": "YouTube 설정 로더·수집 어댑터와 테스트 구현(페이지 처리, 50개 분할, 통계·길이 판정, 채널별 오류·전체 중단); httpx 0.28.1 직접 의존성 추가, make verify 551개 테스트 통과.",
+      "completed_at": "2026-11-12T18:29:54+0900",
+      "usage": {
+        "input_tokens": 980660,
+        "cached_input_tokens": 897280,
+        "output_tokens": 12590,
+        "attempts": 1
+      }
     },
     {
       "step": 7,
