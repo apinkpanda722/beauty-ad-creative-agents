@@ -135,3 +135,71 @@ uv run python -m beautyads.sources.split --resplit --reason "수집량 확인 �
 
 분할이 바뀌면 시범 20건도 바뀌므로 `make live-pilot`은 분할 확정 뒤에 실행한다
 (P2 step 13에서 제공).
+
+## live-pilot (P2)
+
+**live 순서: `make live-collect` → 수집량 확인 → 필요 시 라벨링 전에 1회
+재분할 → 그 뒤에 `make live-pilot`.** 수집을 완료하고
+`config/brand_split.yaml`의 dev·test 수집량 기준을 충족해야 한다.
+시범 실행기는 저장소의 `collection_stats()`로 이를 다시 검사하며 우회 옵션은 없다.
+분할이 바뀌면 시범 20건도 바뀌므로 분할을 확정한 뒤 시작한다.
+
+OrbStack을 켜고 `.env`에 `GEMINI_API_KEY`, `POSTGRES_PASSWORD`,
+`INSTAGRAM_ACCESS_TOKEN`, `INSTAGRAM_USER_ID`를 설정한다. 시작 점검에서는
+대상 출처를 아직 모르므로 Instagram 두 설정도 확인한다. `make db-up`에는
+`NEO4J_PASSWORD`(8자 이상)도 필요하다. 시범은 PostgreSQL만 사용한다.
+
+먼저 `--dry-run`으로 계획 호출 수와 영상 입력 토큰 추정을 확인한다.
+이 모드는 키 없이 실행하며 Docker 점검·네트워크 호출·DB 접속·모델 호출을 하지 않는다.
+금액은 추정하지 않는다. 비용은 원장에 기록되며 시범 뒤 `cost-recalc`가 계산한다.
+
+```bash
+uv run python -m beautyads.eval.pilot_run --dry-run
+make db-up
+# 컨테이너가 준비되고 수집량·분할을 확인한 뒤 사용자가 실행한다.
+make live-pilot
+# 개수·선정 seed·구간 상한·출력 폴더를 바꾸는 예
+uv run python -m beautyads.eval.pilot_run --n 20 --seed 20261112 --content-type-window-s 60 --full-window-s 60 --out-dir data/interim/pilot
+```
+
+기본값은 dev 브랜드의 분석 가능한 YouTube·Instagram 소재 20건,
+seed `20261112`, 콘텐츠 유형·전체 분석 구간 각각 최대 60초다. `--n`은
+1~40이며 지표나 분석 결과를 선정에 쓰지 않는다. 같은 선정 소재를
+`thinking_level=minimal` → `default` 순으로 분석한다. **두 실행이므로
+단일 실행보다 계획 호출 수가 두 배다.** 제품 소재는 콘텐츠 유형·첫 3초 훅·전체
+세 축을 분석하고 스키마 검증 실패 시 축당 한 번 재요청한다. `--dry-run`의 입력
+추정은 영상만 계산하며 프롬프트·캡션·출력·thought 토큰은 제외한다.
+실제 Gemini 비용에는 thought 토큰도 포함되므로 원장으로 확인한다.
+누적 상한 기본값은 Gemini $12, OpenAI $10, Anthropic $8이다.
+시범은 Gemini를 호출하며 첫 실행이 한도로 중단되면 두 번째 실행을 시작하지 않는다.
+
+출력은 실행 태그별 상태 분포, 이번 실행의 `gemini_cost_usd`, 분할 파일의
+`split_sha256`, 네 파일의 경로다. 기본 출력 폴더 `data/interim/pilot` 아래에
+`pilot_sheet.csv`, `pilot_codebook.csv`, `pilot_instructions.md`, `pilot_key.json`을 쓴다.
+`--out-dir`은 `data/interim` 아래만 허용하고 경로 이탈·심볼릭 링크 이탈도 거부한다.
+시범 명령은 키 파일을 읽거나 모델 라벨을 출력하지 않는다.
+
+11-17~18에는 **시트의 영상 링크·제목·캡션으로 먼저 라벨링**하고,
+값 선택과 비제품 소재의 빈칸 규칙은 코드북·`pilot_instructions.md`를 참고한다.
+**키 파일(pilot_key.json)은 라벨링을 마치기 전에 열지 마세요.**
+키 파일은 라벨링 뒤에 열어 두 실행 결과와 비교한다.
+
+| 이유 코드 | 의미와 조치 |
+|---|---|
+| `ENV_MISSING:GEMINI_API_KEY` / `ENV_MISSING:POSTGRES_PASSWORD` | 해당 이름의 공백이 아닌 값을 설정한다. |
+| `ENV_MISSING:INSTAGRAM_ACCESS_TOKEN` / `ENV_MISSING:INSTAGRAM_USER_ID` | 토큰과 호출 주체 ID를 설정한다. |
+| `DOCKER_DOWN` / `POSTGRES_UNREACHABLE` | OrbStack·`make db-up`과 포트(기본 5433, `BEAUTYADS_POSTGRES_PORT`)를 확인한다. |
+| `POSTGRES_AUTH_FAILED` / `POSTGRES_CONNECT_FAILED` | 비밀번호·컨테이너·포트를 확인한다. 비밀번호는 볼륨 최초 생성 시 적용되므로 기존 볼륨의 원래 값을 확인한다. |
+| `COST_CAP:gemini` | 원장 누적액과 예산을 확인한다. 상한에 도달하면 호출하지 않는다. |
+| `LEDGER_NOT_WRITABLE` | 원장과 부모 디렉터리의 쓰기 권한·여유 공간을 확인한다. |
+| `PILOT_SPLIT_FILE_INVALID` | `config/brand_split.yaml`의 존재·형식을 확인한다. |
+| `PILOT_SPLIT_NOT_VERIFIED` | 수집량 기준 미달이다. 수집 결과를 확인하고 추가 수집 또는 허용된 1회 재분할 후 실행한다. |
+| `PILOT_NO_COLLECTION` | dev에 분석 가능한 YouTube·Instagram 소재가 없다. 수집 결과를 확인한다. |
+| `PILOT_SHORTFALL <k>` | 목표보다 k건 부족하다. 가능한 소재로 계속 실행한다. |
+| `OUTPUT_NOT_IGNORED` | 출력 폴더를 `data/interim` 아래로 지정한다. |
+| `DAILY_LIMIT` / `RATE_LIMITED` | 한도 회복 뒤 재실행한다. 남은 작업은 pending으로 유지한다. |
+| `INVALID_SETTING:<이름>` | 해당 설정의 형식·범위를 확인한다. 값은 출력하지 않는다. |
+
+점검·수집량·옵션 오류는 종료 코드 2, 실행 중 한도 중단은 3,
+정상 완료와 `--dry-run`은 0이다. 분석 도중 소재별 실패나 한도로 일부 결과가 비어도
+선정 소재의 블라인드 시트는 생성하고 누락 결과는 키 파일에 빈 값으로 남긴다.
