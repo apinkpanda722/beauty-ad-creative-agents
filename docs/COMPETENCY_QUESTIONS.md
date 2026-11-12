@@ -18,7 +18,7 @@
 | CQ-08 | 건성 피부용 제품의 광고에서 자주 쓰는 앵글과 포맷은 | 1+2 | SkinType←SUITS←Product←PROMOTES←Creative→HAS_ANGLE/HAS_FORMAT | 리서치, E3 |
 | CQ-09 | 브랜드가 직접 집행한 광고와 판매처 광고는 훅이 다른가 | 2 | Creative(집행 주체 속성)→USES_HOOK→Hook | 리서치, E3 |
 | CQ-10 | 이 기획안이 주장한 효능은 대상 제품의 성분·인증으로 뒷받침되는가 | 1 | Product→CONTAINS→Ingredient→HAS_EFFICACY→Efficacy, Product→CERTIFIED_AS | 평가(코드 검사) |
-| CQ-11 | 이 기획안의 효능 표현에 걸리는 표현 규칙이 있는가 | 1 | ClaimRule→APPLIES_TO→Efficacy | 평가(코드 검사) |
+| CQ-11 | 이 기획안의 효능 표현에 걸리는 표현 규칙이 있는가 | 1 | ClaimRule→APPLIES_TO→Efficacy 또는 SkinConcern(또는 Category) | 평가(코드 검사) |
 | CQ-12 | 이 작업 공간(브랜드)이 최근 반려한 기획의 패턴은 | 2 | Feedback(tenant_id)→ABOUT→Hook·Efficacy | 기획(피드백 메모리) |
 | CQ-13 | 우리 제품과 핵심 성분을 공유하는 경쟁 제품은 무엇이고, 그 제품들은 광고에서 어떤 효능을 앞세우나 | 1+2 | Product→CONTAINS→Ingredient←CONTAINS←Product(경쟁)←PROMOTES←Creative→CLAIMS→Efficacy | 리서치, 기획, E3 |
 | CQ-14 | 우리 제품만 가진 성분·인증 중, 경쟁 광고가 아무도 앞세우지 않는 효능은 | 1+2 | Product→CONTAINS→Ingredient→HAS_EFFICACY→Efficacy, 경쟁 제품의 Creative→CLAIMS→Efficacy와 차집합 | 기획, 평가(차별성) |
