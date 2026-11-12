@@ -21,6 +21,7 @@ from .errors import (
     classify_error,
     retry_after_seconds,
 )
+from .files import file_error_code
 
 
 class GeminiInteractionsFn(Protocol):
@@ -37,8 +38,11 @@ def video_part(
     start_s: float | None = None,
     end_s: float | None = None,
     fps: float | None = None,
+    mime_type: str | None = None,
 ) -> dict:
     part = {"type": "video", "uri": uri}
+    if mime_type is not None:
+        part["mime_type"] = mime_type
     processing = {}
     if start_s is not None:
         processing["start_offset"] = f"{start_s:g}s"
@@ -166,9 +170,12 @@ def gemini_interact(
             error_type = (
                 DailyLimitReached if kind == ErrorKind.DAILY_LIMIT else LlmCallError
             )
+            code = "RETRIES_EXHAUSTED" if kind == ErrorKind.RETRYABLE else kind.value
+            if kind == ErrorKind.FATAL:
+                code = file_error_code(message) or code
             raise error_type(
                 kind=kind,
-                code="RETRIES_EXHAUSTED" if kind == ErrorKind.RETRYABLE else kind.value,
+                code=code,
                 message=message,
                 retry_after_s=retry_after_seconds(exc),
             ) from None
