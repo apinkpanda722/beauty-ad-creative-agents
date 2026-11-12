@@ -173,7 +173,16 @@
     {
       "step": 12,
       "name": "pilot-sheet",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-12T23:05:23+0900",
+      "summary": "dev 브랜드의 결정적 시범 선정·블라인드 시트·코드북·안내문·분리 키 파일과 출력 경로 가드 구현; 아키텍처 가드 포함 make verify 통과(1280 tests), 실제 서비스 미호출.",
+      "completed_at": "2026-11-12T23:10:22+0900",
+      "usage": {
+        "input_tokens": 860247,
+        "cached_input_tokens": 776192,
+        "output_tokens": 11207,
+        "attempts": 1
+      }
     },
     {
       "step": 13,
