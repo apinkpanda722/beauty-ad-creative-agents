@@ -1,0 +1,13 @@
+{
+  "_meta": {
+    "recorded_at": "2026-11-11T16:18:23Z",
+    "http_status": 503,
+    "note": "과부하 시 오류 형태(재시도 중 관측)"
+  },
+  "response": {
+    "error": {
+      "message": "gemini-3.6-flash is currently experiencing high demand, spikes in demand are usually temporary. Please try again later.",
+      "code": "service_unavailable"
+    }
+  }
+}

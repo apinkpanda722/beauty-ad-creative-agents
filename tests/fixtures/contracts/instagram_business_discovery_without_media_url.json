@@ -1,0 +1,69 @@
+{
+  "_meta": {
+    "recorded_at": "2026-11-11T16:18:15Z",
+    "http_status": 200,
+    "note": "릴스에 media_url이 없는 계정(키 자체가 빠지는지 확인)"
+  },
+  "response": {
+    "business_discovery": {
+      "username": "mediheal_official",
+      "followers_count": 182451,
+      "media_count": 337,
+      "media": {
+        "data": [
+          {
+            "id": "18139411297625727",
+            "media_type": "CAROUSEL_ALBUM",
+            "media_product_type": "FEED",
+            "permalink": "https://www.instagram.com/p/DetdR9IoEZJ/",
+            "timestamp": "2026-10-20T08:58:12+0000",
+            "like_count": 343,
+            "comments_count": 8,
+            "media_url": "https://scontent-ssn1-1.cdninstagram.com/v/t51.82787-15/849773185_18640898812053936_1256445758303625073_n.jpg?<signed-query omitted>",
+            "caption": "🚨 종료 D-1 🚨 아직 블루백 없는 사람? \n\n더현대 서울에서 포착된 메디힐 블루백\n팝업에서만 받을 수 있는 혜택들과 함께 왔어요!\n\n✔ 최대 83% 메가 세일\n✔ 매일 선착순 9,900 특가\n✔ 하나만 구매해도 슬롯머신 이벤트권 🎰\n✔ 구매 증정 이벤트로 모델링팩 본품, 블루백, 17,000원 상당 스페셜키트까지 받아가세요! \n\n📍더현대 서울 B2 아이코닉존\n📅 10.15(목)-10.21(수) *10.19 (월) 휴점\n\n#메디힐 #MEDIHEAL #더현대 #더현대팝업 #팝업"
+          },
+          {
+            "id": "18230698459327284",
+            "media_type": "CAROUSEL_ALBUM",
+            "media_product_type": "FEED",
+            "permalink": "https://www.instagram.com/p/DeisnxrIFUb/",
+            "timestamp": "2026-10-16T04:40:36+0000",
+            "like_count": 217,
+            "comments_count": 3,
+            "media_url": "https://scontent-ssn1-1.cdninstagram.com/v/t51.82787-15/842143239_18639341977053936_9126422221679380529_n.jpg?<signed-query omitted>",
+            "caption": "메디힐 창고 대방출🔥\n더현대 서울 POP-UP 오픈🛍️💙\n\n뜨거운 관심과 열기로 가득한 팝업 현장을 공개합니다.\n오직 팝업에서만 만나볼 수 있는\n특별한 혜택을 놓치지 마세요✨\n\n1️⃣매일 선착순 50명 특가\n58,000원 상당 제품 4종을 9,900원에 GET\n\n2️⃣구매 고객 전체 : 슬롯머신 이벤트\n빙고 결과에 따라 마스크팩 1·3·5매 GET\n\n3️⃣구매 금액별 증정\n1만 원 이상 구매 시, 모델링팩 \n3만 원 이상 구매 시, 메디힐 블루백\n5만 원 이상 구매 시, 스페셜 키트\n\n4️⃣10.17(토) 일일 점장 이사배 DAY\n뷰티 크리에이터 이사배와 함께하는\n피부 고민 상담부터 추가 선물까지! \n \n📍 더현대 서울 B2 아이코닉존\n 📅 10.15(목)–10.21(수) *10.19(월) 휴점\n\n #메디힐 #MEDIHEAL #메디힐팝업 #더현대서울 #더현대팝업"
+          },
+          {
+            "id": "17863533447694676",
+            "media_type": "VIDEO",
+            "media_product_type": "REELS",
+            "permalink": "https://www.instagram.com/reel/DegMPnMuj-w/",
+            "timestamp": "2026-10-15T05:23:53+0000",
+            "like_count": 203,
+            "comments_count": 5,
+            "view_count": 18871,
+            "caption": "열심히 달린 뒤 피부 쿨타임 시작! 🏃🏻‍♀️💙\n\n‘메디힐 서울에디션’ 출시를 기념해\n나이키 트레이너 김은서님(agilemonkee)과 함께 서울을 달렸어요!\n\n청명한 가을 공기 속에서\n남산, 북촌, 한강을 달리고,\n달아오른 피부에 메디힐 네모패드 쿨타임!\n\n서울의 아름다운 풍경과 함께한 러닝부터\n메디힐의 대표 성분 3가지를 담은\n서울에디션으로 피부를 진정시키는 시간까지✨\n\n즐거웠던 그날의 순간을 영상으로 만나보세요! 🎬\n\n#메디힐 #MEDIHEAL #서울에디션 #메디힐서울에디션 #러닝"
+          },
+          {
+            "id": "17962253031206636",
+            "media_type": "VIDEO",
+            "media_product_type": "REELS",
+            "permalink": "https://www.instagram.com/reel/DebJMR_kQ_3/",
+            "timestamp": "2026-10-13T06:17:01+0000",
+            "like_count": 23,
+            "comments_count": 0,
+            "view_count": 4046,
+            "caption": "DERMA FACT CHECK #5\n✔️화장품 냉장 보관의 진실\n\n“냉장고에 넣으면 화장품 성분이 망가진다?”\n\n시원한 사용감보다 중요한 건,\n성분과 제형에 맞는 보관 방법입니다\n\n화장품 냉장 보관의 오해와 진실!\n메디힐 더마 팩트체크에서 확인해 보세요.\n\n*해당 영상은 전문가의 지식을 공유하는 목적으로 제작되었으며, 브랜드 및 제품 광고와는 무관합니다.\n\n#메디힐 #더마팩트체크 #화장품냉장고 #뷰티괴담 #더마스킨케어"
+          }
+        ],
+        "paging": {
+          "cursors": {
+            "after": "QVFIVFRrSzZABV0RzUmNoLURSWEdNMkgyWTFPWDdsNFBEbmUxYTl6ekRUeUJmSDhZAaG92VWVETzhMZAUlVRlFlY2FhMW41eVByeDFwWXB0N0dsbmtOWDh0RGdR"
+          }
+        }
+      },
+      "id": "17841401618077866"
+    },
+    "id": "17841423923684858"
+  }
+}

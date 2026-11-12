@@ -1,0 +1,50 @@
+{
+  "_meta": {
+    "recorded_at": "2026-11-11T16:18:39Z",
+    "http_status": 200,
+    "note": "업로드한 파일 uri로 분석"
+  },
+  "response": {
+    "id": "v1_ChdXWlgwYXRpNU5jWG5yZmNQLXQ3SnNRTRIXV1pYMGF0aTVOY1hucmZjUC10N0pzUU0",
+    "status": "completed",
+    "usage": {
+      "total_tokens": 2908,
+      "total_input_tokens": 2662,
+      "input_tokens_by_modality": [
+        {
+          "modality": "video",
+          "tokens": 2638
+        },
+        {
+          "modality": "text",
+          "tokens": 24
+        }
+      ],
+      "total_cached_tokens": 0,
+      "total_output_tokens": 246,
+      "total_tool_use_tokens": 0,
+      "total_thought_tokens": 0,
+      "initial_input_tokens": 2662
+    },
+    "created": "2026-11-11T16:18:37Z",
+    "updated": "2026-11-11T16:18:37Z",
+    "service_tier": "standard",
+    "steps": [
+      {
+        "signature": "<signature omitted, 132 chars>",
+        "type": "thought"
+      },
+      {
+        "content": [
+          {
+            "text": "```json\n{\n \"hook_first_seconds\": \"00:03\",\n \"on_screen_text\": [\n  \"토리든의 수분 장벽 코스를\",\n  \"만날 수 있는 사우나💧\",\n  \"프라이빗한 사우나부터\",\n  \"스킨케어까지 한 번에! 🔥\",\n  \"속보습 부터 장벽 보습까지 한 번에\",\n  \"토리든 다이브인 인텐시브 크림\",\n  \"사우나 후,\",\n  \"피부에도 수분 장벽 케어가 필요할 때!\",\n  \"인텐시브 크림으로\",\n  \"수분과 보습 장벽을 케어 하고💧\",\n  \"인텐시브 크림 랩핑 마스크로\",\n  \"탄력까지 집중 케어! 🧖🏻‍♀️\",\n  \"마지막으로 수분 장벽 케어 루틴을\",\n  \"SNS에 인증하면 선물까지!\",\n  \"지금 토바 바스하우스에서\",\n  \"만나보세요💙\"\n ]\n}\n```",
+            "type": "text"
+          }
+        ],
+        "type": "model_output"
+      }
+    ],
+    "object": "interaction",
+    "model": "gemini-3.5-flash-lite"
+  }
+}

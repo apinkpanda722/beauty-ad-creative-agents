@@ -1,0 +1,15 @@
+{
+  "_meta": {
+    "recorded_at": "2026-11-11T16:18:13Z",
+    "http_status": 200,
+    "note": "없는 핸들: 200과 items 없음인지 확인용"
+  },
+  "response": {
+    "kind": "youtube#channelListResponse",
+    "etag": "RuuXzTIr0OoDqI4S0RU6n4FqKEM",
+    "pageInfo": {
+      "totalResults": 0,
+      "resultsPerPage": 5
+    }
+  }
+}

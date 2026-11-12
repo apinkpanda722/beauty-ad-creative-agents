@@ -1,0 +1,50 @@
+{
+  "_meta": {
+    "recorded_at": "2026-11-11T16:18:23Z",
+    "http_status": 200,
+    "note": "YouTube 주소 + processing(0~6s, fps 2)"
+  },
+  "response": {
+    "id": "v1_ChdTWlgwYXZETEw4dlFvc1VQMnQ3S21RURIXU1pYMGF2RExMOHZRb3NVUDJ0N0ttUVE",
+    "status": "completed",
+    "usage": {
+      "total_tokens": 1011,
+      "total_input_tokens": 967,
+      "input_tokens_by_modality": [
+        {
+          "modality": "video",
+          "tokens": 943
+        },
+        {
+          "modality": "text",
+          "tokens": 24
+        }
+      ],
+      "total_cached_tokens": 0,
+      "total_output_tokens": 44,
+      "total_tool_use_tokens": 0,
+      "total_thought_tokens": 0,
+      "initial_input_tokens": 967
+    },
+    "created": "2026-11-11T16:18:21Z",
+    "updated": "2026-11-11T16:18:21Z",
+    "service_tier": "standard",
+    "steps": [
+      {
+        "signature": "<signature omitted, 132 chars>",
+        "type": "thought"
+      },
+      {
+        "content": [
+          {
+            "text": "```json\n{\"hook_first_seconds\": \"00:04\", \"on_screen_text\": [\"BEHIND THE SCENE\", \"Torriden\", \"CORTIS\"]}\n```",
+            "type": "text"
+          }
+        ],
+        "type": "model_output"
+      }
+    ],
+    "object": "interaction",
+    "model": "gemini-3.5-flash-lite"
+  }
+}
