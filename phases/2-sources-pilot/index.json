@@ -1,0 +1,86 @@
+{
+  "project": "beauty-ad-creative-agents",
+  "phase": "2-sources-pilot",
+  "steps": [
+    {
+      "step": 0,
+      "name": "live-fixes-config",
+      "status": "pending"
+    },
+    {
+      "step": 1,
+      "name": "brand-split",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "creative-brand",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "youtube-brand",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "instagram-source",
+      "status": "pending"
+    },
+    {
+      "step": 5,
+      "name": "collect-runner",
+      "status": "pending"
+    },
+    {
+      "step": 6,
+      "name": "gemini-files",
+      "status": "pending"
+    },
+    {
+      "step": 7,
+      "name": "media-download",
+      "status": "pending"
+    },
+    {
+      "step": 8,
+      "name": "store-queries",
+      "status": "pending"
+    },
+    {
+      "step": 9,
+      "name": "analysis-full",
+      "status": "pending"
+    },
+    {
+      "step": 10,
+      "name": "media-flow",
+      "status": "pending"
+    },
+    {
+      "step": 11,
+      "name": "batch-runner",
+      "status": "pending"
+    },
+    {
+      "step": 12,
+      "name": "pilot-sheet",
+      "status": "pending"
+    },
+    {
+      "step": 13,
+      "name": "pilot-live-target",
+      "status": "pending"
+    },
+    {
+      "step": 14,
+      "name": "creative-attributes",
+      "status": "pending"
+    },
+    {
+      "step": 15,
+      "name": "tiktok-source",
+      "status": "pending"
+    }
+  ]
+}

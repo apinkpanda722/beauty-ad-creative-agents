@@ -31,16 +31,17 @@
 | 18 | 사용자 시간 표에 날짜별 예상 소요 시간 추가(추정) | 조언 세션(원래) |
 | 20 | **사전 실측 2차 반영**(원본 8건, 포크 조언 세션 실측, 원본 대조 완료): 영상 입력 토큰 ≈ 91/초(길이에 비례), `thinking_level` 설정, Gemini Files 실패 형태, TikTok 쪽 넘김·쪽 간 중복, Instagram URL 만료, 식약처 선케어 SPF·PA 대부분 null, YouTube 마지막 쪽·숨김 통계 | 포크 조언 세션 |
 | 21 | **분석 비용 견적 상향 가능성**(상한 $12 유지 확정, 아래 §8): 1,500건 $9.3(minimal)~$12.8(기본 thinking), 상세페이지 $1.2 별도 → **Gemini 상한 $12는 기본 thinking이면 닿는다.** P1에 `duration_s`·분석 구간 상한(60초)·`thinking_level` 필수 인자(기본 minimal), P2 시범에서 minimal·기본 비교. 상한 결정은 사용자 | 포크 조언 세션 |
-| 19 | TikTok 집행 주체 규칙(§P2 step 9)은 처음에 포크 조언 세션의 답이었으나 이후 **사용자가 확정**했다(§8) | 정정 |
+| 19 | TikTok 집행 주체 규칙(§P2 step 15)은 처음에 포크 조언 세션의 답이었으나 이후 **사용자가 확정**했다(§8) | 정정 |
 | 22 | **분류 동결을 둘로 나눔**: 11-18 `content_type`·`category`만 부분 동결(시범 결과 반영, 사용자 승인), 11-19 나머지 축 전체 v1 동결. 두 날짜를 사전 등록 파일에 기록. 분석 일괄 실행은 전체 v1 동결 뒤 | 조언 세션 v2.1 |
 | 23 | **`pilot-compare`·`cost-recalc`를 `analyze-target` 앞으로**, 둘 뒤에 사용자 결정 지점(thinking_level·Gemini 상한)을 두고 그 뒤에 일괄 분석 | 조언 세션 v2.1 |
 | 24 | **TikTok은 E1 표본 출처에서 기본 제외**(밀릴 때만이 아님). 시트에는 YouTube 영상 주소·Instagram `permalink`만 쓰고 만료되는 `media_url`은 넣지 않음. 결과 문서에 "E1은 YouTube·Instagram 한정"을 한계로 기록 | 조언 세션 v2.1 |
 | 25 | P2 시범의 성분은 **원문 그대로 저장**, 표준명 대조·폐기는 P4로(의존성 역전 해소). E1 판정 축에서 `ingredients` 제외 권고 | 조언 세션 v2.1 |
 | 26 | E1 절차 3(타사 모델 라벨): 기본 "미수행, 결과 문서에 한계로 기록"으로 확정, P6에서 텍스트·캡션 축만 재검토 가능 | 조언 세션 v2.1, 사용자 확정 |
 | 27 | E3 벡터 비교 구성(임베딩 모델, 벡터 저장소)을 남은 미확인과 P5 전 실측 대상에 추가 | 조언 세션 v2.1 |
-| 28 | **수집 실행기를 P2로**: `collect-runner`(재개 가능한 전체 수집, 지표 이력 누적, `make live-collect`)를 P2 `instagram-source` 바로 뒤 step으로. 사용자가 11-15~16에 수집을 돌린다. P2가 밀리면 `batch-runner`·TikTok이 먼저 줄고 `collect-runner`는 남긴다 | 조언 세션 v3 검토 |
+| 28 | **수집 실행기를 P2로**: `collect-runner`(재개 가능한 전체 수집, 지표 이력 누적, `make live-collect`)를 P2 `instagram-source`(step 4) 뒤 step 5로. 사용자가 11-15~16에 수집을 돌린다. P2가 밀리면 `batch-runner`·TikTok이 먼저 줄고 `collect-runner`는 남긴다 | 조언 세션 v3 검토 |
 | 29 | **E1 표본 프레임 = 분석 가능한 소재**: 소재마다 `analyzable`을 저장(`domain` 공통 소재 형식, P1 step 1), `e1-sampling`은 `analyzable == true`에서만 추출, 제외 비율을 결과 문서에 한계로 기록 | 조언 세션 v3 검토 |
 | 30 | `ingredients` E1 판정 축 제외는 **사용자 확정 전까지 권고 상태**. 확정되면 `e1_preregistration.md`에 기록 | 조언 세션 v3 검토 |
+| 31 | **P2를 11 step에서 16 step으로 재번호**(레이어당 한 step 원칙): `media-upload-flow`→`gemini-files`·`media-download`·`media-flow`, `analysis-full`→`store-queries`·`analysis-full`, `creative-brand`·`youtube-brand`·`creative-attributes` 추가. 끊는 지점은 step 5·13 뒤. 초안은 승인본이라 step 내용 변경 없이 이동 | P2 초안 승인(2026-11-12) |
 
 ## 1. 전제와 일정
 
@@ -85,7 +86,7 @@
 - `make verify`는 서비스 없이 통과하므로 SQL·Cypher·드라이버 설정의 결함은 첫 live에서 드러난다. 수정은 다음 phase의 첫 step(`live-fixes`)에 넣는다.
 - 라벨 키 파일이 `data/interim/`에 놓이므로 **P2부터 모든 step의 열람 금지 경로에 `data/interim/`를 넣는다**(블라인드 보호).
 - 패키지 설치: step이 `uv add`로 지시한 패키지만 허용하고 그 밖의 설치·의존성 추가는 금지하며, 해석된 버전을 완료 보고(`summary`)에 적는다. (AGENTS.md CRITICAL을 이에 맞게 고쳤다. 사용자 결정, 2026-11-12)
-- `execute.py --steps N`으로 phase를 끊어 리뷰한다(P2는 TikTok 앞에서 한 번 끊어 시범 live를 먼저 돌린다).
+- `execute.py --steps N`으로 phase를 끊어 리뷰한다(P2는 step 5 뒤·step 13 뒤에서 끊어 live를 먼저 돌린다).
 
 ## 3. phase 상세
 
@@ -109,22 +110,34 @@
 
 **P1b (선택, 11-14 소요 측정 뒤 결정)**: 그래프 적재와 에이전트 한 줄을 P1 끝에 이어 붙이는 선택지. 단 P4·P5 첫 step과 중복이라 일정이 허락할 때만 한다.
 
-### P2 sources-pilot (11 step: 4a·4b 분리 포함, TikTok은 마지막). P2가 밀리면 `batch-runner`·TikTok이 먼저 줄고 `collect-runner`는 남긴다
+### P2 sources-pilot (16 step: 구 11 step에서 레이어별로 쪼갬, TikTok은 마지막 2개). P2가 밀리면 `batch-runner`·TikTok(14·15)이 먼저 줄고 `collect-runner`는 남긴다
 
-| step | 이름 | 내용 |
-|---|---|---|
-| 0 | `live-fixes-config` | P1 live 결함 수정 |
-| 1 | `brand-split` | **dev/test 브랜드 분할**: `sources.yaml`의 14개 브랜드를 시드로 나눠 `config/brand_split.yaml`에 기록(수집 전, 같은 브랜드가 양쪽에 걸치지 않음, 계정이 여럿인 브랜드는 한쪽). **사전 등록 제약**: dev·test 양쪽에 3개 카테고리와 YouTube·Instagram이 모두 들어갈 것, test가 E1 100~200건(YouTube·Instagram만)과 E4 60건을 채울 수집량일 것. 안 맞으면 **라벨링 전에 한해** 이유를 적고 1회 재분할할 수 있다. 분할·시드·제약은 `docs/results/e1_preregistration.md`에 포함 |
-| 2 | `instagram-source` | Business Discovery, `after` 커서, `media_url` 키 없음, 영상 여부는 `media_type == "VIDEO"`, 오류 110·190 분기, 서명 주소는 받을 때마다 새로 조회. **만료는 `media_url`의 `oe`(16진 Unix 시각)**에 있고 49건 모두 남은 시간 32~108시간이었다 → 목록 조회 뒤 수 시간 안에 받아 처리하고 저장한 URL을 나중에 쓰지 않으며, `oe`가 임박하면 재조회. 만료된 URL의 응답은 미확인. 묶음 게시물의 `media_url`은 이미지. **`permalink`는 표본 8건에 모두 있었으나 CONTRACTS에는 아직 없다**(계약 PR에서 추가). 어댑터는 `fields`에 `permalink`를 넣어 요청하고 없을 수 있다고 읽는다. 블라인드 시트(P3)는 이 `permalink`를 쓴다. **재조회 실측(2026-11-12, 4계정×50건)**: `media_url` 반환 여부는 5초·15분·약 20시간 뒤 재조회에서 모두 일관(변화 0건)해 수집 시점 `analyzable` 저장이 성립하나, 3일 뒤 일관성은 미실측이라 **분석 직전 재조회에서 `media_url`이 사라진 게시물은 `analyzable=False`로 갱신**한다. `media.limit(100)`이 한 번에 100건을 반환하므로 계정 재스캔은 계정당 1~2호출이다. 재조회 때 `oe`는 일부 게시물만 약 4시간 단위로 갱신되고 재조회 직후 남은 유효 시간은 최소 32.1시간(대부분 104~108시간). 호출당 `x-app-usage` `call_count` 약 0.5%(한도 정의는 미확인). 특정 게시물만 조회하는 방법은 없다. `oe` 임박(남은 6시간 미만)이면 어댑터가 재조회 |
-| 3 | `collect-runner` | **전체 수집 실행기**(YouTube·Instagram 전 브랜드, 재개 가능, 지표 이력 누적, 소재마다 `analyzable` 저장, 수집은 메타데이터만 쓰고 분석과 무관), `make live-collect`와 환경 점검. **이 step 뒤에 끊어 사용자가 11-15~16에 `make live-collect`를 돌린다.** 영상 파일은 받지 않는다. **분석 직전 갱신 필요**: Instagram `media_url`은 32~108시간 뒤 만료하므로 11-19 이후 분석할 때는 수집 때 저장한 URL을 쓰지 않고 분석 직전에 계정을 다시 조회해 URL을 갱신한다(P3 `analyze-target`) |
-| 4 | `media-upload-flow` | 영상 임시 다운로드 → `create_file` → `processed` 대기 → 분석 → `file_delete`(`deleted: true`로 판단) → 임시 파일 삭제. 실패해도 정리. **업로드 뒤 `status == "processed"`일 때만 분석**, `error`면 소재를 보류로 두고 파일 삭제. 영상 크기 0은 사전 거부(빈 파일 업로드는 `ValueError(...'sizeBytes')`). 없거나 삭제된 파일은 403 `permission_denied`, 비영상은 400 `invalid_request`로 오므로 분석 오류 분류에 넣는다. 8.19MB 기준 다운로드 9.9초·업로드 3.9초·대기 4.9초·분석 16.6초. 구간 지정은 Files 파일에서도 동작. **llm(Files)과 임시 파일 정리 오케스트레이션이 한 step에 레이어 둘이므로 step 파일 작성 때 4a(llm)·4b(pipeline)로 쪼갠다**. **`httpx`는 `sources`에서만 허용되므로 영상 임시 다운로드는 `sources`의 함수(예: `download_media`)로 두고 `pipeline`(4b)이 그 함수를 호출한다**. 받기 실패(만료 포함)는 `analyzable` 해제가 아니라 "재조회 후 재시도 1회, 그래도 실패하면 보류(`held`)" |
-| 5 | `analysis-full` | 콘텐츠 유형 먼저, 제품 소재만 전체 축, 두 번 호출(첫 3초 / 전체). **성분은 원문 그대로 저장한다**(표준명 대조·목록 밖 폐기는 사전이 생기는 P4 `product-records`에서 한다. P2 시범 시점에는 사전이 없다). 시범·E1 라벨링 판정 축에서 `ingredients`는 제외하는 것을 권고(그래프 연결 품질은 역량 질문 검증으로 확인) |
-| 6 | `batch-runner` | 작업 상태 4종, 소재별 실패 격리, **동시성 기본값 낮게(설정 가능)**, 429를 분당·일일로 구분(분당은 대기 후 재개, 일일은 멈춤), 비용 상한, 실행 유형 기록. 동시성 기본값은 낮게(8~16까지는 429 없이 안전, 텍스트 60건·동시 30 전부 200). 유료 등급 분당 한도 수치는 미확인 |
-| 7 | `pilot-sheet` | **시범 20건은 dev 브랜드에서만**(YouTube·Instagram), 출처별 층화·시드 기록. 블라인드 시트: **모델 라벨과 지표를 숨기고**, 항목 순서를 시드로 섞고, 키 파일은 `data/interim/`에 분리. **시트 생성기만**(채점기는 P3). 키 파일에 **`thinking_level` `minimal`과 기본 두 실행**의 모델 라벨을 모두 둔다(추가 비용 약 $0.2). 비교는 사람 라벨 확정 뒤에만. 시트에는 YouTube 영상 주소와 Instagram `permalink`만 넣고 만료되는 `media_url`은 넣지 않는다. 같은 소재를 두 `thinking_level` 실행으로 분석하므로 `analysis_jobs` 키에 실행 태그(`run_tag`)를 넣거나 `kind`에 붙인다(P1 스키마의 키는 `(source, source_id, kind)`이라 `labels`가 덮어써진다. 원문은 `model_outputs`에 남는다) |
-| 8 | `pilot-live-target` | `make live-pilot`: dev 브랜드 소량 수집 → 20건 분석 → 시트 출력. 환경 점검 포함 |
-| 9 | `tiktok-source` | 토큰(7200초, 만료 시 재발급), 광고 조회(날짜 문자열, `max`는 어제 이전, `has_more`·`search_id` 페이지 넘김), `error.code == "ok"`로 성공 판정, 500 대기 후 재시도, 도달 구간 하한 변환(방식 기록). 집행 주체는 `config/retailers.yaml`(판매처 목록 시드)로 판정하고 **숫자 이름·목록 밖은 `불명`**(광고주 이름의 40%가 숫자). **쪽 넘김**: 같은 본문에 `search_id`를 더해 보내고(마지막으로 받은 값), 종료는 `has_more == false`(마지막 쪽에도 `search_id`가 오므로 그 유무로 판정하지 않음, 마지막 쪽은 10건 미만 가능). **쪽 사이 중복 광고**(dalba 29건 받아 28 고유, mixsoon 49건 받아 43 고유)라 `ad.id`로 중복 제거. `image_urls`는 이미지 없는 광고에서 키 자체가 없다. 쪽당 2~3초. **TikTok 소재는 E1 표본에서 제외**하고 그래프·에이전트 데이터로만 쓴다 |
+step 본문(내용·금지사항·수정 허용 경로)은 `phases/2-sources-pilot/step*.md`가 원본이다. 아래 표는 번호와 계층만 적는다(P2_NOTES 초안 승인본, 2026-11-12).
 
-끊는 지점: **step 3(`collect-runner`) 뒤** 사용자가 `make live-collect`(11-15~16), **step 8(`pilot-live-target`) 뒤** 사용자가 `make live-pilot`을 돌리고 시범 라벨링을 시작한 상태에서 step 9(`tiktok-source`)를 실행한다. P2는 live 타깃이 둘(`live-collect`, `live-pilot`)이다.
+| step | 이름 | 계층 | 한 줄 |
+|---|---|---|---|
+| 0 | `live-fixes-config` | store | P1 코드 검토 메모: 읽기 뒤 트랜잭션 종료(P1 live 결함은 없었음) |
+| 1 | `brand-split` | sources | dev/test 브랜드 분할(`config/brand_split.yaml`), 사전 등록 제약, 라벨링 전 1회 재분할 CLI |
+| 2 | `creative-brand` | domain+store | 소재에 brand·account 추가(P1 공백) |
+| 3 | `youtube-brand` | sources | 채널 설정의 brand·handle 전달 |
+| 4 | `instagram-source` | sources | Business Discovery, `after` 커서, `media_url` 없음·`oe` 만료·`permalink`·오류 110·190 |
+| 5 | `collect-runner` | pipeline | 전체 수집 실행기와 `make live-collect`. **이 step 뒤에 끊고 사용자가 11-15~16에 실행** |
+| 6 | `gemini-files` | llm | Gemini Files(create·retrieve·delete) 경로(`gemini_files_failures_thinking_burst_probe.json`) |
+| 7 | `media-download` | sources | `download_media`(메모리 바이트, timeout 120초, 최대 50MB) |
+| 8 | `store-queries` | domain+store | 분석 대기열·실행 태그(`kind`의 `@태그`, 스키마 불변) |
+| 9 | `analysis-full` | domain+analysis | 콘텐츠 유형 먼저, 제품 소재만 전체 축, 성분 원문 저장, 모델 ID 한 곳, `FINAL_RUN_TAG` |
+| 10 | `media-flow` | pipeline | 다운로드 → 업로드 → `processed` 대기 → 분석 → 삭제(`finally`) |
+| 11 | `batch-runner` | pipeline | 작업 상태 4종, 소재별 실패 격리, 낮은 동시성, 429 분당·일일 구분, 비용 상한 |
+| 12 | `pilot-sheet` | eval | 시범 20건 블라인드 시트(dev 브랜드만), 키 파일 분리, 라벨링 안내 |
+| 13 | `pilot-live-target` | eval | `make live-pilot`. **이 step 뒤에 끊고 사용자가 실행**(`pipeline`이 아니라 `eval`에 둠: 다른 계층은 eval을 import하지 못함) |
+| 14 | `creative-attributes` | domain+store | 마이그레이션 v3, TikTok 출처 고유 정보 |
+| 15 | `tiktok-source` | sources | 토큰·광고 조회·쪽 넘김(`has_more`)·`ad.id` 중복 제거·집행 주체 규칙. 밀리면 P3로 |
+
+번호 변경: 구 `media-upload-flow`는 6·7·10으로, 구 `analysis-full`은 8·9로, 구 `tiktok-source`는 14·15로 나뉘었다.
+
+끊는 지점: **step 5 뒤** 사용자가 `make live-collect`(11-15~16), **step 13 뒤** 사용자가 `make live-pilot`을 돌리고 시범 라벨링을 시작한 상태에서 step 14·15(TikTok)를 실행한다. P2는 live 타깃이 둘(`live-collect`, `live-pilot`)이다. step 6 실행 전에 `gemini_files_failures_thinking_burst_probe.json`이, step 15 전에 `tiktok_*` 원본이 `tests/fixtures/contracts/`에 있어야 한다(둘 다 계약 PR #22로 들어와 있음).
+
+**P2 실행에서 사용자 결정이 필요한 항목**: 분할 수집량 기준(수집 뒤 실제 값을 보고 확정), 판매처 시드(`sephora`, `etos`, `cosibella`, `pilulka`, `pharmacontinente`), `thinking_level` 비교와 Gemini 상한 유지(시범 직후 `cost-recalc`).
 
 ### P3 collect-freeze
 
@@ -139,6 +152,11 @@
 | 6 | `analyze-target` | `make live-analyze`(재개 가능, **전체 v1 동결 뒤**, **Instagram은 분석 직전에 계정을 다시 조회해 `media_url`을 갱신하고 받은 즉시 처리**, 결정된 `thinking_level`·상한으로, 사용자가 2단계 라벨링하는 동안 돈다), 진행 보고(출처·카테고리별 건수, 실패율, 축별 `other` 비율). **step 6 실행 전에 step 4·5의 사용자 결정이 끝나 있어야 한다** |
 | 7 | `metrics-normalize` | 채널 내 조회수 백분위(게시 14일 이상), 상·하위 25%, 출처 간 직접 비교 없음 |
 | 8 | `e1-scorer` | 축별 일치율·Cohen's κ·소구점 정밀도·재현율·콘텐츠 유형 재현율(`pilot-compare`의 일치율 함수를 재사용, 그 모듈은 "추가에 한함"). 사람 라벨 파일이 없으면 시작하지 않는다. 합성 데이터 테스트, 모델 값 고정 금지, 빈 집합이면 실패 |
+
+**P2에서 넘어온 P3 항목**
+- `taxonomy-partial`·`taxonomy-v1`: 분류 값·프롬프트를 v1로 올릴 때 `analysis/models.py`의 `PROMPT_VERSIONS`를 갱신하고 E1 사전 등록 파일에 프롬프트 버전 3개와 `ANALYSIS_MODEL_ID`를 함께 기록한다.
+- `live-fixes` 뒤 **`tiktok-plans`**(pipeline: `prepare_tiktok_plans`, 브랜드별 재조회 한 번, `analyze_creative`에 연결)를 둔다. TikTok은 영상 주소를 저장하지 않아 분석 직전 `refresh_tiktok_video_urls`로 받아야 하는데 P2 step 10은 Instagram만 구현한다. `max_pages`는 수집 때 쓴 값 이상(필수 인자).
+- `FINAL_RUN_TAG = "v1"`(`analysis/models.py`): P3 `analyze-target`과 P4 `graph-sync`는 이 태그의 `content_type@`·`hook@`·`full@`만 읽는다. 시범은 `@minimal`·`@default`.
 
 실행 끊는 지점: step 4 뒤(비용·thinking_level 결정), step 5 뒤(전체 v1 승인).
 
@@ -236,8 +254,8 @@ P6: E2, E3(벡터 구성은 실측 뒤), E5, 격리 검사 200건, (E4), (E1 타
 |---|---|
 | 셋업 직후 | `uv sync`, OrbStack 켜기, `.env`의 `NEO4J_PASSWORD`(8자 이상)·`POSTGRES_PASSWORD` 채우기 |
 | P1 머지 뒤 | `docker compose up`, `make live-slice`, 결과 알리기 → 결과 문서 PR |
-| P2 step 3 뒤 | `make live-collect`(11-15~16) |
-| P2 step 8 뒤 | `make live-pilot` → **시범 20건 라벨링(11-17~18)**. 이어서 step 9 실행 |
+| P2 step 5 뒤 | `make live-collect`(11-15~16) |
+| P2 step 13 뒤 | `make live-pilot` → **시범 20건 라벨링(11-17~18)**. 이어서 step 14·15 실행 |
 | P3 | 11-18~19 **E1 1단계 라벨링**, 11-19 분류 v1 승인, 2단계 시트 생성 CLI 실행, **11-20까지 2단계 라벨링(축 50건)**, `make live-analyze`(라벨링 중 돌림, 12월 안, 되도록 11-24까지) |
 | P4 | step 0 뒤 `make live-graph`, 11-20 역량 질문 최종 검토, 대표 단품 목록 확인, `make live-cq` |
 | P5 | step 1 뒤 `make live-agent`, **11-26까지 평가셋**(§8), 이미지 시안 모델 결정(보류 중), 격리 표식 데이터 확인 |
