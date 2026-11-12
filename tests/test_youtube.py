@@ -13,6 +13,8 @@ from urllib.parse import urlsplit
 from uuid import uuid4
 
 import pytest
+
+from beautyads.domain import Source
 from beautyads.sources.config import YouTubeChannel
 from beautyads.sources.youtube import (
     HttpResponse,
@@ -24,8 +26,6 @@ from beautyads.sources.youtube import (
     list_upload_video_ids,
     parse_duration_seconds,
 )
-
-from beautyads.domain import Source
 
 FIXTURES = Path(__file__).parent / "fixtures" / "contracts"
 STAMP = datetime(2026, 11, 12, tzinfo=UTC)

@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+
 from beautyads.sources.config import ConfigError, YouTubeChannel, load_youtube_channels
 
 

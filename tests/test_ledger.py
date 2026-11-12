@@ -6,6 +6,8 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
+from pydantic import ValidationError
+
 from beautyads.obs.ledger import (
     CostCapExceeded,
     LedgerEntry,
@@ -15,7 +17,6 @@ from beautyads.obs.ledger import (
     provider_total,
     read_entries,
 )
-from pydantic import ValidationError
 
 
 @pytest.fixture

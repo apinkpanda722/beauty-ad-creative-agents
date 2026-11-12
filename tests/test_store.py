@@ -9,6 +9,9 @@ from urllib.parse import unquote, urlparse
 
 import psycopg
 import pytest
+
+from beautyads.domain import Creative, CreativeKey, JobStatus, Metrics, Source
+from beautyads.settings import MissingSetting
 from beautyads.store.connection import StoreConnectError, connect, postgres_dsn
 from beautyads.store.repository import CREATIVE_COLUMNS, PostgresCreativeStore
 from beautyads.store.schema import (
@@ -17,9 +20,6 @@ from beautyads.store.schema import (
     apply_migrations,
     build_upsert_sql,
 )
-
-from beautyads.domain import Creative, CreativeKey, JobStatus, Metrics, Source
-from beautyads.settings import MissingSetting
 
 NOW = datetime(2026, 11, 12, tzinfo=UTC)
 

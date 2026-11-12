@@ -4,6 +4,7 @@ import json
 from datetime import UTC, datetime
 
 import pytest
+
 from beautyads.analysis import (
     HOOK_PROMPT_VERSION,
     HOOK_WINDOW_S,
@@ -14,7 +15,6 @@ from beautyads.analysis import (
     hook_window,
     select_for_analysis,
 )
-
 from beautyads.domain import Creative, HookType, JobStatus, Source
 from beautyads.llm import (
     CostCapExceeded,
