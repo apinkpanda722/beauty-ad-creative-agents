@@ -201,7 +201,16 @@
     {
       "step": 14,
       "name": "creative-attributes",
-      "status": "pending"
+      "status": "blocked",
+      "started_at": "2026-11-13T00:03:16+0900",
+      "blocked_reason": "“`src/beautyads/store/schema.py`(마이그레이션 v3 추가와 `CHANGE_COLUMNS` 확장에 한함)”과 “값은 `json.dumps`한 문자열을 `%s::jsonb`로 전달한다(매개변수 방식 유지).”가 충돌합니다. 현재 업서트 SQL은 schema.py의 고정 `_INSERT_TYPES`로 매개변수 형변환을 생성하므로 attributes 열에 대응하는 jsonb 타입 추가가 필요하지만 허용 범위에서 제외되어 있습니다. `_INSERT_TYPES` 확장도 허용하도록 수정 범위를 조정해야 합니다.",
+      "blocked_at": "2026-11-13T00:04:22+0900",
+      "usage": {
+        "input_tokens": 153996,
+        "cached_input_tokens": 103296,
+        "output_tokens": 1590,
+        "attempts": 1
+      }
     },
     {
       "step": 15,
