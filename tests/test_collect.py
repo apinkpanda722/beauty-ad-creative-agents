@@ -354,15 +354,51 @@ def test_instagram_stop_does_not_stop_youtube_or_call_later_accounts(
     )
 
 
-def test_usage_high_saves_current_account_and_stops_next(split):
-    response = instagram_success()._replace(
-        headers={"x-app-usage": json.dumps({"call_count": 80})}
-    )
+def test_usage_high_stops_next_and_discards_partial_account(split):
+    usage = {"call_count": 12, "total_cputime": 80, "total_time": 31}
+    response = instagram_success()._replace(headers={"x-app-usage": json.dumps(usage)})
     dependencies = deps(instagram=FakeGet(response))
-    report = run(dependencies, split, instagram_accounts=[account(), account("later")])
+    out = io.StringIO()
+    report = run(
+        dependencies,
+        split,
+        sources=["instagram"],
+        instagram_accounts=[account(), account("later")],
+        out=out,
+    )
     assert report.stopped == {"instagram": "INSTAGRAM_USAGE_HIGH"}
-    assert report.accounts[-1].fetched > 0
     assert len(dependencies.instagram_get.calls) == 1
+    last = report.accounts[-1]
+    # 받았지만 불완전하므로 저장하지 않는다(skip-recent가 완료로 오인하지 않게).
+    assert last.fetched > 0 and last.stored is False
+    assert not dependencies.store.creatives
+    # 세 지표를 각각 기록해 어느 지표가 한도를 채웠는지 다음 실행에서 볼 수 있다.
+    assert last.usage == {key: float(value) for key, value in usage.items()}
+    summary = json.loads(out.getvalue().splitlines()[-1])
+    assert summary["instagram_last_usage"] == last.usage
+
+
+def test_partial_account_is_collected_again_with_skip_recent(split):
+    usage_high = instagram_success()._replace(
+        headers={"x-app-usage": json.dumps({"call_count": 90})}
+    )
+    first = deps(instagram=FakeGet(usage_high))
+    run(first, split, sources=["instagram"], instagram_accounts=[account()])
+    # 첫 실행이 남긴 저장 상태(없음)를 다음 실행의 store로 넘겨도 계정을 건너뛰지 않는다.
+    second = deps(
+        instagram=FakeGet(instagram_success()),
+        store=MemoryStore(first.store.collection_stats()),
+    )
+    report = run(
+        second,
+        split,
+        sources=["instagram"],
+        instagram_accounts=[account()],
+        skip_recent_hours=24,
+    )
+    assert report.accounts[0].skipped is False
+    assert report.accounts[0].stored is True
+    assert second.instagram_get.calls
 
 
 def test_skip_recent_and_account_filter(split):
@@ -464,7 +500,7 @@ def test_dry_run_calls_no_dependencies_or_checks(config):
     assert len(text.splitlines()) == 1 and text.startswith("ESTIMATE ")
     assert "호출당 시간은 가정(미실측)" in text
     assert "YouTube 쿼터 사용량은 미확인(Cloud 콘솔에서 확인)" in text
-    assert "호출당 앱 사용량 약 0.5%(실측 추정)" in text
+    assert "호출당 앱 사용량 0.5%는 과소추정이었다" in text
 
 
 def test_dry_run_filters_sources_and_accounts(config):

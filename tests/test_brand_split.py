@@ -29,6 +29,7 @@ from beautyads.sources.split import (
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCES = ("youtube", "instagram", "tiktok")
+E1_SOURCES = ("youtube", "instagram")
 
 
 def write_yaml(path, data):
@@ -242,21 +243,25 @@ def test_volume_thresholds_and_empty_input(synthetic):
     split = new_split(synthetic)
     counts = {
         (source, split.test[0]): split.volume.test_analyzable_min_per_source
-        for source in SOURCES
+        for source in E1_SOURCES
     }
+    counts[(SOURCES[0], split.test[0])] += split.volume.test_analyzable_min_total
     counts[(SOURCES[0], split.dev[0])] = split.volume.dev_analyzable_min_total
     assert volume_violations(split, counts) == []
     empty = volume_violations(split, {})
-    assert len(empty) == len(SOURCES) + 2
+    assert len(empty) == len(E1_SOURCES) + 2
     assert any("test total" in item for item in empty)
     assert any("dev total" in item for item in empty)
-    for source in SOURCES:
+    for source in E1_SOURCES:
         assert any(source in item for item in empty)
     # Isolate each check by relaxing the other thresholds.
     total_only = split.model_copy(
         update={
             "volume": VolumeConstraints(
-                test_analyzable_min_total=split.volume.test_analyzable_min_total + 1,
+                test_analyzable_min_total=sum(
+                    value for key, value in counts.items() if key[1] in split.test
+                )
+                + 1,
                 test_analyzable_min_per_source=0,
                 dev_analyzable_min_total=0,
             )
@@ -264,7 +269,7 @@ def test_volume_thresholds_and_empty_input(synthetic):
     )
     assert len(volume_violations(total_only, counts)) == 1
     without_source = {
-        key: value for key, value in counts.items() if key[0] != SOURCES[-1]
+        key: value for key, value in counts.items() if key[0] != E1_SOURCES[-1]
     }
     source_only = split.model_copy(
         update={
@@ -278,6 +283,22 @@ def test_volume_thresholds_and_empty_input(synthetic):
     without_dev = {key: value for key, value in counts.items() if key[1] in split.test}
     assert len(volume_violations(split, without_dev)) == 1
     assert volume_violations(split, {("unknown", "unregistered"): 10000}) == empty
+
+
+def test_volume_per_source_floor_covers_only_e1_sources(synthetic):
+    # E1 표본은 YouTube·Instagram만이므로 TikTok 수집량 0이 위반이 되면 안 된다.
+    split = new_split(synthetic)
+    floor = split.volume.test_analyzable_min_per_source
+    counts = {
+        ("youtube", split.test[0]): floor + split.volume.test_analyzable_min_total,
+        ("instagram", split.test[0]): floor,
+        ("youtube", split.dev[0]): split.volume.dev_analyzable_min_total,
+    }
+    assert volume_violations(split, counts) == []
+    short = {**counts, ("instagram", split.test[0]): floor - 1}
+    violations = volume_violations(split, short)
+    assert any("instagram" in item for item in violations)
+    assert not any("tiktok" in item for item in violations)
 
 
 def test_brand_group(synthetic):

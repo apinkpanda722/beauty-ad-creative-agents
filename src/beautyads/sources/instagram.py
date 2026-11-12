@@ -29,9 +29,16 @@ InstagramGet = Callable[[str, Mapping[str, str], float], InstagramHttpResponse]
 class InstagramError(Exception):
     """Stable codes only; never retain provider messages or request diagnostics."""
 
-    def __init__(self, code: str, *, usage_pct: float | None = None):
+    def __init__(
+        self,
+        code: str,
+        *,
+        usage_pct: float | None = None,
+        usage: dict[str, float] | None = None,
+    ):
         self.code = code
         self.usage_pct = usage_pct
+        self.usage = usage
         super().__init__(code)
 
 
@@ -73,7 +80,8 @@ def business_discovery_fields(
     )
 
 
-def parse_usage_pct(headers: Mapping[str, str]) -> float | None:
+def parse_usage(headers: Mapping[str, str]) -> dict[str, float] | None:
+    """Per-metric `x-app-usage` values; the stop check uses their maximum."""
     raw = headers.get("x-app-usage")
     if not isinstance(raw, str):
         return None
@@ -81,14 +89,19 @@ def parse_usage_pct(headers: Mapping[str, str]) -> float | None:
         usage = _mapping(json.loads(raw))
     except ValueError:
         return None
-    values = [
-        value
+    values = {
+        key: float(value)
         for key in ("call_count", "total_cputime", "total_time")
         if isinstance(value := usage.get(key), (int, float))
         and not isinstance(value, bool)
         and isfinite(value)
-    ]
-    return float(max(values)) if values else None
+    }
+    return values or None
+
+
+def parse_usage_pct(headers: Mapping[str, str]) -> float | None:
+    values = parse_usage(headers)
+    return max(values.values()) if values else None
 
 
 def _published_at(value: Any) -> datetime | None:
@@ -142,6 +155,7 @@ class AccountPage(NamedTuple):
     followers_count: int | None
     media_count: int | None
     usage_pct: float | None
+    usage: dict[str, float] | None = None
 
 
 def fetch_account_page(
@@ -176,12 +190,19 @@ def fetch_account_page(
             reason = "INSTAGRAM_RATE_LIMITED"
         else:
             reason = f"INSTAGRAM_ERROR_{code if code is not None else response.status}"
-        raise InstagramError(reason, usage_pct=parse_usage_pct(response.headers))
+        raise InstagramError(
+            reason,
+            usage_pct=parse_usage_pct(response.headers),
+            usage=parse_usage(response.headers),
+        )
 
-    usage_pct = parse_usage_pct(response.headers)
+    usage = parse_usage(response.headers)
+    usage_pct = max(usage.values()) if usage else None
     discovery = _mapping(response.body).get("business_discovery")
     if not isinstance(discovery, Mapping):
-        raise InstagramError("INSTAGRAM_INVALID_RESPONSE", usage_pct=usage_pct)
+        raise InstagramError(
+            "INSTAGRAM_INVALID_RESPONSE", usage_pct=usage_pct, usage=usage
+        )
     media = _mapping(discovery.get("media"))
     posts = media.get("data", [])
     after = _mapping(_mapping(media.get("paging")).get("cursors")).get("after")
@@ -190,7 +211,9 @@ def fetch_account_page(
         or any(not isinstance(post, Mapping) for post in posts)
         or (after is not None and not isinstance(after, str))
     ):
-        raise InstagramError("INSTAGRAM_INVALID_RESPONSE", usage_pct=usage_pct)
+        raise InstagramError(
+            "INSTAGRAM_INVALID_RESPONSE", usage_pct=usage_pct, usage=usage
+        )
     followers = discovery.get("followers_count")
     count = discovery.get("media_count")
     return AccountPage(
@@ -199,6 +222,7 @@ def fetch_account_page(
         followers if type(followers) is int else None,
         count if type(count) is int else None,
         usage_pct,
+        usage,
     )
 
 
@@ -216,6 +240,7 @@ def collect_instagram(
     max_posts_per_account: int,
     collected_at: datetime,
     usage_stop_pct: float = 80.0,
+    usage_sink: dict[str, float] | None = None,
 ) -> CollectResult:
     creatives: list[Creative] = []
     errors: dict[str, str] = {}
@@ -234,6 +259,9 @@ def collect_instagram(
                     get, token, ig_user_id, account, base_url=base_url, after=after
                 )
                 usage_pct = page.usage_pct
+                if usage_sink is not None and page.usage:
+                    usage_sink.clear()
+                    usage_sink.update(page.usage)
                 for post in page.posts[: max_posts_per_account - collected]:
                     creatives.append(
                         media_to_creative(
@@ -248,6 +276,9 @@ def collect_instagram(
                     break
         except InstagramError as error:
             errors[account.username] = error.code
+            if usage_sink is not None and error.usage:
+                usage_sink.clear()
+                usage_sink.update(error.usage)
             if error.code in _STOP_ERRORS:
                 return CollectResult(creatives, errors, error.code)
             if _usage_high(error.usage_pct, usage_stop_pct) or _usage_high(

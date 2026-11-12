@@ -26,7 +26,7 @@
 
 | 확인한 것 | 실제 형태 | 원본 |
 |---|---|---|
-| 호출 주체와 기본 URL | `GET https://graph.facebook.com/v21.0/{내 IG 사용자 ID}`에 `fields=business_discovery.username(대상){followers_count,media_count,media.limit(100){id,media_type,media_product_type,media_url,permalink,timestamp,caption,like_count,comments_count,view_count}}`와 `access_token`을 쿼리로 보낸다. v21.0·v23.0·버전 없는 URL 모두 같은 요청에 200이었다. 호출 주체 ID는 `.env`의 **`INSTAGRAM_USER_ID`**(2026-11-12 현재 `.env`에 없다. 사용자가 추가해야 한다). 앱 심사를 신청하지 않은 새 앱에서 동작했다 | `instagram_business_discovery_with_media_url.json` |
+| 호출 주체와 기본 URL | `GET https://graph.facebook.com/v21.0/{내 IG 사용자 ID}`에 `fields=business_discovery.username(대상){followers_count,media_count,media.limit(100){id,media_type,media_product_type,media_url,permalink,timestamp,caption,like_count,comments_count,view_count}}`와 `access_token`을 쿼리로 보낸다. v21.0·v23.0·버전 없는 URL 모두 같은 요청에 200이었다. 호출 주체 ID는 `.env`의 **`INSTAGRAM_USER_ID`**(사용자가 `.env`에 추가함, 2026-11-12). 앱 심사를 신청하지 않은 새 앱에서 동작했다 | `instagram_business_discovery_with_media_url.json` |
 | **`media_url`이 없을 때** | `null`이 아니라 **키 자체가 빠진다**. 같은 계정 안에서도 게시물마다 다르다 | `instagram_business_discovery_without_media_url.json` |
 | `view_count` | 묶음 게시물에는 **키가 없다**. 영상이라도 없을 수 있다(바이오던스 계정은 릴스 24건 모두 없었다. 이 사례의 원본은 저장하지 않았다) | `instagram_business_discovery_with_media_url.json` |
 | 게시물 유형 | 원본에서 본 `media_type`은 `VIDEO`·`CAROUSEL_ALBUM`, `media_product_type`은 `REELS`·`FEED`다. `IMAGE` 등 다른 값은 **미확인**이므로 모르는 값이 와도 죽지 않게 읽는다. 묶음 게시물에도 `media_url`이 올 수 있다(영상이 아님) | 위와 같음 |
@@ -39,7 +39,7 @@
 | **`media_url` 반환 여부는 재조회해도 일관된다** | 4계정 × 50건에서 즉시(5초 뒤)·15분 뒤 재조회의 반환 여부 변화가 0건이었고, 전날 기록한 원본 8건과 약 20시간 뒤 값도 8/8 같았다. 계정 단위 편차가 크다: torriden_official 96%, skin1004official 100%, mediheal_official 0%(릴스 23건 모두 키 없음), beautyofjoseon_official 100%. 3일 뒤의 일관성은 미실측 | `instagram_requery_probe.json` |
 | **`media_url` 만료** | URL의 쿼리 파라미터 `oe`(16진 Unix 시각)에 만료 시각이 있다. 49건 모두 받는 시점 기준 남은 시간이 **32~108시간**이었다. 재조회 직후 URL(199개)의 남은 시간은 최소 32.1시간, 대부분 약 104~108시간이었고, 재조회할 때 `oe`는 일부 게시물만 갱신되며(약 4시간 단위로 이동) 나머지는 같은 URL이 유지됐다. 바로 받으면 `Range` 요청에 206, `video/mp4`. 묶음 게시물의 `media_url`은 이미지(`.jpg`)다. **만료된 URL의 응답은 미확인** | `instagram_mfds_youtube_probe.json`, `instagram_requery_probe.json` |
 | 계정 재스캔 | 특정 게시물만 조회하는 방법은 없다(Business Discovery는 계정 단위). 계정 재스캔은 `media.limit(100)`으로 계정당 1~2호출이다 | `instagram_requery_probe.json` |
-| 사용량 헤더 | 응답 헤더 `x-app-usage`(JSON 문자열: `call_count`, `total_cputime`, `total_time`)가 온다. 9호출 뒤 `call_count`가 4(%)였다 → **호출당 약 0.5%로 추정**(시간당 창 기준 추정이며 정확한 한도 정의는 미확인, 병렬 호출 없이 잰 값) | `instagram_requery_probe.json` |
+| 사용량 헤더 | 응답 헤더 `x-app-usage`(JSON 문자열: `call_count`, `total_cputime`, `total_time`)가 온다. 9호출 뒤 `call_count`가 4(%)였다 → 호출당 약 0.5%로 추정했으나 **과소추정이었다**: 첫 `make live-collect`에서 13계정(약 26호출)만에 최댓값 기준 80%에 도달해 `INSTAGRAM_USAGE_HIGH`로 멈췄다(사용자 출력 기준. 어느 지표가 올랐는지는 당시 기록이 없어 미확인이며 수집기가 이후 지표별 값을 기록한다) | `instagram_requery_probe.json` |
 
 주의:
 - 릴스 영상 주소 반환율은 표본 195건 중 101건(52%)이었고 계정마다 0%~100%로 갈린다.
@@ -304,7 +304,7 @@
 |---|---|
 | Python HTTPS | uv 관리 파이썬 3.12.13은 `SSL_CERT_FILE` 없이 `urllib`(·httpx)가 HTTPS를 통과한다(2026-11-12, 이 저장소 `.venv`에서 `urllib.request.urlopen("https://pypi.org/simple/")` 200 확인). python.org 3.12.10은 `urllib`만 `CERTIFICATE_VERIFY_FAILED`(httpx는 certifi로 통과). 그래서 `pyproject.toml`에 `python-preference = "only-managed"`를 둔다 |
 | 셸 | 기본 셸이 zsh다. 변수의 공백 분리가 bash와 다르다. 스크립트는 `#!/usr/bin/env bash`를 명시한다 |
-| `.env` | 키 이름은 `.env.example`이 기준이다(출처 7개, 모델 3개, 로컬 compose 2개). **Instagram 호출 주체 ID는 `INSTAGRAM_USER_ID`로 정했고(2026-11-12) 값은 사용자가 `.env`에 추가해야 한다.** 빈 값이 기본값을 덮지 않게 읽는다 |
+| `.env` | 키 이름은 `.env.example`이 기준이다(출처 7개, 모델 3개, 로컬 compose 2개). **Instagram 호출 주체 ID는 `INSTAGRAM_USER_ID`로 정했고(2026-11-12) 사용자가 `.env`에 추가했다.** 빈 값이 기본값을 덮지 않게 읽는다 |
 | OrbStack | docker 데몬이 꺼져 있으면 `docker.sock` 오류가 난다(2026-11-12 실제로 꺼져 있었음). compose를 쓰는 live 전에 켠다 |
 
 ## 미확인 (쓰기 전에 실측할 것)
@@ -315,7 +315,7 @@
 | LangGraph | `interrupt`, 병렬 노드, 동시 요청에서의 체크포인터, 압축 요약 저장 방식 | M2 에이전트 |
 | Langfuse | 컨테이너 5개의 메모리, 처음 이미지 받는 시간, 대량 trace 지연, SDK 5.x 상세 호환 | M2 관측 |
 | 이미지 생성 | 요청·응답 형태와 비용 | M2 기획 |
-| Instagram 사용 | 만료된 `media_url`의 응답 형태, 3일 뒤 `media_url` 반환 여부 일관성, 앱·계정 사용량 오류 코드(4·17·32·613은 알려진 코드이며 미실측), 호출 한도의 정확한 정의(호출당 약 0.5%는 추정) | M1 수집·분석 |
+| Instagram 사용 | 만료된 `media_url`의 응답 형태, 3일 뒤 `media_url` 반환 여부 일관성, 앱·계정 사용량 오류 코드(4·17·32·613은 알려진 코드이며 미실측), 호출 한도의 정확한 정의와 어느 지표가 먼저 차는지(호출당 0.5%는 과소추정으로 확인됨) | M1 수집·분석 |
 | TikTok 영상 URL | 만료 시각과 만료 뒤 응답 형태 | M1 분석 |
 | YouTube 쿼터 | 호출별 단위 비용·하루 한도, `quotaExceeded` 응답 형태 | M1 수집 |
 | Gemini 유료 한도 | 실제 분당·일일 한도 수치(동시 30개 60호출은 전부 200) | M1 분석 일괄 |

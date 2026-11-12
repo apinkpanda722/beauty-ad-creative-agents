@@ -80,9 +80,10 @@ make live-collect
 1~1000이며 YouTube는 영상 수, Instagram은 게시물 수다. 호출 수 추정은
 YouTube 채널당 `1 + 2 × ceil(N / 50)`, Instagram 계정당 `ceil(N / 100)`이다.
 호출당 시간은 가정(미실측)이며 YouTube 쿼터 사용량은 미확인(Cloud 콘솔에서
-확인)이다. Instagram은 호출당 앱 사용량 약 0.5%(실측 추정)를 적용한다.
-예를 들어 22계정 × 2쪽은 44호출, 예상 앱 사용량 약 22%다. 실제 한도와
-시간당 사용량 창은 다를 수 있으며 수집기는 사용량 80% 이상이면 Instagram을 멈춘다.
+확인)이다. Instagram은 호출당 앱 사용량 0.5%를 적용하지만 첫 live에서 과소추정으로 드러났다(13계정·약 26호출에 80% 도달, 어느 지표가 올랐는지는 미확인).
+예를 들어 22계정 × 2쪽은 44호출이고 0.5% 가정으로는 약 22%지만 실제로는 그보다 훨씬 빨리 찼다.
+사용량 창은 롤링이라 멈춘 뒤 약 1시간 기다렸다가 `--skip-recent-hours`로 이어 받는다.
+오류·중단으로 끝난 계정은 저장하지 않으므로 이어 받을 때 다시 수집된다. 수집기는 수집기는 사용량 80% 이상이면 Instagram을 멈춘다.
 
 ```bash
 uv run python -m beautyads.pipeline.collect --sources youtube --max-per-account 100

@@ -94,6 +94,10 @@ class AccountReport(BaseModel):
     analyzable_null: int
     error: str | None
     skipped: bool
+    # 불완전(오류·중단)으로 끝난 계정은 저장하지 않으므로 skip-recent 대상이 되지 않는다.
+    stored: bool = True
+    # Instagram 앱 사용량 지표(call_count·total_cputime·total_time). 없으면 None.
+    usage: dict[str, float] | None = None
 
 
 class CollectReport(BaseModel):
@@ -211,6 +215,8 @@ def run_collect(
             creatives = []
             error = None
             stop = None
+            usage = None
+            stored = True
             if not skipped:
                 try:
                     if source == "youtube":
@@ -223,6 +229,7 @@ def run_collect(
                             video_length_cut_s=video_length_cut_s,
                         )
                     else:
+                        usage = {}
                         result = collect_instagram(
                             getters[source],
                             instagram_token,
@@ -231,6 +238,7 @@ def run_collect(
                             base_url=instagram_base_url,
                             max_posts_per_account=max_per_account,
                             collected_at=deps.now(),
+                            usage_sink=usage,
                         )
                     # Report unique stored identities, even if provider pages overlap.
                     creatives = list(
@@ -238,13 +246,18 @@ def run_collect(
                     )
                     error = result.errors.get(name)
                     stop = result.stopped
-                    deps.store.upsert_creatives(creatives)
+                    # 오류·중단으로 끝난 계정의 일부 결과를 저장하면 --skip-recent-hours가
+                    # 완료된 계정으로 오인해 건너뛴다. 저장하지 않고 다음 실행이 다시 받게 한다.
+                    stored = error is None and stop is None
+                    if stored:
+                        deps.store.upsert_creatives(creatives)
                 except StoreConnectError:
                     raise
                 except Exception:  # noqa: BLE001 -- isolate failures at the account boundary
                     # Unexpected diagnostics may contain credentials or signed URLs.
                     error = "COLLECTION_ACCOUNT_FAILED"
                     creatives = []
+                    stored = False
             report = AccountReport(
                 source=source,
                 brand=account.brand,
@@ -255,6 +268,8 @@ def run_collect(
                 analyzable_null=sum(item.analyzable is None for item in creatives),
                 error=error,
                 skipped=skipped,
+                stored=stored,
+                usage=usage or None,
             )
             reports.append(report)
             print(
@@ -280,6 +295,9 @@ def run_collect(
                 "event": "summary",
                 **report.model_dump(exclude={"accounts"}),
                 **summary,
+                "instagram_last_usage": next(
+                    (item.usage for item in reversed(reports) if item.usage), None
+                ),
                 "warning": "SPLIT_VOLUME_INSUFFICIENT"
                 if report.volume_violations
                 else None,
@@ -397,7 +415,8 @@ def main(
             )
             preview["assumptions"] = (
                 "호출당 시간은 가정(미실측); YouTube 쿼터 사용량은 미확인(Cloud 콘솔에서 확인); "
-                "호출당 앱 사용량 약 0.5%(실측 추정); 예상 앱 사용량 ≈ 호출 수 × 0.5%"
+                "호출당 앱 사용량 0.5%는 과소추정이었다(첫 live에서 13계정·약 26호출에 80% 도달); "
+                "instagram_app_usage_pct는 하한 참고값이며 한도에 닿으면 수집기가 멈춘다"
             )
             print("ESTIMATE " + json.dumps(preview, ensure_ascii=False), file=out)
             return 0

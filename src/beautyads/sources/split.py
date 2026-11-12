@@ -13,6 +13,8 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 CATEGORIES = ("mask_pack", "serum_ampoule", "sun_care")
 _SOURCES = ("youtube", "instagram", "tiktok")
+# E1 표본 출처(TikTok 제외): 출처별 하한은 이 출처에만 건다.
+_E1_SOURCES = ("youtube", "instagram")
 _CONFIG = Path(__file__).resolve().parents[3] / "config"
 _STATIC_CONSTRAINTS = [
     "dev와 test는 겹치지 않고 합집합은 등록한 전체 브랜드와 같다.",
@@ -233,7 +235,8 @@ def volume_violations(
     violations = []
     if totals["test"] < split.volume.test_analyzable_min_total:
         violations.append(f"test total below {split.volume.test_analyzable_min_total}")
-    for source, count in test_by_source.items():
+    for source in _E1_SOURCES:
+        count = test_by_source[source]
         if count < split.volume.test_analyzable_min_per_source:
             violations.append(
                 f"test {source} below {split.volume.test_analyzable_min_per_source}"
