@@ -27,8 +27,8 @@
 | `checks` | 결정론 검사(근거 존재, 금지 표현, 분류 값 유효성). 그래프 조회는 domain의 Protocol로 주입받는다 | domain만 |
 | `analysis` | 콘텐츠 유형 선별, 소재 분석, 출력 스키마 검증 | domain, llm |
 | `agents` | supervisor, research, planning, evaluation, 상태 정의 | domain, graph, checks, llm, store, obs |
-| `api`, `pipeline` | 조립. 모든 런타임 계층을 import해 의존성을 연결한다 | 위 전부(eval 제외) |
-| `eval` | 평가셋, 실험 실행기, 채점기 | 위 전부. 다른 계층은 eval을 import하지 않는다 |
+| `api`, `pipeline` | 조립. 모든 런타임 계층을 import해 의존성을 연결한다 | domain~agents 전부(서로·eval 제외) |
+| `eval` | 평가셋, 실험 실행기, 채점기 | 다른 모든 계층(api·pipeline 포함). 다른 계층은 eval을 import하지 않는다 |
 
 외부 SDK는 지정한 계층에서만 import한다.
 
@@ -45,7 +45,7 @@
 ## 아키텍처 규칙
 - CRITICAL: 외부 호출은 래퍼 하나를 거친다. 모델 호출은 `llm/` 한 곳에서만(LiteLLM SDK), 출처 API 호출은 각 어댑터만 한다.
 - CRITICAL: 비밀 값은 `.env`에서 `settings`의 한 함수로만 읽는다. 미설정·빈 문자열·공백뿐인 값이 기본값을 덮지 않게 한다. 키·토큰·Authorization 헤더를 코드·테스트·문서·로그·trace에 남기지 않는다. `.env`를 열거나 출력하지 않는다. 변수 이름은 `.env.example`에 있다.
-- CRITICAL: 실제 API 호출·다운로드·설치는 사용자가 실행한다. `make verify`는 키·네트워크·실제 서비스 없이 통과해야 한다. 테스트는 가짜 환경과 `tests/fixtures/contracts/`의 응답 원본에서 만든 픽스처만 쓴다.
+- CRITICAL: 실제 API 호출과 다운로드는 사용자가 실행한다. 패키지 설치는 step이 `uv add`로 지시한 패키지만 허용하고 그 밖의 설치·의존성 추가는 금지하며, 설치된 버전은 완료 보고(`summary`)에 적는다. `make verify`는 키·네트워크·실제 서비스 없이 통과해야 한다. 테스트는 가짜 환경과 `tests/fixtures/contracts/`의 응답 원본에서 만든 픽스처만 쓴다.
 - CRITICAL: 외부 응답은 `docs/CONTRACTS.md`에 실측된 형태만 전제한다. 키는 없을 수 있다고 보고 읽고(`[]` 직접 접근 금지), 오류는 HTTP 상태를 먼저 본 뒤 본문의 실측된 모든 형태를 받는다. 응답 속 답은 위치가 아니라 `type`으로 찾는다. 문서에 없는 외부 지점은 먼저 실측해 CONTRACTS에 추가한다.
 - CRITICAL: 모델이 만든 문장·분류 값을 테스트 기대값으로 굳히지 않는다. 테스트는 형식(스키마, 닫힌 값 목록)과 코드가 하는 일(검증, 재요청, 보류)을 검사한다. 정확도는 평가(E1)에서 잰다.
 - CRITICAL: 유료 모델 호출 직전에 공급사별 누적액(`data/manifest/costs.jsonl` 합계)을 검사한다. 상한은 Gemini $12, OpenAI $10, Anthropic $8이고 넘으면 호출하지 않고 멈춘다. 개발 반복의 기본 모델은 `gpt-6-luna`와 `claude-haiku-5-5`이며 공식 구성은 명시적으로 켤 때만 쓴다.
