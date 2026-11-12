@@ -4,8 +4,10 @@ import pytest
 from pydantic import ValidationError
 
 from beautyads.domain import (
+    CollectionStat,
     Creative,
     CreativeKey,
+    CreativeRepository,
     HookResult,
     HookType,
     JobStatus,
@@ -133,3 +135,56 @@ def test_job_status_uses_held_for_deferred_work():
     assert JobStatus.held.value == "held"
     with pytest.raises(ValueError):
         JobStatus("deferred")
+
+
+def test_creative_brand_and_account_default_to_none(creative_data):
+    item = Creative(**creative_data)
+    assert item.brand is None
+    assert item.account is None
+
+
+@pytest.mark.parametrize("brand, account", [(None, None), ("브랜드", "@brand_handle")])
+def test_creative_preserves_brand_and_account(creative_data, brand, account):
+    item = Creative(**creative_data, brand=brand, account=account)
+    assert item.brand == brand
+    assert item.account == account
+    assert Creative.model_validate_json(item.model_dump_json()) == item
+    with pytest.raises(ValidationError) as caught:
+        Creative(**creative_data, brand=brand, account=account, unknown=True)
+    assert any(error["type"] == "extra_forbidden" for error in caught.value.errors())
+
+
+@pytest.mark.parametrize(
+    "brand, account, last_collected_at",
+    [
+        (None, None, None),
+        ("브랜드", "@brand_handle", datetime(2026, 11, 12, tzinfo=UTC)),
+    ],
+)
+def test_collection_stat_fields(brand, account, last_collected_at):
+    stat = CollectionStat(
+        source="youtube",
+        brand=brand,
+        account=account,
+        total=6,
+        analyzable_true=1,
+        analyzable_false=2,
+        analyzable_null=3,
+        last_collected_at=last_collected_at,
+    )
+    assert stat.source is Source.youtube
+    assert stat.brand == brand
+    assert stat.account == account
+    assert stat.total == 6
+    assert stat.analyzable_true == 1
+    assert stat.analyzable_false == 2
+    assert stat.analyzable_null == 3
+    assert stat.last_collected_at == last_collected_at
+
+
+def test_creative_repository_declares_collection_stats():
+    from typing import get_type_hints
+
+    assert get_type_hints(CreativeRepository.collection_stats) == {
+        "return": list[CollectionStat]
+    }

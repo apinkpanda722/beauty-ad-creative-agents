@@ -46,12 +46,27 @@ class Creative(BaseModel):
     duration_s: float | None = None
     language: str | None = None
     analyzable: bool | None = None
+    brand: str | None = None
+    account: str | None = None
     metrics: Metrics = Field(default_factory=Metrics)
     collected_at: AwareDatetime
 
     @property
     def key(self) -> CreativeKey:
         return CreativeKey(source=self.source, source_id=self.source_id)
+
+
+class CollectionStat(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source: Source
+    brand: str | None
+    account: str | None
+    total: int
+    analyzable_true: int
+    analyzable_false: int
+    analyzable_null: int
+    last_collected_at: datetime | None
 
 
 def is_analyzable(creative: Creative) -> bool:

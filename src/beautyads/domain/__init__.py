@@ -1,6 +1,7 @@
 """Public domain types and repository contracts shared across layers."""
 
 from beautyads.domain.creative import (
+    CollectionStat,
     Creative,
     CreativeKey,
     JobStatus,
@@ -13,6 +14,7 @@ from beautyads.domain.protocols import AnalysisRepository, CreativeRepository
 
 __all__ = [
     "AnalysisRepository",
+    "CollectionStat",
     "Creative",
     "CreativeKey",
     "CreativeRepository",

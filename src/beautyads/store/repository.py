@@ -6,6 +6,7 @@ from typing import Any
 
 from beautyads.domain import (
     AnalysisRepository,
+    CollectionStat,
     Creative,
     CreativeKey,
     CreativeRepository,
@@ -26,6 +27,8 @@ CREATIVE_COLUMNS: tuple[str, ...] = (
     "duration_s",
     "language",
     "analyzable",
+    "brand",
+    "account",
     "latest_view_count",
     "latest_like_count",
     "latest_comment_count",
@@ -128,6 +131,25 @@ class PostgresCreativeStore(CreativeRepository, AnalysisRepository):
             one=True,
         )
         return None if row is None else _restore_creative(row)
+
+    def collection_stats(self) -> list[CollectionStat]:
+        rows = self._read(
+            """SELECT source, brand, account, count(*) AS total,
+                      count(*) FILTER (WHERE analyzable = %s) AS analyzable_true,
+                      count(*) FILTER (WHERE analyzable = %s) AS analyzable_false,
+                      count(*) FILTER (WHERE analyzable IS NULL) AS analyzable_null,
+                      max(collected_at) AS last_collected_at
+               FROM creatives
+               GROUP BY source, brand, account
+               ORDER BY source, brand, account""",
+            (True, False),
+        )
+        return [
+            CollectionStat.model_validate(
+                dict(zip(CollectionStat.model_fields, row, strict=True))
+            )
+            for row in rows
+        ]
 
     def enqueue_analysis(self, kind: str, creatives: Sequence[Creative]) -> int:
         inserted = 0

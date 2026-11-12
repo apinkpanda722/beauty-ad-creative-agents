@@ -10,12 +10,20 @@ from urllib.parse import unquote, urlparse
 import psycopg
 import pytest
 
-from beautyads.domain import Creative, CreativeKey, JobStatus, Metrics, Source
+from beautyads.domain import (
+    CollectionStat,
+    Creative,
+    CreativeKey,
+    JobStatus,
+    Metrics,
+    Source,
+)
 from beautyads.settings import MissingSetting
 from beautyads.store.connection import StoreConnectError, connect, postgres_dsn
 from beautyads.store.repository import CREATIVE_COLUMNS, PostgresCreativeStore
 from beautyads.store.schema import (
     CHANGE_COLUMNS,
+    INSERT_COLUMNS,
     MIGRATIONS,
     apply_migrations,
     build_upsert_sql,
@@ -129,6 +137,31 @@ def test_migrations_are_additive_and_contain_required_schema():
         assert f"'{status.value}'" in sql
 
 
+def test_brand_account_migration_is_additive_version_two():
+    [(version, name, sql)] = [item for item in MIGRATIONS if item[0] == 2]
+    assert version == 2 and name == "creative_brand_account"
+    for column in ("brand", "account"):
+        assert re.search(
+            rf"ALTER TABLE creatives ADD COLUMN IF NOT EXISTS {column} text",
+            sql,
+            re.IGNORECASE,
+        )
+    assert not re.search(r"\b(DROP|TRUNCATE|UPDATE|INSERT)\b", sql, re.IGNORECASE)
+    [(_, _, first_sql)] = [item for item in MIGRATIONS if item[0] == 1]
+    assert not re.search(r"\b(brand|account)\b", first_sql)
+
+
+def test_existing_version_one_only_applies_later_migrations():
+    conn = FakeConnection([FakeCursor(), FakeCursor([(1,)])])
+    remaining = [(version, name) for version, name, _ in MIGRATIONS if version > 1]
+    assert apply_migrations(conn) == [version for version, _ in remaining]
+    assert [
+        params for _, params in calls_for(conn, "INSERT INTO schema_migrations")
+    ] == remaining
+    assert conn.commits == len(remaining) and conn.rollbacks == 0
+    assert not calls_for(conn, "CREATE TABLE IF NOT EXISTS creatives")
+
+
 @pytest.mark.parametrize(
     "fragment",
     [
@@ -154,6 +187,8 @@ def test_change_columns_exclude_all_collection_timestamps():
         "duration_s",
         "language",
         "analyzable",
+        "brand",
+        "account",
         "latest_view_count",
         "latest_like_count",
         "latest_comment_count",
@@ -173,6 +208,7 @@ def test_change_columns_exclude_all_collection_timestamps():
         "metrics_collected_at",
         "updated_at",
     ):
+        assert column not in CHANGE_COLUMNS
         assert column not in comparison
     assert "updated_at = now()" in sql
 
@@ -194,6 +230,29 @@ def test_upsert_parameters_deduplicate_by_source_and_id_with_last_wins():
     assert len(history) == 2
     assert all("ON CONFLICT" in query and "DO NOTHING" in query for query, _ in history)
     assert all(params[-3:] == (None, None, None) for _, params in history)
+    assert conn.commits == 1 and conn.rollbacks == 0
+
+
+@pytest.mark.parametrize(
+    "brand, account", [(None, None), ("O'Brien; --", "@brand'handle")]
+)
+def test_upsert_parameterizes_brand_and_account_as_text_or_null(brand, account):
+    conn = FakeConnection()
+    PostgresCreativeStore(conn).upsert_creatives(
+        [creative(brand=brand, account=account)]
+    )
+    [(query, params)] = calls_for(conn, "INSERT INTO creatives")
+    assert len(params) == len(INSERT_COLUMNS) == query.count("%s")
+    values = dict(zip(INSERT_COLUMNS, params, strict=True))
+    assert values["brand"] == brand
+    assert values["account"] == account
+    casts = re.findall(r"%s::([a-z ]+?)(?=,|\))", query)
+    assert len(casts) == len(INSERT_COLUMNS)
+    types = dict(zip(INSERT_COLUMNS, casts, strict=True))
+    assert types["brand"] == types["account"] == "text"
+    for value in (brand, account):
+        if value is not None:
+            assert all(value not in sql for sql, _ in conn.calls)
     assert conn.commits == 1 and conn.rollbacks == 0
 
 
@@ -270,10 +329,96 @@ def test_get_missing_creative_returns_none():
     assert PostgresCreativeStore(conn).get_creative(creative().key) is None
 
 
+def test_get_creative_restores_brand_and_account():
+    item = creative(brand="브랜드", account="@brand_handle")
+    conn = FakeConnection([FakeCursor([creative_row(item)])])
+    assert PostgresCreativeStore(conn).get_creative(item.key) == item
+    query, params = conn.calls[0]
+    assert "brand" in query and "account" in query
+    assert params == (item.source.value, item.source_id)
+    assert conn.rollbacks == 1 and conn.commits == 0
+
+
+@pytest.mark.parametrize("has_rows", [False, True])
+def test_collection_stats_restores_groups_and_closes_read_transaction(has_rows):
+    brand = "O'Brien; --"
+    account = "@brand'handle"
+    rows = (
+        [
+            ("instagram", None, None, 3, 0, 1, 2, None),
+            ("youtube", brand, account, 6, 1, 2, 3, NOW),
+        ]
+        if has_rows
+        else []
+    )
+    conn = FakeConnection()
+
+    class TransactionCursor(FakeCursor):
+        def fetchall(self):
+            assert conn.rollbacks == 0, "fetchall called after rollback"
+            return super().fetchall()
+
+    conn.replies.append(TransactionCursor(rows))
+    result = PostgresCreativeStore(conn).collection_stats()
+    assert all(isinstance(stat, CollectionStat) for stat in result)
+    assert [
+        (
+            stat.source.value,
+            stat.brand,
+            stat.account,
+            stat.total,
+            stat.analyzable_true,
+            stat.analyzable_false,
+            stat.analyzable_null,
+            stat.last_collected_at,
+        )
+        for stat in result
+    ] == rows
+    assert len(conn.calls) == 1
+    query, params = conn.calls[0]
+    normalized = " ".join(query.upper().split())
+    assert "FROM CREATIVES" in normalized
+    assert "GROUP BY SOURCE, BRAND, ACCOUNT" in normalized
+    assert "ORDER BY SOURCE, BRAND, ACCOUNT" in normalized
+    assert "COUNT(*)" in normalized and normalized.count("FILTER") == 3
+    assert normalized.count("FILTER (WHERE ANALYZABLE = %S)") == 2
+    assert "FILTER (WHERE ANALYZABLE IS NULL)" in normalized
+    assert "MAX(COLLECTED_AT)" in normalized
+    assert params == (True, False)
+    assert query.count("%s") == len(params)
+    assert brand not in query and account not in query
+    assert conn.rollbacks == 1 and conn.commits == 0
+
+
+@pytest.mark.parametrize("failure_stage", ["execute", "fetch"])
+def test_collection_stats_rolls_back_and_propagates_read_failure(failure_stage):
+    failure = RuntimeError("scripted stats read failure")
+
+    def fail_on(query):
+        raise failure
+
+    class FailingCursor(FakeCursor):
+        def fetchall(self):
+            raise failure
+
+    conn = FakeConnection(
+        [FailingCursor()], fail_on=fail_on if failure_stage == "execute" else None
+    )
+    with pytest.raises(RuntimeError) as caught:
+        PostgresCreativeStore(conn).collection_stats()
+    assert caught.value is failure
+    assert conn.rollbacks == 1 and conn.commits == 0
+
+
 def test_next_pending_restores_rows_and_parameterizes_selection():
     items = [
         creative(),
-        creative(source_id="second", metrics=Metrics(view_count=0, like_count=2**40)),
+        creative(
+            source_id="second",
+            brand="브랜드",
+            account="@brand_handle",
+            metrics=Metrics(view_count=0, like_count=2**40),
+        ),
     ]
     conn = FakeConnection([FakeCursor([creative_row(item) for item in items])])
     assert PostgresCreativeStore(conn).next_pending("hook", 7) == items
@@ -282,6 +427,8 @@ def test_next_pending_restores_rows_and_parameterizes_selection():
     assert "ORDER BY" in query and "published_at DESC NULLS LAST" in query
     assert "LIMIT %s" in query
     assert "source_id" in query and "source" in query
+    assert "c.brand" in query and "c.account" in query
+    assert conn.rollbacks == 1 and conn.commits == 0
     assert PostgresCreativeStore(FakeConnection()).next_pending("hook", 1) == []
 
 
