@@ -159,7 +159,16 @@
     {
       "step": 11,
       "name": "batch-runner",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-12T22:59:14+0900",
+      "summary": "배치 분석 실행기·저장소 전체 호출 직렬화·실패 격리·재시도와 한도 중단·완료 축 호출 재사용·JSON 보고 구현; 아키텍처 가드 포함 make verify 통과(1256 tests), 실제 서비스 미호출.",
+      "completed_at": "2026-11-12T23:05:23+0900",
+      "usage": {
+        "input_tokens": 943769,
+        "cached_input_tokens": 869376,
+        "output_tokens": 13232,
+        "attempts": 1
+      }
     },
     {
       "step": 12,
