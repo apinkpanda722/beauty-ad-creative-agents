@@ -1,0 +1,16 @@
+{
+ "_meta": {
+  "recorded_at": "2026-11-12T03:38:54Z",
+  "http_status": 403,
+  "note": "심사품목 getSrngPrdlstInq05, 활용신청 안 된 키와 잘못된 키 모두 같은 응답(2026-11-12 조언 세션 실측). serviceKey 값은 기록하지 않음"
+ },
+ "response": {
+  "OpenAPI_ServiceResponse": {
+   "cmmMsgHeader": {
+    "errMsg": "SERVICE_KEY_IS_NOT_REGISTERED_ERROR",
+    "returnAuthMsg": "등록되지 않은 서비스키",
+    "returnReasonCode": "30"
+   }
+  }
+ }
+}

@@ -1,0 +1,19 @@
+{
+ "_meta": {
+  "recorded_at": "2026-11-12",
+  "http_status": 200,
+  "query": "존재하지않는품목zzz",
+  "note": "기능성화장품 심사품목 getSrngPrdlstInq05, type=json. 활용신청 승인 뒤 실측(2026-11-12 조언 세션). serviceKey 값은 기록하지 않음"
+ },
+ "response": {
+  "header": {
+   "resultCode": "00",
+   "resultMsg": "NORMAL SERVICE."
+  },
+  "body": {
+   "pageNo": 1,
+   "totalCount": 0,
+   "numOfRows": 2
+  }
+ }
+}

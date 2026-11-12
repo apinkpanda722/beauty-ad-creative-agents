@@ -16,28 +16,31 @@
 
 ## 디렉토리 구조
 ```
-src/
-  domain/        소재·라벨·기획안·근거의 타입과 분류 값(닫힌 목록). 외부 의존 없음
-  sources/       출처 어댑터(youtube, instagram, tiktok). 공통 소재 형식으로 변환
+src/beautyads/   (패키지 이름 `beautyads`. 최상위 이름 충돌을 피해 한 단계 감쌌다)
+  settings.py    `.env`를 읽는 유일한 함수
+  domain/        소재·라벨·기획안·근거의 타입과 분류 값(닫힌 목록), 저장소·조회용 Protocol. 표준 라이브러리와 pydantic만
+  obs/           trace(로컬 JSONL, Langfuse), 비용 원장 기록
+  sources/       출처 어댑터(youtube, instagram, tiktok, mfds, mall). 공통 형식으로 변환
+  store/         PostgreSQL 원본(소재, 지표 이력, 모델 출력 원문, 작업 상태, 테넌트 전용 데이터)
   analysis/      콘텐츠 유형 선별, 소재 분석 에이전트, 출력 스키마 검증
   graph/         온톨로지 스키마, 적재, 그래프 탐색 도구
   agents/        supervisor, research, planning, evaluation, 상태 정의
   checks/        결정론 검사(근거 존재, 금지 표현, 분류 값 유효성)
-  llm/           모델 호출 래퍼(LiteLLM), 재시도·대기·비용 집계
+  llm/           모델 호출 래퍼(LiteLLM SDK), 재시도·대기·비용 집계·공급사별 누적액 검사
   api/           FastAPI, SSE 이벤트
-  pipeline/      수집·분석 실행 진입점(스케줄 대상)
-web/             Next.js 화면(대화, 근거 카드, 그래프)
+  pipeline/      수집·분석·동기화 실행 진입점
+  eval/          평가셋, 실험 실행기, 채점기
+web/             Next.js 화면(대화, 근거 카드, 그래프). M3에서 추가
 config/          sources.yaml(수집 대상), 모델·한도 설정
-eval/            평가셋, 실험 실행기, 채점기
-deploy/          docker compose, k3d 매니페스트
+deploy/          docker compose(Postgres·Neo4j, 선택 profile `obs`=Langfuse), k3d 매니페스트
 docs/            PRD, ADR, ARCHITECTURE, EVAL, TAXONOMY, results/
 tests/
 ```
 
 ## 패턴
 
-- **계층 의존 방향을 한쪽으로 고정한다.** `domain`은 아무것도 import하지 않는다. `sources`·`analysis`·`graph`는 `domain`만, `agents`는 `graph`의 도구와 `checks`·`llm`만 쓴다. `api`와 `pipeline`만 조립한다. 이 규칙은 테스트로 강제한다.
-- **외부 호출은 래퍼 하나를 거친다.** 모델 호출은 `llm/`, 출처 API 호출은 각 어댑터만 한다. 재시도·대기·비용 집계가 한곳에 모인다.
+- **계층 의존 방향을 한쪽으로 고정한다.** `domain`은 표준 라이브러리와 pydantic만 쓴다. `llm`·`sources`·`store`·`graph`는 `domain`과 `settings`만(`llm`은 `obs`도), `checks`는 `domain`만(그래프 조회는 Protocol로 주입), `analysis`는 `domain`·`llm`, `agents`는 `graph`의 도구와 `checks`·`llm`·`store`·`obs`를 쓴다. `api`와 `pipeline`만 조립한다. 정확한 표와 외부 SDK별 허용 계층은 `AGENTS.md`의 계층 경계에 있고 테스트가 강제한다.
+- **외부 호출은 래퍼 하나를 거친다.** 모델 호출은 `llm/`(LiteLLM SDK, proxy 없음, ADR-015), 출처 API 호출은 각 어댑터만 한다. 재시도·대기·비용 집계가 한곳에 모인다.
 - **에이전트는 쿼리를 쓰지 않는다.** 리서치 에이전트에게 Cypher를 쓰게 하지 않고, "조건에 맞는 소재 찾기", "훅별 지표 집계", "카테고리 간 패턴 비교" 같은 고수준 도구를 준다. 도구 입력은 분류의 닫힌 값만 받는다.
 - **판정할 수 있는 것은 코드가 판정한다.** 근거 소재 ID가 그래프에 있는지, 분류 값이 목록에 있는지, 금지 표현이 있는지는 `checks/`가 본다. LLM 채점은 차별성과 요청 적합성에만 쓴다.
 - **만든 쪽과 평가하는 쪽을 나눈다.** 기획은 OpenAI, 평가는 Anthropic 모델이다.
@@ -63,6 +66,8 @@ tests/
    - 반영은 같은 입력을 여러 번 넣어도 결과가 같게 만든다(MERGE). 중간에 실패해도 다시 돌리면 된다
    - 마지막으로 반영한 시점을 기록해 그 뒤에 바뀐 것만 가져온다
    - 지표처럼 자주 바뀌는 값은 원본에 이력으로 두고, 그래프에는 최신 값과 수집 시각만 올린다
+   - "바뀐 행"은 PostgreSQL의 변경 시각으로 판정한다. 같은 값을 MERGE해도 Neo4j 카운터는 `properties_set`을 올리므로 카운터로 판정하지 않는다(`docs/CONTRACTS.md`의 Neo4j)
+   - 실행은 스케줄러 없이 `make sync`(수동, 파이프라인 끝에서 호출)다. 로컬 실행이라 상시 스케줄 대상이 없다
 ```
 
 ### 온라인: 요청 처리
@@ -98,13 +103,13 @@ tests/
 | Product | 이름, 브랜드, 용량과 단위(ml·g·매), 판매 지역, **정가·판매가(원), ml(g·매)당 가격, 가격 수집 시각** | 브랜드 공식몰 상세페이지(ADR-013) |
 | Category | `mask_pack`, `serum_ampoule`, `sun_care` | 고정 목록 |
 | Form | 제형(시트, 세럼, 크림, 젤, 선스틱 등) | 제품 정보 |
-| Ingredient | 표준명, 영문명, CAS 번호 | 식약처 화장품 원료성분정보 API(호출 실측 전) |
+| Ingredient | 표준명, 영문명, CAS 번호 | 식약처 화장품 원료성분정보 API(호출 실측 완료) |
 | IngredientAlias | 별칭(예: 시카, 병풀, Centella) | 광고·제품 표기에서 수집, 표준명에 연결 |
 | Efficacy | 효능(보습, 진정, 미백, 주름 개선, 자외선 차단 등). 분류의 소구점 값과 같은 목록 | 고정 목록 |
 | SkinConcern | 피부 고민(건조, 트러블, 홍조, 모공, 칙칙함 등) | 고정 목록 |
 | SkinType | 건성, 지성, 복합성, 민감성 | 고정 목록 |
-| FunctionalCert | 기능성 인증 종류(미백, 주름 개선, 자외선 차단 등) | 제품 정보(출처 미정) |
-| ClaimRule | 표현 규칙(예: 기능성 인증 없는 제품에 미백·주름 개선 표현 금지). 출처 문서와 버전 | 규정 원문(확인 전) |
+| FunctionalCert | 기능성 인증 종류(미백, 주름 개선, 자외선 차단 등) | 식약처 기능성화장품 보고품목(`EE_NAME`, `SPF`·`PA`)·심사품목(`EE_DOC_DATA`, 활용신청 필요) API |
+| ClaimRule | 표현 규칙. `rule_type`(`prohibited`·`requires_functional_cert`·`requires_substantiation`), 예외 문구, 출처 쪽 번호. 예: 기능성 인증 없는 제품에 미백·주름 개선 표현 금지 | 식약처 「화장품 표시·광고 관리 지침」 안내서-0086-07(`config/claim_rules.yaml`, ADR-014) |
 
 | 관계 | 뜻 | 속성 |
 |---|---|---|
@@ -117,7 +122,7 @@ tests/
 | (Efficacy)-[:ADDRESSES]->(SkinConcern) | 효능이 다루는 고민 | 출처 |
 | (Product)-[:SUITS]->(SkinType) | 권장 피부 타입 | 출처(제품 표기) |
 | (Product)-[:CERTIFIED_AS]->(FunctionalCert) | 기능성 인증 | 출처 |
-| (ClaimRule)-[:APPLIES_TO]->(Efficacy 또는 Category) | 규칙이 적용되는 범위 | |
+| (ClaimRule)-[:APPLIES_TO]->(Efficacy, SkinConcern 또는 Category) | 규칙이 적용되는 범위. "여드름"·"홍조"처럼 피부 고민 쪽 표현에 걸리는 규칙이 많아 SkinConcern을 포함한다 | |
 
 - 규칙은 개별 제품이 아니라 효능·카테고리에 붙인다. 새 제품은 연결만 생기면 규칙을 물려받는다(유진 사례의 규칙 상속).
 - 성분과 효능의 연결은 출처가 없는 관계를 만들지 않는다. 출처를 못 찾은 연결은 비워 둔다.
@@ -125,10 +130,10 @@ tests/
 - 가격은 공식몰 기준 원화 가격이다. 가격 이력은 PostgreSQL에 두고 그래프에는 최신 값과 수집 시각만 올린다. 용량이 달라 그대로 비교하지 않고 단위당 가격으로 비교한다. 광고는 EU·글로벌 게재분이 섞여 있으므로 광고 시장의 가격과 비교하지 않는다. 할인가는 수시로 바뀌어 비교에는 정가를 쓴다.
 - 성분 표기는 식약처 원료성분정보의 표준명으로 묶는다. 공공 API에 통용명(시카, 히알루론산)→표준명 연결이 없어 별칭 표는 직접 만든다(`docs/CONTRACTS.md`).
 
-### 1층 구축 파이프라인 (초안, 출처 확정 전)
+### 1층 구축 파이프라인 (초안)
 
 ```
-대표 제품 목록(브랜드 × 카테고리) → 제품 정보 원본 확보(출처 미정) → 제품 단위 레코드 추출 → 성분명 표준화(식약처 표준명·별칭) → 스키마 검증 → PostgreSQL → 그래프 동기화 → 역량 질문으로 검증
+대표 제품 목록(브랜드 × 카테고리) → 제품 정보 원본 확보(브랜드 공식몰 상세페이지, ADR-013) → 제품 단위 레코드 추출 → 성분명 표준화(식약처 표준명·별칭) → 스키마 검증 → PostgreSQL → 그래프 동기화 → 역량 질문으로 검증
 ```
 
 - **제품 하나가 레코드 하나다.** 상세페이지를 조각내지 않는다. 조각을 나누면 성분 정보와 제품명이 다른 조각으로 떨어져 어느 제품의 성분인지 잃는다(리만코리아 사례의 No Chunking 결정과 같은 이유).

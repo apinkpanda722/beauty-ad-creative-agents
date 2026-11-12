@@ -87,10 +87,32 @@
 - **성분 별칭 사전은 직접 만들어야 한다.** 공공 API에 통용명→표준명 연결이 없다(`INGR_SYNONYM` 비어 있음). 상세페이지의 전성분 표기는 대부분 표준명이라 그대로 묶일 것으로 보이지만(미확인), 광고의 "시카", "히알루론산" 같은 표기는 별칭 표로 연결한다.
 - 부분 일치라 정확히 같은 표준명만 고르는 처리가 필요하다.
 - **기능성 종류는 `EE_NAME`(효능효과명)으로 판정한다.** 포털 명세상 `EFFECT_YN1`~`3`은 "2호효능효과_미백/주름개선/자외선"으로 다른 구분이고, 상세페이지에 "주름개선 / 미백 기능성"이라 적힌 코스알엑스 세럼은 세 값이 모두 `N`이었지만 `EE_NAME`이 "피부의 미백에 도움을 준다. 피부의 주름개선에 도움을 준다."였다. 브랜드 3곳 표본에서 `EE_NAME`은 미백, 주름 개선, 둘 다, `null` 중 하나였다. 자외선 차단 제품은 `SPF`·`PA`로 판정한다(표본 확인 전).
-- 이 API는 보고품목만 다룬다. 심사품목은 별도 API(기능성화장품 심사품목정보)라 보고품목에 없는 기능성 제품이 있을 수 있다(**미확인**).
+- 이 API는 보고품목만 다룬다. 심사품목은 별도 API이고(아래 "심사품목 API" 절) 같은 제품이 두 쪽에 모두 있는지, 한쪽에만 있는지는 **미확인**이다. 코스알엑스 색소침착케어세럼은 심사품목에 있었다.
 - **품목명은 띄어쓰기가 없다.** "코스알엑스더6펩타이드스킨부스터세럼"처럼 붙어 있어, "펩타이드 스킨 부스터"(띄어 씀)는 0건, "펩타이드스킨부스터"는 11건이었다. 검색어의 공백을 지우고 보낸다.
 - 취하된 품목(`CANCEL_APPROVAL_YN`)을 걸러야 한다.
 - 일일 한도는 **미확인**이다.
+
+기능성화장품 **심사**품목 API (2026-11-12 실측)
+
+| 확인한 것 | 실제 형태 | 원본 |
+|---|---|---|
+| 오퍼레이션 | 데이터셋 15056939. **기관 코드가 다르다**: `https://apis.data.go.kr/1471057/FtnltCosmSrngPrdlstInfoService05/getSrngPrdlstInq05`(보고품목은 `1471000`). 업체 오퍼레이션 `getSrngEntpInq05`도 있다. 포털 명세상 파라미터는 `serviceKey, pageNo, numOfRows, type, item_seq, item_name`이고 효능은 `EE_DOC_DATA`(보고품목의 `EE_NAME`과 **필드 이름이 다르다**) | 포털 명세 |
+| **활용신청 안 된 키** | 현재 키로 **403**, `{"OpenAPI_ServiceResponse": {"cmmMsgHeader": {"errMsg": "SERVICE_KEY_IS_NOT_REGISTERED_ERROR", "returnAuthMsg": "등록되지 않은 서비스키", "returnReasonCode": "30"}}}`. 잘못된 키도 같은 응답이다. 이 API는 활용신청이 따로 필요하다. 이 오류 본문은 성공 응답(`header`/`body`)과 **형태가 완전히 다르다** | `mfds_error_key_not_registered.json` |
+
+활용신청 승인 뒤 성공 응답 (2026-11-12, 같은 `DATA_GO_KR_SERVICE_KEY`로 200, `NORMAL SERVICE.`)
+
+| 확인한 것 | 실제 형태 | 원본 |
+|---|---|---|
+| 응답 구조 | 보고품목과 같은 `{"header": {"resultCode": "00", "resultMsg": "NORMAL SERVICE."}, "body": {"pageNo", "totalCount", "numOfRows", "items": [...]}}`. **`items`는 배열**(`{"item": ...}` 래퍼가 아님) | `mfds_screening_query.json`(검색어 "코스알엑스", 2건) |
+| **결과 없음** | 200이고 `body`에 `pageNo`·`totalCount`(0)·`numOfRows`만 있고 **`items` 키 자체가 없다**(빈 배열이 아님) | `mfds_screening_query_no_match.json` |
+| 항목 키 | 표본 2건 모두 50개 키. **`SPF`·`PA`·`CANCEL_APPROVAL_YN`이 없다**(보고품목에는 있다). `PERMIT_KIND_NAME`은 "심사" | `mfds_screening_query.json` |
+| **`EE_DOC_DATA`는 XML 문자열** | `<DOC title="효능효과" type="EE">…<PARAGRAPH …><![CDATA[피부의 미백에 도움을 준다.]]></PARAGRAPH>…</DOC>`. 텍스트는 XML을 파싱해 `PARAGRAPH`에서 꺼낸다(보고품목의 `EE_NAME`은 평문). 줄바꿈은 `\r\n` | 위와 같음 |
+| 부분 일치 | "코스알엑스" 2건(`코스알엑스색소침착케어세럼`, `코스알엑스알로에수딩선크림01`) | 위와 같음 |
+
+- **`ENTP_NAME`은 브랜드와 다를 수 있다.** 표본의 `코스알엑스색소침착케어세럼`은 업체명이 "(주)아모레퍼시픽", `코스알엑스알로에수딩선크림01`은 "(주)코리아나화장품"이다. 브랜드를 업체명으로 판정하지 않고 품목명·공식몰 제품과 대조한다.
+- **자외선 차단(`SPF`·`PA`)은 이 API에서 얻을 수 없다.** 심사품목은 효능(미백·주름)에 쓰고 자외선 차단은 보고품목 API의 `SPF`·`PA`로 판정한다. 품목명에 SPF가 들어 있는 경우가 있으나 코드로 파싱해 판정하지 않는다. 취하 여부 필드가 없다는 점도 한계다.
+- `EE_DOC_DATA`가 `null`인 품목이 있다는 보고(조언 세션 관측: "선크림" 검색 결과 중 한 건)가 있으나 **저장한 원본에는 없다**. `null`일 수 있다고 보고 읽는다.
+- 호출 한도는 여전히 **미확인**이다. 어댑터는 HTTP 상태를 먼저 보고, 오류 본문의 형태가 성공 응답과 다름을 받아야 한다(FP-C01).
 
 ## 브랜드 공식몰 상세페이지 (2026-11-12 실측: 코스알엑스 1개, 아누아 1개 상품)
 
@@ -117,11 +139,17 @@
 | 메디큐브 | 있음 | 없음(이미지) | 123 | 사용(이미지가 많아 비용이 큼) |
 | 아비브 | 있음 | 없음(이미지) | 7 | 사용 |
 | 라운드랩 | 있음 | 없음(이미지) | 17 | 사용 |
-| 믹순 | 없음 | 없음 | 0 | 확인 필요(상품 페이지 형식이 다름) |
-| 달바 | - | - | - | 확인 필요(첫 화면에서 상품 링크를 못 찾음) |
+| 믹순 | 있음(카페24, `mixsoon.co.kr`) | 없음(이미지) | 17 | 사용. 아래 "믹순·달바·조선미녀" 참고 |
+| 달바 | **없음**(고도몰, `dalba.co.kr`) | 없음(이미지) | 23 | 사용(형식 별도). 아래 참고 |
 | 넘버즈인 | - | - | - | 제외(접근 시 401) |
-| 조선미녀 | - | - | - | 확인 필요(beautyofjoseon.com은 미국 스토어) |
+| 조선미녀 | 있음(카페24, `beautyofjoseon.co.kr`) | 없음(이미지) | 10 | 사용. 아래 참고 |
 | 토리든 | - | - | - | 제외(robots.txt가 AI 크롤러 차단) |
+
+믹순·달바·조선미녀 (2026-11-12, 첫 화면·상품 1개씩)
+- **믹순**: robots.txt가 `*`에 상품 경로를 막지 않고 AI 크롤러 언급이 없다. 메타 태그 `product:price:amount` 38000 / `sale_price` 26600(두유 세럼 50ml). **단종 상품 주소(`product_no=552`)는 HTTP 200에 "페이지가 사라졌거나" 안내 HTML(3.4KB)로 온다 → HTTP 200만으로 성공을 판정하지 않고 가격 메타 유무로 판정한다.**
+- **달바**: 고도몰이다. robots.txt는 이름을 지정한 봇에만 규칙이 있고 `*` 그룹이 없다(ClaudeBot 등 미지정 봇은 제한 없음). 지정 봇에 `Crawl-delay: 10`이 있어 우리도 10초 간격을 둔다. **메타 태그가 없다.** JSON-LD `offers.price`가 `"34000.00"`(문자열), hidden input `set_goods_price` 34000, `set_goods_fixedPrice`는 `0.00`(정가 없음). "비교에는 정가"(ARCHITECTURE) 규칙과 충돌하므로 정가가 0이면 판매가를 쓰고 `price_basis` 속성에 어느 쪽인지 남긴다. 응답이 gzip이라 클라이언트가 압축을 풀어야 한다. 성분 탭 텍스트는 비어 있다.
+- **조선미녀**: 메타 태그 가격(맑은쌀선크림 18000/18000). 몰 첫 화면이 sources.yaml에 확인된 `instagram.com/beautyofjoseon_official`로 연결돼 국내 공식몰로 판단한다. `beautyofjoseon.com`은 미국 스토어다.
+- 세 곳 모두 이용약관에 기존 9곳과 같은 조항(지적재산권 귀속 정보를 사전 승낙 없이 영리 목적으로 이용 금지)만 있고 크롤링 금지 조항은 없다. 결과: 사용 가능 12곳, 제외 2곳(토리든·넘버즈인).
 
 - 판정 키워드("화장품법에 따라 기재", "모든 성분", "전성분")가 HTML에 있는지로 텍스트 여부를 봤다. 상품마다 다를 수 있다.
 - 이용약관은 확인한 9개 몰 모두 "사이트에 지적재산권이 있는 정보를 영리 목적으로 복제·배포 금지" 조항만 있었다. 스킨1004의 "무단 복제" 문구는 디자인 스크립트에 대한 것이었다.
@@ -150,37 +178,60 @@
 | 파일 삭제 | 200과 빈 객체 `{}` | `gemini_files_delete.json` |
 | **과부하** | 503, `{"error": {"message", "code": "service_unavailable"}}`. **`code`가 문자열** | `gemini_error_overloaded.json` |
 | **잘못된 키** | 400인데 본문이 **객체가 아니라 배열**이고 `error.code`는 **정수** | `gemini_error_bad_key.json` |
+| **무료 등급 일일 한도** | `gemini-3.6-flash`는 무료 등급에서 하루 20회. 429, `{"error": {"message": "Rate limit exceeded ... (limit: 20 requests per day on Free Tier)...", "code": "too_many_requests"}}`(`code`는 문자열), 헤더 `retry-after: 15555`(초). 503과 429가 번갈아 났고 503 요청도 한도에 셈된 것으로 보인다(집계 방식 미확인). 이 프로젝트는 유료 등급(2026-11-12 전환) | `gemini_error_free_tier_daily_limit.json` |
+| 구조화 출력 | `response_format: {"type":"text","mime_type":"application/json","schema":{...enum...}}`와 헤더 `Api-Revision: 2026-05-20`. 울타리 없는 JSON이 오고 값은 enum 안(`person_first`). 구 방식(`response_mime_type`+`response_format`, 헤더 없음)도 동작. 응답 속 위치는 여전히 `steps[]`의 `type == "model_output"` | `gemini_interactions_36flash_response_format_schema.json`(3.6-flash), `gemini_interactions_response_format_schema.json`(3.5-flash-lite) |
+| 3.6-flash 구간 지정 | `processing: {type: static, start_offset: "0s", end_offset: "6s", fps: 2}`가 동작, 영상 토큰 943. 호출당 약 6~7초 | `gemini_interactions_36flash_youtube_offset.json` |
+| thought 토큰 | 3.6-flash는 출력 15토큰에 `total_thought_tokens` 345~360이 따로 온다(호출당 260~490). thought 토큰은 `response_cost`에 **포함**된다(입력 956×$0.75/M + (출력 18+thought 355)×$3.75/M = LiteLLM `response_cost`) | 위 두 원본의 `usage` |
+| LiteLLM SDK 경유 | `litellm.interactions.create/acreate(model="gemini/<모델>", input=[...])`가 `POST /v1beta/interactions`로 가고 `Api-Revision: 2026-05-20`을 항상 붙인다. `input`을 그대로 전달해 `processing`이 동작한다. 응답 `model_dump()` 최상위에 `agent`·`outputs` 키가 **추가**된다. 응답 `model`은 실제 모델 이름. 비용은 `resp._hidden_params["response_cost"]`. 503은 `litellm.ServiceUnavailableError`. `litellm==1.103.3` 고정. proxy 경유는 실측하지 않았다 | 원본 없음(SDK 객체, 조언 세션 실측) |
 
 주의:
 - **오류 본문의 형태가 두 가지다.** 과부하는 객체에 문자열 코드, 잘못된 키는 배열에 정수 코드다. 오류를 해석하는 코드는 HTTP 상태를 먼저 보고, 본문은 두 형태를 모두 받아야 한다.
 - 과부하(503)는 실측 중 여러 번 났고, 한 번은 144초가 걸렸으며 한 번은 150초 넘게 응답이 없었다. 호출에는 시간 제한을 두고, 503·429·시간 초과만 대기 후 다시 시도한다.
-- 프롬프트가 느슨하면 답의 뜻이 달라진다. "첫 구간에 무슨 일이 일어나는가"를 물었는데 `"00:03"`처럼 시각만 돌려준 사례가 있다. 구조화 출력 기능으로 형식을 강제하는 방식은 **미확인**이다. M1 설계 전에 실측한다.
+- 프롬프트가 느슨하면 답의 뜻이 달라진다. "첫 구간에 무슨 일이 일어나는가"를 물었는데 `"00:03"`처럼 시각만 돌려준 사례가 있다. 형식은 프롬프트가 아니라 구조화 출력(위 표)으로 강제한다. 단 enum으로 값 목록은 지켜지지만 어느 값을 고르는지는 호출마다 달라질 수 있다(FP-C03).
 - 같은 영상의 분류가 호출마다 달라진 사례가 있다(`question`과 `problem`). 모델도 달랐다.
 - 업로드한 파일은 약 48시간 뒤 만료된다(`expirationTime`). 분석 직후 삭제를 요청한다.
-- 무료 범위의 한도 수치는 **미확인**이다. 유료 단가는 2027-01-01부터 두 배가 된다(가격 페이지, 2026-11-12 확인).
+- **일일 한도 429는 재시도하지 않는다.** `retry-after`가 수 시간이면 고정 간격 재시도는 한도만 깎는다. 래퍼는 429를 본문·`retry-after`로 일일 한도와 분당 한도로 가르고, 일일 한도면 배치를 멈춰 남은 소재를 대기 상태로 둔다(실측 중 실제로 그렇게 당일 한도를 소진했다).
+- 유료 단가는 2027-01-01부터 두 배가 된다(가격 페이지, 2026-11-12 확인). 소재 분석은 12월 안에 끝낸다. thought가 호출당 260~490토큰이라 분석 1건 비용이 견적(출력 600)보다 커질 수 있다. thinking 수준을 낮추는 설정은 **미확인**이다(M1 분석 시범에서 실측).
+- LiteLLM SDK가 Gemini **Files API 업로드**(Instagram·TikTok 영상 경로)를 지원하는지는 **미확인**이다.
+
+## Neo4j (2026-11-12 실측, 임시 컨테이너, 끝난 뒤 삭제)
+
+| 확인한 것 | 결과 |
+|---|---|
+| 이미지·드라이버 | 이미지 `neo4j:2026.10.1-community`(같은 날 나온 2026.10.2는 피함), 드라이버 `neo4j==6.4.1`. pull 13초, 로그 `Started.`까지 7초. server agent `Neo4j/2026.10.1`, Bolt 6.1 |
+| 복합 유일 제약 | `CREATE CONSTRAINT ... FOR (c:Creative) REQUIRE (c.source, c.source_id) IS UNIQUE`가 community에서 동작. `IF NOT EXISTS` 재실행은 `constraints_added 0`, 오류 없음 |
+| MERGE 반복 | 같은 입력 2회째: `nodes_created 0`, `relationships_created 0`, **`properties_set 1`, `contains_updates true`**(값이 같아도 `SET`은 다시 쓴 것으로 센다). **"바뀐 행만 반영"은 그래프 카운터로 판정하지 않고 PostgreSQL의 변경 시각으로 판정한다.** 노드·관계 수 불변은 `count`로 검사 |
+| 정수 | `2**40` 왕복 시 `int` 유지. 문자열 숫자는 문자열 그대로(YouTube `statistics`는 문자열이라 적재 전에 변환) |
+| 제약 위반 | `ConstraintError`, `code` `Neo.ClientError.Schema.ConstraintValidationFailed`, `gql_status` `22N79` |
+| 문법 오류 | `CypherSyntaxError`, `Neo.ClientError.Statement.SyntaxError`, `42001` |
+| 없는 라벨·속성 | 오류가 아니라 **빈 결과** + 드라이버 WARNING 알림(`01N50`, `01N52`) 로그. 시끄러우면 `notifications_min_severity`로 거른다 |
+| 잘못된 비밀번호 / 서버 없음 | `AuthError`(`Neo.ClientError.Security.Unauthorized`) / `ServiceUnavailable` |
+| **첫 live 함정** | `NEO4J_AUTH` 비밀번호는 **데이터 볼륨을 처음 만들 때만** 적용된다. 나중에 `.env`를 바꾸면 기존 볼륨에서는 인증 실패이고 볼륨 삭제(명시 타깃)로만 해결된다 |
+| 비밀번호 길이 | 8자 미만이면 기동 실패: "Invalid value for password. The minimum password length is 8 characters." |
+
+원본 응답 파일은 없다(드라이버 출력과 카운터를 직접 확인). 적재 코드의 테스트는 이 표의 오류 종류를 가짜로 재현한다.
 
 ## 로컬 환경
 
 | 확인한 것 | 내용 |
 |---|---|
-| Python HTTPS | 이 맥의 python.org 3.12는 그대로 쓰면 인증서 검증에 실패한다. `SSL_CERT_FILE=/etc/ssl/cert.pem`을 줘야 한다. 프로젝트 가상 환경에서는 `certifi`로 해결되는지 **미확인** |
+| Python HTTPS | uv 관리 파이썬 3.12.13은 `SSL_CERT_FILE` 없이 `urllib`(·httpx)가 HTTPS를 통과한다(2026-11-12, 이 저장소 `.venv`에서 `urllib.request.urlopen("https://pypi.org/simple/")` 200 확인). python.org 3.12.10은 `urllib`만 `CERTIFICATE_VERIFY_FAILED`(httpx는 certifi로 통과). 그래서 `pyproject.toml`에 `python-preference = "only-managed"`를 둔다 |
 | 셸 | 기본 셸이 zsh다. 변수의 공백 분리가 bash와 다르다. 스크립트는 `#!/usr/bin/env bash`를 명시한다 |
-| `.env` | 키 5개(`YOUTUBE_API_KEY`, `GEMINI_API_KEY`, `INSTAGRAM_ACCESS_TOKEN`, `META_APP_ID`, `META_APP_SECRET`). 빈 값이 기본값을 덮지 않게 읽는다 |
+| `.env` | 키 이름은 `.env.example`이 기준이다(출처 7개, 모델 3개, 로컬 compose 2개). 빈 값이 기본값을 덮지 않게 읽는다 |
+| OrbStack | docker 데몬이 꺼져 있으면 `docker.sock` 오류가 난다(2026-11-12 실제로 꺼져 있었음). compose를 쓰는 live 전에 켠다 |
 
 ## 미확인 (쓰기 전에 실측할 것)
 
 | 외부 지점 | 무엇을 모르는가 | 언제 필요한가 |
 |---|---|---|
-| Gemini 구조화 출력 | 스키마를 주면 울타리 없이 오는지, 닫힌 값 목록을 강제할 수 있는지 | M1 소재 분석 |
-| Gemini 무료 범위 한도 | 분당·일일 요청 수 | M1 분석 일괄 실행 |
+| Gemini Files API 업로드(LiteLLM SDK 경유) | SDK가 Files 업로드를 지원하는지, 아니면 `llm/`이 HTTP로 직접 해야 하는지 | M1 Instagram·TikTok 분석 |
+| Gemini thinking 수준 | thought 토큰(호출당 260~490)을 줄이는 설정 | M1 분석 시범 |
 | OpenAI·Anthropic 호출(LiteLLM 경유) | 응답 본문의 모델 이름, 오류 형태, 도구 호출 형식 | M2 에이전트 |
-| Neo4j | 드라이버 버전과 MERGE 동작, 컨테이너 기동 시간 | M1 그래프 적재 |
 | LangGraph | 체크포인터, 하위 그래프 호출, 스트리밍 이벤트의 실제 형태 | M2 에이전트 |
 | Langfuse | 로컬 실행 구성과 trace 필드 | M2 관측 |
 | YouTube `statistics` 누락 | 좋아요·댓글을 숨긴 영상의 형태 | M1 수집 |
 | Instagram `media_url` 만료 | 주소의 유효 시간 | M1 수집 |
 | 이미지 생성 | 요청·응답 형태와 비용 | M2 기획 |
-| 식약처 공공 API | 심사품목정보 API, 자외선 차단 제품의 `SPF`·`PA` 값, 일일 한도, 잘못된 키의 오류 형태 | M1 1층 구축 |
-| 브랜드 공식몰 상세페이지 | 믹순·달바 상품 페이지 형식, 조선미녀 국내 공식몰 여부 | M1 1층 구축 |
+| 식약처 공공 API | 보고품목에서 자외선 차단 제품의 `SPF`·`PA` 값, 일일 한도, 잘못된 키의 오류 형태(보고품목) | M1 1층 구축 |
 
 프로젝트 B에서 겪은 것: LiteLLM은 응답 본문의 `model`을 일관되게 채우지 않았고(별칭이 오거나 제공자 ID가 옴) 실제 모델은 헤더로 확인해야 했다. 이 프로젝트에서도 LiteLLM을 쓰므로 M2 설계 전에 같은 지점을 다시 실측한다.

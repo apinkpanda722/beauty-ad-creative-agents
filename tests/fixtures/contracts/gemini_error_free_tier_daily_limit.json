@@ -1,0 +1,16 @@
+{
+ "_meta": {
+  "recorded_at": "2026-11-12",
+  "http_status": 429,
+  "headers": {
+   "retry-after": "15555"
+  },
+  "note": "무료 등급 일일 한도 20회 소진. 2026-11-12 조언 세션 실측"
+ },
+ "response": {
+  "error": {
+   "message": "Rate limit exceeded for model gemini-3.6-flash (limit: 20 requests per day on Free Tier). Please retry in 4h19m15s or upgrade your tier at https://ai.dev/rate-limit.",
+   "code": "too_many_requests"
+  }
+ }
+}
