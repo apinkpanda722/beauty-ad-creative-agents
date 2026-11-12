@@ -1,0 +1,51 @@
+{
+ "_meta": {
+  "recorded_at": "2026-11-12",
+  "litellm": "1.103.3",
+  "note": "각 조건 1회 호출. SDK 예외·응답 요약(원본 HTTP 아님)"
+ },
+ "results": {
+  "luna_none_temp0": {
+   "ok": true,
+   "model": "gpt-6-luna",
+   "completion_tokens": 14,
+   "reasoning_tokens": 0
+  },
+  "luna_none_temp0.5": {
+   "ok": true,
+   "model": "gpt-6-luna",
+   "completion_tokens": 13,
+   "reasoning_tokens": 0
+  },
+  "luna_none_temp1": {
+   "ok": true,
+   "model": "gpt-6-luna",
+   "completion_tokens": 14,
+   "reasoning_tokens": 0
+  },
+  "luna_low_temp0": {
+   "ok": false,
+   "exc": "UnsupportedParamsError",
+   "status_code": 400,
+   "message": "litellm.UnsupportedParamsError: gpt-6-luna doesn't support temperature=0 while reasoning is active. Only temperature=1 is supported unless reasoning_effort resolves to 'none', either set explicitly on the request or declared as the model's default_reasoning_effort. To drop unsupported params set `litellm.drop_params = True`"
+  },
+  "terra_none_temp0": {
+   "ok": true,
+   "model": "gpt-6.1-terra",
+   "completion_tokens": 10,
+   "reasoning_tokens": 0
+  },
+  "haiku_temp0.5": {
+   "ok": false,
+   "exc": "UnsupportedParamsError",
+   "status_code": 400,
+   "message": "litellm.UnsupportedParamsError: claude-haiku-5-5 does not support temperature=0.5. Only temperature=1 is supported. To drop unsupported params, set `litellm.drop_params = True`."
+  },
+  "haiku_temp1": {
+   "ok": true,
+   "model": "claude-haiku-5-5",
+   "completion_tokens": 21,
+   "reasoning_tokens": 0
+  }
+ }
+}

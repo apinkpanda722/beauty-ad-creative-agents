@@ -194,6 +194,66 @@
 - 유료 단가는 2027-01-01부터 두 배가 된다(가격 페이지, 2026-11-12 확인). 소재 분석은 12월 안에 끝낸다. thought가 호출당 260~490토큰이라 분석 1건 비용이 견적(출력 600)보다 커질 수 있다. thinking 수준을 낮추는 설정은 **미확인**이다(M1 분석 시범에서 실측).
 - LiteLLM SDK가 Gemini **Files API 업로드**(Instagram·TikTok 영상 경로)를 지원하는지는 **미확인**이다.
 
+## LiteLLM SDK 경유 OpenAI·Anthropic·Gemini Files (2026-11-12 실측, `litellm==1.103.3`)
+
+원본은 HTTP 원문이 아니라 SDK 객체의 `model_dump`와 실행 결과다(`tests/fixtures/contracts/README.md`). 호출 전에 막는 오류와 공급사 오류가 모두 `litellm.exceptions`의 예외로 올라온다.
+
+| 확인한 것 | 실제 형태 | 원본 |
+|---|---|---|
+| 응답 `model` | SDK에 실제 모델 이름을 주면 응답 `model`도 실제 이름이다(`gpt-6-luna`, `gpt-6.1-terra`, `claude-haiku-5-5`, `claude-sonnet-5-5`). 프로젝트 B의 별칭 문제는 proxy와 별칭 조합에서 생긴 것으로 보인다. `_hidden_params["litellm_model_name"]`은 `openai/gpt-6-luna`처럼 공급사 접두어가 붙는다. **Router나 별칭을 쓰면 다시 확인한다** | `litellm_openai_anthropic_probe.json` |
+| 비용(비스트리밍) | `resp._hidden_params["response_cost"]`. 단가표 `litellm.model_cost`는 luna·haiku $0.10/$0.50, terra $1/$5, sonnet $2/$10으로 COST_ESTIMATE와 일치한다 | 위와 같음 |
+| **스트리밍 비용** | 스트리밍 응답의 `_hidden_params["response_cost"]`는 `None`이다. `stream_options={"include_usage": True}`를 주고 청크를 `litellm.stream_chunk_builder(chunks, messages=...)`로 합친 응답에 `litellm.completion_cost(completion_response=built)`를 쓰면 값이 나온다. 사용량은 마지막 청크에 온다 | `litellm_reasoning_effort_and_stream_cost.json` |
+| **`temperature`** | `litellm.UnsupportedParamsError`(`status_code` 400, `llm_provider` 없음)로 **네트워크 호출 전에** 거부된다. 추론이 켜진 luna는 "doesn't support temperature=0 while reasoning is active. Only temperature=1 is supported unless reasoning_effort resolves to 'none'", haiku는 항상 "Only temperature=1 is supported"(0.5도 거부, 1만 성공). **luna·terra는 `reasoning_effort="none"`일 때만 temperature를 줄 수 있다**: luna `none`에서 0·0.5·1이 모두 성공했고 `low`+0은 거부됐으며, terra `none`+0은 성공했다. 추론이 켜진 terra는 측정하지 않았다. 각 조건 1회 측정 → 기본은 `temperature`를 지정하지 않는다 | `litellm_openai_anthropic_probe.json`(`temp0_*`), `litellm_temperature_with_reasoning_none.json` |
+| **luna 추론 기본값** | 추론이 기본으로 켜져 있다. 같은 한 줄 계산에서 `reasoning_effort` 미지정 273토큰(추론 242), `none` 19, `low` 5, `medium` 56, `high` 1,201(추론 1,158). **비용이 약 100배 차이**(미지정 1.4e-04, `none` 1.4e-05, `high` 6.1e-04). `minimal`은 `UnsupportedParamsError`. 한 번씩만 잰 값이라 분포가 아니다. haiku의 `reasoning_tokens`는 0이었고 Anthropic thinking 설정은 **미확인** | `litellm_reasoning_effort_and_stream_cost.json` |
+| 도구 호출 | 두 공급사 모두 `message.tool_calls[{id, type: "function", function: {name, arguments}, index}]`, `finish_reason: "tool_calls"`. **`arguments`는 JSON 문자열**이라 파싱 실패를 처리한다. id는 `call_…`(OpenAI)·`toolu_…`(Anthropic). Anthropic에는 `caller: {type: "direct"}`가 붙는다. `tool_choice="required"`가 둘 다 동작 | `litellm_openai_anthropic_probe.json`(`tool_*`) |
+| 구조화 출력 | `response_format={"type":"json_schema","json_schema":{"strict":true,...}}`가 luna·haiku 모두 동작하고 울타리 없는 JSON이 온다 | 위와 같음(`schema_*`) |
+| 프롬프트 캐시 | 같은 긴 접두(약 5.7k·8.6k 토큰)를 두 번 보냈다. OpenAI는 자동이며 `prompt_tokens_details.cached_tokens` 5,742. Anthropic은 시스템 블록에 `cache_control: {"type":"ephemeral"}`가 필요하고 `cache_read_input_tokens` 8,600. 첫 호출은 LiteLLM 단가표가 **캐시 쓰기 단가(입력의 1.25배)**로 계산한다(haiku 첫 호출 0.0010785, 이후 8.95e-05). OpenAI가 실제로 쓰기 가산을 청구하는지는 단가표의 가정일 뿐 **미확인**. 최소 캐시 길이는 위 두 크기에서만 확인했다 | 위와 같음(`cache_*`) |
+| usage 필드 | 공통: `prompt_tokens`, `completion_tokens`, `total_tokens`, `prompt_tokens_details.cached_tokens`, `completion_tokens_details.reasoning_tokens`. Anthropic은 `cache_read_input_tokens`, `cache_creation_input_tokens`, `cache_creation_token_details` 등이 추가된다. 비용 원장은 이름으로 읽고 없으면 0으로 본다 | 위와 같음 |
+| 오류 | 잘못된 키 `litellm.AuthenticationError`(401, `llm_provider`가 `openai`/`anthropic`), 없는 모델 `litellm.NotFoundError`(404), 호출 전 거부 `litellm.UnsupportedParamsError`(400). 본문은 예외의 **문자열**(`OpenAIException - ...`, `AnthropicException - {"type":"error",...}`)이다. **OpenAI·Anthropic의 429·503은 유도하지 못해 미확인** | 위와 같음(`err_*`) |
+| 한도 값 | `max_completion_tokens=0`을 Anthropic에 주면 오류 없이 출력 0토큰으로 성공한다. 한도 값 검증은 래퍼가 한다 | 위와 같음(`err_tooLongOutputParam`) |
+| **Gemini Files (SDK 지원)** | `litellm.create_file(file=(이름, 바이트, "video/mp4"), purpose="user_data", custom_llm_provider="gemini", api_key=...)`, `file_retrieve`, `file_delete`. 반환 `id`가 **전체 주소**(`https://generativelanguage.googleapis.com/v1beta/files/<id>`)라 그대로 `interactions` 입력의 `{"type":"video","uri": id,"mime_type":"video/mp4"}`에 넣으면 분석된다(3.6-flash, 영상 토큰 189). `expires_at`은 `null`. 처리 대기: `status`가 `uploaded` → `processed`(3초 영상에서 2초 간격 조회 2번째). 시험 영상은 ffmpeg가 만든 3초 생성물 | `litellm_gemini_files_flow.json` |
+| **삭제와 삭제 뒤 조회** | `file_delete`는 `{"id": "files/<id>", "deleted": true}`(id가 업로드 때와 다른 형태). 삭제 뒤 `file_retrieve`는 깨끗한 NotFound가 아니라 **`ValueError("Error parsing file retrieve response: 'createTime'")`**이고 LiteLLM이 ERROR 로그를 남긴다 → 삭제 확인에 `file_retrieve`를 쓰지 않고 `file_delete`의 `deleted`로 판단한다 | 위와 같음 |
+
+- Gemini Files의 큰 파일(4~10MB) 업로드 소요와 업로드 실패의 오류 형태는 **미확인**이다.
+- 이 실측으로 `llm`에서 `httpx`를 직접 쓸 필요가 없어졌다(Files도 SDK로 된다). `AGENTS.md`의 SDK 허용 표에서 `llm`의 `httpx`를 뺐다.
+
+## LangGraph (2026-11-12 실측, 외부 API 호출 없음)
+
+버전: `langgraph 1.2.20`, `langgraph-checkpoint 4.3.1`, `langgraph-checkpoint-postgres 3.2.0`, `langgraph-prebuilt 1.1.1`, `psycopg 3.3.8`, `psycopg-pool 3.3.3`, `pydantic 2.14.3`. Postgres는 `postgres:17.11` 임시 컨테이너. 원본: `langgraph_checkpointer_probe.json`(실행 결과).
+
+| 확인한 것 | 결과 |
+|---|---|
+| **연결 설정** | `AsyncConnectionPool(kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row})`가 필요하다. autocommit 없이 `setup()`을 부르면 `psycopg.errors.ActiveSqlTransaction: CREATE INDEX CONCURRENTLY cannot run inside a transaction block`. `setup()`은 두 번 불러도 오류가 없다 |
+| 테이블 | `checkpoints`, `checkpoint_blobs`, `checkpoint_writes`, `checkpoint_migrations`(v9까지). 상태는 채널마다 msgpack 바이너리 blob이라 사람이 바로 읽을 수 없다 |
+| **상태 속 pydantic** | pydantic 객체를 상태에 넣으면 왕복 시 타입은 보존되지만 `Deserializing unregistered type ... will be blocked in a future version` 경고가 난다 → 상태에는 dict·기본 타입만 넣거나 타입을 등록하고 `LANGGRAPH_STRICT_MSGPACK=true`로 테스트한다 |
+| **하위 그래프와 상태 키 공유** | 부모와 같은 키(리듀서 `operator.add`)를 하위 그래프가 공유하면 입력이 출력에 다시 합쳐져 `trace`에 `supervisor`가 **두 번** 들어갔다 → 하위 그래프는 자기 전용 상태 스키마를 쓰고 부모 노드가 입력·출력을 명시적으로 매핑한다(ADR-008과 같은 방향) |
+| 스트리밍 | `astream(input, config, context=..., stream_mode=["updates","custom"], subgraphs=True)`는 `(네임스페이스 튜플, 모드, 청크)`를 낸다. 하위 그래프 이벤트의 네임스페이스는 `['research:<uuid>']`. 노드 안의 `get_stream_writer()`는 하위 그래프 안에서도 `custom` 청크로 나온다 → SSE 이벤트는 `custom` 모드로 보낸다. `updates` 청크에는 **원본 파이썬 객체**가 들어 있어 SSE 직전에 직렬화한다. `astream_events(version="v2")`는 LangChain 모델을 쓰지 않는 노드에서 `on_chain_*`만 내므로 쓰지 않는다 |
+| **컨텍스트(테넌트)** | `context_schema` + `ainvoke(..., context={"tenant_id": "A"})`로 넘기고 노드는 `runtime.context["tenant_id"]`로 읽는다. thread·컨텍스트가 다르면 값이 섞이지 않았다. **컨텍스트 없이 호출하면 `runtime.context`가 `None`이라 노드 안에서 `TypeError: 'NoneType' object is not subscriptable`**이 난다 → api가 호출 전에 테넌트를 검사하고(fail-closed) 도구의 범위 검사 함수가 명시적 오류를 올린다 |
+| 스냅샷 | `StateSnapshot` 필드: `values, next, config, metadata, created_at, parent_config, tasks, interrupts`. `metadata` 키는 `parents, source, step`뿐이고 `config.configurable`은 `checkpoint_id, checkpoint_ns, thread_id` |
+| **되돌림 상한** | `recursion_limit`을 넘으면 `langgraph.errors.GraphRecursionError`이고 상태는 **보존**된다(`attempts` 3, `next` `['planning']`). `recursion_limit`은 기획 횟수가 아니라 노드 실행(슈퍼스텝) 수라 `recursion_limit=8`에서 기획이 3번 돌고 멈췄다 → "평가→기획 되돌림 최대 2회"는 상태의 카운터로 구현하고 `recursion_limit`은 넉넉한 안전망으로 둔다 |
+| 노드 라우팅·삭제 | 노드가 `Command(goto=..., update=...)`를 돌려주는 방식이 동작하고 도착지는 `add_node(..., destinations=(...))`로 알린다. `await checkpointer.adelete_thread(thread_id)` 뒤 `checkpoints` 행이 0이 되고 `aget_state`는 빈 `values`를 돌려준다(보존 기간 정리에 쓴다) |
+| **테넌트 격리** | `thread_id`는 단순 문자열이고 DB 수준의 격리가 없다. 격리는 `thread_id = "<tenant>:<...>"` 규칙과 **api가 모든 읽기·재개에서 소유 테넌트를 검증**하는 것으로만 이뤄진다 |
+
+- **미확인**: `interrupt`(승인 대기), 병렬 노드, 동시 요청에서의 체크포인터 동작, 압축 요약 저장 방식.
+
+## Langfuse (2026-11-12 실측, 임시 컨테이너 5개, 끝난 뒤 볼륨까지 삭제)
+
+서버: 프로젝트 B와 같은 구성(`langfuse/langfuse:3.225.11`, worker, `clickhouse/clickhouse-server:25.12.9.61`, `redis:7.4.11`, minio, `postgres:17.11`)을 호스트 포트만 바꿔(Postgres 15434, 웹 3001) 올렸다. 원본: `langfuse_probe.json`(REST 응답과 SDK 결과).
+
+| 확인한 것 | 결과 |
+|---|---|
+| 기동 | `docker compose --profile obs up -d`에서 약 19초 만에 `/api/public/health`·`/api/public/ready`가 `{"status":"OK","version":"3.225.11"}`. 이미지는 이 맥에 이미 있었다(처음 받는 시간 **미확인**). Postgres 초기화 스크립트(`CREATE DATABASE langfuse`)가 반드시 필요하다 |
+| **무인 초기화** | 웹 서비스에 `LANGFUSE_INIT_ORG_ID`, `LANGFUSE_INIT_PROJECT_ID`, `LANGFUSE_INIT_PROJECT_PUBLIC_KEY`, `LANGFUSE_INIT_PROJECT_SECRET_KEY`, `LANGFUSE_INIT_USER_EMAIL`, `LANGFUSE_INIT_USER_NAME`, `LANGFUSE_INIT_USER_PASSWORD`를 주면 첫 기동에 조직·프로젝트·키·사용자가 만들어진다(UI 없이 `auth_check` 통과). 키는 `.env`에서만 읽는다 |
+| SDK | `langfuse==3.15.0`과 `5.2.0` 둘 다 이 서버로 trace를 보냈다(OTLP `/api/public/otel`). **`3.15.0` 고정**(서버 세대와 같고 실측을 전부 이것으로 했다). 3.x의 `start_as_current_generation`은 deprecated라 `start_as_current_observation(as_type="generation")`을 쓴다. 5.2.0은 `start_as_current_span`이 없고 `start_as_current_observation(as_type=...)` + `propagate_attributes(user_id, session_id, tags, metadata)`를 쓴다(5.x의 나머지는 얇게만 확인) |
+| 수집 지연 | 전송이 비동기라 REST로 읽히기까지 수 초가 걸린다. 테스트는 `flush()` 뒤 폴링한다 |
+| 읽은 필드 | trace: `id, name, userId, sessionId, tags, metadata, input, output, latency, totalCost, timestamp, environment`. 관측: `type`(`SPAN`·`GENERATION`), `model`, `usage`, `usageDetails`, `costDetails`, `calculated*Cost`, `parentObservationId`, `metadata`. `metadata`에는 우리가 준 `tenant_id`에 SDK가 `resourceAttributes`·`scope`를 덧붙인다 |
+| **비용** | 서버가 모르는 모델(`gpt-6.1-terra`)에 `cost_details`를 주지 않으면 비용이 비어 합계에서 빠진다 → **항상 원장의 `response_cost`를 `cost_details`로 보낸다** |
+| **테넌트 분리** | `user_id`에 `tenant_id`, `session_id`에 thread id를 넣으면 `GET /api/public/traces?userId=tenantA`가 그 테넌트 trace만 돌려준다(tenantA 1건, tenantB 0건) |
+| 서버 꺼짐 | `flush()` 0.8초, `shutdown()` 1.2초(`timeout=3`)로 멈추지 않고 로그에 `Transient error ... Failed to export spans batch`를 남긴다. 단 **`auth_check()`는 `False`가 아니라 `ConnectError`를 올린다** → `obs` 래퍼가 예외를 삼키고 로컬 JSONL로 폴백한다 |
+| **함정** | 같은 프로세스에서 같은 공개 키로 `Langfuse(...)`를 다시 만들면 다른 host를 줘도 기존 클라이언트를 재사용한다. 테스트는 키를 다르게 하거나 별도 프로세스로 한다. 잘못된 키는 REST 401 `{"message":"Invalid credentials. Confirm that you've configured the correct host."}` |
+
+- **미확인**: 컨테이너 5개의 메모리 사용량, 처음 이미지 받는 시간, 대량 trace 지연, SDK 5.x의 상세 호환.
+
 ## Neo4j (2026-11-12 실측, 임시 컨테이너, 끝난 뒤 삭제)
 
 | 확인한 것 | 결과 |
@@ -224,14 +284,14 @@
 
 | 외부 지점 | 무엇을 모르는가 | 언제 필요한가 |
 |---|---|---|
-| Gemini Files API 업로드(LiteLLM SDK 경유) | SDK가 Files 업로드를 지원하는지, 아니면 `llm/`이 HTTP로 직접 해야 하는지 | M1 Instagram·TikTok 분석 |
 | Gemini thinking 수준 | thought 토큰(호출당 260~490)을 줄이는 설정 | M1 분석 시범 |
-| OpenAI·Anthropic 호출(LiteLLM 경유) | 응답 본문의 모델 이름, 오류 형태, 도구 호출 형식 | M2 에이전트 |
-| LangGraph | 체크포인터, 하위 그래프 호출, 스트리밍 이벤트의 실제 형태 | M2 에이전트 |
-| Langfuse | 로컬 실행 구성과 trace 필드 | M2 관측 |
+| Gemini Files 큰 파일 | 4~10MB 업로드 소요, 업로드 실패의 오류 형태 | M1 Instagram·TikTok 분석 |
+| OpenAI·Anthropic 오류 | 429·503의 예외 형태(유도하지 못함), Anthropic thinking 설정, 캐시 최소 길이, OpenAI의 캐시 쓰기 가산 청구 여부 | M2 에이전트 |
+| LangGraph | `interrupt`, 병렬 노드, 동시 요청에서의 체크포인터, 압축 요약 저장 방식 | M2 에이전트 |
+| Langfuse | 컨테이너 5개의 메모리, 처음 이미지 받는 시간, 대량 trace 지연, SDK 5.x 상세 호환 | M2 관측 |
 | YouTube `statistics` 누락 | 좋아요·댓글을 숨긴 영상의 형태 | M1 수집 |
 | Instagram `media_url` 만료 | 주소의 유효 시간 | M1 수집 |
 | 이미지 생성 | 요청·응답 형태와 비용 | M2 기획 |
 | 식약처 공공 API | 보고품목에서 자외선 차단 제품의 `SPF`·`PA` 값, 일일 한도, 잘못된 키의 오류 형태(보고품목) | M1 1층 구축 |
 
-프로젝트 B에서 겪은 것: LiteLLM은 응답 본문의 `model`을 일관되게 채우지 않았고(별칭이 오거나 제공자 ID가 옴) 실제 모델은 헤더로 확인해야 했다. 이 프로젝트에서도 LiteLLM을 쓰므로 M2 설계 전에 같은 지점을 다시 실측한다.
+프로젝트 B에서 겪은 것: LiteLLM 응답 본문의 `model`이 별칭이나 제공자 ID로 와서 실제 모델을 헤더로 확인해야 했다. 이 프로젝트의 SDK 직접 호출 실측(2026-11-12)에서는 실제 모델 이름이 왔다. Router나 별칭을 도입하면 같은 지점을 다시 실측한다.

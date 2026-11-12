@@ -1,0 +1,363 @@
+{
+ "versions": {
+  "langgraph": "1.2.20",
+  "langgraph-checkpoint": "4.3.1",
+  "langgraph-checkpoint-postgres": "3.2.0",
+  "langgraph-prebuilt": "1.1.1",
+  "psycopg": "3.3.8",
+  "psycopg-pool": "3.3.3",
+  "pydantic": "2.14.3"
+ },
+ "setup_without_autocommit": {
+  "exc": "ActiveSqlTransaction",
+  "msg": "CREATE INDEX CONCURRENTLY cannot run inside a transaction block"
+ },
+ "tables": [
+  "checkpoint_blobs",
+  "checkpoint_migrations",
+  "checkpoint_writes",
+  "checkpoints"
+ ],
+ "migrations": [
+  {
+   "v": 7
+  },
+  {
+   "v": 8
+  },
+  {
+   "v": 9
+  }
+ ],
+ "stream_events": [
+  {
+   "ns": [],
+   "mode": "updates",
+   "chunk": {
+    "supervisor": {
+     "trace": [
+      "supervisor"
+     ]
+    }
+   }
+  },
+  {
+   "ns": [
+    "research:f79cb049-3c38-f66f-777c-ada1c7466f4f"
+   ],
+   "mode": "custom",
+   "chunk": {
+    "type": "tool_start",
+    "name": "find_creatives"
+   }
+  },
+  {
+   "ns": [
+    "research:f79cb049-3c38-f66f-777c-ada1c7466f4f"
+   ],
+   "mode": "updates",
+   "chunk": {
+    "r1": {
+     "trace": [
+      "research.r1"
+     ]
+    }
+   }
+  },
+  {
+   "ns": [
+    "research:f79cb049-3c38-f66f-777c-ada1c7466f4f"
+   ],
+   "mode": "custom",
+   "chunk": {
+    "type": "ui_command",
+    "cmd": "show_evidence_cards"
+   }
+  },
+  {
+   "ns": [
+    "research:f79cb049-3c38-f66f-777c-ada1c7466f4f"
+   ],
+   "mode": "updates",
+   "chunk": {
+    "r2": {
+     "trace": [
+      "research.r2"
+     ],
+     "evidence": [
+      {
+       "creative_id": "c1",
+       "score": 0.5
+      }
+     ],
+     "tenant_seen": "A"
+    }
+   }
+  },
+  {
+   "ns": [],
+   "mode": "updates",
+   "chunk": {
+    "research": {
+     "trace": [
+      "supervisor",
+      "research.r1",
+      "research.r2"
+     ],
+     "attempts": 0,
+     "evidence": [
+      {
+       "creative_id": "c1",
+       "score": 0.5
+      }
+     ],
+     "tenant_seen": "A"
+    }
+   }
+  },
+  {
+   "ns": [],
+   "mode": "custom",
+   "chunk": {
+    "type": "token",
+    "text": "기획 중"
+   }
+  },
+  {
+   "ns": [],
+   "mode": "updates",
+   "chunk": {
+    "planning": {
+     "trace": [
+      "planning"
+     ],
+     "attempts": 1
+    }
+   }
+  },
+  {
+   "ns": [],
+   "mode": "updates",
+   "chunk": {
+    "evaluation": {
+     "trace": [
+      "evaluation(attempt=1)"
+     ]
+    }
+   }
+  },
+  {
+   "ns": [],
+   "mode": "custom",
+   "chunk": {
+    "type": "token",
+    "text": "기획 중"
+   }
+  },
+  {
+   "ns": [],
+   "mode": "updates",
+   "chunk": {
+    "planning": {
+     "trace": [
+      "planning"
+     ],
+     "attempts": 2
+    }
+   }
+  },
+  {
+   "ns": [],
+   "mode": "updates",
+   "chunk": {
+    "evaluation": {
+     "trace": [
+      "evaluation(attempt=2)"
+     ]
+    }
+   }
+  }
+ ],
+ "snapshot": {
+  "fields": [
+   "values",
+   "next",
+   "config",
+   "metadata",
+   "created_at",
+   "parent_config",
+   "tasks",
+   "interrupts"
+  ],
+  "next": [],
+  "metadata_keys": [
+   "parents",
+   "source",
+   "step"
+  ],
+  "config_keys": [
+   "checkpoint_id",
+   "checkpoint_ns",
+   "thread_id"
+  ],
+  "values_trace": [
+   "supervisor",
+   "supervisor",
+   "research.r1",
+   "research.r2",
+   "planning",
+   "evaluation(attempt=1)",
+   "planning",
+   "evaluation(attempt=2)"
+  ],
+  "tenant_seen": "A",
+  "evidence_type": "Evidence",
+  "created_at": "2026-11-12T07:40:04.433415+00:00"
+ },
+ "history_len": 8,
+ "tenantB_seen": "B",
+ "ainvoke_result_keys": [
+  "attempts",
+  "evidence",
+  "tenant_seen",
+  "trace"
+ ],
+ "no_context": {
+  "exc": "TypeError",
+  "msg": "'NoneType' object is not subscriptable"
+ },
+ "recursion": {
+  "exc": "GraphRecursionError",
+  "module": "langgraph.errors",
+  "msg": "Recursion limit of 8 reached without hitting a stop condition. You can increase the limit by setting the `recursion_limit` config key.\nFor troubleshooting, visit: https://docs.langchain.com/oss/python/langgraph/errors/GRAPH_RECURSION_LIMIT"
+ },
+ "recursion_state_after": {
+  "attempts": 3,
+  "next": [
+   "planning"
+  ],
+  "trace_len": 10
+ },
+ "after_delete_thread": {
+  "values": {},
+  "next": []
+ },
+ "after_delete_rows": 0,
+ "checkpoints_columns_sample": [
+  {
+   "thread_id": "tenantA:t1",
+   "checkpoint_ns": "",
+   "checkpoint_id": "1f1de6c4-6652-676c-bfff-5b2e0e6e30ec",
+   "type": null,
+   "k": "v"
+  },
+  {
+   "thread_id": "tenantA:t1",
+   "checkpoint_ns": "",
+   "checkpoint_id": "1f1de6c4-6652-676c-bfff-5b2e0e6e30ec",
+   "type": null,
+   "k": "id"
+  },
+  {
+   "thread_id": "tenantA:t1",
+   "checkpoint_ns": "",
+   "checkpoint_id": "1f1de6c4-6652-676c-bfff-5b2e0e6e30ec",
+   "type": null,
+   "k": "ts"
+  },
+  {
+   "thread_id": "tenantA:t1",
+   "checkpoint_ns": "",
+   "checkpoint_id": "1f1de6c4-6652-676c-bfff-5b2e0e6e30ec",
+   "type": null,
+   "k": "versions_seen"
+  },
+  {
+   "thread_id": "tenantA:t1",
+   "checkpoint_ns": "",
+   "checkpoint_id": "1f1de6c4-6652-676c-bfff-5b2e0e6e30ec",
+   "type": null,
+   "k": "channel_values"
+  },
+  {
+   "thread_id": "tenantA:t1",
+   "checkpoint_ns": "",
+   "checkpoint_id": "1f1de6c4-6652-676c-bfff-5b2e0e6e30ec",
+   "type": null,
+   "k": "channel_versions"
+  }
+ ],
+ "blobs_columns": [
+  {
+   "column_name": "thread_id",
+   "data_type": "text"
+  },
+  {
+   "column_name": "checkpoint_ns",
+   "data_type": "text"
+  },
+  {
+   "column_name": "channel",
+   "data_type": "text"
+  },
+  {
+   "column_name": "version",
+   "data_type": "text"
+  },
+  {
+   "column_name": "type",
+   "data_type": "text"
+  },
+  {
+   "column_name": "blob",
+   "data_type": "bytea"
+  }
+ ],
+ "blobs_sample": [
+  {
+   "channel": "evidence",
+   "type": "msgpack",
+   "bytes": 1
+  },
+  {
+   "channel": "evidence",
+   "type": "msgpack",
+   "bytes": 74
+  },
+  {
+   "channel": "evidence",
+   "type": "msgpack",
+   "bytes": 1
+  },
+  {
+   "channel": "evidence",
+   "type": "msgpack",
+   "bytes": 74
+  },
+  {
+   "channel": "__start__",
+   "type": "msgpack",
+   "bytes": 52
+  },
+  {
+   "channel": "__start__",
+   "type": "msgpack",
+   "bytes": 41
+  },
+  {
+   "channel": "trace",
+   "type": "msgpack",
+   "bytes": 47
+  },
+  {
+   "channel": "trace",
+   "type": "msgpack",
+   "bytes": 56
+  }
+ ],
+ "astream_events_names": [
+  "on_chain_end",
+  "on_chain_start",
+  "on_chain_stream"
+ ]
+}

@@ -1,0 +1,64 @@
+{
+ "luna_effort_None": {
+  "ok": true,
+  "content": "넓이는 \\(17^2 \\times 23 = 6{,}647\\)입니다.",
+  "completion_tokens": 273,
+  "reasoning_tokens": 242,
+  "cost": 0.00014130000000000002
+ },
+ "luna_effort_none": {
+  "ok": true,
+  "content": "넓이는 \\(17 \\times 23 = 391\\)입니다.",
+  "completion_tokens": 19,
+  "reasoning_tokens": 0,
+  "cost": 1.4299999999999999e-05
+ },
+ "luna_effort_minimal": {
+  "ok": false,
+  "exc": "UnsupportedParamsError",
+  "msg": "litellm.UnsupportedParamsError: reasoning_effort=minimal is not supported for this model."
+ },
+ "luna_effort_low": {
+  "ok": true,
+  "content": "391\n",
+  "completion_tokens": 5,
+  "reasoning_tokens": 0,
+  "cost": 7.2999999999999996e-06
+ },
+ "luna_effort_medium": {
+  "ok": true,
+  "content": "17 × 23 = 391이므로 넓이는 391입니다.",
+  "completion_tokens": 56,
+  "reasoning_tokens": 31,
+  "cost": 3.28e-05
+ },
+ "luna_effort_high": {
+  "ok": true,
+  "content": "넓이는 \\(23 \\times 17^2 = 6{,}647\\)입니다.",
+  "completion_tokens": 1201,
+  "reasoning_tokens": 1158,
+  "cost": 0.0006053
+ },
+ "stream_cost_luna": {
+  "built_usage": {
+   "completion_tokens": 14,
+   "prompt_tokens": 14,
+   "total_tokens": 28
+  },
+  "built_hidden_cost": 8.4e-06,
+  "completion_cost_built": 8.4e-06,
+  "nonstream_cost": 1.6899999999999997e-05,
+  "nonstream_usage": 31
+ },
+ "stream_cost_haiku": {
+  "built_usage": {
+   "completion_tokens": 21,
+   "prompt_tokens": 19,
+   "total_tokens": 40
+  },
+  "built_hidden_cost": 1.24e-05,
+  "completion_cost_built": 1.24e-05,
+  "nonstream_cost": 1.24e-05,
+  "nonstream_usage": 21
+ }
+}

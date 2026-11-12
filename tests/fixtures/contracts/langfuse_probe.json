@@ -1,0 +1,343 @@
+{
+ "sdk_version": "3.15.0",
+ "server_health": {
+  "status": "OK",
+  "version": "3.225.11"
+ },
+ "auth_check": true,
+ "trace_id": "32aab309157fdc73d2f6ecefcdb791bf",
+ "poll_attempts": 2,
+ "trace_fields": {
+  "id": "32aab309157fdc73d2f6ecefcdb791bf",
+  "name": "request",
+  "userId": "tenantA",
+  "sessionId": "tenantA:thread-1",
+  "tags": [
+   "dev",
+   "probe"
+  ],
+  "metadata": {
+   "tenant_id": "A",
+   "run_type": "dev",
+   "resourceAttributes": {
+    "telemetry.sdk.language": "python",
+    "telemetry.sdk.name": "opentelemetry",
+    "telemetry.sdk.version": "1.45.2",
+    "service.instance.id": "bdb365d0-cde7-4602-93a5-e081612c5413",
+    "service.name": "unknown_service:python"
+   },
+   "scope": {
+    "name": "langfuse-sdk",
+    "version": "3.15.0",
+    "attributes": {
+     "public_key": "<probe-public-key>"
+    }
+   }
+  },
+  "input": {
+   "query": "진정 세럼 3안 기획"
+  },
+  "output": {
+   "plan": "A"
+  },
+  "latency": 0.001,
+  "totalCost": 2.2e-05,
+  "timestamp": "2026-11-12T07:41:52.737Z",
+  "environment": "default",
+  "release": null,
+  "version": null,
+  "public": false,
+  "bookmarked": false
+ },
+ "trace_all_keys": [
+  "bookmarked",
+  "createdAt",
+  "environment",
+  "externalId",
+  "htmlPath",
+  "id",
+  "input",
+  "latency",
+  "metadata",
+  "name",
+  "observations",
+  "output",
+  "projectId",
+  "public",
+  "release",
+  "scores",
+  "sessionId",
+  "tags",
+  "timestamp",
+  "totalCost",
+  "updatedAt",
+  "userId",
+  "version"
+ ],
+ "observations": [
+  {
+   "name": "supervisor.llm",
+   "type": "GENERATION",
+   "model": "gpt-6-luna",
+   "level": "DEFAULT",
+   "usage": {
+    "unit": "TOKENS",
+    "input": 120,
+    "output": 20,
+    "total": 240
+   },
+   "usageDetails": {
+    "input": 120,
+    "output": 20,
+    "cache_read_input_tokens": 100,
+    "total": 240
+   },
+   "costDetails": {
+    "input": 1.2e-05,
+    "output": 1e-05,
+    "total": 2.2e-05
+   },
+   "calculatedInputCost": 1.2e-05,
+   "calculatedOutputCost": 1e-05,
+   "calculatedTotalCost": 2.2e-05,
+   "latency": 0,
+   "parentObservationId": "28568774dc09b27d",
+   "metadata": {
+    "provider": "openai",
+    "actual_model": "gpt-6-luna",
+    "resourceAttributes": {
+     "telemetry.sdk.language": "python",
+     "telemetry.sdk.name": "opentelemetry",
+     "telemetry.sdk.version": "1.45.2",
+     "service.instance.id": "bdb365d0-cde7-4602-93a5-e081612c5413",
+     "service.name": "unknown_service:python"
+    },
+    "scope": {
+     "name": "langfuse-sdk",
+     "version": "3.15.0",
+     "attributes": {
+      "public_key": "<probe-public-key>"
+     }
+    }
+   },
+   "modelParameters": {
+    "reasoning_effort": "low"
+   },
+   "unit": "TOKENS"
+  },
+  {
+   "name": "request",
+   "type": "SPAN",
+   "model": null,
+   "level": "DEFAULT",
+   "usage": {
+    "unit": "TOKENS",
+    "input": 0,
+    "output": 0,
+    "total": 0
+   },
+   "usageDetails": {},
+   "costDetails": {},
+   "calculatedInputCost": null,
+   "calculatedOutputCost": null,
+   "calculatedTotalCost": 0,
+   "latency": 0.001,
+   "parentObservationId": null,
+   "metadata": {
+    "resourceAttributes": {
+     "telemetry.sdk.language": "python",
+     "telemetry.sdk.name": "opentelemetry",
+     "telemetry.sdk.version": "1.45.2",
+     "service.instance.id": "bdb365d0-cde7-4602-93a5-e081612c5413",
+     "service.name": "unknown_service:python"
+    },
+    "scope": {
+     "name": "langfuse-sdk",
+     "version": "3.15.0",
+     "attributes": {
+      "public_key": "<probe-public-key>"
+     }
+    }
+   },
+   "modelParameters": null,
+   "unit": "TOKENS"
+  },
+  {
+   "name": "tool.find_creatives",
+   "type": "SPAN",
+   "model": null,
+   "level": "DEFAULT",
+   "usage": {
+    "unit": "TOKENS",
+    "input": 0,
+    "output": 0,
+    "total": 0
+   },
+   "usageDetails": {},
+   "costDetails": {},
+   "calculatedInputCost": null,
+   "calculatedOutputCost": null,
+   "calculatedTotalCost": 0,
+   "latency": 0,
+   "parentObservationId": "ced35af5faeae531",
+   "metadata": {
+    "resourceAttributes": {
+     "telemetry.sdk.language": "python",
+     "telemetry.sdk.name": "opentelemetry",
+     "telemetry.sdk.version": "1.45.2",
+     "service.instance.id": "bdb365d0-cde7-4602-93a5-e081612c5413",
+     "service.name": "unknown_service:python"
+    },
+    "scope": {
+     "name": "langfuse-sdk",
+     "version": "3.15.0",
+     "attributes": {
+      "public_key": "<probe-public-key>"
+     }
+    }
+   },
+   "modelParameters": null,
+   "unit": "TOKENS"
+  },
+  {
+   "name": "supervisor",
+   "type": "SPAN",
+   "model": null,
+   "level": "DEFAULT",
+   "usage": {
+    "unit": "TOKENS",
+    "input": 0,
+    "output": 0,
+    "total": 0
+   },
+   "usageDetails": {},
+   "costDetails": {},
+   "calculatedInputCost": null,
+   "calculatedOutputCost": null,
+   "calculatedTotalCost": 0,
+   "latency": 0.001,
+   "parentObservationId": "ced35af5faeae531",
+   "metadata": {
+    "resourceAttributes": {
+     "telemetry.sdk.language": "python",
+     "telemetry.sdk.name": "opentelemetry",
+     "telemetry.sdk.version": "1.45.2",
+     "service.instance.id": "bdb365d0-cde7-4602-93a5-e081612c5413",
+     "service.name": "unknown_service:python"
+    },
+    "scope": {
+     "name": "langfuse-sdk",
+     "version": "3.15.0",
+     "attributes": {
+      "public_key": "<probe-public-key>"
+     }
+    }
+   },
+   "modelParameters": null,
+   "unit": "TOKENS"
+  },
+  {
+   "name": "planning.llm",
+   "type": "GENERATION",
+   "model": "gpt-6.1-terra",
+   "level": "DEFAULT",
+   "usage": {
+    "unit": "TOKENS",
+    "input": 800,
+    "output": 300,
+    "total": 1100
+   },
+   "usageDetails": {
+    "input": 800,
+    "output": 300,
+    "total": 1100
+   },
+   "costDetails": {},
+   "calculatedInputCost": null,
+   "calculatedOutputCost": null,
+   "calculatedTotalCost": 0,
+   "latency": 0,
+   "parentObservationId": "ced35af5faeae531",
+   "metadata": {
+    "resourceAttributes": {
+     "telemetry.sdk.language": "python",
+     "telemetry.sdk.name": "opentelemetry",
+     "telemetry.sdk.version": "1.45.2",
+     "service.instance.id": "bdb365d0-cde7-4602-93a5-e081612c5413",
+     "service.name": "unknown_service:python"
+    },
+    "scope": {
+     "name": "langfuse-sdk",
+     "version": "3.15.0",
+     "attributes": {
+      "public_key": "<probe-public-key>"
+     }
+    }
+   },
+   "modelParameters": {},
+   "unit": "TOKENS"
+  }
+ ],
+ "observation_keys": [
+  "calculatedInputCost",
+  "calculatedOutputCost",
+  "calculatedTotalCost",
+  "completionStartTime",
+  "completionTokens",
+  "costDetails",
+  "createdAt",
+  "endTime",
+  "environment",
+  "id",
+  "input",
+  "inputPrice",
+  "latency",
+  "level",
+  "metadata",
+  "model",
+  "modelId",
+  "modelParameters",
+  "name",
+  "output",
+  "outputPrice",
+  "parentObservationId",
+  "projectId",
+  "promptId",
+  "promptName",
+  "promptTokens",
+  "promptVersion",
+  "startTime",
+  "statusMessage",
+  "timeToFirstToken",
+  "totalPrice",
+  "totalTokens",
+  "traceId",
+  "type",
+  "unit",
+  "updatedAt",
+  "usage",
+  "usageDetails",
+  "usagePricingTierId",
+  "usagePricingTierName",
+  "version"
+ ],
+ "list_by_user": {
+  "status": 200,
+  "n": 1,
+  "meta": {
+   "page": 1,
+   "limit": 5,
+   "totalItems": 1,
+   "totalPages": 1
+  }
+ },
+ "list_other_tenant": {
+  "status": 200,
+  "n": 0
+ },
+ "bad_key": {
+  "status": 401,
+  "body": "{\"message\":\"Invalid credentials. Confirm that you've configured the correct host.\"}"
+ },
+ "_note": "SDK 3.15.0, 서버 3.225.11 임시 스택(포트 3001), 임시 키. 서버 꺼짐 동작은 별도 프로세스로 측정해 결과 문서에 적음. 5.2.0도 동일 서버에서 동작 확인(thin check)"
+}

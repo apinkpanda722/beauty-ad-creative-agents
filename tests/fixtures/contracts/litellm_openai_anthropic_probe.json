@@ -1,0 +1,1862 @@
+{
+ "_meta": {
+  "recorded_at": "2026-11-12",
+  "litellm": "1.103.3"
+ },
+ "results": {
+  "basic_luna": {
+   "ok": true,
+   "elapsed_s": 1.5,
+   "response": {
+    "id": "chatcmpl-EjJcVJd5i6NJWTKQhqnyaXZmNUD6i",
+    "created": 1794468887,
+    "model": "gpt-6-luna",
+    "object": "chat.completion",
+    "system_fingerprint": null,
+    "choices": [
+     {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+       "content": "안녕하세요, 만나 뵙게 되어 반갑습니다!",
+       "role": "assistant",
+       "tool_calls": null,
+       "function_call": null,
+       "provider_specific_fields": {
+        "refusal": null
+       },
+       "annotations": []
+      },
+      "provider_specific_fields": {}
+     }
+    ],
+    "usage": {
+     "completion_tokens": 16,
+     "prompt_tokens": 14,
+     "total_tokens": 30,
+     "completion_tokens_details": {
+      "accepted_prediction_tokens": 0,
+      "audio_tokens": 0,
+      "reasoning_tokens": 0,
+      "rejected_prediction_tokens": 0
+     },
+     "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cache_write_tokens": 0,
+      "cached_tokens": 0,
+      "cache_creation_tokens": 0
+     }
+    },
+    "moderation": null,
+    "service_tier": "default"
+   },
+   "hidden": {
+    "keys": [
+     "_response_ms",
+     "additional_headers",
+     "api_base",
+     "callback_duration_ms",
+     "custom_llm_provider",
+     "litellm_call_id",
+     "litellm_model_name",
+     "litellm_overhead_time_ms",
+     "model_id",
+     "optional_params",
+     "region_name",
+     "response_cost"
+    ],
+    "response_cost": 9.4e-06,
+    "model_id": null,
+    "litellm_model_name": "openai/gpt-6-luna",
+    "custom_llm_provider": "openai",
+    "additional_headers_keys": [
+     "llm_provider-access-control-expose-headers",
+     "llm_provider-alt-svc",
+     "llm_provider-cf-cache-status",
+     "llm_provider-cf-ray",
+     "llm_provider-connection",
+     "llm_provider-content-encoding",
+     "llm_provider-content-type",
+     "llm_provider-date",
+     "llm_provider-openai-organization",
+     "llm_provider-openai-processing-ms",
+     "llm_provider-openai-project",
+     "llm_provider-openai-version",
+     "llm_provider-server",
+     "llm_provider-set-cookie",
+     "llm_provider-strict-transport-security",
+     "llm_provider-transfer-encoding",
+     "llm_provider-x-content-type-options",
+     "llm_provider-x-openai-proxy-wasm",
+     "llm_provider-x-ratelimit-limit-requests",
+     "llm_provider-x-ratelimit-limit-tokens",
+     "llm_provider-x-ratelimit-remaining-requests",
+     "llm_provider-x-ratelimit-remaining-tokens",
+     "llm_provider-x-ratelimit-reset-requests",
+     "llm_provider-x-ratelimit-reset-tokens",
+     "llm_provider-x-request-id",
+     "x-ratelimit-limit-requests",
+     "x-ratelimit-limit-tokens",
+     "x-ratelimit-remaining-requests",
+     "x-ratelimit-remaining-tokens"
+    ],
+    "raw_headers_names": [],
+    "raw_headers_model_like": {}
+   }
+  },
+  "basic_terra": {
+   "ok": true,
+   "elapsed_s": 1.6,
+   "response": {
+    "id": "chatcmpl-EjJcWWa6tkQ21Bu8wqA7OjnKaV8dR",
+    "created": 1794468888,
+    "model": "gpt-6.1-terra",
+    "object": "chat.completion",
+    "system_fingerprint": null,
+    "choices": [
+     {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+       "content": "안녕하세요, 만나서 반가워요!",
+       "role": "assistant",
+       "tool_calls": null,
+       "function_call": null,
+       "provider_specific_fields": {
+        "refusal": null
+       },
+       "annotations": []
+      },
+      "provider_specific_fields": {}
+     }
+    ],
+    "usage": {
+     "completion_tokens": 13,
+     "prompt_tokens": 14,
+     "total_tokens": 27,
+     "completion_tokens_details": {
+      "accepted_prediction_tokens": 0,
+      "audio_tokens": 0,
+      "reasoning_tokens": 0,
+      "rejected_prediction_tokens": 0
+     },
+     "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cache_write_tokens": 0,
+      "cached_tokens": 0,
+      "cache_creation_tokens": 0
+     }
+    },
+    "moderation": null,
+    "service_tier": "default"
+   },
+   "hidden": {
+    "keys": [
+     "_response_ms",
+     "additional_headers",
+     "api_base",
+     "callback_duration_ms",
+     "custom_llm_provider",
+     "litellm_call_id",
+     "litellm_model_name",
+     "litellm_overhead_time_ms",
+     "model_id",
+     "optional_params",
+     "region_name",
+     "response_cost"
+    ],
+    "response_cost": 7.900000000000001e-05,
+    "model_id": null,
+    "litellm_model_name": "openai/gpt-6.1-terra",
+    "custom_llm_provider": "openai",
+    "additional_headers_keys": [
+     "llm_provider-access-control-expose-headers",
+     "llm_provider-alt-svc",
+     "llm_provider-cf-cache-status",
+     "llm_provider-cf-ray",
+     "llm_provider-connection",
+     "llm_provider-content-encoding",
+     "llm_provider-content-type",
+     "llm_provider-date",
+     "llm_provider-openai-organization",
+     "llm_provider-openai-processing-ms",
+     "llm_provider-openai-project",
+     "llm_provider-openai-version",
+     "llm_provider-server",
+     "llm_provider-strict-transport-security",
+     "llm_provider-transfer-encoding",
+     "llm_provider-x-content-type-options",
+     "llm_provider-x-openai-proxy-wasm",
+     "llm_provider-x-ratelimit-limit-requests",
+     "llm_provider-x-ratelimit-limit-tokens",
+     "llm_provider-x-ratelimit-remaining-requests",
+     "llm_provider-x-ratelimit-remaining-tokens",
+     "llm_provider-x-ratelimit-reset-requests",
+     "llm_provider-x-ratelimit-reset-tokens",
+     "llm_provider-x-request-id",
+     "x-ratelimit-limit-requests",
+     "x-ratelimit-limit-tokens",
+     "x-ratelimit-remaining-requests",
+     "x-ratelimit-remaining-tokens"
+    ],
+    "raw_headers_names": [],
+    "raw_headers_model_like": {}
+   }
+  },
+  "basic_haiku": {
+   "ok": true,
+   "elapsed_s": 1.1,
+   "response": {
+    "id": "chatcmpl-09216950-6cea-487e-80da-d9f1c6b2fd52",
+    "created": 1794468890,
+    "model": "claude-haiku-5-5",
+    "object": "chat.completion",
+    "system_fingerprint": null,
+    "choices": [
+     {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+       "content": "안녕하세요! 만나서 반가워요.",
+       "role": "assistant",
+       "tool_calls": null,
+       "function_call": null,
+       "provider_specific_fields": {
+        "citations": null,
+        "thinking_blocks": null
+       }
+      }
+     }
+    ],
+    "usage": {
+     "completion_tokens": 19,
+     "prompt_tokens": 19,
+     "total_tokens": 38,
+     "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "text_tokens": 19
+     },
+     "prompt_tokens_details": {
+      "audio_tokens": null,
+      "cache_write_tokens": 0,
+      "cached_tokens": 0,
+      "text_tokens": 19,
+      "image_tokens": null,
+      "video_tokens": null,
+      "cache_creation_tokens": 0,
+      "cache_creation_token_details": {
+       "ephemeral_5m_input_tokens": 0,
+       "ephemeral_1h_input_tokens": 0
+      }
+     },
+     "cache_creation_input_tokens": 0,
+     "cache_read_input_tokens": 0,
+     "iterations": null,
+     "inference_geo": "global",
+     "speed": "standard",
+     "service_tier": "standard"
+    }
+   },
+   "hidden": {
+    "keys": [
+     "_response_ms",
+     "additional_headers",
+     "api_base",
+     "callback_duration_ms",
+     "litellm_call_id",
+     "litellm_model_name",
+     "model_id",
+     "optional_params",
+     "provider_specific_fields",
+     "response_cost"
+    ],
+    "response_cost": 1.14e-05,
+    "model_id": null,
+    "litellm_model_name": "anthropic/claude-haiku-5-5",
+    "custom_llm_provider": null,
+    "additional_headers_keys": [
+     "llm_provider-anthropic-organization-id",
+     "llm_provider-anthropic-ratelimit-input-tokens-limit",
+     "llm_provider-anthropic-ratelimit-input-tokens-remaining",
+     "llm_provider-anthropic-ratelimit-input-tokens-reset",
+     "llm_provider-anthropic-ratelimit-output-tokens-limit",
+     "llm_provider-anthropic-ratelimit-output-tokens-remaining",
+     "llm_provider-anthropic-ratelimit-output-tokens-reset",
+     "llm_provider-anthropic-ratelimit-requests-limit",
+     "llm_provider-anthropic-ratelimit-requests-remaining",
+     "llm_provider-anthropic-ratelimit-requests-reset",
+     "llm_provider-anthropic-ratelimit-tokens-limit",
+     "llm_provider-anthropic-ratelimit-tokens-remaining",
+     "llm_provider-anthropic-ratelimit-tokens-reset",
+     "llm_provider-anthropic-workspace-id",
+     "llm_provider-cf-cache-status",
+     "llm_provider-cf-ray",
+     "llm_provider-connection",
+     "llm_provider-content-encoding",
+     "llm_provider-content-security-policy",
+     "llm_provider-content-type",
+     "llm_provider-date",
+     "llm_provider-request-id",
+     "llm_provider-server",
+     "llm_provider-server-timing",
+     "llm_provider-strict-transport-security",
+     "llm_provider-traceresponse",
+     "llm_provider-transfer-encoding",
+     "llm_provider-vary",
+     "llm_provider-x-ratelimit-limit-requests",
+     "llm_provider-x-ratelimit-limit-tokens",
+     "llm_provider-x-ratelimit-remaining-requests",
+     "llm_provider-x-ratelimit-remaining-tokens",
+     "llm_provider-x-robots-tag",
+     "x-ratelimit-limit-requests",
+     "x-ratelimit-limit-tokens",
+     "x-ratelimit-remaining-requests",
+     "x-ratelimit-remaining-tokens"
+    ],
+    "raw_headers_names": [],
+    "raw_headers_model_like": {}
+   }
+  },
+  "basic_sonnet": {
+   "ok": true,
+   "elapsed_s": 1.5,
+   "response": {
+    "id": "chatcmpl-b8e83ea6-5cd4-42db-bc85-b521428d53f7",
+    "created": 1794468892,
+    "model": "claude-sonnet-5-5",
+    "object": "chat.completion",
+    "system_fingerprint": null,
+    "choices": [
+     {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+       "content": "안녕하세요, 만나서 반갑습니다. 오늘 무엇을 도와드릴까요?",
+       "role": "assistant",
+       "tool_calls": null,
+       "function_call": null,
+       "provider_specific_fields": {
+        "citations": null,
+        "thinking_blocks": null
+       }
+      }
+     }
+    ],
+    "usage": {
+     "completion_tokens": 39,
+     "prompt_tokens": 19,
+     "total_tokens": 58,
+     "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "text_tokens": 39
+     },
+     "prompt_tokens_details": {
+      "audio_tokens": null,
+      "cache_write_tokens": 0,
+      "cached_tokens": 0,
+      "text_tokens": 19,
+      "image_tokens": null,
+      "video_tokens": null,
+      "cache_creation_tokens": 0,
+      "cache_creation_token_details": {
+       "ephemeral_5m_input_tokens": 0,
+       "ephemeral_1h_input_tokens": 0
+      }
+     },
+     "cache_creation_input_tokens": 0,
+     "cache_read_input_tokens": 0,
+     "iterations": null,
+     "inference_geo": "global",
+     "speed": "standard",
+     "service_tier": "standard"
+    }
+   },
+   "hidden": {
+    "keys": [
+     "_response_ms",
+     "additional_headers",
+     "api_base",
+     "callback_duration_ms",
+     "litellm_call_id",
+     "litellm_model_name",
+     "model_id",
+     "optional_params",
+     "provider_specific_fields",
+     "response_cost"
+    ],
+    "response_cost": 0.00042800000000000005,
+    "model_id": null,
+    "litellm_model_name": "anthropic/claude-sonnet-5-5",
+    "custom_llm_provider": null,
+    "additional_headers_keys": [
+     "llm_provider-anthropic-organization-id",
+     "llm_provider-anthropic-ratelimit-input-tokens-limit",
+     "llm_provider-anthropic-ratelimit-input-tokens-remaining",
+     "llm_provider-anthropic-ratelimit-input-tokens-reset",
+     "llm_provider-anthropic-ratelimit-output-tokens-limit",
+     "llm_provider-anthropic-ratelimit-output-tokens-remaining",
+     "llm_provider-anthropic-ratelimit-output-tokens-reset",
+     "llm_provider-anthropic-ratelimit-requests-limit",
+     "llm_provider-anthropic-ratelimit-requests-remaining",
+     "llm_provider-anthropic-ratelimit-requests-reset",
+     "llm_provider-anthropic-ratelimit-tokens-limit",
+     "llm_provider-anthropic-ratelimit-tokens-remaining",
+     "llm_provider-anthropic-ratelimit-tokens-reset",
+     "llm_provider-anthropic-workspace-id",
+     "llm_provider-cf-cache-status",
+     "llm_provider-cf-ray",
+     "llm_provider-connection",
+     "llm_provider-content-encoding",
+     "llm_provider-content-security-policy",
+     "llm_provider-content-type",
+     "llm_provider-date",
+     "llm_provider-request-id",
+     "llm_provider-server",
+     "llm_provider-server-timing",
+     "llm_provider-strict-transport-security",
+     "llm_provider-traceresponse",
+     "llm_provider-transfer-encoding",
+     "llm_provider-vary",
+     "llm_provider-x-ratelimit-limit-requests",
+     "llm_provider-x-ratelimit-limit-tokens",
+     "llm_provider-x-ratelimit-remaining-requests",
+     "llm_provider-x-ratelimit-remaining-tokens",
+     "llm_provider-x-robots-tag",
+     "x-ratelimit-limit-requests",
+     "x-ratelimit-limit-tokens",
+     "x-ratelimit-remaining-requests",
+     "x-ratelimit-remaining-tokens"
+    ],
+    "raw_headers_names": [],
+    "raw_headers_model_like": {}
+   }
+  },
+  "tool_luna": {
+   "ok": true,
+   "elapsed_s": 4.5,
+   "response": {
+    "id": "resp_0d2c12992bd1a5b2006af56c1df4b887d29a35a638015547af",
+    "created": 1794468892,
+    "model": "gpt-6-luna",
+    "object": "chat.completion",
+    "system_fingerprint": null,
+    "choices": [
+     {
+      "finish_reason": "tool_calls",
+      "index": 0,
+      "message": {
+       "content": null,
+       "role": "assistant",
+       "tool_calls": [
+        {
+         "index": 0,
+         "function": {
+          "arguments": "{\"category\":\"sun_care\",\"limit\":3}",
+          "name": "find_creatives"
+         },
+         "id": "call_4qtMyRfNs0zEJGkRMQGxl40d",
+         "type": "function"
+        }
+       ],
+       "function_call": null
+      }
+     }
+    ],
+    "usage": {
+     "completion_tokens": 25,
+     "prompt_tokens": 75,
+     "total_tokens": 100,
+     "completion_tokens_details": {
+      "audio_tokens": null,
+      "reasoning_tokens": 0,
+      "text_tokens": null,
+      "image_tokens": null
+     },
+     "prompt_tokens_details": {
+      "audio_tokens": null,
+      "cache_write_tokens": 0,
+      "cached_tokens": 0,
+      "text_tokens": null,
+      "image_tokens": null,
+      "video_tokens": null,
+      "cache_creation_tokens": 0
+     }
+    },
+    "billing": {
+     "payer": "developer"
+    },
+    "frequency_penalty": 0.0,
+    "image": {
+     "context_compression": "disabled"
+    },
+    "presence_penalty": 0.0,
+    "service_tier": "default",
+    "tool_usage": {
+     "image_gen": {
+      "input_tokens": 0,
+      "input_tokens_details": {
+       "image_tokens": 0,
+       "text_tokens": 0
+      },
+      "output_tokens": 0,
+      "output_tokens_details": {
+       "image_tokens": 0,
+       "text_tokens": 0
+      },
+      "total_tokens": 0
+     },
+     "web_search": {
+      "num_requests": 0
+     }
+    }
+   },
+   "hidden": {
+    "keys": [
+     "_response_ms",
+     "additional_headers",
+     "api_base",
+     "callback_duration_ms",
+     "custom_llm_provider",
+     "headers",
+     "litellm_call_id",
+     "litellm_model_name",
+     "model_id",
+     "optional_params",
+     "region_name",
+     "response_cost"
+    ],
+    "response_cost": 1.9999999999999998e-05,
+    "model_id": null,
+    "litellm_model_name": "openai/gpt-6-luna",
+    "custom_llm_provider": "openai",
+    "additional_headers_keys": [
+     "llm_provider-access-control-expose-headers",
+     "llm_provider-alt-svc",
+     "llm_provider-cf-cache-status",
+     "llm_provider-cf-ray",
+     "llm_provider-connection",
+     "llm_provider-content-encoding",
+     "llm_provider-content-type",
+     "llm_provider-date",
+     "llm_provider-openai-organization",
+     "llm_provider-openai-processing-ms",
+     "llm_provider-openai-project",
+     "llm_provider-openai-version",
+     "llm_provider-server",
+     "llm_provider-set-cookie",
+     "llm_provider-strict-transport-security",
+     "llm_provider-transfer-encoding",
+     "llm_provider-x-content-type-options",
+     "llm_provider-x-ratelimit-limit-requests",
+     "llm_provider-x-ratelimit-limit-tokens",
+     "llm_provider-x-ratelimit-remaining-requests",
+     "llm_provider-x-ratelimit-remaining-tokens",
+     "llm_provider-x-ratelimit-reset-requests",
+     "llm_provider-x-ratelimit-reset-tokens",
+     "llm_provider-x-request-id",
+     "x-ratelimit-limit-requests",
+     "x-ratelimit-limit-tokens",
+     "x-ratelimit-remaining-requests",
+     "x-ratelimit-remaining-tokens",
+     "x-ratelimit-reset-requests",
+     "x-ratelimit-reset-tokens"
+    ],
+    "raw_headers_names": [
+     "access-control-expose-headers",
+     "alt-svc",
+     "cf-cache-status",
+     "cf-ray",
+     "connection",
+     "content-encoding",
+     "content-type",
+     "date",
+     "openai-organization",
+     "openai-processing-ms",
+     "openai-project",
+     "openai-version",
+     "server",
+     "set-cookie",
+     "strict-transport-security",
+     "transfer-encoding",
+     "x-content-type-options",
+     "x-ratelimit-limit-requests",
+     "x-ratelimit-limit-tokens",
+     "x-ratelimit-remaining-requests",
+     "x-ratelimit-remaining-tokens",
+     "x-ratelimit-reset-requests",
+     "x-ratelimit-reset-tokens",
+     "x-request-id"
+    ],
+    "raw_headers_model_like": {
+     "openai-processing-ms": "2544",
+     "x-request-id": "req_99c1d5137dba407caeb404040b581975"
+    }
+   }
+  },
+  "tool_haiku": {
+   "ok": true,
+   "elapsed_s": 1.0,
+   "response": {
+    "id": "chatcmpl-2aedb376-762e-4479-bf7f-1e67c7125c83",
+    "created": 1794468897,
+    "model": "claude-haiku-5-5",
+    "object": "chat.completion",
+    "system_fingerprint": null,
+    "choices": [
+     {
+      "finish_reason": "tool_calls",
+      "index": 0,
+      "message": {
+       "content": null,
+       "role": "assistant",
+       "tool_calls": [
+        {
+         "index": 0,
+         "caller": {
+          "type": "direct"
+         },
+         "function": {
+          "arguments": "{\"category\": \"sun_care\", \"limit\": 3}",
+          "name": "find_creatives"
+         },
+         "id": "toolu_01BotX3kuedoi72rUXAPzJBF",
+         "type": "function"
+        }
+       ],
+       "function_call": null,
+       "provider_specific_fields": {
+        "citations": null,
+        "thinking_blocks": null
+       }
+      }
+     }
+    ],
+    "usage": {
+     "completion_tokens": 64,
+     "prompt_tokens": 552,
+     "total_tokens": 616,
+     "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "text_tokens": 64
+     },
+     "prompt_tokens_details": {
+      "audio_tokens": null,
+      "cache_write_tokens": 0,
+      "cached_tokens": 0,
+      "text_tokens": 552,
+      "image_tokens": null,
+      "video_tokens": null,
+      "cache_creation_tokens": 0,
+      "cache_creation_token_details": {
+       "ephemeral_5m_input_tokens": 0,
+       "ephemeral_1h_input_tokens": 0
+      }
+     },
+     "cache_creation_input_tokens": 0,
+     "cache_read_input_tokens": 0,
+     "iterations": null,
+     "inference_geo": "global",
+     "speed": "standard",
+     "service_tier": "standard"
+    }
+   },
+   "hidden": {
+    "keys": [
+     "_response_ms",
+     "additional_headers",
+     "api_base",
+     "callback_duration_ms",
+     "litellm_call_id",
+     "litellm_model_name",
+     "model_id",
+     "optional_params",
+     "provider_specific_fields",
+     "response_cost"
+    ],
+    "response_cost": 8.72e-05,
+    "model_id": null,
+    "litellm_model_name": "anthropic/claude-haiku-5-5",
+    "custom_llm_provider": null,
+    "additional_headers_keys": [
+     "llm_provider-anthropic-organization-id",
+     "llm_provider-anthropic-ratelimit-input-tokens-limit",
+     "llm_provider-anthropic-ratelimit-input-tokens-remaining",
+     "llm_provider-anthropic-ratelimit-input-tokens-reset",
+     "llm_provider-anthropic-ratelimit-output-tokens-limit",
+     "llm_provider-anthropic-ratelimit-output-tokens-remaining",
+     "llm_provider-anthropic-ratelimit-output-tokens-reset",
+     "llm_provider-anthropic-ratelimit-requests-limit",
+     "llm_provider-anthropic-ratelimit-requests-remaining",
+     "llm_provider-anthropic-ratelimit-requests-reset",
+     "llm_provider-anthropic-ratelimit-tokens-limit",
+     "llm_provider-anthropic-ratelimit-tokens-remaining",
+     "llm_provider-anthropic-ratelimit-tokens-reset",
+     "llm_provider-anthropic-workspace-id",
+     "llm_provider-cf-cache-status",
+     "llm_provider-cf-ray",
+     "llm_provider-connection",
+     "llm_provider-content-encoding",
+     "llm_provider-content-security-policy",
+     "llm_provider-content-type",
+     "llm_provider-date",
+     "llm_provider-request-id",
+     "llm_provider-server",
+     "llm_provider-server-timing",
+     "llm_provider-strict-transport-security",
+     "llm_provider-traceresponse",
+     "llm_provider-transfer-encoding",
+     "llm_provider-vary",
+     "llm_provider-x-ratelimit-limit-requests",
+     "llm_provider-x-ratelimit-limit-tokens",
+     "llm_provider-x-ratelimit-remaining-requests",
+     "llm_provider-x-ratelimit-remaining-tokens",
+     "llm_provider-x-robots-tag",
+     "x-ratelimit-limit-requests",
+     "x-ratelimit-limit-tokens",
+     "x-ratelimit-remaining-requests",
+     "x-ratelimit-remaining-tokens"
+    ],
+    "raw_headers_names": [],
+    "raw_headers_model_like": {}
+   }
+  },
+  "temp0_luna": {
+   "ok": false,
+   "elapsed_s": 0.0,
+   "exc_type": "UnsupportedParamsError",
+   "exc_module": "litellm.exceptions",
+   "status_code": 400,
+   "llm_provider": null,
+   "model": null,
+   "message": "litellm.UnsupportedParamsError: gpt-6-luna doesn't support temperature=0 while reasoning is active. Only temperature=1 is supported unless reasoning_effort resolves to 'none', either set explicitly on the request or declared as the model's default_reasoning_effort. To drop unsupported params set `litellm.drop_params = True`",
+   "response_status": null
+  },
+  "temp0_haiku": {
+   "ok": false,
+   "elapsed_s": 0.0,
+   "exc_type": "UnsupportedParamsError",
+   "exc_module": "litellm.exceptions",
+   "status_code": 400,
+   "llm_provider": null,
+   "model": null,
+   "message": "litellm.UnsupportedParamsError: claude-haiku-5-5 does not support temperature=0. Only temperature=1 is supported. To drop unsupported params, set `litellm.drop_params = True`.",
+   "response_status": null
+  },
+  "schema_luna": {
+   "ok": true,
+   "elapsed_s": 1.7,
+   "response": {
+    "id": "chatcmpl-EjJcgo0w5XcyajGo6EsVxxUdHOwmC",
+    "created": 1794468898,
+    "model": "gpt-6-luna",
+    "object": "chat.completion",
+    "system_fingerprint": null,
+    "choices": [
+     {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+       "content": "{\"hook_type\":\"question\"}",
+       "role": "assistant",
+       "tool_calls": null,
+       "function_call": null,
+       "provider_specific_fields": {
+        "refusal": null
+       },
+       "annotations": []
+      },
+      "provider_specific_fields": {}
+     }
+    ],
+    "usage": {
+     "completion_tokens": 44,
+     "prompt_tokens": 62,
+     "total_tokens": 106,
+     "completion_tokens_details": {
+      "accepted_prediction_tokens": 0,
+      "audio_tokens": 0,
+      "reasoning_tokens": 26,
+      "rejected_prediction_tokens": 0
+     },
+     "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cache_write_tokens": 0,
+      "cached_tokens": 0,
+      "cache_creation_tokens": 0
+     }
+    },
+    "moderation": null,
+    "service_tier": "default"
+   },
+   "hidden": {
+    "keys": [
+     "_response_ms",
+     "additional_headers",
+     "api_base",
+     "callback_duration_ms",
+     "custom_llm_provider",
+     "litellm_call_id",
+     "litellm_model_name",
+     "litellm_overhead_time_ms",
+     "model_id",
+     "optional_params",
+     "region_name",
+     "response_cost"
+    ],
+    "response_cost": 2.82e-05,
+    "model_id": null,
+    "litellm_model_name": "openai/gpt-6-luna",
+    "custom_llm_provider": "openai",
+    "additional_headers_keys": [
+     "llm_provider-access-control-expose-headers",
+     "llm_provider-alt-svc",
+     "llm_provider-cf-cache-status",
+     "llm_provider-cf-ray",
+     "llm_provider-connection",
+     "llm_provider-content-encoding",
+     "llm_provider-content-type",
+     "llm_provider-date",
+     "llm_provider-openai-organization",
+     "llm_provider-openai-processing-ms",
+     "llm_provider-openai-project",
+     "llm_provider-openai-version",
+     "llm_provider-server",
+     "llm_provider-strict-transport-security",
+     "llm_provider-transfer-encoding",
+     "llm_provider-x-content-type-options",
+     "llm_provider-x-openai-proxy-wasm",
+     "llm_provider-x-ratelimit-limit-requests",
+     "llm_provider-x-ratelimit-limit-tokens",
+     "llm_provider-x-ratelimit-remaining-requests",
+     "llm_provider-x-ratelimit-remaining-tokens",
+     "llm_provider-x-ratelimit-reset-requests",
+     "llm_provider-x-ratelimit-reset-tokens",
+     "llm_provider-x-request-id",
+     "x-ratelimit-limit-requests",
+     "x-ratelimit-limit-tokens",
+     "x-ratelimit-remaining-requests",
+     "x-ratelimit-remaining-tokens"
+    ],
+    "raw_headers_names": [],
+    "raw_headers_model_like": {}
+   }
+  },
+  "schema_haiku": {
+   "ok": true,
+   "elapsed_s": 1.8,
+   "response": {
+    "id": "chatcmpl-500aebd8-efec-4724-a4d4-cda8f10a3c5e",
+    "created": 1794468901,
+    "model": "claude-haiku-5-5",
+    "object": "chat.completion",
+    "system_fingerprint": null,
+    "choices": [
+     {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+       "content": "{\"hook_type\":\"question\"}",
+       "role": "assistant",
+       "tool_calls": null,
+       "function_call": null,
+       "provider_specific_fields": {
+        "citations": null,
+        "thinking_blocks": null
+       }
+      }
+     }
+    ],
+    "usage": {
+     "completion_tokens": 13,
+     "prompt_tokens": 259,
+     "total_tokens": 272,
+     "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "text_tokens": 13
+     },
+     "prompt_tokens_details": {
+      "audio_tokens": null,
+      "cache_write_tokens": 0,
+      "cached_tokens": 0,
+      "text_tokens": 259,
+      "image_tokens": null,
+      "video_tokens": null,
+      "cache_creation_tokens": 0,
+      "cache_creation_token_details": {
+       "ephemeral_5m_input_tokens": 0,
+       "ephemeral_1h_input_tokens": 0
+      }
+     },
+     "cache_creation_input_tokens": 0,
+     "cache_read_input_tokens": 0,
+     "iterations": null,
+     "inference_geo": "global",
+     "speed": "standard",
+     "service_tier": "standard"
+    }
+   },
+   "hidden": {
+    "keys": [
+     "_response_ms",
+     "additional_headers",
+     "api_base",
+     "callback_duration_ms",
+     "litellm_call_id",
+     "litellm_model_name",
+     "model_id",
+     "optional_params",
+     "provider_specific_fields",
+     "response_cost"
+    ],
+    "response_cost": 3.24e-05,
+    "model_id": null,
+    "litellm_model_name": "anthropic/claude-haiku-5-5",
+    "custom_llm_provider": null,
+    "additional_headers_keys": [
+     "llm_provider-anthropic-organization-id",
+     "llm_provider-anthropic-ratelimit-input-tokens-limit",
+     "llm_provider-anthropic-ratelimit-input-tokens-remaining",
+     "llm_provider-anthropic-ratelimit-input-tokens-reset",
+     "llm_provider-anthropic-ratelimit-output-tokens-limit",
+     "llm_provider-anthropic-ratelimit-output-tokens-remaining",
+     "llm_provider-anthropic-ratelimit-output-tokens-reset",
+     "llm_provider-anthropic-ratelimit-requests-limit",
+     "llm_provider-anthropic-ratelimit-requests-remaining",
+     "llm_provider-anthropic-ratelimit-requests-reset",
+     "llm_provider-anthropic-ratelimit-tokens-limit",
+     "llm_provider-anthropic-ratelimit-tokens-remaining",
+     "llm_provider-anthropic-ratelimit-tokens-reset",
+     "llm_provider-anthropic-workspace-id",
+     "llm_provider-cf-cache-status",
+     "llm_provider-cf-ray",
+     "llm_provider-connection",
+     "llm_provider-content-encoding",
+     "llm_provider-content-security-policy",
+     "llm_provider-content-type",
+     "llm_provider-date",
+     "llm_provider-request-id",
+     "llm_provider-server",
+     "llm_provider-server-timing",
+     "llm_provider-strict-transport-security",
+     "llm_provider-traceresponse",
+     "llm_provider-transfer-encoding",
+     "llm_provider-vary",
+     "llm_provider-x-ratelimit-limit-requests",
+     "llm_provider-x-ratelimit-limit-tokens",
+     "llm_provider-x-ratelimit-remaining-requests",
+     "llm_provider-x-ratelimit-remaining-tokens",
+     "llm_provider-x-robots-tag",
+     "x-ratelimit-limit-requests",
+     "x-ratelimit-limit-tokens",
+     "x-ratelimit-remaining-requests",
+     "x-ratelimit-remaining-tokens"
+    ],
+    "raw_headers_names": [],
+    "raw_headers_model_like": {}
+   }
+  },
+  "cache_luna_1": {
+   "ok": true,
+   "elapsed_s": 1.1,
+   "response": {
+    "id": "chatcmpl-EjJcjdzbUQl3Kh2bUjqkftYjCisxY",
+    "created": 1794468901,
+    "model": "gpt-6-luna",
+    "object": "chat.completion",
+    "system_fingerprint": null,
+    "choices": [
+     {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+       "content": "OK",
+       "role": "assistant",
+       "tool_calls": null,
+       "function_call": null,
+       "provider_specific_fields": {
+        "refusal": null
+       },
+       "annotations": []
+      },
+      "provider_specific_fields": {}
+     }
+    ],
+    "usage": {
+     "completion_tokens": 4,
+     "prompt_tokens": 5745,
+     "total_tokens": 5749,
+     "completion_tokens_details": {
+      "accepted_prediction_tokens": 0,
+      "audio_tokens": 0,
+      "reasoning_tokens": 0,
+      "rejected_prediction_tokens": 0
+     },
+     "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cache_write_tokens": 0,
+      "cached_tokens": 5742,
+      "cache_creation_tokens": 0
+     }
+    },
+    "moderation": null,
+    "service_tier": "default"
+   },
+   "hidden": {
+    "keys": [
+     "_response_ms",
+     "additional_headers",
+     "api_base",
+     "callback_duration_ms",
+     "custom_llm_provider",
+     "litellm_call_id",
+     "litellm_model_name",
+     "litellm_overhead_time_ms",
+     "model_id",
+     "optional_params",
+     "region_name",
+     "response_cost"
+    ],
+    "response_cost": 5.9720000000000004e-05,
+    "model_id": null,
+    "litellm_model_name": "openai/gpt-6-luna",
+    "custom_llm_provider": "openai",
+    "additional_headers_keys": [
+     "llm_provider-access-control-expose-headers",
+     "llm_provider-alt-svc",
+     "llm_provider-cf-cache-status",
+     "llm_provider-cf-ray",
+     "llm_provider-connection",
+     "llm_provider-content-encoding",
+     "llm_provider-content-type",
+     "llm_provider-date",
+     "llm_provider-openai-organization",
+     "llm_provider-openai-processing-ms",
+     "llm_provider-openai-project",
+     "llm_provider-openai-version",
+     "llm_provider-server",
+     "llm_provider-strict-transport-security",
+     "llm_provider-transfer-encoding",
+     "llm_provider-x-content-type-options",
+     "llm_provider-x-openai-proxy-wasm",
+     "llm_provider-x-ratelimit-limit-requests",
+     "llm_provider-x-ratelimit-limit-tokens",
+     "llm_provider-x-ratelimit-remaining-requests",
+     "llm_provider-x-ratelimit-remaining-tokens",
+     "llm_provider-x-ratelimit-reset-requests",
+     "llm_provider-x-ratelimit-reset-tokens",
+     "llm_provider-x-request-id",
+     "x-ratelimit-limit-requests",
+     "x-ratelimit-limit-tokens",
+     "x-ratelimit-remaining-requests",
+     "x-ratelimit-remaining-tokens"
+    ],
+    "raw_headers_names": [],
+    "raw_headers_model_like": {}
+   }
+  },
+  "cache_luna_2": {
+   "ok": true,
+   "elapsed_s": 1.1,
+   "response": {
+    "id": "chatcmpl-EjJckbLce4sxTC9widEP4IUEYTA6j",
+    "created": 1794468902,
+    "model": "gpt-6-luna",
+    "object": "chat.completion",
+    "system_fingerprint": null,
+    "choices": [
+     {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+       "content": "OK",
+       "role": "assistant",
+       "tool_calls": null,
+       "function_call": null,
+       "provider_specific_fields": {
+        "refusal": null
+       },
+       "annotations": []
+      },
+      "provider_specific_fields": {}
+     }
+    ],
+    "usage": {
+     "completion_tokens": 4,
+     "prompt_tokens": 5745,
+     "total_tokens": 5749,
+     "completion_tokens_details": {
+      "accepted_prediction_tokens": 0,
+      "audio_tokens": 0,
+      "reasoning_tokens": 0,
+      "rejected_prediction_tokens": 0
+     },
+     "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cache_write_tokens": 0,
+      "cached_tokens": 5742,
+      "cache_creation_tokens": 0
+     }
+    },
+    "moderation": null,
+    "service_tier": "default"
+   },
+   "hidden": {
+    "keys": [
+     "_response_ms",
+     "additional_headers",
+     "api_base",
+     "callback_duration_ms",
+     "custom_llm_provider",
+     "litellm_call_id",
+     "litellm_model_name",
+     "litellm_overhead_time_ms",
+     "model_id",
+     "optional_params",
+     "region_name",
+     "response_cost"
+    ],
+    "response_cost": 5.9720000000000004e-05,
+    "model_id": null,
+    "litellm_model_name": "openai/gpt-6-luna",
+    "custom_llm_provider": "openai",
+    "additional_headers_keys": [
+     "llm_provider-access-control-expose-headers",
+     "llm_provider-alt-svc",
+     "llm_provider-cf-cache-status",
+     "llm_provider-cf-ray",
+     "llm_provider-connection",
+     "llm_provider-content-encoding",
+     "llm_provider-content-type",
+     "llm_provider-date",
+     "llm_provider-openai-organization",
+     "llm_provider-openai-processing-ms",
+     "llm_provider-openai-project",
+     "llm_provider-openai-version",
+     "llm_provider-server",
+     "llm_provider-strict-transport-security",
+     "llm_provider-transfer-encoding",
+     "llm_provider-x-content-type-options",
+     "llm_provider-x-openai-proxy-wasm",
+     "llm_provider-x-ratelimit-limit-requests",
+     "llm_provider-x-ratelimit-limit-tokens",
+     "llm_provider-x-ratelimit-remaining-requests",
+     "llm_provider-x-ratelimit-remaining-tokens",
+     "llm_provider-x-ratelimit-reset-requests",
+     "llm_provider-x-ratelimit-reset-tokens",
+     "llm_provider-x-request-id",
+     "x-ratelimit-limit-requests",
+     "x-ratelimit-limit-tokens",
+     "x-ratelimit-remaining-requests",
+     "x-ratelimit-remaining-tokens"
+    ],
+    "raw_headers_names": [],
+    "raw_headers_model_like": {}
+   }
+  },
+  "cache_haiku_1": {
+   "ok": true,
+   "elapsed_s": 0.9,
+   "response": {
+    "id": "chatcmpl-05adb48e-c136-46e9-a237-34f339bed985",
+    "created": 1794468904,
+    "model": "claude-haiku-5-5",
+    "object": "chat.completion",
+    "system_fingerprint": null,
+    "choices": [
+     {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+       "content": "OK",
+       "role": "assistant",
+       "tool_calls": null,
+       "function_call": null,
+       "provider_specific_fields": {
+        "citations": null,
+        "thinking_blocks": null
+       }
+      }
+     }
+    ],
+    "usage": {
+     "completion_tokens": 4,
+     "prompt_tokens": 8615,
+     "total_tokens": 8619,
+     "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "text_tokens": 4
+     },
+     "prompt_tokens_details": {
+      "audio_tokens": null,
+      "cache_write_tokens": 0,
+      "cached_tokens": 8600,
+      "text_tokens": 15,
+      "image_tokens": null,
+      "video_tokens": null,
+      "cache_creation_tokens": 0,
+      "cache_creation_token_details": {
+       "ephemeral_5m_input_tokens": 0,
+       "ephemeral_1h_input_tokens": 0
+      }
+     },
+     "cache_creation_input_tokens": 0,
+     "cache_read_input_tokens": 8600,
+     "iterations": null,
+     "inference_geo": "global",
+     "speed": "standard",
+     "service_tier": "standard"
+    }
+   },
+   "hidden": {
+    "keys": [
+     "_response_ms",
+     "additional_headers",
+     "api_base",
+     "callback_duration_ms",
+     "litellm_call_id",
+     "litellm_model_name",
+     "model_id",
+     "optional_params",
+     "provider_specific_fields",
+     "response_cost"
+    ],
+    "response_cost": 8.95e-05,
+    "model_id": null,
+    "litellm_model_name": "anthropic/claude-haiku-5-5",
+    "custom_llm_provider": null,
+    "additional_headers_keys": [
+     "llm_provider-anthropic-organization-id",
+     "llm_provider-anthropic-ratelimit-input-tokens-limit",
+     "llm_provider-anthropic-ratelimit-input-tokens-remaining",
+     "llm_provider-anthropic-ratelimit-input-tokens-reset",
+     "llm_provider-anthropic-ratelimit-output-tokens-limit",
+     "llm_provider-anthropic-ratelimit-output-tokens-remaining",
+     "llm_provider-anthropic-ratelimit-output-tokens-reset",
+     "llm_provider-anthropic-ratelimit-requests-limit",
+     "llm_provider-anthropic-ratelimit-requests-remaining",
+     "llm_provider-anthropic-ratelimit-requests-reset",
+     "llm_provider-anthropic-ratelimit-tokens-limit",
+     "llm_provider-anthropic-ratelimit-tokens-remaining",
+     "llm_provider-anthropic-ratelimit-tokens-reset",
+     "llm_provider-anthropic-workspace-id",
+     "llm_provider-cf-cache-status",
+     "llm_provider-cf-ray",
+     "llm_provider-connection",
+     "llm_provider-content-encoding",
+     "llm_provider-content-security-policy",
+     "llm_provider-content-type",
+     "llm_provider-date",
+     "llm_provider-request-id",
+     "llm_provider-server",
+     "llm_provider-server-timing",
+     "llm_provider-strict-transport-security",
+     "llm_provider-traceresponse",
+     "llm_provider-transfer-encoding",
+     "llm_provider-vary",
+     "llm_provider-x-ratelimit-limit-requests",
+     "llm_provider-x-ratelimit-limit-tokens",
+     "llm_provider-x-ratelimit-remaining-requests",
+     "llm_provider-x-ratelimit-remaining-tokens",
+     "llm_provider-x-robots-tag",
+     "x-ratelimit-limit-requests",
+     "x-ratelimit-limit-tokens",
+     "x-ratelimit-remaining-requests",
+     "x-ratelimit-remaining-tokens"
+    ],
+    "raw_headers_names": [],
+    "raw_headers_model_like": {}
+   }
+  },
+  "cache_haiku_2": {
+   "ok": true,
+   "elapsed_s": 1.1,
+   "response": {
+    "id": "chatcmpl-4feb10c9-3be9-45a8-a04a-e49b74c5a737",
+    "created": 1794468905,
+    "model": "claude-haiku-5-5",
+    "object": "chat.completion",
+    "system_fingerprint": null,
+    "choices": [
+     {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+       "content": "OK",
+       "role": "assistant",
+       "tool_calls": null,
+       "function_call": null,
+       "provider_specific_fields": {
+        "citations": null,
+        "thinking_blocks": null
+       }
+      }
+     }
+    ],
+    "usage": {
+     "completion_tokens": 4,
+     "prompt_tokens": 8615,
+     "total_tokens": 8619,
+     "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "text_tokens": 4
+     },
+     "prompt_tokens_details": {
+      "audio_tokens": null,
+      "cache_write_tokens": 0,
+      "cached_tokens": 8600,
+      "text_tokens": 15,
+      "image_tokens": null,
+      "video_tokens": null,
+      "cache_creation_tokens": 0,
+      "cache_creation_token_details": {
+       "ephemeral_5m_input_tokens": 0,
+       "ephemeral_1h_input_tokens": 0
+      }
+     },
+     "cache_creation_input_tokens": 0,
+     "cache_read_input_tokens": 8600,
+     "iterations": null,
+     "inference_geo": "global",
+     "speed": "standard",
+     "service_tier": "standard"
+    }
+   },
+   "hidden": {
+    "keys": [
+     "_response_ms",
+     "additional_headers",
+     "api_base",
+     "callback_duration_ms",
+     "litellm_call_id",
+     "litellm_model_name",
+     "model_id",
+     "optional_params",
+     "provider_specific_fields",
+     "response_cost"
+    ],
+    "response_cost": 8.95e-05,
+    "model_id": null,
+    "litellm_model_name": "anthropic/claude-haiku-5-5",
+    "custom_llm_provider": null,
+    "additional_headers_keys": [
+     "llm_provider-anthropic-organization-id",
+     "llm_provider-anthropic-ratelimit-input-tokens-limit",
+     "llm_provider-anthropic-ratelimit-input-tokens-remaining",
+     "llm_provider-anthropic-ratelimit-input-tokens-reset",
+     "llm_provider-anthropic-ratelimit-output-tokens-limit",
+     "llm_provider-anthropic-ratelimit-output-tokens-remaining",
+     "llm_provider-anthropic-ratelimit-output-tokens-reset",
+     "llm_provider-anthropic-ratelimit-requests-limit",
+     "llm_provider-anthropic-ratelimit-requests-remaining",
+     "llm_provider-anthropic-ratelimit-requests-reset",
+     "llm_provider-anthropic-ratelimit-tokens-limit",
+     "llm_provider-anthropic-ratelimit-tokens-remaining",
+     "llm_provider-anthropic-ratelimit-tokens-reset",
+     "llm_provider-anthropic-workspace-id",
+     "llm_provider-cf-cache-status",
+     "llm_provider-cf-ray",
+     "llm_provider-connection",
+     "llm_provider-content-encoding",
+     "llm_provider-content-security-policy",
+     "llm_provider-content-type",
+     "llm_provider-date",
+     "llm_provider-request-id",
+     "llm_provider-server",
+     "llm_provider-server-timing",
+     "llm_provider-strict-transport-security",
+     "llm_provider-traceresponse",
+     "llm_provider-transfer-encoding",
+     "llm_provider-vary",
+     "llm_provider-x-ratelimit-limit-requests",
+     "llm_provider-x-ratelimit-limit-tokens",
+     "llm_provider-x-ratelimit-remaining-requests",
+     "llm_provider-x-ratelimit-remaining-tokens",
+     "llm_provider-x-robots-tag",
+     "x-ratelimit-limit-requests",
+     "x-ratelimit-limit-tokens",
+     "x-ratelimit-remaining-requests",
+     "x-ratelimit-remaining-tokens"
+    ],
+    "raw_headers_names": [],
+    "raw_headers_model_like": {}
+   }
+  },
+  "stream_luna": {
+   "ok": true,
+   "elapsed_s": 1.1,
+   "response": {
+    "n_chunks": 12,
+    "first": {
+     "id": "chatcmpl-EjJcnzojSUItRKDpyPkHDn4Z2N6ZH",
+     "created": 1794468906,
+     "model": "gpt-6-luna",
+     "object": "chat.completion.chunk",
+     "system_fingerprint": null,
+     "choices": [
+      {
+       "finish_reason": null,
+       "index": 0,
+       "delta": {
+        "refusal": null,
+        "content": "",
+        "role": "assistant",
+        "function_call": null,
+        "tool_calls": null,
+        "audio": null
+       },
+       "logprobs": null
+      }
+     ],
+     "provider_specific_fields": null,
+     "citations": null,
+     "moderation": null,
+     "service_tier": "default",
+     "obfuscation": ""
+    },
+    "last": {
+     "id": "chatcmpl-EjJcnzojSUItRKDpyPkHDn4Z2N6ZH",
+     "created": 1794468906,
+     "model": "gpt-6-luna",
+     "object": "chat.completion.chunk",
+     "choices": [
+      {
+       "finish_reason": null,
+       "index": 0,
+       "delta": {
+        "content": null,
+        "role": null,
+        "function_call": null,
+        "tool_calls": null,
+        "audio": null
+       },
+       "logprobs": null
+      }
+     ],
+     "provider_specific_fields": null,
+     "usage": {
+      "completion_tokens": 12,
+      "prompt_tokens": 14,
+      "total_tokens": 26,
+      "completion_tokens_details": {
+       "accepted_prediction_tokens": 0,
+       "audio_tokens": 0,
+       "reasoning_tokens": 0,
+       "rejected_prediction_tokens": 0,
+       "text_tokens": null,
+       "image_tokens": null,
+       "video_tokens": null
+      },
+      "prompt_tokens_details": {
+       "audio_tokens": 0,
+       "cache_write_tokens": 0,
+       "cached_tokens": 0,
+       "text_tokens": null,
+       "image_tokens": null,
+       "video_tokens": null,
+       "cache_creation_tokens": 0
+      },
+      "cost": 7.4e-06
+     }
+    },
+    "usage_chunk": {
+     "id": "chatcmpl-EjJcnzojSUItRKDpyPkHDn4Z2N6ZH",
+     "created": 1794468906,
+     "model": "gpt-6-luna",
+     "object": "chat.completion.chunk",
+     "choices": [
+      {
+       "finish_reason": null,
+       "index": 0,
+       "delta": {
+        "content": null,
+        "role": null,
+        "function_call": null,
+        "tool_calls": null,
+        "audio": null
+       },
+       "logprobs": null
+      }
+     ],
+     "provider_specific_fields": null,
+     "usage": {
+      "completion_tokens": 12,
+      "prompt_tokens": 14,
+      "total_tokens": 26,
+      "completion_tokens_details": {
+       "accepted_prediction_tokens": 0,
+       "audio_tokens": 0,
+       "reasoning_tokens": 0,
+       "rejected_prediction_tokens": 0,
+       "text_tokens": null,
+       "image_tokens": null,
+       "video_tokens": null
+      },
+      "prompt_tokens_details": {
+       "audio_tokens": 0,
+       "cache_write_tokens": 0,
+       "cached_tokens": 0,
+       "text_tokens": null,
+       "image_tokens": null,
+       "video_tokens": null,
+       "cache_creation_tokens": 0
+      },
+      "cost": 7.4e-06
+     }
+    },
+    "model": "gpt-6-luna"
+   },
+   "hidden": {
+    "keys": [],
+    "response_cost": null,
+    "model_id": null,
+    "litellm_model_name": null,
+    "custom_llm_provider": null,
+    "additional_headers_keys": [],
+    "raw_headers_names": [],
+    "raw_headers_model_like": {}
+   }
+  },
+  "stream_haiku": {
+   "ok": true,
+   "elapsed_s": 0.9,
+   "response": {
+    "n_chunks": 6,
+    "first": {
+     "id": "chatcmpl-03f7c451-0457-483e-bf99-09aad6334da7",
+     "created": 1794468907,
+     "model": "claude-haiku-5-5",
+     "object": "chat.completion.chunk",
+     "system_fingerprint": null,
+     "choices": [
+      {
+       "finish_reason": null,
+       "index": 0,
+       "delta": {
+        "provider_specific_fields": null,
+        "content": "안녕하세요!",
+        "role": "assistant",
+        "function_call": null,
+        "tool_calls": null,
+        "audio": null
+       },
+       "logprobs": null
+      }
+     ],
+     "provider_specific_fields": null,
+     "citations": null
+    },
+    "last": {
+     "id": "chatcmpl-03f7c451-0457-483e-bf99-09aad6334da7",
+     "created": 1794468907,
+     "model": "claude-haiku-5-5",
+     "object": "chat.completion.chunk",
+     "choices": [
+      {
+       "finish_reason": null,
+       "index": 0,
+       "delta": {
+        "content": null,
+        "role": null,
+        "function_call": null,
+        "tool_calls": null,
+        "audio": null
+       },
+       "logprobs": null
+      }
+     ],
+     "provider_specific_fields": null,
+     "usage": {
+      "completion_tokens": 21,
+      "prompt_tokens": 19,
+      "total_tokens": 40,
+      "completion_tokens_details": {
+       "accepted_prediction_tokens": null,
+       "audio_tokens": null,
+       "reasoning_tokens": 0,
+       "rejected_prediction_tokens": null,
+       "text_tokens": 21,
+       "image_tokens": null,
+       "video_tokens": null
+      },
+      "prompt_tokens_details": {
+       "audio_tokens": null,
+       "cache_write_tokens": 0,
+       "cached_tokens": 0,
+       "text_tokens": 19,
+       "image_tokens": null,
+       "video_tokens": null,
+       "cache_creation_tokens": 0,
+       "cache_creation_token_details": {
+        "ephemeral_5m_input_tokens": 0,
+        "ephemeral_1h_input_tokens": 0
+       }
+      },
+      "cost": 1.24e-05,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0,
+      "inference_geo": "global",
+      "speed": "standard"
+     }
+    },
+    "usage_chunk": {
+     "id": "chatcmpl-03f7c451-0457-483e-bf99-09aad6334da7",
+     "created": 1794468907,
+     "model": "claude-haiku-5-5",
+     "object": "chat.completion.chunk",
+     "choices": [
+      {
+       "finish_reason": null,
+       "index": 0,
+       "delta": {
+        "content": null,
+        "role": null,
+        "function_call": null,
+        "tool_calls": null,
+        "audio": null
+       },
+       "logprobs": null
+      }
+     ],
+     "provider_specific_fields": null,
+     "usage": {
+      "completion_tokens": 21,
+      "prompt_tokens": 19,
+      "total_tokens": 40,
+      "completion_tokens_details": {
+       "accepted_prediction_tokens": null,
+       "audio_tokens": null,
+       "reasoning_tokens": 0,
+       "rejected_prediction_tokens": null,
+       "text_tokens": 21,
+       "image_tokens": null,
+       "video_tokens": null
+      },
+      "prompt_tokens_details": {
+       "audio_tokens": null,
+       "cache_write_tokens": 0,
+       "cached_tokens": 0,
+       "text_tokens": 19,
+       "image_tokens": null,
+       "video_tokens": null,
+       "cache_creation_tokens": 0,
+       "cache_creation_token_details": {
+        "ephemeral_5m_input_tokens": 0,
+        "ephemeral_1h_input_tokens": 0
+       }
+      },
+      "cost": 1.24e-05,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0,
+      "inference_geo": "global",
+      "speed": "standard"
+     }
+    },
+    "model": "claude-haiku-5-5"
+   },
+   "hidden": {
+    "keys": [],
+    "response_cost": null,
+    "model_id": null,
+    "litellm_model_name": null,
+    "custom_llm_provider": null,
+    "additional_headers_keys": [],
+    "raw_headers_names": [],
+    "raw_headers_model_like": {}
+   }
+  },
+  "err_badkey_openai": {
+   "ok": false,
+   "elapsed_s": 0.5,
+   "exc_type": "AuthenticationError",
+   "exc_module": "litellm.exceptions",
+   "status_code": 401,
+   "llm_provider": "openai",
+   "model": "gpt-6-luna",
+   "message": "litellm.AuthenticationError: AuthenticationError: OpenAIException - Incorrect API key provided: sk-bad-k********robe. You can find your API key at https://platform.openai.com/account/api-keys.",
+   "response_status": 401,
+   "response_body": ""
+  },
+  "err_badkey_anthropic": {
+   "ok": false,
+   "elapsed_s": 0.2,
+   "exc_type": "AuthenticationError",
+   "exc_module": "litellm.exceptions",
+   "status_code": 401,
+   "llm_provider": "anthropic",
+   "model": "claude-haiku-5-5",
+   "message": "litellm.AuthenticationError: AnthropicException - {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CgxeZaF1bCdWNc5tiFLfM\"}",
+   "response_status": 401,
+   "response_body": ""
+  },
+  "err_nomodel_openai": {
+   "ok": false,
+   "elapsed_s": 0.4,
+   "exc_type": "NotFoundError",
+   "exc_module": "litellm.exceptions",
+   "status_code": 404,
+   "llm_provider": "openai",
+   "model": "gpt-nonexistent-probe",
+   "message": "litellm.NotFoundError: OpenAIException - The model `gpt-nonexistent-probe` does not exist or you do not have access to it.",
+   "response_status": 404,
+   "response_body": ""
+  },
+  "err_nomodel_anthropic": {
+   "ok": false,
+   "elapsed_s": 0.4,
+   "exc_type": "NotFoundError",
+   "exc_module": "litellm.exceptions",
+   "status_code": 404,
+   "llm_provider": "anthropic",
+   "model": "claude-nonexistent-probe",
+   "message": "litellm.NotFoundError: AnthropicException - {\"type\":\"error\",\"error\":{\"type\":\"not_found_error\",\"message\":\"model: claude-nonexistent-probe\"},\"request_id\":\"req_011CgxeZdAstGVTJbJxT3MmA\"}",
+   "response_status": 404,
+   "response_body": ""
+  },
+  "err_tooLongOutputParam": {
+   "ok": true,
+   "elapsed_s": 0.6,
+   "response": {
+    "id": "chatcmpl-b2e3ee4b-8120-43f3-bd67-c91bca44231d",
+    "created": 1794468909,
+    "model": "claude-haiku-5-5",
+    "object": "chat.completion",
+    "system_fingerprint": null,
+    "choices": [
+     {
+      "finish_reason": "length",
+      "index": 0,
+      "message": {
+       "content": null,
+       "role": "assistant",
+       "tool_calls": null,
+       "function_call": null,
+       "provider_specific_fields": {
+        "citations": null,
+        "thinking_blocks": null
+       }
+      }
+     }
+    ],
+    "usage": {
+     "completion_tokens": 0,
+     "prompt_tokens": 19,
+     "total_tokens": 19,
+     "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "text_tokens": 0
+     },
+     "prompt_tokens_details": {
+      "audio_tokens": null,
+      "cache_write_tokens": 0,
+      "cached_tokens": 0,
+      "text_tokens": 19,
+      "image_tokens": null,
+      "video_tokens": null,
+      "cache_creation_tokens": 0,
+      "cache_creation_token_details": {
+       "ephemeral_5m_input_tokens": 0,
+       "ephemeral_1h_input_tokens": 0
+      }
+     },
+     "cache_creation_input_tokens": 0,
+     "cache_read_input_tokens": 0,
+     "iterations": null,
+     "inference_geo": "global",
+     "speed": "standard",
+     "service_tier": "standard"
+    }
+   },
+   "hidden": {
+    "keys": [
+     "_response_ms",
+     "additional_headers",
+     "api_base",
+     "callback_duration_ms",
+     "litellm_call_id",
+     "litellm_model_name",
+     "model_id",
+     "optional_params",
+     "provider_specific_fields",
+     "response_cost"
+    ],
+    "response_cost": 1.9e-06,
+    "model_id": null,
+    "litellm_model_name": "anthropic/claude-haiku-5-5",
+    "custom_llm_provider": null,
+    "additional_headers_keys": [
+     "llm_provider-anthropic-organization-id",
+     "llm_provider-anthropic-ratelimit-input-tokens-limit",
+     "llm_provider-anthropic-ratelimit-input-tokens-remaining",
+     "llm_provider-anthropic-ratelimit-input-tokens-reset",
+     "llm_provider-anthropic-ratelimit-output-tokens-limit",
+     "llm_provider-anthropic-ratelimit-output-tokens-remaining",
+     "llm_provider-anthropic-ratelimit-output-tokens-reset",
+     "llm_provider-anthropic-ratelimit-requests-limit",
+     "llm_provider-anthropic-ratelimit-requests-remaining",
+     "llm_provider-anthropic-ratelimit-requests-reset",
+     "llm_provider-anthropic-ratelimit-tokens-limit",
+     "llm_provider-anthropic-ratelimit-tokens-remaining",
+     "llm_provider-anthropic-ratelimit-tokens-reset",
+     "llm_provider-anthropic-workspace-id",
+     "llm_provider-cf-cache-status",
+     "llm_provider-cf-ray",
+     "llm_provider-connection",
+     "llm_provider-content-encoding",
+     "llm_provider-content-security-policy",
+     "llm_provider-content-type",
+     "llm_provider-date",
+     "llm_provider-request-id",
+     "llm_provider-server",
+     "llm_provider-server-timing",
+     "llm_provider-strict-transport-security",
+     "llm_provider-traceresponse",
+     "llm_provider-transfer-encoding",
+     "llm_provider-vary",
+     "llm_provider-x-ratelimit-limit-requests",
+     "llm_provider-x-ratelimit-limit-tokens",
+     "llm_provider-x-ratelimit-remaining-requests",
+     "llm_provider-x-ratelimit-remaining-tokens",
+     "llm_provider-x-robots-tag",
+     "x-ratelimit-limit-requests",
+     "x-ratelimit-limit-tokens",
+     "x-ratelimit-remaining-requests",
+     "x-ratelimit-remaining-tokens"
+    ],
+    "raw_headers_names": [],
+    "raw_headers_model_like": {}
+   }
+  },
+  "price_luna": {
+   "input_cost_per_token": 1e-07,
+   "output_cost_per_token": 5e-07,
+   "cache_read_input_token_cost": 1e-08,
+   "cache_creation_input_token_cost": 1.25e-07,
+   "max_input_tokens": 922000,
+   "max_output_tokens": 128000
+  },
+  "price_terra": {
+   "input_cost_per_token": 1e-06,
+   "output_cost_per_token": 5e-06,
+   "cache_read_input_token_cost": 5e-08,
+   "cache_creation_input_token_cost": 1.25e-06,
+   "max_input_tokens": 922000,
+   "max_output_tokens": 128000
+  },
+  "price_haiku": {
+   "input_cost_per_token": 1e-07,
+   "output_cost_per_token": 5e-07,
+   "cache_read_input_token_cost": 1e-08,
+   "cache_creation_input_token_cost": 1.25e-07,
+   "max_input_tokens": 1000000,
+   "max_output_tokens": 128000
+  },
+  "price_sonnet": {
+   "input_cost_per_token": 2e-06,
+   "output_cost_per_token": 1e-05,
+   "cache_read_input_token_cost": 1e-07,
+   "cache_creation_input_token_cost": 2.5e-06,
+   "max_input_tokens": 1000000,
+   "max_output_tokens": 128000
+  }
+ }
+}
