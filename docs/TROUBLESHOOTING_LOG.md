@@ -83,3 +83,11 @@
 - **해결**: 성공 여부를 HTTP 상태가 아니라 가격 메타 태그 유무로 판정하기로 했다.
 - **결과**: 설계만 했고 수집기 구현 전이다.
 - **근거**: `docs/CONTRACTS.md`의 공식몰 절(믹순).
+
+
+## 2026-11-12 P1 머지 직후 main에서 make verify가 실패했다
+- **문제**: P1 PR을 머지한 직후 main에서 `make verify`가 ruff I001(import 정렬) 6건으로 실패했다(`tests/test_analysis.py`, `test_domain.py`, `test_ledger.py`, `test_sources_config.py`, `test_store.py`, `test_youtube.py`). 같은 코드를 머지 전 브랜치에서 돌렸을 때는 648개 통과였다.
+- **원인**: ruff 0.17.4는 기본 규칙에 import 정렬이 들어 있고 `beautyads`를 first-party로 분류하면 Codex가 쓴 테스트의 import 순서(third-party와 한 블록)가 어긋난다. 브랜치에서는 `.ruff_cache`가 이전 결과를 가려 통과로 보였고 `--no-cache`로는 실패했다. first-party 분류가 설정에 고정돼 있지 않았다. 실행기(`execute.py`)가 step마다 돌린 검증이 왜 통과했는지는 확인하지 못했다(미확인).
+- **해결**: `pyproject.toml`에 `[tool.ruff.lint.isort] known-first-party = ["beautyads"]`를 추가하고 `ruff check --fix`로 import 순서만 정렬했다(PR #20, 동작·단언 변경 없음).
+- **결과**: 수정 뒤 main에서 `ruff check . --no-cache`가 통과하고 `make verify` 648개 통과를 확인했다.
+- **근거**: PR #20, 이슈 #19.
