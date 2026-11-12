@@ -1,0 +1,12 @@
+{
+  "_meta": {
+    "recorded_at": "2026-11-12T02:16:42Z",
+    "http_status": 200,
+    "note": "client_credentials 토큰 발급"
+  },
+  "response": {
+    "access_token": "<token omitted>",
+    "expires_in": 7200,
+    "token_type": "Bearer"
+  }
+}

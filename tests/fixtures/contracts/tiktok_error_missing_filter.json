@@ -1,0 +1,14 @@
+{
+  "_meta": {
+    "recorded_at": "2026-11-12T02:16:46Z",
+    "http_status": 400,
+    "note": "필수 필터 누락의 오류 형태"
+  },
+  "response": {
+    "error": {
+      "code": "invalid_params",
+      "message": "`filters.ad_published_date_range` is a required filter. Please refer to the API doc for more information.",
+      "log_id": "202611120216463F733518D720F509A2A1"
+    }
+  }
+}

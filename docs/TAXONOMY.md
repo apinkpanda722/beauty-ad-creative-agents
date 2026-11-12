@@ -100,6 +100,7 @@ v1 동결 전에 "원문 정독 전" 항목은 원문을 읽고 인용 위치를
 `hydration`, `soothing`, `brightening`, `firming_elasticity`, `pore_sebum`, `acne_trouble`, `barrier`, `anti_aging`, `sun_protection`, `texture_finish`(제형·마무리감), `other`
 
 - 자막이나 음성으로 **명시된** 효능만 붙인다. 화면 분위기에서 추정하지 않는다.
+- 이 값 목록은 온톨로지 1층의 효능(Efficacy) 노드와 같은 목록이다. 한쪽을 바꾸면 다른 쪽도 같이 바꾼다(`docs/ARCHITECTURE.md`의 온톨로지).
 - 값 목록의 출처를 아직 찾지 않았다. v1 전에 조사한다.
 
 ### 9. 성분 `ingredients` (여럿 선택, 열린 목록)

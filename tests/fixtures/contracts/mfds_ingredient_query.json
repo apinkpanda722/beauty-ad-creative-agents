@@ -1,0 +1,41 @@
+{
+  "_meta": {
+    "recorded_at": "2026-11-12T02:59:33Z",
+    "http_status": 200,
+    "note": "원료성분정보, INGR_KOR_NAME=병풀추출물"
+  },
+  "response": {
+    "header": {
+      "resultCode": "00",
+      "resultMsg": "NORMAL SERVICE."
+    },
+    "body": {
+      "pageNo": 1,
+      "totalCount": 7,
+      "numOfRows": 3,
+      "items": [
+        {
+          "INGR_KOR_NAME": "병풀추출물",
+          "INGR_ENG_NAME": "Centella Asiatica Extract",
+          "CAS_NO": "84696-21-9\r,84776-24-9",
+          "ORIGIN_MAJOR_KOR_NAME": "이 원료는 병풀 (Centella asiatica)의 전초에서 추출한 것이다.",
+          "INGR_SYNONYM": null
+        },
+        {
+          "INGR_KOR_NAME": "바실러스/병풀추출물발효여과물",
+          "INGR_ENG_NAME": "Bacillus/Centella Asiatica Extract Ferment Filtrate",
+          "CAS_NO": null,
+          "ORIGIN_MAJOR_KOR_NAME": "이 원료는 바실러스로 병풀추출물을 발효하여 여과한 것이다.",
+          "INGR_SYNONYM": null
+        },
+        {
+          "INGR_KOR_NAME": "하이드롤라이즈드병풀추출물",
+          "INGR_ENG_NAME": "Hydrolyzed Centella Asiatica Extract",
+          "CAS_NO": null,
+          "ORIGIN_MAJOR_KOR_NAME": "이 원료는 산, 효소 혹은 다른 가수분해 방법으로 얻은 병풀추출물의 가수분해물이다.",
+          "INGR_SYNONYM": null
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "_meta": {
+    "recorded_at": "2026-11-12T02:16:33Z",
+    "http_status": 400,
+    "note": "문서 예시 형태로 재시도: country_code 키, 날짜는 숫자"
+  },
+  "response": {
+    "error": {
+      "code": "invalid_params",
+      "message": "The request parameter type is incorrect. request.Filters.(1)AdPublishedDateRange.(1)Min expected string, actual value: 20251201 (json.Number)",
+      "log_id": "20261112021632632EAB6A87712F0AAF0A",
+      "http_status_code": 400
+    }
+  }
+}
