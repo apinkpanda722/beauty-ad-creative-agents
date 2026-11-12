@@ -47,7 +47,16 @@
     {
       "step": 3,
       "name": "youtube-brand",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-12T22:10:08+0900",
+      "summary": "YouTube 어댑터에 채널 설정의 brand·handle 전달 및 기본값 None 호환성 구현, 다중 채널 회귀 테스트 추가; 아키텍처 가드 포함 make verify 통과(725 tests).",
+      "completed_at": "2026-11-12T22:11:43+0900",
+      "usage": {
+        "input_tokens": 537278,
+        "cached_input_tokens": 465664,
+        "output_tokens": 2570,
+        "attempts": 1
+      }
     },
     {
       "step": 4,
