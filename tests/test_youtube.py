@@ -215,6 +215,8 @@ def test_creative_metadata_and_integer_metrics(api_key):
         )
         assert creative.language == snippet.get("defaultLanguage")
         assert creative.collected_at == STAMP
+        assert creative.brand is None
+        assert creative.account is None
         assert creative.duration_s == parse_duration_seconds(
             raw.get("contentDetails").get("duration")
         )
@@ -227,6 +229,65 @@ def test_creative_metadata_and_integer_metrics(api_key):
             assert isinstance(value, str)
             assert getattr(creative.metrics, field) == int(value)
             assert type(getattr(creative.metrics, field)) is int
+
+
+@pytest.mark.parametrize(
+    ("brand", "account"),
+    [("torriden", "@official"), ("torriden", None), (None, "@official")],
+)
+def test_fetch_videos_forwards_brand_and_account(api_key, brand, account):
+    response = body("videos")
+    creatives = fetch_videos(
+        FakeGet(HttpResponse(200, response)),
+        api_key,
+        upload_ids(),
+        collected_at=STAMP,
+        video_length_cut_s=600,
+        brand=brand,
+        account=account,
+    )
+    assert [creative.source_id for creative in creatives] == upload_ids()
+    for creative in creatives:
+        assert creative.brand == brand
+        assert creative.account == account
+
+
+def test_collect_youtube_preserves_each_channels_brand_and_account(api_key):
+    channels = [
+        channel(brand="brand-a", handle="@official-a", channel_id="UC-a"),
+        channel(brand="brand-b", handle="@official-b", channel_id="UC-b"),
+    ]
+    replies = []
+    expected = []
+    for index, configured_channel in enumerate(channels):
+        channel_response = body("channels_forhandle")
+        channel_response.get("items")[0]["id"] = configured_channel.channel_id
+        playlist_response = last_page()
+        video_response = body("videos")
+        for upload, video in zip(
+            playlist_response.get("items"), video_response.get("items"), strict=True
+        ):
+            video_id = f"{index}-{video.get('id')}"
+            upload.get("contentDetails")["videoId"] = video_id
+            video["id"] = video_id
+            expected.append(
+                (video_id, configured_channel.brand, configured_channel.handle)
+            )
+        replies.extend(
+            HttpResponse(200, response)
+            for response in (channel_response, playlist_response, video_response)
+        )
+    get = FakeGet(*replies)
+
+    result = collect(get, api_key, channels)
+
+    assert result.errors == {}
+    assert result.stopped is None
+    assert [
+        (creative.source_id, creative.brand, creative.account)
+        for creative in result.creatives
+    ] == expected
+    assert not get.responses
 
 
 def test_hidden_statistics_remain_none_and_zero_is_preserved(api_key):
