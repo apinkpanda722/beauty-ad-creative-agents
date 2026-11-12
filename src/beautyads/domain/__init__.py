@@ -9,6 +9,7 @@ from beautyads.domain.creative import (
     Source,
     is_analyzable,
 )
+from beautyads.domain.jobs import JobResult
 from beautyads.domain.labels import HookResult, HookType
 from beautyads.domain.protocols import AnalysisRepository, CreativeRepository
 
@@ -20,6 +21,7 @@ __all__ = [
     "CreativeRepository",
     "HookResult",
     "HookType",
+    "JobResult",
     "JobStatus",
     "Metrics",
     "Source",

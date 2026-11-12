@@ -1,7 +1,7 @@
 """Parameterized persistence for public creatives and their analysis jobs."""
 
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from typing import Any
 
 from beautyads.domain import (
@@ -10,8 +10,10 @@ from beautyads.domain import (
     Creative,
     CreativeKey,
     CreativeRepository,
+    JobResult,
     JobStatus,
     Metrics,
+    Source,
     is_analyzable,
 )
 from beautyads.store.connection import SqlConnection
@@ -77,6 +79,121 @@ class PostgresCreativeStore(CreativeRepository, AnalysisRepository):
             raise
         self.conn.rollback()
         return rows
+
+    def requeue_jobs(self, kind: str, error_codes: Collection[str]) -> int:
+        if not error_codes:
+            return 0
+        try:
+            cursor = self.conn.execute(
+                """UPDATE analysis_jobs SET status='pending', updated_at=now()
+                   WHERE kind=%s AND status='failed' AND error_code = ANY(%s)""",
+                (kind, list(error_codes)),
+            )
+            count = cursor.rowcount
+            self.conn.commit()
+        except Exception:
+            self.conn.rollback()
+            raise
+        return count
+
+    def job_counts(self, kind: str) -> dict[str, int]:
+        rows = self._read(
+            """SELECT status, count(*) FROM analysis_jobs
+               WHERE kind = %s GROUP BY status""",
+            (kind,),
+        )
+        counts = {status.value: 0 for status in JobStatus}
+        counts.update(rows)
+        return counts
+
+    def get_job_results(
+        self, kind: str, keys: Sequence[CreativeKey]
+    ) -> list[JobResult]:
+        # Keep each statement well below PostgreSQL's bind-parameter limit.
+        batch_size = 500
+        results = []
+        columns = (
+            "source",
+            "source_id",
+            "kind",
+            "status",
+            "labels",
+            "error_code",
+            "model",
+            "thinking_level",
+            "prompt_version",
+            "raw_output",
+            "attempts",
+            "updated_at",
+        )
+        for offset in range(0, len(keys), batch_size):
+            batch = keys[offset : offset + batch_size]
+            placeholders = ", ".join("(%s, %s)" for _ in batch)
+            params = (
+                kind,
+                *(
+                    value
+                    for key in batch
+                    for value in (key.source.value, key.source_id)
+                ),
+            )
+            rows = self._read(
+                f"""SELECT j.source, j.source_id, j.kind, j.status, j.labels,
+                           j.error_code, m.model, m.thinking_level, m.prompt_version,
+                           m.raw_output, j.attempts, j.updated_at
+                    FROM analysis_jobs AS j
+                    LEFT JOIN model_outputs AS m
+                      ON m.source = j.source AND m.source_id = j.source_id
+                         AND m.kind = j.kind
+                         AND m.id = (SELECT max(o.id) FROM model_outputs AS o
+                                     WHERE o.source = j.source AND o.source_id = j.source_id
+                                       AND o.kind = j.kind)
+                    WHERE j.kind = %s AND (j.source, j.source_id) IN ({placeholders})""",
+                params,
+            )
+            for row in rows:
+                values = dict(zip(columns, row, strict=True))
+                key = CreativeKey(
+                    source=values.pop("source"), source_id=values.pop("source_id")
+                )
+                labels = values["labels"]
+                if labels is not None:
+                    values["labels"] = (
+                        json.loads(labels) if isinstance(labels, str) else dict(labels)
+                    )
+                results.append(JobResult(key=key, **values))
+        return results
+
+    def list_creatives(
+        self,
+        *,
+        brands: Collection[str] | None = None,
+        sources: Collection[Source] | None = None,
+        analyzable_only: bool = False,
+        limit: int | None = None,
+    ) -> list[Creative]:
+        if (brands is not None and not brands) or (sources is not None and not sources):
+            return []
+        conditions = []
+        params: list[Any] = []
+        if brands is not None:
+            conditions.append("brand = ANY(%s)")
+            params.append(list(brands))
+        if sources is not None:
+            conditions.append("source = ANY(%s)")
+            params.append([source.value for source in sources])
+        if analyzable_only:
+            conditions.append("analyzable IS TRUE")
+        columns = ", ".join(CREATIVE_COLUMNS)
+        query = f"SELECT {columns} FROM creatives"
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        query += " ORDER BY published_at DESC NULLS LAST, source, source_id"
+        if limit is not None:
+            query += " LIMIT %s"
+            params.append(limit)
+        rows = self._read(query, tuple(params))
+        return [_restore_creative(row) for row in rows]
 
     def upsert_creatives(self, creatives: Sequence[Creative]) -> int:
         try:

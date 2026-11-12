@@ -188,3 +188,76 @@ def test_creative_repository_declares_collection_stats():
     assert get_type_hints(CreativeRepository.collection_stats) == {
         "return": list[CollectionStat]
     }
+
+
+@pytest.mark.parametrize("status", list(JobStatus))
+@pytest.mark.parametrize("nullable", [False, True])
+def test_job_result_fields_and_nested_labels(creative_data, status, nullable):
+    from beautyads.domain import JobResult
+
+    data = {
+        "key": Creative(**creative_data).key,
+        "kind": "hook@minimal",
+        "status": status,
+        "labels": {"items": ["synthetic", {"enabled": True}], "flag": False},
+        "error_code": "SYNTHETIC_ERROR",
+        "model": "synthetic-model",
+        "thinking_level": "minimal",
+        "prompt_version": "test-v1",
+        "raw_output": "unparsed output",
+        "attempts": 2,
+        "updated_at": creative_data["collected_at"],
+    }
+    if nullable:
+        for name in (
+            "labels",
+            "error_code",
+            "model",
+            "thinking_level",
+            "prompt_version",
+            "raw_output",
+            "updated_at",
+        ):
+            data[name] = None
+    result = JobResult.model_validate(data)
+    assert set(JobResult.model_fields) == set(data)
+    for name, value in data.items():
+        assert getattr(result, name) == value
+    assert JobResult.model_validate_json(result.model_dump_json()) == result
+    with pytest.raises(ValidationError) as caught:
+        JobResult.model_validate({**data, "unknown": True})
+    assert any(error["type"] == "extra_forbidden" for error in caught.value.errors())
+    with pytest.raises(ValidationError):
+        JobResult.model_validate({**data, "status": "unknown"})
+
+
+def test_repository_protocols_declare_batch_queries_and_general_labels():
+    from collections.abc import Collection, Mapping, Sequence
+    from typing import Any, get_type_hints
+
+    from beautyads.domain import AnalysisRepository, JobResult
+
+    assert get_type_hints(AnalysisRepository.record_analysis)["labels"] == (
+        Mapping[str, Any] | None
+    )
+    assert get_type_hints(AnalysisRepository.requeue_jobs) == {
+        "kind": str,
+        "error_codes": Collection[str],
+        "return": int,
+    }
+    assert get_type_hints(AnalysisRepository.job_counts) == {
+        "kind": str,
+        "return": dict[str, int],
+    }
+    assert get_type_hints(AnalysisRepository.get_job_results) == {
+        "kind": str,
+        "keys": Sequence[CreativeKey],
+        "return": list[JobResult],
+    }
+    assert get_type_hints(CreativeRepository.list_creatives) == {
+        "brands": Collection[str] | None,
+        "sources": Collection[Source] | None,
+        "analyzable_only": bool,
+        "limit": int | None,
+        "return": list[Creative],
+    }

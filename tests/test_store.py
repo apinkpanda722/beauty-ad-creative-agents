@@ -676,3 +676,250 @@ def test_reads_rollback_and_propagate_fetch_failure(operation):
             store.next_pending("hook", 7)
     assert caught.value is failure
     assert conn.rollbacks == 1 and conn.commits == 0
+
+
+def job_result_row(key, *, labels=None, status="done", output=True):
+    return (
+        key.source.value,
+        key.source_id,
+        "hook@minimal",
+        status,
+        labels,
+        "SYNTHETIC_ERROR" if status == "failed" else None,
+        "synthetic-model" if output else None,
+        "minimal" if output else None,
+        "test-v1" if output else None,
+        "unparsed output" if output else None,
+        2,
+        NOW,
+    )
+
+
+def test_requeue_jobs_targets_only_failed_selected_codes_and_parameterizes_values():
+    kind = "hook@minimal'; --"
+    codes = ["OVERLOADED'; --", "TIMEOUT"]
+    conn = FakeConnection([FakeCursor(rowcount=3)])
+    assert PostgresCreativeStore(conn).requeue_jobs(kind, codes) == 3
+    [(query, params)] = conn.calls
+    normalized = " ".join(query.split())
+    assert "UPDATE analysis_jobs SET status='pending', updated_at=now()" in normalized
+    assert "WHERE kind=%s AND status='failed' AND error_code = ANY(%s)" in normalized
+    assert "held" not in query and "done" not in query
+    assert params == (kind, codes)
+    assert query.count("%s") == len(params)
+    assert kind not in query and all(code not in query for code in codes)
+    assert conn.commits == 1 and conn.rollbacks == 0
+
+
+def test_requeue_jobs_empty_codes_skip_database():
+    conn = FakeConnection()
+    assert PostgresCreativeStore(conn).requeue_jobs("hook@minimal", []) == 0
+    assert conn.calls == []
+    assert conn.commits == conn.rollbacks == 0
+
+
+def test_requeue_jobs_rolls_back_write_failure():
+    conn = FakeConnection(fail_on=lambda query: True)
+    with pytest.raises(RuntimeError, match="scripted SQL failure"):
+        PostgresCreativeStore(conn).requeue_jobs("hook@minimal", ["OVERLOADED"])
+    assert conn.commits == 0 and conn.rollbacks == 1
+
+
+@pytest.mark.parametrize("rows", [[], [("failed", 3), ("done", 5)]])
+def test_job_counts_fills_all_statuses_and_closes_read_transaction(rows):
+    conn = FakeConnection([FakeCursor(rows)])
+    result = PostgresCreativeStore(conn).job_counts("hook@minimal")
+    expected = {status.value: 0 for status in JobStatus}
+    expected.update(rows)
+    assert result == expected
+    assert all(type(key) is str for key in result)
+    [(query, params)] = conn.calls
+    assert "GROUP BY status" in query and "count(*)" in query.lower()
+    assert "WHERE kind = %s" in query
+    assert params == ("hook@minimal",) and "hook@minimal" not in query
+    assert conn.rollbacks == 1 and conn.commits == 0
+
+
+@pytest.mark.parametrize("as_json", [False, True])
+def test_get_job_results_restores_jobs_and_latest_output_without_missing_jobs(as_json):
+    from beautyads.domain import JobResult
+
+    keys = [creative(source_id=name).key for name in ("one'", "two", "missing")]
+    labels = {"items": ["synthetic", {"enabled": True}], "flag": False}
+    stored_labels = json.dumps(labels) if as_json else labels
+    conn = FakeConnection(
+        [
+            FakeCursor(
+                [
+                    job_result_row(keys[0], labels=stored_labels),
+                    job_result_row(keys[1], status="failed", output=False),
+                ]
+            )
+        ]
+    )
+    results = PostgresCreativeStore(conn).get_job_results("hook@minimal", keys)
+    assert all(isinstance(result, JobResult) for result in results)
+    assert [result.key for result in results] == keys[:2]
+    first, second = results
+    assert first.kind == "hook@minimal" and first.status is JobStatus.done
+    assert first.labels == labels and type(first.labels) is dict
+    assert first.error_code is None
+    assert first.model == "synthetic-model" and first.thinking_level == "minimal"
+    assert first.prompt_version == "test-v1" and first.raw_output == "unparsed output"
+    assert first.attempts == 2 and first.updated_at == NOW
+    assert second.labels is None and second.status is JobStatus.failed
+    assert second.error_code == "SYNTHETIC_ERROR"
+    assert second.model is second.thinking_level is second.prompt_version is None
+    assert second.raw_output is None
+    [(query, params)] = conn.calls
+    normalized = " ".join(query.lower().split())
+    assert (
+        "from analysis_jobs" in normalized and "left join model_outputs" in normalized
+    )
+    assert re.search(r"max\((?:\w+\.)?id\)", normalized)
+    for column in ("source", "source_id", "kind"):
+        assert re.search(rf"\w+\.{column}\s*=\s*\w+\.{column}", query)
+    assert "hook@minimal" not in query and "one'" not in query
+    assert params == (
+        "hook@minimal",
+        *(value for key in keys for value in (key.source.value, key.source_id)),
+    )
+    assert query.count("%s") == len(params)
+    assert conn.rollbacks == 1 and conn.commits == 0
+
+
+def test_get_job_results_empty_keys_skip_database():
+    conn = FakeConnection()
+    assert PostgresCreativeStore(conn).get_job_results("hook@minimal", []) == []
+    assert conn.calls == [] and conn.rollbacks == conn.commits == 0
+
+
+def test_get_job_results_batches_large_key_lists():
+    keys = [creative(source_id=f"key-{index}").key for index in range(1201)]
+    conn = FakeConnection()
+    assert PostgresCreativeStore(conn).get_job_results("hook@minimal", keys) == []
+    assert 1 < len(conn.calls) < len(keys)
+    actual_keys = []
+    for query, params in conn.calls:
+        assert params[0] == "hook@minimal"
+        assert query.count("%s") == len(params)
+        actual_keys.extend(zip(params[1::2], params[2::2], strict=True))
+    assert actual_keys == [(key.source.value, key.source_id) for key in keys]
+    assert conn.rollbacks == len(conn.calls) and conn.commits == 0
+
+
+@pytest.mark.parametrize("brands", [None, ["O'Brien; --"]])
+@pytest.mark.parametrize("sources", [None, [Source.youtube, Source.instagram]])
+@pytest.mark.parametrize("analyzable_only", [False, True])
+@pytest.mark.parametrize("limit", [None, 0, 7])
+def test_list_creatives_filter_combinations_and_restore_metadata(
+    brands, sources, analyzable_only, limit
+):
+    items = [
+        creative(brand="O'Brien; --", account="@brand"),
+        creative(source_id="nullable", brand=None, account=None),
+    ]
+    conn = FakeConnection([FakeCursor([creative_row(item) for item in items])])
+    assert (
+        PostgresCreativeStore(conn).list_creatives(
+            brands=brands, sources=sources, analyzable_only=analyzable_only, limit=limit
+        )
+        == items
+    )
+    [(query, params)] = conn.calls
+    assert ("brand = ANY(%s)" in query) is (brands is not None)
+    assert ("source = ANY(%s)" in query) is (sources is not None)
+    assert ("analyzable IS TRUE" in query) is analyzable_only
+    assert ("LIMIT %s" in query) is (limit is not None)
+    assert "ORDER BY published_at DESC NULLS LAST, source, source_id" in query
+    expected = []
+    if brands is not None:
+        expected.append(brands)
+    if sources is not None:
+        expected.append([source.value for source in sources])
+    if limit is not None:
+        expected.append(limit)
+    assert tuple(params) == tuple(expected)
+    assert query.count("%s") == len(params)
+    assert "O'Brien; --" not in query
+    assert conn.rollbacks == 1 and conn.commits == 0
+
+
+@pytest.mark.parametrize("filters", [{"brands": []}, {"sources": []}])
+def test_list_creatives_empty_filters_skip_database(filters):
+    conn = FakeConnection()
+    assert PostgresCreativeStore(conn).list_creatives(**filters) == []
+    assert conn.calls == [] and conn.rollbacks == conn.commits == 0
+
+
+@pytest.mark.parametrize(
+    "operation", ["job_counts", "get_job_results", "list_creatives"]
+)
+@pytest.mark.parametrize("failure_stage", [None, "execute", "fetch"])
+def test_new_reads_fetch_before_single_rollback_and_propagate_failures(
+    operation, failure_stage
+):
+    conn = FakeConnection(fail_on=lambda query: failure_stage == "execute")
+
+    class TransactionCursor(FakeCursor):
+        def fetchall(self):
+            assert conn.rollbacks == 0, "fetchall called after rollback"
+            if failure_stage == "fetch":
+                raise RuntimeError("scripted fetch failure")
+            return super().fetchall()
+
+    conn.replies.append(TransactionCursor())
+    store = PostgresCreativeStore(conn)
+
+    def read():
+        if operation == "job_counts":
+            return store.job_counts("hook@minimal")
+        if operation == "get_job_results":
+            return store.get_job_results("hook@minimal", [creative().key])
+        return store.list_creatives()
+
+    if failure_stage:
+        with pytest.raises(RuntimeError, match="scripted"):
+            read()
+    else:
+        result = read()
+        assert result == (
+            {status.value: 0 for status in JobStatus}
+            if operation == "job_counts"
+            else []
+        )
+    assert len(conn.calls) == 1
+    assert conn.rollbacks == 1 and conn.commits == 0
+
+
+@pytest.mark.parametrize("kind", ["hook@minimal", "hook@default"])
+def test_existing_analysis_methods_preserve_run_tag_and_serialize_general_labels(kind):
+    item = creative(analyzable=True)
+    conn = FakeConnection([FakeCursor(), FakeCursor([creative_row(item)])])
+    store = PostgresCreativeStore(conn)
+    assert store.enqueue_analysis(kind, [item]) == 1
+    assert store.next_pending(kind, 7) == [item]
+    labels = {"items": ["synthetic", {"nested": None}], "flag": True}
+    store.record_analysis(
+        kind,
+        item.key,
+        status=JobStatus.done,
+        model="synthetic-model",
+        thinking_level="minimal",
+        prompt_version="test-v1",
+        raw_output="raw",
+        labels=labels,
+        error_code=None,
+    )
+    [(_, enqueue_params)] = calls_for(conn, "INSERT INTO analysis_jobs")
+    assert enqueue_params == ("youtube", "video-1", kind, "pending")
+    [(_, pending_params)] = calls_for(conn, "JOIN analysis_jobs")
+    assert pending_params == (kind, "pending", 7)
+    [(_, output_params)] = calls_for(conn, "INSERT INTO model_outputs")
+    assert output_params[2] == kind
+    [(_, update_params)] = calls_for(conn, "UPDATE analysis_jobs")
+    assert update_params[-1] == kind
+    assert isinstance(update_params[2], str)
+    assert json.loads(update_params[2]) == labels
+    assert all(kind not in query for query, _ in conn.calls)
+    assert conn.commits == 2 and conn.rollbacks == 1
