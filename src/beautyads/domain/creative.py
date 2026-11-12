@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from enum import StrEnum
+from typing import Any
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
@@ -48,6 +49,7 @@ class Creative(BaseModel):
     analyzable: bool | None = None
     brand: str | None = None
     account: str | None = None
+    attributes: dict[str, Any] = Field(default_factory=dict)
     metrics: Metrics = Field(default_factory=Metrics)
     collected_at: AwareDatetime
 

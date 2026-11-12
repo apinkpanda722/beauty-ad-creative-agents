@@ -35,12 +35,14 @@ CREATIVE_COLUMNS: tuple[str, ...] = (
     "latest_like_count",
     "latest_comment_count",
     "collected_at",
+    "attributes",
 )
 
 
 def _creative_values(creative: Creative) -> dict[str, Any]:
     values = creative.model_dump(exclude={"metrics"})
     values["source"] = creative.source.value
+    values["attributes"] = json.dumps(creative.attributes, sort_keys=True)
     values.update(
         {
             f"latest_{name}": value
@@ -52,6 +54,8 @@ def _creative_values(creative: Creative) -> dict[str, Any]:
 
 def _restore_creative(row: Sequence[Any]) -> Creative:
     values = dict(zip(CREATIVE_COLUMNS, row, strict=True))
+    attributes = values["attributes"]
+    values["attributes"] = {} if attributes is None else dict(attributes)
     values["metrics"] = Metrics(
         view_count=values.pop("latest_view_count"),
         like_count=values.pop("latest_like_count"),

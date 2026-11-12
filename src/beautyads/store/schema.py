@@ -15,6 +15,7 @@ CHANGE_COLUMNS: tuple[str, ...] = (
     "latest_view_count",
     "latest_like_count",
     "latest_comment_count",
+    "attributes",
 )
 
 MIGRATIONS: list[tuple[int, str, str]] = [
@@ -86,6 +87,13 @@ MIGRATIONS: list[tuple[int, str, str]] = [
         ALTER TABLE creatives ADD COLUMN IF NOT EXISTS account text;
         """,
     ),
+    (
+        3,
+        "creative_attributes",
+        """
+        ALTER TABLE creatives ADD COLUMN IF NOT EXISTS attributes jsonb;
+        """,
+    ),
 ]
 
 # Fixed identifiers and SQL types, never caller input. Explicit casts preserve
@@ -112,6 +120,7 @@ _INSERT_TYPES: tuple[str, ...] = (
     "bigint",
     "bigint",
     "bigint",
+    "jsonb",
     "timestamptz",
     "timestamptz",
 )

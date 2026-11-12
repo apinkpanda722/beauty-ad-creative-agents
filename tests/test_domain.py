@@ -141,6 +141,29 @@ def test_metrics_defaults_are_independent(creative_data):
     assert second.metrics.view_count is None
 
 
+def test_creative_attributes_default_to_empty_dict(creative_data):
+    assert Creative(**creative_data).attributes == {}
+
+
+def test_creative_attributes_preserve_nested_json_values(creative_data):
+    attributes = {
+        "reach": "600K-700K",
+        "advertiser": {"business_id": 42, "business_name": "합성 광고주"},
+        "observations": ["synthetic", 1.5, {"enabled": True, "missing": None}],
+    }
+    item = Creative(**creative_data, attributes=attributes)
+    assert item.attributes == attributes
+    assert Creative.model_validate_json(item.model_dump_json()) == item
+
+
+def test_creative_attributes_defaults_are_independent(creative_data):
+    first = Creative(**creative_data)
+    second = Creative(**creative_data)
+    assert first.attributes is not second.attributes
+    first.attributes["reach"] = "600K-700K"
+    assert second.attributes == {}
+
+
 def test_missing_analyzable_is_not_eligible(creative_data):
     assert "analyzable" not in creative_data
     creative = Creative.model_validate(creative_data)

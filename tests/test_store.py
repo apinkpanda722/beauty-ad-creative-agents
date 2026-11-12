@@ -162,6 +162,33 @@ def test_existing_version_one_only_applies_later_migrations():
     assert not calls_for(conn, "CREATE TABLE IF NOT EXISTS creatives")
 
 
+def test_attributes_migration_is_additive_version_three():
+    [(version, name, sql)] = [item for item in MIGRATIONS if item[0] == 3]
+    assert version == 3 and name == "creative_attributes"
+    assert re.fullmatch(
+        r"\s*ALTER TABLE creatives ADD COLUMN IF NOT EXISTS attributes jsonb;\s*",
+        sql,
+        re.IGNORECASE,
+    )
+    assert not re.search(r"\b(DROP|TRUNCATE|UPDATE|INSERT)\b", sql, re.IGNORECASE)
+    for prior_version, _, prior_sql in MIGRATIONS:
+        if prior_version < 3:
+            assert not re.search(r"\battributes\b", prior_sql)
+
+
+def test_existing_version_two_only_applies_later_migrations():
+    conn = FakeConnection([FakeCursor(), FakeCursor([(1,), (2,)])])
+    remaining = [(version, name) for version, name, _ in MIGRATIONS if version > 2]
+    assert apply_migrations(conn) == [version for version, _ in remaining]
+    assert [
+        params for _, params in calls_for(conn, "INSERT INTO schema_migrations")
+    ] == remaining
+    assert conn.commits == len(remaining) and conn.rollbacks == 0
+    assert not calls_for(conn, "CREATE TABLE IF NOT EXISTS creatives")
+    assert not calls_for(conn, "ADD COLUMN IF NOT EXISTS brand")
+    assert not calls_for(conn, "ADD COLUMN IF NOT EXISTS account")
+
+
 @pytest.mark.parametrize(
     "fragment",
     [
@@ -179,7 +206,7 @@ def test_migrations_rollback_and_propagate_failure(fragment):
 
 
 def test_change_columns_exclude_all_collection_timestamps():
-    expected = {
+    expected = (
         "url",
         "title",
         "caption",
@@ -192,10 +219,11 @@ def test_change_columns_exclude_all_collection_timestamps():
         "latest_view_count",
         "latest_like_count",
         "latest_comment_count",
-    }
+        "attributes",
+    )
     assert isinstance(CHANGE_COLUMNS, tuple)
     assert len(CHANGE_COLUMNS) == len(expected)
-    assert set(CHANGE_COLUMNS) == expected
+    assert CHANGE_COLUMNS == expected
     sql = build_upsert_sql()
     comparison = sql.split("WHERE", 1)[1]
     assert "IS DISTINCT FROM" in comparison
@@ -254,6 +282,84 @@ def test_upsert_parameterizes_brand_and_account_as_text_or_null(brand, account):
         if value is not None:
             assert all(value not in sql for sql, _ in conn.calls)
     assert conn.commits == 1 and conn.rollbacks == 0
+
+
+@pytest.mark.parametrize(
+    "attributes",
+    [
+        {},
+        {
+            "reach": "600K-700K",
+            "advertiser": {"business_name": "O'Brien\"; --", "business_id": 42},
+            "observations": ["synthetic", 1.5, {"enabled": True, "missing": None}],
+        },
+    ],
+)
+def test_upsert_parameterizes_attributes_as_jsonb(attributes):
+    conn = FakeConnection()
+    PostgresCreativeStore(conn).upsert_creatives([creative(attributes=attributes)])
+    [(query, params)] = calls_for(conn, "INSERT INTO creatives")
+    assert len(params) == len(INSERT_COLUMNS) == query.count("%s")
+    values = dict(zip(INSERT_COLUMNS, params, strict=True))
+    assert isinstance(values["attributes"], str)
+    assert json.loads(values["attributes"]) == attributes
+    casts = re.findall(r"%s::([a-z ]+?)(?=,|\))", query)
+    assert len(casts) == len(INSERT_COLUMNS)
+    assert dict(zip(INSERT_COLUMNS, casts, strict=True))["attributes"] == "jsonb"
+    assert "attributes = EXCLUDED.attributes" in query
+    assert all(values["attributes"] not in sql for sql, _ in conn.calls)
+    assert all("O'Brien" not in sql for sql, _ in conn.calls)
+    assert conn.commits == 1 and conn.rollbacks == 0
+
+
+def test_upsert_attributes_key_order_does_not_change_comparison_values():
+    first_attributes = {"reach": "600K-700K", "advertiser": {"name": "合成", "id": 42}}
+    reordered_attributes = {
+        "advertiser": {"id": 42, "name": "合成"},
+        "reach": "600K-700K",
+    }
+    conn = FakeConnection()
+    store = PostgresCreativeStore(conn)
+    store.upsert_creatives([creative(attributes=first_attributes)])
+    store.upsert_creatives([creative(attributes=reordered_attributes)])
+    first, second = calls_for(conn, "INSERT INTO creatives")
+    assert first == second
+    values = dict(zip(INSERT_COLUMNS, first[1], strict=True))
+    assert values["attributes"] == json.dumps(first_attributes, sort_keys=True)
+    comparison = first[0].split("WHERE", 1)[1]
+    assert "IS DISTINCT FROM" in comparison
+    assert "creatives.attributes" in comparison
+    assert "EXCLUDED.attributes" in comparison
+
+
+@pytest.mark.parametrize(
+    "operation", ["get_creative", "list_creatives", "next_pending"]
+)
+@pytest.mark.parametrize(
+    "stored_attributes",
+    [None, {}, {"reach": "600K-700K", "nested": {"items": [1, None]}}],
+)
+def test_creative_reads_restore_attributes_and_legacy_nulls(
+    operation, stored_attributes
+):
+    item = creative(
+        attributes=stored_attributes if stored_attributes is not None else {}
+    )
+    values = dict(zip(CREATIVE_COLUMNS, creative_row(item), strict=True))
+    values["attributes"] = stored_attributes
+    row = tuple(values[column] for column in CREATIVE_COLUMNS)
+    conn = FakeConnection([FakeCursor([row])])
+    store = PostgresCreativeStore(conn)
+    if operation == "get_creative":
+        result = store.get_creative(item.key)
+    elif operation == "list_creatives":
+        [result] = store.list_creatives()
+    else:
+        [result] = store.next_pending("hook", 7)
+    assert result == item
+    assert type(result.attributes) is dict
+    assert "attributes" in conn.calls[0][0]
+    assert conn.rollbacks == 1 and conn.commits == 0
 
 
 def test_recollection_only_timestamps_differ_in_upsert_parameters():
