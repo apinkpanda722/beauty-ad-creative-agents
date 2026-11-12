@@ -1,0 +1,243 @@
+{
+ "_meta": {
+  "recorded_at": "2026-11-12",
+  "http_status": 200,
+  "term": "mixsoon",
+  "page": 2,
+  "of": 5,
+  "note": "search_id를 이어 받은 쪽 원본(조언 세션 실측)"
+ },
+ "response": {
+  "data": {
+   "ads": [
+    {
+     "ad": {
+      "reach": {
+       "unique_users_seen": "100K-200K"
+      },
+      "status": "active",
+      "videos": [
+       {
+        "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-no1a-p-0037-no/o0AnFEopkEvBTR9IINkfBF85PDdz1PEprae06g~tplv-noop.image?<query omitted>",
+        "url": "https://v77.tiktokcdn.com/a8379fdb077f34b702aad2d916f198b9/6af5cb5c/video/tos/useast2a/tos-useast2a-ve-68c810-euttp/o8pzIkrEADEqeg5CN8CBfFppIFkPvE61RP50KQ/?<query omitted>"
+       }
+      ],
+      "first_shown_date": "20260419",
+      "id": 1862913151664385,
+      "last_shown_date": "20260422"
+     },
+     "advertiser": {
+      "business_name": "JJ Media Ltd",
+      "paid_for_by": "JJ Media Ltd",
+      "business_id": 7492410384427614209
+     }
+    },
+    {
+     "ad": {
+      "first_shown_date": "20260408",
+      "id": 1861904818281730,
+      "last_shown_date": "20260410",
+      "reach": {
+       "unique_users_seen": "100K-200K"
+      },
+      "status": "active",
+      "videos": [
+       {
+        "url": "https://v77.tiktokcdn.com/05170f8fda51a29d2a3c44dfb92cd854/6af5cb69/video/tos/useast2a/tos-useast2a-ve-68c810-euttp/osn0AUtDio6iDz8AzwRI6s4GIhIABCQ3CfXEzy/?<query omitted>",
+        "cover_image_url": "https://p19-common-sign.tiktokcdn.com/tos-no1a-p-0037-no/oUnURwDEaQRAEQ4QCBFpA8fDgYk0yFr3fP1EHv~tplv-noop.image?<query omitted>"
+       }
+      ]
+     },
+     "advertiser": {
+      "business_id": 7498746062467891216,
+      "business_name": "7498746124186943510",
+      "paid_for_by": "7498746124186943510"
+     }
+    },
+    {
+     "ad": {
+      "reach": {
+       "unique_users_seen": "100K-200K"
+      },
+      "status": "active",
+      "videos": [
+       {
+        "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-no1a-p-0037-no/o4OtkIEIDDLNZBl2gEfDApCZuFQyKpFEyfORY1~tplv-noop.image?<query omitted>",
+        "url": "https://v77.tiktokcdn.com/05942b75c5726e115766be5a2ea7eb5a/6af5cb6f/video/tos/useast2a/tos-useast2a-ve-68c810-euttp/oYeIHldGQheIIIaDs1QGeLcjaJALgKyALJcTIk/?<query omitted>"
+       }
+      ],
+      "first_shown_date": "20260315",
+      "id": 1859743895868545,
+      "last_shown_date": "20260317"
+     },
+     "advertiser": {
+      "business_id": 7492410384427614209,
+      "business_name": "JJ Media Ltd",
+      "paid_for_by": "JJ Media Ltd"
+     }
+    },
+    {
+     "ad": {
+      "reach": {
+       "unique_users_seen": "100K-200K"
+      },
+      "status": "active",
+      "videos": [
+       {
+        "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-no1a-p-0037-no/o8fjII5i2jf3ndWghpDKIRI6AFFALTAcweDIuE~tplv-noop.image?<query omitted>",
+        "url": "https://v77.tiktokcdn.com/637db59e8a0400351acb1ee390ba5c3b/6af5cb65/video/tos/useast2a/tos-useast2a-ve-68c810-euttp/oA2jjwE3IFibOgIBIW5f6LAIDfARFLQheDFTcE/?<query omitted>"
+       }
+      ],
+      "first_shown_date": "20260416",
+      "id": 1862635574708225,
+      "last_shown_date": "20260417"
+     },
+     "advertiser": {
+      "business_id": 7492410384427614209,
+      "business_name": "JJ Media Ltd",
+      "paid_for_by": "JJ Media Ltd"
+     }
+    },
+    {
+     "ad": {
+      "first_shown_date": "20260307",
+      "id": 1859020847538497,
+      "last_shown_date": "20260309",
+      "reach": {
+       "unique_users_seen": "100K-200K"
+      },
+      "status": "active",
+      "videos": [
+       {
+        "url": "https://v77.tiktokcdn.com/e90ecba3caf4c97a4b2a86726edcda13/6af5cb79/video/tos/useast2a/tos-useast2a-ve-68c810-euttp/ownJCEsiIySfKXO3TwQi1Eo1IAl0c0BcXIaCiA/?<query omitted>",
+        "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-no1a-p-0037-no/ow5kF4fDkQpsRUpEKTLuOrTEsBXAsEutFEfRQg~tplv-noop.image?<query omitted>"
+       }
+      ]
+     },
+     "advertiser": {
+      "business_id": 7492410384427614209,
+      "business_name": "JJ Media Ltd",
+      "paid_for_by": "JJ Media Ltd"
+     }
+    },
+    {
+     "advertiser": {
+      "business_id": 7492410384427614209,
+      "business_name": "JJ Media Ltd",
+      "paid_for_by": "JJ Media Ltd"
+     },
+     "ad": {
+      "id": 1858475318144450,
+      "last_shown_date": "20260302",
+      "reach": {
+       "unique_users_seen": "100K-200K"
+      },
+      "status": "active",
+      "videos": [
+       {
+        "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-no1a-p-0037-no/ogoIFwASeAgbp49zGGjTNfD4vILILIfDZL7gxn~tplv-noop.image?<query omitted>",
+        "url": "https://v77.tiktokcdn.com/3d3d3bf0bd134dd62ccab894f7d7c573/6af5cb76/video/tos/useast2a/tos-useast2a-ve-68c810-euttp/o8AFgB4I7spIfBeJzFDFBQCPkpwRE8FgYP0Ecm/?<query omitted>"
+       }
+      ],
+      "first_shown_date": "20260301"
+     }
+    },
+    {
+     "ad": {
+      "videos": [
+       {
+        "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-no1a-p-0037-no/oweeEylAWCGINwAPTqGEQnQHDIe9JAGUfLyRHl~tplv-noop.image?<query omitted>",
+        "url": "https://v77.tiktokcdn.com/84f2faaba0859f430bd021ea55474b7f/6af5cb81/video/tos/useast2a/tos-useast2a-ve-68c810-euttp/osZGpDEvfHnq7EQLRyeyAJAIDfA7FWQCYGznfE/?<query omitted>"
+       }
+      ],
+      "first_shown_date": "20260325",
+      "id": 1860648804197377,
+      "last_shown_date": "20260328",
+      "reach": {
+       "unique_users_seen": "100K-200K"
+      },
+      "status": "active"
+     },
+     "advertiser": {
+      "business_id": 7492410384427614209,
+      "business_name": "JJ Media Ltd",
+      "paid_for_by": "JJ Media Ltd"
+     }
+    },
+    {
+     "ad": {
+      "reach": {
+       "unique_users_seen": "100K-200K"
+      },
+      "status": "active",
+      "videos": [
+       {
+        "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-no1a-p-0037-no/oE03Jp7LfAB8EXDxERhNS1QgQFRlSzwfxkEQFy~tplv-noop.image?<query omitted>",
+        "url": "https://v77.tiktokcdn.com/1a41dcdb10c87bfa5d219e5f15010bab/6af5cb62/video/tos/useast2a/tos-useast2a-ve-68c810-euttp/oAINEQC2IJo5AmB06iP1f6GrZJ7CYiDwyYpSAY/?<query omitted>"
+       }
+      ],
+      "first_shown_date": "20260401",
+      "id": 1861277086767105,
+      "last_shown_date": "20260402"
+     },
+     "advertiser": {
+      "business_id": 7492410384427614209,
+      "business_name": "JJ Media Ltd",
+      "paid_for_by": "JJ Media Ltd"
+     }
+    },
+    {
+     "ad": {
+      "first_shown_date": "20260322",
+      "id": 1860345550981122,
+      "last_shown_date": "20260323",
+      "reach": {
+       "unique_users_seen": "100K-200K"
+      },
+      "status": "active",
+      "videos": [
+       {
+        "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-no1a-p-0037-no/o4l5pFQoWGDBgcAtQgVEB6AfEkFbRvaEmct6fH~tplv-noop.image?<query omitted>",
+        "url": "https://v77.tiktokcdn.com/d5d5bd36063894e0b01d7b14fb39f006/6af5cb60/video/tos/useast2a/tos-useast2a-ve-68c810-euttp/ocfAgvDghIpFFVBWUkfBR6tjcoaVl5EcAEFEHQ/?<query omitted>"
+       }
+      ]
+     },
+     "advertiser": {
+      "business_id": 7492410384427614209,
+      "business_name": "JJ Media Ltd",
+      "paid_for_by": "JJ Media Ltd"
+     }
+    },
+    {
+     "ad": {
+      "id": 1860910985555969,
+      "last_shown_date": "20260330",
+      "reach": {
+       "unique_users_seen": "100K-200K"
+      },
+      "status": "active",
+      "videos": [
+       {
+        "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-no1a-p-0037-no/ocz3HNIUgQCGeTZL6oTIPMsDjgbrIfH8AA7Xej~tplv-noop.image?<query omitted>",
+        "url": "https://v77.tiktokcdn.com/c01ad5bb2932dc7f86902fa55e898d12/6af5cb65/video/tos/useast2a/tos-useast2a-ve-68c810-euttp/oYYH9wgxfAInahrdQBRpdXBl0iFkiEv3veEEq5/?<query omitted>"
+       }
+      ],
+      "first_shown_date": "20260328"
+     },
+     "advertiser": {
+      "paid_for_by": "JJ Media Ltd",
+      "business_id": 7492410384427614209,
+      "business_name": "JJ Media Ltd"
+     }
+    }
+   ],
+   "has_more": true,
+   "search_id": "eyJsYXN0X3NvcnQiOlsxMDQzMzJdLCJuZXh0X2N1cnNvciI6MjB9"
+  },
+  "error": {
+   "code": "ok",
+   "message": "",
+   "log_id": "20261112082051B999019B5681D0062238"
+  }
+ }
+}

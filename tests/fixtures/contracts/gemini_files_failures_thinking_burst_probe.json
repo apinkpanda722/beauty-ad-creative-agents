@@ -1,0 +1,157 @@
+{
+ "_meta": {
+  "recorded_at": "2026-11-12",
+  "model": "gemini-3.6-flash",
+  "litellm": "1.103.3"
+ },
+ "big_candidate": {
+  "content_length": 8187260,
+  "content_type": "video/mp4",
+  "n_candidates": 10
+ },
+ "download": {
+  "elapsed_s": 9.9,
+  "bytes": 8187260,
+  "status": 200
+ },
+ "big_upload": {
+  "bytes": 8187260,
+  "upload_s": 3.9,
+  "wait_processed_s": 4.9,
+  "status": "processed",
+  "id_is_url": true
+ },
+ "big_analyze": {
+  "http": 200,
+  "elapsed_s": 16.6,
+  "usage": {
+   "total_input_tokens": 5560,
+   "input_tokens_by_modality": [
+    {
+     "modality": "text",
+     "tokens": 13
+    },
+    {
+     "modality": "video",
+     "tokens": 5547
+    }
+   ],
+   "total_output_tokens": 20,
+   "total_thought_tokens": 155
+  },
+  "text": [
+   "The ad starts with a man showing a close-up of skin texture while talking about skin issues."
+  ]
+ },
+ "big_delete": {
+  "id": "files/gxb8kvt4wbk7",
+  "deleted": true,
+  "object": "file"
+ },
+ "analyze_deleted_file": {
+  "http": 403,
+  "elapsed_s": 0.6,
+  "body": {
+   "error": {
+    "message": "You do not have permission to access the File gxb8kvt4wbk7 or it may not exist.",
+    "code": "permission_denied"
+   }
+  }
+ },
+ "junk_upload": {
+  "upload_s": 3.4,
+  "wait_s": 2.6,
+  "status": "error"
+ },
+ "analyze_junk": {
+  "http": 400,
+  "elapsed_s": 0.6,
+  "body": {
+   "error": {
+    "message": "The File bjk3rntnpo8k is not in an ACTIVE state and usage is not allowed.",
+    "code": "invalid_request"
+   }
+  }
+ },
+ "empty_upload": {
+  "exc": "ValueError",
+  "status_code": null,
+  "msg": "Error parsing file upload response: 'sizeBytes'"
+ },
+ "analyze_missing_file": {
+  "http": 403,
+  "body": {
+   "error": {
+    "message": "You do not have permission to access the File doesnotexist123 or it may not exist.",
+    "code": "permission_denied"
+   }
+  }
+ },
+ "thinking": {
+  "default": {
+   "http": 200,
+   "elapsed_s": 5.9,
+   "thought": 186,
+   "output": 14,
+   "error": null
+  },
+  "thinking_level=minimal": {
+   "http": 200,
+   "elapsed_s": 4.7,
+   "thought": 0,
+   "output": 13,
+   "error": null
+  },
+  "thinking_level=low": {
+   "http": 200,
+   "elapsed_s": 4.6,
+   "thought": 26,
+   "output": 19,
+   "error": null
+  },
+  "thinking_level=medium": {
+   "http": 200,
+   "elapsed_s": 5.6,
+   "thought": 187,
+   "output": 14,
+   "error": null
+  },
+  "thinking_level=high": {
+   "http": 200,
+   "elapsed_s": 6.0,
+   "thought": 164,
+   "output": 17,
+   "error": null
+  },
+  "thinking_budget=0": {
+   "http": 400,
+   "elapsed_s": 0.3,
+   "thought": null,
+   "output": null,
+   "error": {
+    "message": "Unknown parameter 'thinking_budget' at 'generation_config'.",
+    "code": "invalid_request"
+   }
+  },
+  "bogus_param": {
+   "http": 400,
+   "elapsed_s": 0.2,
+   "thought": null,
+   "output": null,
+   "error": {
+    "message": "Unknown parameter 'no_such_param' at 'generation_config'.",
+    "code": "invalid_request"
+   }
+  }
+ },
+ "thinking_litellm_low": {
+  "thought": 41
+ },
+ "burst60": {
+  "wall_s": 8.5,
+  "by_http": {
+   "200": 60
+  },
+  "non200_samples": []
+ }
+}

@@ -1,0 +1,221 @@
+{
+ "_meta": {
+  "recorded_at": "2026-11-12",
+  "http_status": 200,
+  "term": "mixsoon",
+  "page": 5,
+  "of": 5,
+  "note": "search_id를 이어 받은 쪽 원본(조언 세션 실측)"
+ },
+ "response": {
+  "data": {
+   "ads": [
+    {
+     "ad": {
+      "id": 1868787576480194,
+      "last_shown_date": "20260624",
+      "reach": {
+       "unique_users_seen": "10K-100K"
+      },
+      "status": "active",
+      "videos": [
+       {
+        "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-no1a-p-0037-no/oglQAILCjpIIUASe03edREn4FLaGIDLRIseL7n~tplv-noop.image?<query omitted>",
+        "url": "https://v77.tiktokcdn.com/4e096a2409fe7fa4e2918d540f3add75/6af5cb84/video/tos/useast2a/tos-useast2a-ve-68c810-euttp/osl6o2UEnCRkQE4I3BFqAJ4DgfktIFMVfiOETl/?<query omitted>"
+       }
+      ],
+      "first_shown_date": "20260623"
+     },
+     "advertiser": {
+      "paid_for_by": "Maia kendra",
+      "business_id": 7411224170119430160,
+      "business_name": "Maia kendra"
+     }
+    },
+    {
+     "ad": {
+      "id": 1852194716219394,
+      "last_shown_date": "20251225",
+      "reach": {
+       "unique_users_seen": "10K-100K"
+      },
+      "status": "active",
+      "videos": [
+       {
+        "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-no1a-p-0037-no/oU0jyJHTPAnIeAiI0CWIDNKDhoCEw6PJmEhBi4~tplv-noop.image?<query omitted>",
+        "url": "https://v77.tiktokcdn.com/b9ddf5a933f2ac6af1c36f757d03c345/6af5cb83/video/tos/useast2a/tos-useast2a-ve-68c810-euttp/oo5DCEPByI0ZIW0CThz4toneHANAniEoiQHPEw/?<query omitted>"
+       }
+      ],
+      "first_shown_date": "20251222"
+     },
+     "advertiser": {
+      "paid_for_by": "JJ Media Ltd",
+      "business_id": 7492410384427614209,
+      "business_name": "JJ Media Ltd"
+     }
+    },
+    {
+     "advertiser": {
+      "business_id": 7646318489321504784,
+      "business_name": "Mixsoon Limited",
+      "paid_for_by": "钛动科技-2026-7"
+     },
+     "ad": {
+      "first_shown_date": "20260925",
+      "id": 1877331149381970,
+      "last_shown_date": "20261025",
+      "reach": {
+       "unique_users_seen": "10K-100K"
+      },
+      "status": "active",
+      "videos": [
+       {
+        "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-useast2a-p-0037-euttp/oAIjtHQqvtan8sGaDgecLeAMGMQrXofjGsaVxI~tplv-noop.image?<query omitted>",
+        "url": "https://v77.tiktokcdn.com/03aeab9af13bf1be8e4d560a1b1ea3ba/6af5cb6c/video/tos/useast2a/tos-useast2a-ve-0068-euttp/ogsEufW1tQzRD0DEQ23EARBmYDtFIk4TqVGfPG/?<query omitted>"
+       }
+      ]
+     }
+    },
+    {
+     "ad": {
+      "first_shown_date": "20260207",
+      "id": 1856483880237057,
+      "last_shown_date": "20260208",
+      "reach": {
+       "unique_users_seen": "10K-100K"
+      },
+      "status": "active",
+      "videos": [
+       {
+        "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-no1a-p-0037-no/o0MEuyFhKIDvBlCAQ4egf6EgpHQjRggFktK2ZB~tplv-noop.image?<query omitted>",
+        "url": "https://v77.tiktokcdn.com/87cff5e07a1a321214153c1c6408acfe/6af5cb72/video/tos/useast2a/tos-useast2a-ve-68c810-euttp/o8gu7dDBQFAQIDBh4gEkSZEIFl2DfRgHp6LegK/?<query omitted>"
+       }
+      ]
+     },
+     "advertiser": {
+      "business_id": 7492410384427614209,
+      "business_name": "JJ Media Ltd",
+      "paid_for_by": "JJ Media Ltd"
+     }
+    },
+    {
+     "ad": {
+      "first_shown_date": "20260601",
+      "id": 1866812761664530,
+      "last_shown_date": "20260602",
+      "reach": {
+       "unique_users_seen": "10K-100K"
+      },
+      "status": "active",
+      "videos": [
+       {
+        "url": "https://v77.tiktokcdn.com/d31b79483f0b567bc214414ace9089e5/6af5cb6e/video/tos/useast2a/tos-useast2a-ve-0068-euttp/o8fIIC2U593b4CscbvAlEImXoQiHB1AiDEBzmi/?<query omitted>",
+        "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-useast2a-p-0037-euttp/ogiAnE3f4cH1iBA9E2G5IXbBoizCzcBsUmDMIu~tplv-noop.image?<query omitted>"
+       }
+      ]
+     },
+     "advertiser": {
+      "business_id": 7498746062467891216,
+      "business_name": "7498746124186943510",
+      "paid_for_by": "7498746124186943510"
+     }
+    },
+    {
+     "ad": {
+      "id": 1860023107643393,
+      "last_shown_date": "20260320",
+      "reach": {
+       "unique_users_seen": "10K-100K"
+      },
+      "status": "active",
+      "videos": [
+       {
+        "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-no1a-p-0037-no/oMSEXroLIMuEk4tBv2zDfFhRtpAFEJqg9P8pIf~tplv-noop.image?<query omitted>",
+        "url": "https://v77.tiktokcdn.com/db1c8ef23e26ad58be85b3ac81213e71/6af5cb6b/video/tos/useast2a/tos-useast2a-ve-68c810-euttp/ocvFhEBoImRk6tCpgfuM2EqXpMVrfDoYtQEgAF/?<query omitted>"
+       }
+      ],
+      "first_shown_date": "20260318"
+     },
+     "advertiser": {
+      "business_id": 7498746062467891216,
+      "business_name": "7498746124186943510",
+      "paid_for_by": "7498746124186943510"
+     }
+    },
+    {
+     "ad": {
+      "videos": [
+       {
+        "cover_image_url": "https://p19-common-sign.tiktokcdn.com/tos-no1a-p-0037-no/ocaskIJID6gJFBVugEfDAADGeFbCKpFEC1vR4w~tplv-noop.image?<query omitted>",
+        "url": "https://v77.tiktokcdn.com/c4181cebcbdaa7067d54cac54741f5c1/6af5cb69/video/tos/useast2a/tos-useast2a-ve-68c810-euttp/oIweuDBEREbADk4f1SIQC6DpzuvFEFJFBgWJVs/?<query omitted>"
+       }
+      ],
+      "first_shown_date": "20260310",
+      "id": 1859297426629634,
+      "last_shown_date": "20260311",
+      "reach": {
+       "unique_users_seen": "10K-100K"
+      },
+      "status": "active"
+     },
+     "advertiser": {
+      "paid_for_by": "JJ Media Ltd",
+      "business_id": 7492410384427614209,
+      "business_name": "JJ Media Ltd"
+     }
+    },
+    {
+     "ad": {
+      "first_shown_date": "20260609",
+      "id": 1867539297607745,
+      "last_shown_date": "20260610",
+      "reach": {
+       "unique_users_seen": "10K-100K"
+      },
+      "status": "active",
+      "videos": [
+       {
+        "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-useast2a-p-0037-euttp/oMCo7NoIi6BAFzJiASAd41AE3aZBICCJI33Uf9~tplv-noop.image?<query omitted>",
+        "url": "https://v77.tiktokcdn.com/dc20549f14c9d6791c02d4eb21c7b029/6af5cb73/video/tos/useast2a/tos-useast2a-ve-0068c001-euttp/oEAQoi96EFZ4BAjDIfdAARC3ozi1Bo9EU1sNI7/?<query omitted>"
+       }
+      ]
+     },
+     "advertiser": {
+      "business_id": 7498746062467891216,
+      "business_name": "7498746124186943510",
+      "paid_for_by": "7498746124186943510"
+     }
+    },
+    {
+     "ad": {
+      "videos": [
+       {
+        "cover_image_url": "https://p16-common-sign.tiktokcdn.com/tos-useast2a-p-0037-euttp/oMCo7NoIi6BAFzJiASAd41AE3aZBICCJI33Uf9~tplv-noop.image?<query omitted>",
+        "url": "https://v77.tiktokcdn.com/dc20549f14c9d6791c02d4eb21c7b029/6af5cb73/video/tos/useast2a/tos-useast2a-ve-0068c001-euttp/oEAQoi96EFZ4BAjDIfdAARC3ozi1Bo9EU1sNI7/?<query omitted>"
+       }
+      ],
+      "first_shown_date": "20260610",
+      "id": 1867629294436738,
+      "last_shown_date": "20260611",
+      "reach": {
+       "unique_users_seen": "10K-100K"
+      },
+      "status": "active"
+     },
+     "advertiser": {
+      "business_id": 7498746062467891216,
+      "business_name": "7498746124186943510",
+      "paid_for_by": "7498746124186943510"
+     }
+    }
+   ],
+   "has_more": false,
+   "search_id": "eyJsYXN0X3NvcnQiOls0OTExMV0sIm5leHRfY3Vyc29yIjo1MH0="
+  },
+  "error": {
+   "code": "ok",
+   "message": "",
+   "log_id": "2026111208210125D0024FCC3E930002F4"
+  }
+ }
+}

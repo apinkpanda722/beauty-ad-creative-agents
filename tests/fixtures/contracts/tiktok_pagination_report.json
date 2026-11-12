@@ -1,0 +1,167 @@
+{
+ "_meta": {
+  "recorded_at": "2026-11-12",
+  "range": {
+   "min": "20251217",
+   "max": "20261111"
+  },
+  "countries": [
+   "DE",
+   "FR",
+   "IT",
+   "ES",
+   "NL",
+   "PL"
+  ]
+ },
+ "runs": {
+  "dalba": {
+   "pages": [
+    {
+     "page": 1,
+     "http": 200,
+     "elapsed_s": 2.4,
+     "n_ads": 10,
+     "has_more": true,
+     "has_search_id_key": true,
+     "search_id_len": 52,
+     "search_id_changes": true,
+     "data_keys": [
+      "ads",
+      "has_more",
+      "search_id"
+     ],
+     "error_code": "ok",
+     "first_id": 1863712467571714
+    },
+    {
+     "page": 2,
+     "http": 200,
+     "elapsed_s": 1.9,
+     "n_ads": 10,
+     "has_more": true,
+     "has_search_id_key": true,
+     "search_id_len": 52,
+     "search_id_changes": true,
+     "data_keys": [
+      "ads",
+      "has_more",
+      "search_id"
+     ],
+     "error_code": "ok",
+     "first_id": 1877877564803201
+    },
+    {
+     "page": 3,
+     "http": 200,
+     "elapsed_s": 2.1,
+     "n_ads": 9,
+     "has_more": false,
+     "has_search_id_key": true,
+     "search_id_len": 52,
+     "search_id_changes": true,
+     "data_keys": [
+      "ads",
+      "has_more",
+      "search_id"
+     ],
+     "error_code": "ok",
+     "first_id": 1872510194745937
+    }
+   ],
+   "total_unique": 28,
+   "duplicates_across_pages": 1
+  },
+  "mixsoon": {
+   "pages": [
+    {
+     "page": 1,
+     "http": 200,
+     "elapsed_s": 3.0,
+     "n_ads": 10,
+     "has_more": true,
+     "has_search_id_key": true,
+     "search_id_len": 52,
+     "search_id_changes": true,
+     "data_keys": [
+      "ads",
+      "has_more",
+      "search_id"
+     ],
+     "error_code": "ok",
+     "first_id": 1880090180185570
+    },
+    {
+     "page": 2,
+     "http": 200,
+     "elapsed_s": 2.5,
+     "n_ads": 10,
+     "has_more": true,
+     "has_search_id_key": true,
+     "search_id_len": 52,
+     "search_id_changes": true,
+     "data_keys": [
+      "ads",
+      "has_more",
+      "search_id"
+     ],
+     "error_code": "ok",
+     "first_id": 1862913151664385
+    },
+    {
+     "page": 3,
+     "http": 200,
+     "elapsed_s": 2.0,
+     "n_ads": 10,
+     "has_more": true,
+     "has_search_id_key": true,
+     "search_id_len": 52,
+     "search_id_changes": true,
+     "data_keys": [
+      "ads",
+      "has_more",
+      "search_id"
+     ],
+     "error_code": "ok",
+     "first_id": 1862999107031361
+    },
+    {
+     "page": 4,
+     "http": 200,
+     "elapsed_s": 1.9,
+     "n_ads": 10,
+     "has_more": true,
+     "has_search_id_key": true,
+     "search_id_len": 52,
+     "search_id_changes": true,
+     "data_keys": [
+      "ads",
+      "has_more",
+      "search_id"
+     ],
+     "error_code": "ok",
+     "first_id": 1877354006927906
+    },
+    {
+     "page": 5,
+     "http": 200,
+     "elapsed_s": 2.4,
+     "n_ads": 9,
+     "has_more": false,
+     "has_search_id_key": true,
+     "search_id_len": 52,
+     "search_id_changes": true,
+     "data_keys": [
+      "ads",
+      "has_more",
+      "search_id"
+     ],
+     "error_code": "ok",
+     "first_id": 1868787576480194
+    }
+   ],
+   "total_unique": 43,
+   "duplicates_across_pages": 6
+  }
+ }
+}

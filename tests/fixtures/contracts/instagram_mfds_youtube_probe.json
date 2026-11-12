@@ -1,0 +1,740 @@
+{
+ "_meta": {
+  "recorded_at": "2026-11-12T08:24:32+00:00"
+ },
+ "instagram_url_expiry": {
+  "accounts": {
+   "skin1004official": {
+    "n_media": 25,
+    "n_with_media_url": 25,
+    "rows_sample": [
+     {
+      "type": "VIDEO",
+      "product_type": "REELS",
+      "host_kind": "scontent-ssn…cdninstagram",
+      "query_param_names": [
+       "_nc_cat",
+       "_nc_gid",
+       "_nc_ht",
+       "_nc_map",
+       "_nc_ohc",
+       "_nc_sid",
+       "_nc_vs",
+       "_nc_zt",
+       "ccb",
+       "edm",
+       "efg",
+       "oe",
+       "oh",
+       "vs"
+      ],
+      "oe_expires_utc": "2026-11-13T19:16:13+00:00",
+      "ttl_hours_from_now": 34.9,
+      "has_oh": true,
+      "path_ext": ".mp4"
+     },
+     {
+      "type": "CAROUSEL_ALBUM",
+      "product_type": "FEED",
+      "host_kind": "scontent-ssn…cdninstagram",
+      "query_param_names": [
+       "_nc_cat",
+       "_nc_ct",
+       "_nc_gid",
+       "_nc_ht",
+       "_nc_map",
+       "_nc_oc",
+       "_nc_ohc",
+       "_nc_sid",
+       "_nc_zt",
+       "ccb",
+       "edm",
+       "efg",
+       "oe",
+       "oh",
+       "stp"
+      ],
+      "oe_expires_utc": "2026-11-16T17:37:09+00:00",
+      "ttl_hours_from_now": 105.2,
+      "has_oh": true,
+      "path_ext": ".jpg"
+     },
+     {
+      "type": "VIDEO",
+      "product_type": "REELS",
+      "host_kind": "scontent-ssn…cdninstagram",
+      "query_param_names": [
+       "_nc_cat",
+       "_nc_gid",
+       "_nc_ht",
+       "_nc_map",
+       "_nc_ohc",
+       "_nc_sid",
+       "_nc_vs",
+       "_nc_zt",
+       "ccb",
+       "edm",
+       "efg",
+       "oe",
+       "oh",
+       "vs"
+      ],
+      "oe_expires_utc": "2026-11-13T20:18:14+00:00",
+      "ttl_hours_from_now": 35.9,
+      "has_oh": true,
+      "path_ext": ".mp4"
+     },
+     {
+      "type": "CAROUSEL_ALBUM",
+      "product_type": "FEED",
+      "host_kind": "scontent-ssn…cdninstagram",
+      "query_param_names": [
+       "_nc_cat",
+       "_nc_ct",
+       "_nc_gid",
+       "_nc_ht",
+       "_nc_map",
+       "_nc_oc",
+       "_nc_ohc",
+       "_nc_sid",
+       "_nc_zt",
+       "ccb",
+       "edm",
+       "efg",
+       "oe",
+       "oh",
+       "stp"
+      ],
+      "oe_expires_utc": "2026-11-16T20:10:40+00:00",
+      "ttl_hours_from_now": 107.8,
+      "has_oh": true,
+      "path_ext": ".jpg"
+     },
+     {
+      "type": "VIDEO",
+      "product_type": "REELS",
+      "host_kind": "scontent-ssn…cdninstagram",
+      "query_param_names": [
+       "_nc_cat",
+       "_nc_gid",
+       "_nc_ht",
+       "_nc_map",
+       "_nc_ohc",
+       "_nc_sid",
+       "_nc_vs",
+       "_nc_zt",
+       "ccb",
+       "edm",
+       "efg",
+       "oe",
+       "oh",
+       "vs"
+      ],
+      "oe_expires_utc": "2026-11-13T19:22:42+00:00",
+      "ttl_hours_from_now": 35.0,
+      "has_oh": true,
+      "path_ext": ".mp4"
+     },
+     {
+      "type": "VIDEO",
+      "product_type": "REELS",
+      "host_kind": "scontent-ssn…cdninstagram",
+      "query_param_names": [
+       "_nc_cat",
+       "_nc_gid",
+       "_nc_ht",
+       "_nc_map",
+       "_nc_ohc",
+       "_nc_sid",
+       "_nc_vs",
+       "_nc_zt",
+       "ccb",
+       "edm",
+       "efg",
+       "oe",
+       "oh",
+       "vs"
+      ],
+      "oe_expires_utc": "2026-11-13T18:54:15+00:00",
+      "ttl_hours_from_now": 34.5,
+      "has_oh": true,
+      "path_ext": ".mp4"
+     }
+    ],
+    "ttl_hours_min": 32.3,
+    "ttl_hours_max": 107.9,
+    "video_range_download": {
+     "http": 206,
+     "content_type": "video/mp4",
+     "content_range": "bytes 0-1023/1772528"
+    }
+   },
+   "torriden_official": {
+    "n_media": 25,
+    "n_with_media_url": 24,
+    "rows_sample": [
+     {
+      "type": "CAROUSEL_ALBUM",
+      "product_type": "FEED",
+      "host_kind": "scontent-ssn…cdninstagram",
+      "query_param_names": [
+       "_nc_cat",
+       "_nc_ct",
+       "_nc_gid",
+       "_nc_ht",
+       "_nc_map",
+       "_nc_oc",
+       "_nc_ohc",
+       "_nc_sid",
+       "_nc_zt",
+       "ccb",
+       "edm",
+       "efg",
+       "oe",
+       "oh",
+       "stp"
+      ],
+      "oe_expires_utc": "2026-11-16T16:43:42+00:00",
+      "ttl_hours_from_now": 104.3,
+      "has_oh": true,
+      "path_ext": ".jpg"
+     },
+     {
+      "type": "CAROUSEL_ALBUM",
+      "product_type": "FEED",
+      "host_kind": "scontent-ssn…cdninstagram",
+      "query_param_names": [
+       "_nc_cat",
+       "_nc_ct",
+       "_nc_gid",
+       "_nc_ht",
+       "_nc_map",
+       "_nc_oc",
+       "_nc_ohc",
+       "_nc_sid",
+       "_nc_zt",
+       "ccb",
+       "edm",
+       "efg",
+       "oe",
+       "oh",
+       "stp"
+      ],
+      "oe_expires_utc": "2026-11-16T17:24:30+00:00",
+      "ttl_hours_from_now": 105.0,
+      "has_oh": true,
+      "path_ext": ".jpg"
+     },
+     {
+      "type": "CAROUSEL_ALBUM",
+      "product_type": "FEED",
+      "host_kind": "scontent-ssn…cdninstagram",
+      "query_param_names": [
+       "_nc_cat",
+       "_nc_ct",
+       "_nc_gid",
+       "_nc_ht",
+       "_nc_map",
+       "_nc_oc",
+       "_nc_ohc",
+       "_nc_sid",
+       "_nc_zt",
+       "ccb",
+       "edm",
+       "efg",
+       "oe",
+       "oh",
+       "stp"
+      ],
+      "oe_expires_utc": "2026-11-16T17:56:11+00:00",
+      "ttl_hours_from_now": 105.5,
+      "has_oh": true,
+      "path_ext": ".jpg"
+     },
+     {
+      "type": "VIDEO",
+      "product_type": "REELS",
+      "host_kind": "scontent-ssn…cdninstagram",
+      "query_param_names": [
+       "_nc_cat",
+       "_nc_gid",
+       "_nc_ht",
+       "_nc_map",
+       "_nc_ohc",
+       "_nc_sid",
+       "_nc_vs",
+       "_nc_zt",
+       "ccb",
+       "edm",
+       "efg",
+       "oe",
+       "oh",
+       "vs"
+      ],
+      "oe_expires_utc": "2026-11-13T19:58:06+00:00",
+      "ttl_hours_from_now": 35.6,
+      "has_oh": true,
+      "path_ext": ".mp4"
+     },
+     {
+      "type": "VIDEO",
+      "product_type": "REELS",
+      "host_kind": "scontent-ssn…cdninstagram",
+      "query_param_names": [
+       "_nc_cat",
+       "_nc_gid",
+       "_nc_ht",
+       "_nc_map",
+       "_nc_ohc",
+       "_nc_sid",
+       "_nc_vs",
+       "_nc_zt",
+       "ccb",
+       "edm",
+       "efg",
+       "oe",
+       "oh",
+       "vs"
+      ],
+      "oe_expires_utc": "2026-11-13T18:33:56+00:00",
+      "ttl_hours_from_now": 34.2,
+      "has_oh": true,
+      "path_ext": ".mp4"
+     },
+     {
+      "type": "VIDEO",
+      "product_type": "REELS",
+      "host_kind": "scontent-ssn…cdninstagram",
+      "query_param_names": [
+       "_nc_cat",
+       "_nc_gid",
+       "_nc_ht",
+       "_nc_map",
+       "_nc_ohc",
+       "_nc_sid",
+       "_nc_vs",
+       "_nc_zt",
+       "ccb",
+       "edm",
+       "efg",
+       "oe",
+       "oh",
+       "vs"
+      ],
+      "oe_expires_utc": "2026-11-13T17:03:45+00:00",
+      "ttl_hours_from_now": 32.7,
+      "has_oh": true,
+      "path_ext": ".mp4"
+     }
+    ],
+    "ttl_hours_min": 32.0,
+    "ttl_hours_max": 107.8,
+    "video_range_download": {
+     "http": 206,
+     "content_type": "video/mp4",
+     "content_range": "bytes 0-1023/3957426"
+    }
+   }
+  }
+ },
+ "mfds_sun": {
+  "선크림": {
+   "report_http": 200,
+   "report_total": 4837,
+   "report_n": 30,
+   "screen_http": 200,
+   "screen_total": 1222,
+   "screen_n": 30,
+   "overlap_names_in_first_page": 0,
+   "spf_pa_sample": [
+    [
+     "핫스탑플러스선크림에스피에프33",
+     null,
+     null,
+     "N"
+    ],
+    [
+     "허브선크림",
+     null,
+     null,
+     "N"
+    ],
+    [
+     "엔찬트엠에프선크림",
+     null,
+     null,
+     "N"
+    ],
+    [
+     "닥터랩유브이퍼펙트선크림에스피에프35,피에이+",
+     null,
+     null,
+     "N"
+    ],
+    [
+     "리더스클리니에라이프소스선크림",
+     null,
+     null,
+     "N"
+    ],
+    [
+     "리더스클리니에라이프소스선크림에스피에프50플러",
+     null,
+     null,
+     "N"
+    ]
+   ],
+   "spf_nonnull": 0,
+   "pa_nonnull": 0,
+   "spf_value_types": [
+    "NoneType"
+   ],
+   "spf_values": [
+    "None"
+   ],
+   "pa_values": [
+    "None"
+   ],
+   "cancel_values": [
+    "N"
+   ],
+   "report_keys_count": 36
+  },
+  "선스크린": {
+   "report_http": 200,
+   "report_total": 1059,
+   "report_n": 30,
+   "screen_http": 200,
+   "screen_total": 409,
+   "screen_n": 30,
+   "overlap_names_in_first_page": 0,
+   "spf_pa_sample": [
+    [
+     "유브이얼티메이트프로텍션선스크린(에스피에프50",
+     null,
+     null,
+     "N"
+    ],
+    [
+     "유브이얼티메이트프로텍션선스크린(에스피에프50",
+     null,
+     null,
+     "N"
+    ],
+    [
+     "헬릭스선스크린",
+     null,
+     null,
+     "N"
+    ],
+    [
+     "라졸리서패스선스크린앤화이트닝로션",
+     null,
+     null,
+     "N"
+    ],
+    [
+     "빌리프유브이프로텍터스탠바이유선스크린",
+     null,
+     null,
+     "N"
+    ],
+    [
+     "빌리프유브이프로텍터레포츠쉐이킹선스크린",
+     null,
+     null,
+     "N"
+    ]
+   ],
+   "spf_nonnull": 0,
+   "pa_nonnull": 0,
+   "spf_value_types": [
+    "NoneType"
+   ],
+   "spf_values": [
+    "None"
+   ],
+   "pa_values": [
+    "None"
+   ],
+   "cancel_values": [
+    "N"
+   ],
+   "report_keys_count": 36
+  },
+  "선스틱": {
+   "report_http": 200,
+   "report_total": 1234,
+   "report_n": 30,
+   "screen_http": 200,
+   "screen_total": 457,
+   "screen_n": 30,
+   "overlap_names_in_first_page": 0,
+   "spf_pa_sample": [
+    [
+     "엔프라니옴므딜라이트선스틱유브이이엑스에스피에프",
+     null,
+     null,
+     "N"
+    ],
+    [
+     "세띠마아쿠아선스틱",
+     null,
+     null,
+     "N"
+    ],
+    [
+     "케어존닥터솔루션피큐어선스틱비비",
+     null,
+     null,
+     "N"
+    ],
+    [
+     "보닌제이에스피스포츠수퍼세이브비비선스틱",
+     null,
+     null,
+     "N"
+    ],
+    [
+     "오휘선프로텍션선스틱",
+     null,
+     null,
+     "N"
+    ],
+    [
+     "보닌알엑스스포츠파워프로텍션선스틱",
+     null,
+     null,
+     "N"
+    ]
+   ],
+   "spf_nonnull": 11,
+   "pa_nonnull": 11,
+   "spf_value_types": [
+    "NoneType",
+    "str"
+   ],
+   "spf_values": [
+    "30",
+    "33",
+    "50+",
+    "83",
+    "None"
+   ],
+   "pa_values": [
+    "0",
+    "2",
+    "3",
+    "None"
+   ],
+   "cancel_values": [
+    "N"
+   ],
+   "report_keys_count": 36
+  },
+  "맑은쌀선크림": {
+   "report_http": 200,
+   "report_total": 2,
+   "report_n": 2,
+   "screen_http": 200,
+   "screen_total": 0,
+   "screen_n": 0,
+   "overlap_names_in_first_page": 0,
+   "spf_pa_sample": [
+    [
+     "조선미녀맑은쌀선크림",
+     "50+",
+     "4",
+     "N"
+    ],
+    [
+     "조선미녀맑은쌀선크림아쿠아프레쉬",
+     "50+",
+     "4",
+     "N"
+    ]
+   ],
+   "spf_nonnull": 2,
+   "pa_nonnull": 2,
+   "spf_value_types": [
+    "str"
+   ],
+   "spf_values": [
+    "50+"
+   ],
+   "pa_values": [
+    "4"
+   ],
+   "cancel_values": [
+    "N"
+   ],
+   "report_keys_count": 36
+  }
+ },
+ "youtube_pages_stats": {
+  "channels": {
+   "mediheal": {
+    "videos_checked": 150,
+    "pages": 3,
+    "reached_last_page": false,
+    "last_page_has_nextPageToken_key": null,
+    "missing": {
+     "like": 2,
+     "comment": 2,
+     "view": 0
+    }
+   },
+   "cosrx": {
+    "videos_checked": 150,
+    "pages": 3,
+    "reached_last_page": false,
+    "last_page_has_nextPageToken_key": null,
+    "missing": {
+     "like": 0,
+     "comment": 0,
+     "view": 0
+    }
+   },
+   "skin1004": {
+    "videos_checked": 150,
+    "pages": 3,
+    "reached_last_page": false,
+    "last_page_has_nextPageToken_key": null,
+    "missing": {
+     "like": 0,
+     "comment": 0,
+     "view": 0
+    }
+   },
+   "torriden": {
+    "videos_checked": 107,
+    "pages": 3,
+    "reached_last_page": true,
+    "last_page_has_nextPageToken_key": false,
+    "missing": {
+     "like": 0,
+     "comment": 1,
+     "view": 0
+    }
+   },
+   "beauty_of_joseon": {
+    "videos_checked": 15,
+    "pages": 1,
+    "reached_last_page": true,
+    "last_page_has_nextPageToken_key": false,
+    "missing": {
+     "like": 0,
+     "comment": 0,
+     "view": 0
+    }
+   },
+   "numbuzin": {
+    "videos_checked": 68,
+    "pages": 2,
+    "reached_last_page": true,
+    "last_page_has_nextPageToken_key": false,
+    "missing": {
+     "like": 0,
+     "comment": 0,
+     "view": 0
+    }
+   },
+   "isntree": {
+    "videos_checked": 150,
+    "pages": 3,
+    "reached_last_page": false,
+    "last_page_has_nextPageToken_key": null,
+    "missing": {
+     "like": 0,
+     "comment": 1,
+     "view": 0
+    }
+   },
+   "mixsoon": {
+    "videos_checked": 61,
+    "pages": 2,
+    "reached_last_page": true,
+    "last_page_has_nextPageToken_key": false,
+    "missing": {
+     "like": 0,
+     "comment": 0,
+     "view": 0
+    }
+   },
+   "dalba": {
+    "videos_checked": 150,
+    "pages": 3,
+    "reached_last_page": false,
+    "last_page_has_nextPageToken_key": null,
+    "missing": {
+     "like": 2,
+     "comment": 0,
+     "view": 0
+    }
+   },
+   "medicube": {
+    "videos_checked": 150,
+    "pages": 3,
+    "reached_last_page": false,
+    "last_page_has_nextPageToken_key": null,
+    "missing": {
+     "like": 0,
+     "comment": 0,
+     "view": 0
+    }
+   },
+   "abib": {
+    "videos_checked": 135,
+    "pages": 3,
+    "reached_last_page": true,
+    "last_page_has_nextPageToken_key": false,
+    "missing": {
+     "like": 1,
+     "comment": 1,
+     "view": 0
+    }
+   },
+   "biodance": {
+    "videos_checked": 12,
+    "pages": 1,
+    "reached_last_page": true,
+    "last_page_has_nextPageToken_key": false,
+    "missing": {
+     "like": 0,
+     "comment": 0,
+     "view": 0
+    }
+   },
+   "anua": {
+    "videos_checked": 20,
+    "pages": 1,
+    "reached_last_page": true,
+    "last_page_has_nextPageToken_key": false,
+    "missing": {
+     "like": 20,
+     "comment": 0,
+     "view": 0
+    }
+   },
+   "round_lab": {
+    "videos_checked": 31,
+    "pages": 1,
+    "reached_last_page": true,
+    "last_page_has_nextPageToken_key": false,
+    "missing": {
+     "like": 1,
+     "comment": 2,
+     "view": 0
+    }
+   }
+  },
+  "totals": {
+   "videos": 1349,
+   "missing_like": 26,
+   "missing_comment": 7,
+   "missing_view": 0,
+   "no_nextpagetoken_on_last": 8,
+   "pages": 32
+  }
+ }
+}

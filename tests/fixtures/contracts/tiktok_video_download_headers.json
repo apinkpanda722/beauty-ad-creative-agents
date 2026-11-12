@@ -1,0 +1,36 @@
+{
+ "_meta": {
+  "recorded_at": "2026-11-12",
+  "note": "TikTok Commercial Content API 광고 영상 다운로드 응답 헤더 실측(조언 세션). 영상 URL·토큰은 기록하지 않음. 검색어 dalba, DE·FR, 최근 200일, 광고 10건 모두 videos[].url 있음"
+ },
+ "ad_query_structure": {
+  "top_level_keys_per_ad": [
+   "ad",
+   "advertiser"
+  ],
+  "note": "videos는 ad 안에 있다(ad.videos[].url). 최상위가 아니다"
+ },
+ "downloads": [
+  {
+   "status": 200,
+   "content_type": "video/mp4",
+   "content_length": 29172979,
+   "magic_bytes": "ftypisom",
+   "redirects": 0
+  },
+  {
+   "status": 200,
+   "content_type": "video/mp4",
+   "content_length": 1450844,
+   "magic_bytes": "ftypisom",
+   "redirects": 0
+  },
+  {
+   "status": 200,
+   "content_type": "video/mp4",
+   "content_length": 29495861,
+   "magic_bytes": "ftypisom",
+   "redirects": 0
+  }
+ ]
+}
