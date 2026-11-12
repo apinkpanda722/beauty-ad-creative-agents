@@ -1,0 +1,51 @@
+{
+  "project": "beauty-ad-creative-agents",
+  "phase": "1-collect-analyze-core",
+  "steps": [
+    {
+      "step": 0,
+      "name": "architecture-guard",
+      "status": "pending"
+    },
+    {
+      "step": 1,
+      "name": "settings-domain",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "compose",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "store",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "obs-ledger",
+      "status": "pending"
+    },
+    {
+      "step": 5,
+      "name": "llm-wrapper",
+      "status": "pending"
+    },
+    {
+      "step": 6,
+      "name": "youtube-source",
+      "status": "pending"
+    },
+    {
+      "step": 7,
+      "name": "analysis-hook",
+      "status": "pending"
+    },
+    {
+      "step": 8,
+      "name": "slice-live-target",
+      "status": "pending"
+    }
+  ]
+}
