@@ -33,7 +33,9 @@ from beautyads.eval.sheets import (
     codebook_rows,
     instructions_text,
     label_columns,
+    parse_taxonomy,
     sha256_of,
+    write_docs_files,
     write_sheet_files,
 )
 from beautyads.sources.split import BrandSplit, ResplitRule, VolumeConstraints
@@ -217,6 +219,93 @@ def test_label_columns_and_codebook_follow_domain():
     book = codebook_rows()
     assert {(row["axis"], row["value"]) for row in book} == expected
     assert len(book) == len(expected)
+
+
+TAXONOMY_SAMPLE = """\
+### 1. 훅 유형 `hook_type` (하나 선택)
+
+| 값 | 판정 기준 |
+|---|---|
+| `alpha` | 첫째 기준 |
+| `beta` | 둘째 기준 |
+
+둘 이상 해당하면 표의 위쪽 값을 우선한다.
+
+### 4. 출연자 `talent` (하나 선택)
+
+`none`, `staff`(직원)
+
+- `none`과 `staff`는 구별한다.
+"""
+
+
+def test_taxonomy_definitions_and_priority_are_parsed_not_copied():
+    guides = parse_taxonomy(TAXONOMY_SAMPLE)
+    assert guides["hook_type"].definitions == {
+        "alpha": "첫째 기준",
+        "beta": "둘째 기준",
+    }
+    assert (
+        guides["hook_type"].order == ["alpha", "beta"] and guides["hook_type"].ordered
+    )
+    assert guides["talent"].definitions == {"staff": "직원"}
+    assert guides["talent"].bullets == ["`none`과 `staff`는 구별한다."]
+
+
+def test_codebook_notes_carry_taxonomy_definitions_and_priority():
+    book = {
+        (row["axis"], row["value"]): row["note"]
+        for row in codebook_rows(TAXONOMY_SAMPLE)
+    }
+    # 합성 문서에 없는 값은 일반 note만 갖고, 있는 값은 정의·우선순위가 앞에 붙는다.
+    assert book[("hook_type", "question")].startswith("하나만 고른다.")
+    guides = parse_taxonomy(TAXONOMY_SAMPLE)
+    assert guides["hook_type"].definitions["alpha"] == "첫째 기준"
+    synthetic = codebook_rows(TAXONOMY_SAMPLE.replace("alpha", "question"))
+    note = next(
+        row["note"]
+        for row in synthetic
+        if (row["axis"], row["value"]) == ("hook_type", "question")
+    )
+    assert note.startswith("정의: 첫째 기준.")
+    assert "우선순위 1/2(둘 이상 해당하면 숫자가 작은 값)." in note
+    staff = next(
+        row["note"]
+        for row in codebook_rows(TAXONOMY_SAMPLE)
+        if (row["axis"], row["value"]) == ("talent", "staff")
+    )
+    assert staff.startswith("정의: 직원.") and "구별한다" in staff
+
+
+def test_real_taxonomy_gives_every_tabled_value_a_definition():
+    # 표로 정의된 네 축(content_type·hook_type·angle·format)은 값마다 정의 또는
+    # 명시적 "정의 없음" 문구가 있어야 한다. 문서와 domain 값이 어긋나면 실패한다.
+    notes = {(row["axis"], row["value"]): row["note"] for row in codebook_rows()}
+    for axis in ("content_type", "hook_type", "angle", "format"):
+        rows = [note for (a, _), note in notes.items() if a == axis]
+        assert rows and all(note.startswith(("정의:", "정의 없음")) for note in rows)
+    hook_notes = [note for (a, _), note in notes.items() if a == "hook_type"]
+    assert all("우선순위" in note for note in hook_notes)
+
+
+def test_docs_only_rewrite_leaves_sheet_and_key_untouched(tmp_path):
+    out = tmp_path / "data/interim/pilot"
+    sheet = sheet_for([creative(1), creative(2)])
+    files = write_sheet_files(out, sheet, codebook_rows(), instructions_text())
+    before = {name: files[name].read_bytes() for name in ("sheet", "key")}
+    files["codebook"].write_text("stale", encoding="utf-8")
+    written = write_docs_files(out, codebook_rows(), instructions_text())
+    assert set(written) == {"codebook", "instructions"}
+    assert files["codebook"].read_text(encoding="utf-8") != "stale"
+    assert {name: files[name].read_bytes() for name in ("sheet", "key")} == before
+
+
+def test_docs_only_rewrite_rejects_output_outside_interim(tmp_path):
+    out = tmp_path / "tracked"
+    with pytest.raises(SheetError) as caught:
+        write_docs_files(out, codebook_rows(), instructions_text())
+    assert caught.value.code == "OUTPUT_NOT_IGNORED"
+    assert not out.exists()
 
 
 def test_labeling_rules_in_instructions_and_codebook():

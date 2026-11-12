@@ -4,7 +4,9 @@ import csv
 import hashlib
 import json
 import random
+import re
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
@@ -20,6 +22,10 @@ from beautyads.domain import (
     HookResult,
     JobResult,
 )
+
+TAXONOMY_PATH = Path(__file__).resolve().parents[3] / "docs" / "TAXONOMY.md"
+_NO_DEFINITION = "정의 없음(위 값 어느 것에도 맞지 않을 때만 고른다)."
+_TOKEN = re.compile(r"`([a-z_]+)`(?:\(([^)]*)\))?")
 
 _NON_PRODUCT = (
     "content_type이 product_creative가 아니면 나머지 열(category 제외)은 비워 둔다. "
@@ -81,8 +87,80 @@ def label_columns() -> list[str]:
     ]
 
 
-def codebook_rows() -> list[dict[str, str]]:
-    """Enumerate domain values rather than maintaining a second value list."""
+@dataclass
+class AxisGuide:
+    """Definitions parsed from one `### ... `axis`` section of TAXONOMY.md."""
+
+    definitions: dict[str, str]
+    order: list[str]
+    ordered: bool
+    bullets: list[str]
+
+
+def parse_taxonomy(text: str) -> dict[str, AxisGuide]:
+    """Read value definitions from the taxonomy document instead of copying them."""
+    guides: dict[str, AxisGuide] = {}
+    current: AxisGuide | None = None
+    for line in text.splitlines():
+        if line.startswith("### "):
+            axis = _TOKEN.search(line)
+            current = AxisGuide({}, [], False, [])
+            if axis:
+                guides[axis.group(1)] = current
+            else:
+                current = None
+            continue
+        if line.startswith("## "):
+            current = None
+            continue
+        if current is None:
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if line.startswith("|") and len(cells) == 2:
+            token = re.fullmatch(r"`([a-z_]+)`", cells[0])
+            if token:
+                current.definitions[token.group(1)] = cells[1]
+                current.order.append(token.group(1))
+            continue
+        if "위쪽 값을 우선" in line:
+            current.ordered = True
+        elif line.startswith("- "):
+            current.bullets.append(line[2:].strip())
+        elif line and not line.startswith(("|", ">")):
+            for token, description in _TOKEN.findall(line):
+                if description:
+                    current.definitions.setdefault(token, description)
+    return guides
+
+
+def _value_note(guide: AxisGuide | None, value: str) -> str:
+    if guide is None:
+        return ""
+    parts = []
+    definition = guide.definitions.get(value, "")
+    if definition:
+        parts.append(f"정의: {definition}.")
+    elif value in guide.order:
+        parts.append(_NO_DEFINITION)
+    if guide.ordered and value in guide.order:
+        parts.append(
+            f"우선순위 {guide.order.index(value) + 1}/{len(guide.order)}"
+            "(둘 이상 해당하면 숫자가 작은 값)."
+        )
+    for bullet in guide.bullets:
+        if f"`{value}`" in bullet:
+            parts.append(bullet)
+    return " ".join(parts)
+
+
+def codebook_rows(taxonomy_text: str | None = None) -> list[dict[str, str]]:
+    """Enumerate domain values rather than maintaining a second value list.
+
+    Per-value definitions and priorities come from docs/TAXONOMY.md.
+    """
+    if taxonomy_text is None:
+        taxonomy_text = TAXONOMY_PATH.read_text(encoding="utf-8")
+    guides = parse_taxonomy(taxonomy_text)
     rows = []
     for model in (ContentTypeResult, HookResult, FullResult):
         for axis, annotation in _label_axes(model):
@@ -98,7 +176,14 @@ def codebook_rows() -> list[dict[str, str]]:
             if axis == "hook_type":
                 note += " 훅은 첫 3초 기준이며 둘 이상 해당하면 코드북의 위쪽 값을 우선한다."
             for value in values:
-                rows.append({"axis": axis, "value": value, "note": note})
+                detail = _value_note(guides.get(axis), value)
+                rows.append(
+                    {
+                        "axis": axis,
+                        "value": value,
+                        "note": f"{detail} {note}" if detail else note,
+                    }
+                )
     return rows
 
 
@@ -256,6 +341,45 @@ def write_sheet_files(
         json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
     return paths
+
+
+def write_docs_files(
+    out_dir: Path, codebook: Sequence[dict[str, str]], instructions: str
+) -> dict[str, Path]:
+    """Rewrite only the codebook and instructions; sheet and key stay untouched."""
+    paths = _output_paths(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    _write_csv(paths["codebook"], ["axis", "value", "note"], codebook)
+    paths["instructions"].write_text(instructions, encoding="utf-8")
+    return {name: paths[name] for name in ("codebook", "instructions")}
+
+
+def write_key_supplement(out_dir: Path, document: Mapping[str, Any]) -> Path:
+    """Write retry results beside, never into, the already-generated key file."""
+    _output_paths(out_dir)
+    path = out_dir / "pilot_key_supplement.json"
+    if not path.resolve().is_relative_to(out_dir.resolve()):
+        raise SheetError("OUTPUT_NOT_IGNORED")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    return path
+
+
+def read_key_items(out_dir: Path) -> dict[str, CreativeKey]:
+    """item_id -> creative key from the existing key file (read-only)."""
+    path = _output_paths(out_dir)["key"]
+    try:
+        items = json.loads(path.read_text(encoding="utf-8"))["items"]
+        return {
+            item_id: CreativeKey(source=value["source"], source_id=value["source_id"])
+            for item_id, value in items.items()
+        }
+    except FileNotFoundError:
+        raise SheetError("PILOT_KEY_MISSING") from None
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        raise SheetError("PILOT_KEY_INVALID") from None
 
 
 def sha256_of(path: Path) -> str:

@@ -339,6 +339,21 @@ def test_unavailable_plan_does_not_call_media(run, state, url, status, code, mar
     assert code not in RETRYABLE_ERROR_CODES
 
 
+def test_stopped_refresh_plan_is_a_retryable_failure_without_unmarking(run):
+    fake = FakeMedia()
+    result = analyze_creative(
+        creative(), plan=UrlPlan(None, "refresh_stopped"), run=run, media=fake.deps()
+    )
+    assert fake.events == [] and run.interact.calls == []
+    assert result.mark_not_analyzable is False
+    record = result.records[0]
+    assert record.kind == f"content_type@{run.run_tag}"
+    assert record.status == JobStatus.failed
+    assert record.error_code == "MEDIA_REFRESH_STOPPED"
+    assert record.error_code in RETRYABLE_ERROR_CODES
+    assert "MEDIA_URL_MISSING" not in RETRYABLE_ERROR_CODES
+
+
 def test_tiktok_without_plan_url_stays_missing(run):
     fake = FakeMedia()
     result = analyze_creative(
@@ -421,6 +436,7 @@ def test_retryable_codes_exclude_every_held_code():
             "FILE_PROCESS_TIMEOUT",
             "FILE_RETRIEVE_FAILED",
             "LLM_RETRYABLE",
+            "MEDIA_REFRESH_STOPPED",
         }
     )
     assert RETRYABLE_ERROR_CODES.isdisjoint(
@@ -538,7 +554,7 @@ def test_instagram_plans_group_each_known_account_once():
 
 def test_empty_refresh_result_is_missing_and_other_sources_are_ignored():
     account = InstagramAccount(brand="synthetic", username="account-a")
-    refresh = Mock(return_value=RefreshResult({}, set(), set(), "INSTAGRAM_USAGE_HIGH"))
+    refresh = Mock(return_value=RefreshResult({}, set(), set(), None))
     item = creative()
     plans = prepare_instagram_plans(
         [item, creative(source=Source.youtube), creative(source=Source.tiktok)],
@@ -548,6 +564,31 @@ def test_empty_refresh_result_is_missing_and_other_sources_are_ignored():
     assert plans == {item.key: UrlPlan(None, "missing")}
     refresh.assert_called_once_with(account, {item.source_id})
     assert prepare_instagram_plans([], {}, refresh=refresh) == {}
+
+
+def test_interrupted_scan_keeps_found_urls_and_marks_the_rest_stopped():
+    account = InstagramAccount(brand="synthetic", username="account-a")
+    items = [creative("found"), creative("deep"), creative("vanished")]
+    result = RefreshResult(
+        {"found": MEDIA_URL}, {"vanished"}, {"deep"}, "INSTAGRAM_USAGE_HIGH"
+    )
+    plans = prepare_instagram_plans(
+        items, {account.username: account}, refresh=Mock(return_value=result)
+    )
+    # 찾은 것은 그대로, 키가 사라진 것은 gone, 못 찾은 것만 "중단으로 못 찾음".
+    assert plans[items[0].key] == UrlPlan(MEDIA_URL, "ok")
+    assert plans[items[1].key] == UrlPlan(None, "refresh_stopped")
+    assert plans[items[2].key] == UrlPlan(None, "gone")
+
+
+def test_completed_scan_confirms_missing():
+    account = InstagramAccount(brand="synthetic", username="account-a")
+    item = creative("absent")
+    result = RefreshResult({}, set(), {"absent"}, None)
+    plans = prepare_instagram_plans(
+        [item], {account.username: account}, refresh=Mock(return_value=result)
+    )
+    assert plans[item.key] == UrlPlan(None, "missing")
 
 
 class FakeStore:

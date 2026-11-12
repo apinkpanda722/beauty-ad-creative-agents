@@ -36,6 +36,8 @@ RETRYABLE_ERROR_CODES = frozenset(
         "FILE_PROCESS_TIMEOUT",
         "FILE_RETRIEVE_FAILED",
         "LLM_RETRYABLE",
+        # 사용량 등으로 재조회가 중간에 멈춰 못 찾은 것이라 소재 문제가 아니다.
+        "MEDIA_REFRESH_STOPPED",
     }
 )
 _HELD_CODES = frozenset(
@@ -119,6 +121,9 @@ def prepare_instagram_plans(
                 plans[item.key] = UrlPlan(url, "ok")
             elif item.source_id in result.gone:
                 plans[item.key] = UrlPlan(None, "gone")
+            elif result.stopped is not None:
+                # 스캔이 끝까지 돌지 못했으므로 "없다"가 아니라 "못 찾았다"다.
+                plans[item.key] = UrlPlan(None, "refresh_stopped")
     return plans
 
 
@@ -239,6 +244,9 @@ def analyze_creative(
     if plan.state == "gone":
         outcome.mark_not_analyzable = True
         outcome.records.append(_error_record(run, "MEDIA_URL_GONE"))
+        return outcome
+    if plan.state == "refresh_stopped":
+        outcome.records.append(_error_record(run, "MEDIA_REFRESH_STOPPED"))
         return outcome
     if plan.state != "ok" or not plan.url:
         outcome.records.append(_error_record(run, "MEDIA_URL_MISSING"))

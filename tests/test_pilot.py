@@ -115,6 +115,20 @@ class Store:
     def record_analysis(self, kind, key, **kwargs):
         self.jobs[kind, key] = self.jobs[kind, key].model_copy(update=kwargs)
 
+    def requeue_jobs(self, kind, error_codes):
+        count = 0
+        for (axis, key), job in list(self.jobs.items()):
+            if (
+                axis == kind
+                and job.status == JobStatus.failed
+                and job.error_code in error_codes
+            ):
+                self.jobs[axis, key] = job.model_copy(
+                    update={"status": JobStatus.pending}
+                )
+                count += 1
+        return count
+
 
 @pytest.fixture
 def rig(tmp_path, monkeypatch):
@@ -729,3 +743,98 @@ def test_live_dependencies_wire_only_existing_boundaries(rig, monkeypatch):
         assert upload.call_args.kwargs["filename"] == "video.mp4"
         connection.close.assert_not_called()
     connection.close.assert_called_once()
+
+
+def _fail(rig, key, code, status=JobStatus.failed, tag="default"):
+    rig.store.jobs[f"content_type@{tag}", key] = rig.store.jobs[
+        f"content_type@{tag}", key
+    ].model_copy(update={"status": status, "error_code": code, "labels": None})
+
+
+def _retry(rig, **kwargs):
+    return pilot.retry_pilot(
+        rig.deps,
+        tag=kwargs.pop("tag", "default"),
+        content_type_window_s=2,
+        full_window_s=4,
+        ledger_path=rig.ledger,
+        caps={"gemini": 12},
+        interact=rig.model,
+        out_dir=rig.tmp / "data/interim/pilot",
+        out=rig.out,
+        **kwargs,
+    )
+
+
+def test_retry_reruns_only_refresh_failures_and_never_rewrites_sheet_or_key(rig):
+    for tag in pilot.RUN_TAGS:
+        rig.store.enqueue_analysis(f"content_type@{tag}", rig.items)
+    report = run(rig)
+    sheet_dir = rig.tmp / "data/interim/pilot"
+    selected = sorted(
+        {call.args[0].key for call in rig.fake.call_args_list},
+        key=lambda key: key.source_id,
+    )
+    stopped_key, missing_key, gone_key = selected
+    _fail(rig, stopped_key, "MEDIA_REFRESH_STOPPED")
+    _fail(rig, missing_key, "MEDIA_URL_MISSING")
+    _fail(rig, gone_key, "MEDIA_URL_GONE", status=JobStatus.held)
+    # 같은 태그가 아닌 minimal 실패는 건드리지 않는다.
+    _fail(rig, stopped_key, "MEDIA_REFRESH_STOPPED", tag="minimal")
+    before = {
+        name: (sheet_dir / name).read_bytes()
+        for name in ("pilot_sheet.csv", "pilot_key.json")
+    }
+    rig.fake.reset_mock()
+
+    result = _retry(rig)
+
+    assert result.retried == 2 and result.stopped is None
+    calls = rig.fake.call_args_list
+    assert {call.args[0].key for call in calls} == {stopped_key, missing_key}
+    assert {call.kwargs["run"].run_tag for call in calls} == {"default"}
+    assert all(call.kwargs["run"].purpose == "pilot-default-retry" for call in calls)
+    # 시트·기존 키는 바이트 단위로 그대로, 결과는 별도 보충 파일에만 쓴다.
+    assert {name: (sheet_dir / name).read_bytes() for name in before} == before
+    supplement = json.loads((sheet_dir / "pilot_key_supplement.json").read_text())
+    key_items = json.loads((sheet_dir / "pilot_key.json").read_text())["items"]
+    assert supplement["run_tag"] == "default"
+    assert {
+        (value["source"], value["source_id"]) for value in supplement["items"].values()
+    } == {(key.source.value, key.source_id) for key in (stopped_key, missing_key)}
+    for item_id, value in supplement["items"].items():
+        assert item_id in key_items
+        assert key_items[item_id]["source_id"] == value["source_id"]
+        assert value["runs"]["default"]["content_type"]["status"] == "done"
+    # held(MEDIA_URL_GONE)와 minimal 실패는 그대로 남는다.
+    assert rig.store.jobs["content_type@default", gone_key].status == JobStatus.held
+    assert (
+        rig.store.jobs["content_type@minimal", stopped_key].status == JobStatus.failed
+    )
+    assert report.files["key"].read_bytes() == before["pilot_key.json"]
+
+
+def test_retry_with_nothing_to_retry_makes_no_call_and_no_file(rig):
+    for tag in pilot.RUN_TAGS:
+        rig.store.enqueue_analysis(f"content_type@{tag}", rig.items)
+    run(rig)
+    rig.fake.reset_mock()
+    result = _retry(rig)
+    assert result.retried == 0 and result.supplement is None
+    rig.fake.assert_not_called()
+    assert "RETRY_NOTHING" in rig.out.getvalue()
+    assert not (rig.tmp / "data/interim/pilot/pilot_key_supplement.json").exists()
+
+
+def test_retry_requires_the_existing_key_file(rig):
+    with pytest.raises(pilot.SheetError) as caught:
+        _retry(rig)
+    assert caught.value.code == "PILOT_KEY_MISSING"
+    rig.fake.assert_not_called()
+
+
+def test_main_retry_flag_uses_retry_path_and_reports_safely(rig):
+    assert cli(rig, ["--retry-missing"]) == 2
+    assert "PREFLIGHT_FAILED PILOT_KEY_MISSING" in rig.out.getvalue()
+    rig.fake.assert_not_called()
+    assert not (rig.tmp / "data/interim/pilot/pilot_sheet.csv").exists()

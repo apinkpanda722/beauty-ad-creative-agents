@@ -173,6 +173,22 @@ seed `20261112`, 콘텐츠 유형·전체 분석 구간 각각 최대 60초다. 
 누적 상한 기본값은 Gemini $12, OpenAI $10, Anthropic $8이다.
 시범은 Gemini를 호출하며 첫 실행이 한도로 중단되면 두 번째 실행을 시작하지 않는다.
 
+**재시도와 코드북 재생성(시트·키는 건드리지 않는다)**
+
+```bash
+# 코드북·안내만 다시 쓴다(API·DB·키 파일 접근 없음). 값 정의·우선순위는 docs/TAXONOMY.md에서 읽는다.
+uv run python -m beautyads.eval.pilot_docs
+# default 실행에서 Instagram 주소 재조회가 중단돼(MEDIA_REFRESH_STOPPED) 또는 못 찾아(MEDIA_URL_MISSING)
+# 실패한 content_type만 다시 분석한다. 시트와 pilot_key.json은 그대로 두고 결과를
+# pilot_key_supplement.json(같은 item_id)에 쓴다. 완료된 작업은 건드리지 않는다.
+uv run python -m beautyads.eval.pilot_run --retry-missing
+```
+
+Instagram 주소 재조회가 사용량 한도로 도중에 멈추면 못 찾은 소재는
+`MEDIA_REFRESH_STOPPED`(재시도 대상)로 기록하고, 재조회가 끝까지 돌았는데도 없으면
+`MEDIA_URL_MISSING`으로 확정한다. 키가 사라진 게시물(`MEDIA_URL_GONE`)과는 다르다.
+`--retry-missing`은 호출 전 점검과 비용 상한 검사를 시범과 똑같이 한다.
+
 출력은 실행 태그별 상태 분포, 이번 실행의 `gemini_cost_usd`, 분할 파일의
 `split_sha256`, 네 파일의 경로다. 기본 출력 폴더 `data/interim/pilot` 아래에
 `pilot_sheet.csv`, `pilot_codebook.csv`, `pilot_instructions.md`, `pilot_key.json`을 쓴다.

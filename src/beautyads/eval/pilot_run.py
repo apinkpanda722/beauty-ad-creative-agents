@@ -25,7 +25,9 @@ from beautyads.eval.sheets import (
     build_blind_sheet,
     codebook_rows,
     instructions_text,
+    read_key_items,
     sha256_of,
+    write_key_supplement,
     write_sheet_files,
 )
 from beautyads.llm import (
@@ -71,6 +73,8 @@ from beautyads.store import (
 )
 
 RUN_TAGS = ("minimal", "default")
+# 재조회가 사용량으로 중단돼 못 찾았거나 범위 안에서 못 찾아 실패한 content_type 작업.
+RETRY_CODES = frozenset({"MEDIA_URL_MISSING", "MEDIA_REFRESH_STOPPED"})
 DEFAULT_OUT_DIR = Path("data/interim/pilot")
 SPLIT_PATH = Path("config/brand_split.yaml")
 LABELING_NOTICE = "키 파일(pilot_key.json)은 라벨링을 마치기 전에 열지 마세요"
@@ -92,6 +96,15 @@ class PilotReport(BaseModel):
     files: dict[str, Path]
     split_sha256: str
     elapsed_s: float
+
+
+class RetryReport(BaseModel):
+    tag: str
+    retried: int
+    run: AnalysisReport | None
+    stopped: str | None
+    gemini_cost_usd: float
+    supplement: Path | None
 
 
 class PilotError(Exception):
@@ -290,6 +303,118 @@ def run_pilot(
     return report
 
 
+def retry_pilot(
+    deps: PilotDeps,
+    *,
+    tag: str,
+    content_type_window_s: float,
+    full_window_s: float,
+    ledger_path: Path,
+    caps: Mapping[str, float],
+    interact: Callable[..., InteractionResult],
+    out_dir: Path,
+    out: TextIO,
+) -> RetryReport:
+    """Re-run only this tag's refresh-related content_type failures for the pilot items.
+
+    The sheet and the existing key are never rewritten; the new results go to a
+    supplement file next to them. Jobs already done are not touched.
+    """
+    key_items = read_key_items(out_dir)
+    keys = list(key_items.values())
+    kind = f"content_type@{tag}"
+    failed = [
+        job.key
+        for job in deps.store.get_job_results(kind, keys)
+        if job.status == JobStatus.failed and job.error_code in RETRY_CODES
+    ]
+    initial_cost = provider_total(ledger_path, "gemini")
+    if not failed:
+        print("RETRY_NOTHING", file=out)
+        return RetryReport(
+            tag=tag,
+            retried=0,
+            run=None,
+            stopped=None,
+            gemini_cost_usd=0.0,
+            supplement=None,
+        )
+    # 이 종류의 작업은 시범만 쓰므로 종류 단위 되돌림이 시범 밖 소재에 닿지 않는다.
+    deps.store.requeue_jobs(kind, RETRY_CODES)
+    run = AnalysisRun(
+        thinking_level=tag,
+        run_tag=tag,
+        purpose=f"pilot-{tag}-retry",
+        ledger_path=ledger_path,
+        caps=caps,
+        content_type_window_s=content_type_window_s,
+        full_window_s=full_window_s,
+        hook_window_max_s=3.0,
+        interact=interact,
+    )
+    report = run_analysis(
+        deps.analysis._replace(store=deps.store),
+        run=run,
+        limit=len(failed),
+        only_keys=failed,
+        retry_failed=False,
+        out=StringIO(),
+    )
+    retried = set(failed)
+    results = {}
+    for axis in AXES:
+        for job in deps.store.get_job_results(f"{axis}@{tag}", failed):
+            results[job.kind, job.key] = job
+    items = {}
+    for item_id, key in key_items.items():
+        if key not in retried:
+            continue
+        axes = {}
+        for axis in AXES:
+            job = results.get((f"{axis}@{tag}", key))
+            axes[axis] = (
+                job.model_dump(
+                    mode="json",
+                    include={
+                        "status",
+                        "labels",
+                        "error_code",
+                        "model",
+                        "thinking_level",
+                        "prompt_version",
+                    },
+                )
+                if job is not None
+                else None
+            )
+        items[item_id] = {
+            "source": key.source.value,
+            "source_id": key.source_id,
+            "runs": {tag: axes},
+        }
+    supplement = write_key_supplement(
+        out_dir,
+        {
+            "run_tag": tag,
+            "generated_at": deps.now().isoformat(),
+            "note": "pilot_key.json은 바뀌지 않았다. 이 파일의 항목이 같은 item_id의 해당 실행 결과를 보충한다.",
+            "items": items,
+        },
+    )
+    if report.stopped:
+        print(f"STOPPED {report.stopped}", file=out)
+    result = RetryReport(
+        tag=tag,
+        retried=len(failed),
+        run=report,
+        stopped=report.stopped,
+        gemini_cost_usd=provider_total(ledger_path, "gemini") - initial_cost,
+        supplement=supplement,
+    )
+    print(result.model_dump_json(), file=out)
+    return result
+
+
 def _live_deps(*, environ, env_file, stack: ExitStack) -> PilotDeps:
     """Assemble existing SDK boundaries only after the preflight succeeds."""
     accounts = {
@@ -383,6 +508,12 @@ def main(
     parser.add_argument("--content-type-window-s", type=_window, default=60.0)
     parser.add_argument("--full-window-s", type=_window, default=60.0)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--retry-missing",
+        action="store_true",
+        help="시트·키를 다시 쓰지 않고 이 실행 태그의 MEDIA_URL_MISSING·MEDIA_REFRESH_STOPPED 실패만 재시도",
+    )
+    parser.add_argument("--retry-tag", choices=RUN_TAGS, default="default")
     try:
         args = parser.parse_args(argv)
     except SystemExit as exc:
@@ -422,6 +553,30 @@ def main(
             for problem in problems:
                 print(f"PREFLIGHT_FAILED {problem.code}", file=out)
             return 2
+        if args.retry_missing:
+            with ExitStack() as stack:
+                deps = (
+                    deps_factory()
+                    if deps_factory is not None
+                    else _live_deps(environ=environ, env_file=env_file, stack=stack)
+                )
+                retry = retry_pilot(
+                    deps,
+                    tag=args.retry_tag,
+                    content_type_window_s=args.content_type_window_s,
+                    full_window_s=args.full_window_s,
+                    ledger_path=settings.ledger_path,
+                    caps=settings.provider_caps_usd,
+                    interact=partial(
+                        gemini_interact,
+                        api_key=require_setting(
+                            "GEMINI_API_KEY", environ=environ, env_file=env_file
+                        ),
+                    ),
+                    out_dir=args.out_dir,
+                    out=out,
+                )
+            return 3 if retry.stopped else 0
         try:
             split = load_brand_split(SPLIT_PATH)
             split_hash = sha256_of(SPLIT_PATH)
