@@ -9,6 +9,10 @@
       "dir": "2-sources-pilot",
       "status": "completed",
       "completed_at": "2026-11-13T00:13:35+0900"
+    },
+    {
+      "dir": "3-collect-freeze",
+      "status": "pending"
     }
   ]
 }
