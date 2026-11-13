@@ -20,7 +20,16 @@
     {
       "step": 4,
       "name": "cost-recalc",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-13T15:18:05+0900",
+      "summary": "읽기 전용 cost-recalc CLI, 태그별 통계·가정별 견적·상한 비교·종류별 집계, 합성 테스트와 Makefile·README 구현; make verify 통과(1503 tests).",
+      "completed_at": "2026-11-13T15:27:17+0900",
+      "usage": {
+        "input_tokens": 1281348,
+        "cached_input_tokens": 1203584,
+        "output_tokens": 18927,
+        "attempts": 1
+      }
     },
     {
       "step": 1,
