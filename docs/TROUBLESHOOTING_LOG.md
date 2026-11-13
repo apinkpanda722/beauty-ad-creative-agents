@@ -91,3 +91,25 @@
 - **해결**: `pyproject.toml`에 `[tool.ruff.lint.isort] known-first-party = ["beautyads"]`를 추가하고 `ruff check --fix`로 import 순서만 정렬했다(PR #20, 동작·단언 변경 없음).
 - **결과**: 수정 뒤 main에서 `ruff check . --no-cache`가 통과하고 `make verify` 648개 통과를 확인했다.
 - **근거**: PR #20, 이슈 #19.
+
+
+## 2026-11-12 Instagram 앱 사용량을 과소추정해 수집이 중간에 멈췄다
+- **문제**: `make live-collect` 1차가 13계정·약 26호출에서 `INSTAGRAM_USAGE_HIGH`로 멈췄다.
+- **원인**: 호출당 0.5%로 적은 계약 서술이 틀렸다. `x-app-usage`의 `total_time`이 먼저 차올랐고 계정당 약 4~5%씩 늘었다. 한도 정의와 창 길이는 미확인.
+- **해결**: 사용량을 지표별로 읽어 최댓값 80%에서 멈추게 하고, 중단·오류 계정은 저장하지 않으며, 마지막 사용량을 요약에 출력한다. `docs/CONTRACTS.md`의 서술을 고쳤다.
+- **결과**: 2차 실행이 성공했다. 사용량이 내려가는 속도(롤링 창)는 정확히 재지 않았다.
+- **근거**: `docs/CONTRACTS.md` Instagram 절, `src/beautyads/pipeline/collect.py`.
+
+## 2026-11-12 브랜드 분할 검사가 TikTok을 출처별 하한에 넣어 거짓 경고를 냈다
+- **문제**: 수집 1차에서 TikTok 건수가 0이라는 경고가 떴다.
+- **원인**: 출처별 하한을 모든 출처에 걸었지만 E1 출처는 YouTube·Instagram뿐이다.
+- **해결**: `_E1_SOURCES`만 검사하고, 그 밖의 출처가 하한 검사에 들어가지 않는 테스트를 추가했다.
+- **결과**: 2차 실행에서 경고가 사라졌다.
+- **근거**: `src/beautyads/sources/split.py`, `tests/test_brand_split.py`.
+
+## 2026-11-12 재조회 스캔이 사용량으로 중단됐는데 "URL 없음"으로 확정됐다
+- **문제**: 시범 3건이 `MEDIA_URL_MISSING`으로 실패했다. 모두 2쪽 게시물이었다.
+- **원인**: 재조회 스캔이 앱 사용량 때문에 1쪽에서 멈췄고, 못 찾은 것을 "없다"로 기록했다.
+- **해결**: 중단 때는 `MEDIA_REFRESH_STOPPED`(재시도 대상)로 기록하고 `--retry-missing`으로 해당 작업만 다시 돌린다. 재시도 요약에 사용량·중단 시점을 추가했다.
+- **결과**: 시간을 두고 재시도해 3건 모두 성공했다($0.0327).
+- **근거**: `src/beautyads/pipeline/media_flow.py`, `src/beautyads/eval/pilot_run.py`.
