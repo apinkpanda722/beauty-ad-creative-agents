@@ -43,6 +43,7 @@
 | 30 | `ingredients` E1 판정 축 제외는 **사용자 확정 전까지 권고 상태**. 확정되면 `e1_preregistration.md`에 기록 | 조언 세션 v3 검토 |
 | 31 | **P2를 11 step에서 16 step으로 재번호**(레이어당 한 step 원칙): `media-upload-flow`→`gemini-files`·`media-download`·`media-flow`, `analysis-full`→`store-queries`·`analysis-full`, `creative-brand`·`youtube-brand`·`creative-attributes` 추가. 끊는 지점은 step 5·13 뒤. 초안은 승인본이라 step 내용 변경 없이 이동 | P2 초안 승인(2026-11-12) |
 | 32 | **P3 설계 승인(2026-11-13)**: `e1-sampling`에 출처별 중복 그룹 키(YouTube `(source, account, title, caption)`, Instagram `(source, account, caption)`, 상한 1, 빈 캡션은 그룹 없음), `pilot-compare` 입력·제외 규칙과 `product_creative` 교집합·혼동 행렬 규칙, `taxonomy-v1`에 미확정 4건 결정과 기존 단언 두 개 갱신 추가. TikTok 수집 실행기가 없던 빈칸을 `tiktok-collect`(step 9)로 메우고 `tiktok-plans`를 step 10으로 뒤에 둠. `live-fixes`는 Instagram 0건 계정 확인 결과 전달 뒤에 작성 | 사용자 승인, 조언 세션 DB 조회 |
+| 33 | **P3 step 0(`live-fixes`) 제거, step 1~10 파일 확정**(`phases/3-collect-freeze/`). Instagram 0건 계정 4개는 코드 변경 없이 한계로 기록(CONTRACTS·결과 문서). 실행기의 진행 표시(`Step N/total-1`)는 step이 0부터 시작한다고 가정하므로 P3는 `Step 10/9`처럼 보일 수 있다(표시만의 문제, 실행 순서는 `index.json`의 첫 `pending`을 따른다) | 사용자 결정 D4 |
 
 ## 1. 전제와 일정
 
@@ -140,11 +141,11 @@ step 본문(내용·금지사항·수정 허용 경로)은 `phases/2-sources-pil
 
 **P2 실행에서 사용자 결정이 필요한 항목**: 분할 수집량 기준(수집 뒤 실제 값을 보고 확정), 판매처 시드(`sephora`, `etos`, `cosibella`, `pilulka`, `pharmacontinente`), `thinking_level` 비교와 Gemini 상한 유지(시범 직후 `cost-recalc`).
 
-### P3 collect-freeze (11 step: step 0 조건부, TikTok 2개는 뒤쪽)
+### P3 collect-freeze (10 step: step 1부터 시작, TikTok 2개는 뒤쪽)
 
 | step | 이름 | 내용 |
 |---|---|---|
-| 0 | `live-fixes` | **조건부**. P2 live 결함 수정. 후보는 Instagram **분석 가능 0건 계정 4개**(`medicube_global_official`, `medicube_korea`, `anua_global`, `mediheal_official`, 각 150건 전부 `analyzable=false`)의 원인이고 현재 **미확인**이다. 사용자가 직접 확인해 결과를 알려 주면 그때 step 파일을 쓴다(영상이 아니어서 그런 것이면 코드 변경 없이 닫고 결과 문서에 한계로 기록). 실측 없이 `analyzable` 판정 규칙을 고치지 않는다 |
+| ~~0~~ | ~~`live-fixes`~~ | **제거(2026-11-13): 코드 변경 없음.** P2 live 결함 후보였던 Instagram 분석 가능 0건 계정 4개는 읽기 전용 조회로 확인했다(영상은 있고 응답에 `media_url`이 없는 계정 단위 현상, 원인 미확인). 어댑터는 설계대로이며 `docs/CONTRACTS.md` Instagram 절과 P2 live 결과 문서에 관측값으로 기록했다. P3는 step 1부터 시작한다 |
 | 1 | `taxonomy-partial` | **11-18 `content_type`·`category` 정의만 부분 동결**(시범 결과 반영, 사용자 승인, ADR 기록). `domain`의 두 축 값 목록과 `docs/TAXONOMY.md`가 같은지 검사하는 테스트(문서를 읽고 값은 테스트가 정하지 않는다). 사전 등록 파일에 부분 동결 날짜 기록. `has_hook_segment`·`has_cta`·`claims`는 여기에 넣지 않는다(step 5) |
 | 2 | `e1-sampling` | (분석 불필요, 수집·부분 동결만 필요) **사전 등록 파일을 먼저 커밋**한 뒤 추출. **표본 출처는 YouTube·Instagram만, 표본 프레임은 `analyzable == true`인 소재만**(YouTube 전부, Instagram은 영상이고 수집 시점에 `media_url`이 반환된 것). `analyzable`이 None·없음인 소재는 뽑지 않는다. 제외 비율을 결과 문서에 한계로 기록한다. **중복 그룹은 그룹당 1건(상한 1)만 뽑는다. 그룹 키는 출처별이다: YouTube `(source, account, title, caption)`, Instagram `(source, account, caption)`. 캡션이 비었거나 없는 소재는 그룹을 만들지 않는다. YouTube는 같은 캡션 81그룹 중 56그룹이 제목이 달라 캡션만으로 묶으면 서로 다른 영상이 사라진다.** 키 정의·상한·대표 선택 규칙·중복 제거 전후 프레임 크기와 제외 건수를 사전 등록 파일에 적고, 중복 제거는 E1 표본에만 적용한다(분석·그래프 데이터는 제거하지 않는다). **1단계**: **test 브랜드에서만**, 모델 출력과 무관한 **출처×브랜드** 층화로 시드 셔플한 순서의 시트(YouTube 영상 주소·Instagram `permalink`만, `media_url` 없음). 사람이 콘텐츠 유형과 **카테고리를 함께** 라벨링하다가 사람이 제품 소재로 판정한 건이 50건 이상이 되면 멈춘다(최소 100건, 상한 200건을 등록 파일에 박음). 칸이 얇아 할당을 못 채우면 `shortfall`을 보고한다. **2단계**: 사람이 제품으로 판정한 소재에서 **사람 라벨의 출처×카테고리**로 50건을 시드 추출해 나머지 축 시트를 만든다. 7일 재라벨링은 2단계 50건에만. 시트에서 모델 라벨·지표 숨김, 키 파일 분리. **2단계 시트 생성 CLI는 사용자가 직접 돌린다**: README에 키 파일·라벨 파일 경로를 적고, 라벨 파일이 없거나 형식이 틀리면 이유 코드(`LABEL_FILE_MISSING`·`LABEL_FILE_INVALID`)로 중단. **채점기는 이후 step** |
 | 3 | `pilot-compare` | 시범 20건의 두 실행(`thinking_level` minimal·기본)을 사람 라벨(`data/interim/pilot/pilot_sheet_labeled.csv`)과 비교하는 작은 CLI. 모델 결과는 `pilot_key.json`과 `pilot_key_supplement.json`(재시도 보충)을 같은 `item_id`로 겹쳐 읽는다. **한 실행이라도 어떤 작업이 `done`이 아닌 항목은 모든 축에서 제외**하고 제외 목록을 보고한다. **축별 비교는 사람과 모델이 모두 `product_creative`로 판정한 교집합에서만 하고, `content_type`은 사람×모델 혼동 행렬로 따로 보고한다(이 규칙을 사전 등록에 적는다).** 교집합이 비는 축은 실패. 정의가 라벨링 중 바뀐 열(`has_cta`)과 정의가 충돌한 열(`has_hook_segment`)에는 "정의 미확정, 참고용"을 붙인다. **사람 라벨 파일이 없거나 형식이 틀리면 시작하지 않는다(`LABEL_FILE_MISSING`·`LABEL_FILE_INVALID`, 키 파일을 먼저 읽지 않는다).** 합성 데이터 테스트, 모델 값 고정 금지, 빈 집합이면 실패 |
@@ -262,7 +263,7 @@ P6: E2, E3(벡터 구성은 실측 뒤), E5, 격리 검사 200건, (E4), (E1 타
 | P1 머지 뒤 | `docker compose up`, `make live-slice`, 결과 알리기 → 결과 문서 PR |
 | P2 step 5 뒤 | `make live-collect`(11-15~16) |
 | P2 step 13 뒤 | `make live-pilot` → **시범 20건 라벨링(11-17~18)**. 이어서 step 14·15 실행 |
-| P3 | (사용자) Instagram 0건 계정 4개 확인 결과 전달, `config/retailers.yaml` 시드 확인, 11-18 `content_type`·`category` 부분 동결 승인, 11-18~19 **E1 1단계 라벨링**, 11-18~19 TAXONOMY 미확정 4건 결정, 11-19 분류 v1 승인, 2단계 시트 생성 CLI 실행, **11-20까지 2단계 라벨링(축 50건)**, `make live-analyze`(라벨링 중 돌림, 12월 안, 되도록 11-24까지) |
+| P3 | (사용자) `config/retailers.yaml` 시드 확인, 11-18 `content_type`·`category` 부분 동결 승인, 11-18~19 **E1 1단계 라벨링**, 11-18~19 TAXONOMY 미확정 4건 결정, 11-19 분류 v1 승인, 2단계 시트 생성 CLI 실행, **11-20까지 2단계 라벨링(축 50건)**, `make live-analyze`(라벨링 중 돌림, 12월 안, 되도록 11-24까지) |
 | P4 | step 0 뒤 `make live-graph`, 11-20 역량 질문 최종 검토, 대표 단품 목록 확인, `make live-cq` |
 | P5 | step 1 뒤 `make live-agent`, **11-26까지 평가셋**(§8), 이미지 시안 모델 결정(보류 중), 격리 표식 데이터 확인 |
 | P6 | **11-27 E1 재라벨링(축 50건)**, 실험 실행 |
@@ -285,7 +286,7 @@ P6: E2, E3(벡터 구성은 실측 뒤), E5, 격리 검사 200건, (E4), (E1 타
 10. **`ingredients`는 E1 판정 축에서 제외 확정**(2026-11-12). `docs/results/e1_preregistration.md`에 기록하고 그래프 연결 품질은 역량 질문 검증으로 확인한다.
 11. **TikTok 유지 확정**: 수집·분석·그래프·에이전트 데이터로 계속 쓰고 E1 표본에서만 제외한다. 결과 문서에 "모델 정확도는 YouTube·Instagram 소재로만 측정, TikTok 소재 분석 정확도는 미측정"을 한계로 적는다.
 12. **v3 전체 승인**(2026-11-12).
-13. **P3 설계 승인**(2026-11-13): D1 TikTok step은 뒤쪽, D2 TikTok 수집은 별도 타깃, D3 E1 중복은 그룹당 상한 1(키는 출처별), D4 Instagram 0건 계정은 사용자가 직접 확인해 결과를 알려 줌(그 전까지 `live-fixes` 파일 없음), D5 TAXONOMY 미확정 4건은 11-18~19에 결정.
+13. **P3 설계 승인**(2026-11-13): D1 TikTok step은 뒤쪽, D2 TikTok 수집은 별도 타깃, D3 E1 중복은 그룹당 상한 1(키는 출처별), D4 Instagram 0건 계정은 조회로 확인해 코드 변경 없음(`live-fixes` 제거), D5 TAXONOMY 미확정 4건은 11-18~19에 결정.
 14. **E1 채점 분모 규칙 확정**(2026-11-13, 사전 등록 §5): 축별 κ와 합격 판정은 사람·모델 모두 `product_creative`인 교집합에서 계산하고 축별 커버리지를 함께 보고, 모델 누락은 `content_type` 재현율(0.9)로 따로 판정한다. 사전 등록 파일 `docs/results/e1_preregistration.md`를 이 날짜에 커밋했다(§6 분류 동결은 11-18~19에 추가 커밋).
 
 **아직 확정되지 않은 것**
