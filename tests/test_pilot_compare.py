@@ -426,3 +426,56 @@ def test_analysis_target_rule_matches_the_pipeline_rule():
             assert compare._is_analysis_target(tasks) == is_product_target(
                 ContentTypeResult.model_validate(labels)
             )
+
+
+def test_claim_scores_are_per_item_precision_and_recall():
+    first, second, third = (claim.value for claim in list(Claim)[:3])
+    scores = compare.claim_scores(
+        [
+            ({first, second}, {first, third}),
+            ({first}, {first}),
+            (set(), {second}),
+        ]
+    )
+    by_claim = {row.claim: row for row in scores.items}
+    assert scores.n == 3
+    assert (by_claim[first].human_n, by_claim[first].model_n, by_claim[first].tp) == (
+        2,
+        2,
+        2,
+    )
+    assert by_claim[first].precision == 1 and by_claim[first].recall == 1
+    assert by_claim[second].precision == 0 and by_claim[second].recall == 0
+    assert by_claim[third].precision == 0 and by_claim[third].recall is None
+    assert scores.micro_precision == pytest.approx(2 / 4)
+    assert scores.micro_recall == pytest.approx(2 / 3)
+    # nobody predicted anything: no precision is made up
+    silent = compare.claim_scores([({first}, set())])
+    assert silent.items[0].precision is None and silent.items[0].recall == 0
+    assert silent.micro_precision is None
+    with pytest.raises(ValueError):
+        compare.claim_scores([])
+
+
+def test_claims_report_uses_precision_recall_not_exact_sets(tmp_path):
+    first, second = (claim.value for claim in list(Claim)[:2])
+    rows = [human("P001"), human("P002")]
+    items = {"P001": item(), "P002": item()}
+    for tag in TAGS:
+        items["P001"]["runs"][tag]["full"]["labels"]["claims"] = [first]
+        items["P002"]["runs"][tag]["full"]["labels"]["claims"] = [second]
+    labels, key = files(tmp_path, rows, items)
+    code, output, report = cli(labels, key)
+    assert code == 0
+    # the exact-set agreement row is gone; the dedicated section replaces it
+    assert all(row["axis"] != "claims" for row in report["metrics"])
+    for tag in TAGS:
+        entry = report["claims"][tag]
+        assert entry["n"] == 2 and entry["intersection_size"] == 2
+        assert entry["micro_precision"] == 0.5 and entry["micro_recall"] == 0.5
+        by_claim = {row["claim"]: row for row in entry["items"]}
+        assert by_claim[first]["precision"] == 1 and by_claim[first]["recall"] == 0.5
+        assert by_claim[second]["precision"] == 0
+        assert by_claim[second]["recall"] is None
+    assert "항목별 정밀도·재현율" in output
+    assert SENTINEL not in output

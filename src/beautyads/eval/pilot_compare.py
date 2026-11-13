@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, TextIO
 
 from beautyads.domain import ContentTypeResult, FullResult, HookResult, JobStatus
-from beautyads.domain.labels import Category, ContentType
+from beautyads.domain.labels import Category, Claim, ContentType
 from beautyads.eval.sheets import SheetError, _label_axes, label_columns
 
 DEFAULT_LABELS = Path("data/interim/pilot/pilot_sheet_labeled.csv")
@@ -22,6 +22,8 @@ RUN_TAGS = ("minimal", "default")
 CONTENT_AXIS = "content_type"
 PRODUCT = ContentType.product_creative.value
 INTERSECTION_AXES = tuple(axis for axis in label_columns() if axis != CONTENT_AXIS)
+CLAIMS_AXIS = "claims"  # multi-select: precision/recall, not exact-set agreement
+AGREEMENT_AXES = tuple(axis for axis in INTERSECTION_AXES if axis != CLAIMS_AXIS)
 NOT_ANALYZED_REASON = "category_other로 분석 제외"
 UNSETTLED_AXES = frozenset({"has_cta", "has_hook_segment"})
 UNSETTLED_NOTE = "정의 미확정, 참고용"
@@ -66,6 +68,75 @@ def agreement(pairs: Iterable[tuple[Any, Any]]) -> AgreementResult:
     if not n:
         raise ValueError("COMPARE_EMPTY_SET")
     return AgreementResult(n=n, matches=matches, rate=matches / n)
+
+
+@dataclass(frozen=True)
+class ClaimScore:
+    """One claim value: precision = tp / model count, recall = tp / human count."""
+
+    claim: str
+    human_n: int
+    model_n: int
+    tp: int
+    precision: float | None
+    recall: float | None
+
+
+@dataclass(frozen=True)
+class ClaimScores:
+    n: int
+    items: list[ClaimScore]
+    micro_precision: float | None
+    micro_recall: float | None
+
+
+def claim_scores(pairs: Iterable[tuple[Iterable[str], Iterable[str]]]) -> ClaimScores:
+    """Per-claim precision/recall for a multi-select axis (not set agreement).
+
+    Each pair is (human claims, model claims) for one item. Callers select the
+    population first. Empty input raises ValueError so an absent population is
+    never read as 0%. A claim nobody predicted (or nobody labeled) has no
+    precision (or recall) instead of a made-up number.
+    """
+    order = {claim.value: index for index, claim in enumerate(Claim)}
+    human_n: dict[str, int] = {}
+    model_n: dict[str, int] = {}
+    tps: dict[str, int] = {}
+    n = 0
+    for human, model in pairs:
+        n += 1
+        human, model = set(human), set(model)
+        for claim in human:
+            human_n[claim] = human_n.get(claim, 0) + 1
+        for claim in model:
+            model_n[claim] = model_n.get(claim, 0) + 1
+        for claim in human & model:
+            tps[claim] = tps.get(claim, 0) + 1
+    if not n:
+        raise ValueError("COMPARE_EMPTY_SET")
+    claims = sorted(set(human_n) | set(model_n), key=lambda c: order.get(c, len(order)))
+    items = [
+        ClaimScore(
+            claim,
+            human_n.get(claim, 0),
+            model_n.get(claim, 0),
+            tps.get(claim, 0),
+            tps.get(claim, 0) / model_n[claim] if model_n.get(claim) else None,
+            tps.get(claim, 0) / human_n[claim] if human_n.get(claim) else None,
+        )
+        for claim in claims
+    ]
+    total_tp, total_model, total_human = (
+        sum(tps.values()),
+        sum(model_n.values()),
+        sum(human_n.values()),
+    )
+    return ClaimScores(
+        n,
+        items,
+        total_tp / total_model if total_model else None,
+        total_tp / total_human if total_human else None,
+    )
 
 
 def _human_value(axis: str, value: str, *, non_product: bool) -> Any:
@@ -281,6 +352,7 @@ def compare_labels(humans: Mapping[str, dict], items: Mapping[str, dict]) -> dic
         "not_analyzed": [],
         "confusion_matrices": {},
         "metrics": [],
+        "claims": {},
         "errors": [],
     }
 
@@ -335,7 +407,7 @@ def compare_labels(humans: Mapping[str, dict], items: Mapping[str, dict]) -> dic
                 report["not_analyzed"].append(
                     {"item_id": item_id, "run_tag": tag, "reason": NOT_ANALYZED_REASON}
                 )
-        for axis in INTERSECTION_AXES:
+        for axis in AGREEMENT_AXES:
             # category comes from content_type; hook/full axes need the later tasks.
             downstream = AXIS_TASKS[axis] != "content_type"
             population = analyzed[tag] if downstream else intersection
@@ -349,9 +421,40 @@ def compare_labels(humans: Mapping[str, dict], items: Mapping[str, dict]) -> dic
                 ),
                 len(intersection) - len(population),
             )
+    for tag in RUN_TAGS:
+        population = analyzed[tag]
+        unanalyzed = len(intersections[tag]) - len(population)
+        entry = {
+            "intersection_size": len(intersections[tag]),
+            "human_product": human_product,
+            "not_analyzed": unanalyzed,
+        }
+        try:
+            scores = claim_scores(
+                (
+                    humans[i][CLAIMS_AXIS],
+                    _model_value(_tasks(items[i], tag), CLAIMS_AXIS),
+                )
+                for i in population
+            )
+            entry.update(
+                n=scores.n,
+                micro_precision=scores.micro_precision,
+                micro_recall=scores.micro_recall,
+                items=[asdict(score) for score in scores.items],
+            )
+        except ValueError:
+            entry.update(n=0, micro_precision=None, micro_recall=None, items=[])
+            code = f"COMPARE_EMPTY_SET:{CLAIMS_AXIS}"
+            if code not in report["errors"]:
+                report["errors"].append(code)
+        entry["coverage"] = entry["n"] / human_product if human_product else None
+        if unanalyzed:
+            entry["not_analyzed_reason"] = NOT_ANALYZED_REASON
+        report["claims"][tag] = entry
     shared = [i for i in intersections[RUN_TAGS[0]] if i in intersections[RUN_TAGS[1]]]
     shared_analyzed = [i for i in shared if all(i in analyzed[tag] for tag in RUN_TAGS)]
-    for axis in INTERSECTION_AXES:
+    for axis in AGREEMENT_AXES:
         downstream = AXIS_TASKS[axis] != "content_type"
         population = shared_analyzed if downstream else shared
         add_metric(
@@ -400,6 +503,24 @@ def _print_report(report: dict, out: TextIO) -> None:
             f"{row['not_analyzed']}{reason}\t{coverage}\t{rate}{note}",
             file=out,
         )
+    for tag, entry in report.get("claims", {}).items():
+        coverage = "—" if entry["coverage"] is None else f"{entry['coverage']:.1%}"
+        reason = f" ({entry['not_analyzed_reason']})" if entry["not_analyzed"] else ""
+        print(
+            f"claims {tag} 항목별 정밀도·재현율 n={entry['n']} "
+            f"교집합={entry['intersection_size']} 분석 제외={entry['not_analyzed']}"
+            f"{reason} 커버리지={coverage}",
+            file=out,
+        )
+        print("항목\t사람\t모델\t일치\t정밀도\t재현율", file=out)
+        for row in entry["items"]:
+            precision = "—" if row["precision"] is None else f"{row['precision']:.1%}"
+            recall = "—" if row["recall"] is None else f"{row['recall']:.1%}"
+            print(
+                f"{row['claim']}\t{row['human_n']}\t{row['model_n']}\t{row['tp']}\t"
+                f"{precision}\t{recall}",
+                file=out,
+            )
     for error in report["errors"]:
         print(error, file=out)
     print(json.dumps(report, ensure_ascii=False), file=out)
