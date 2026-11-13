@@ -5,6 +5,151 @@
 - 하네스 사용법: [scripts/README.md](scripts/README.md)
 - 요구사항·설계·결정 기록: [docs/](docs/)
 
+## 구성도
+
+아래 그림은 `docs/ARCHITECTURE.md`의 글과 `AGENTS.md` 계층 경계 표, `tests/test_architecture.py`의 `LAYER_IMPORTS`에 적힌 구성만 옮긴 것이다. 구현이 바뀌면 같이 고친다.
+
+### 1. 전체 구성
+
+```mermaid
+flowchart LR
+  subgraph SRC[출처]
+    YT[YouTube Data API]
+    IG[Instagram Business Discovery]
+    TT[TikTok Commercial Content API]
+    MFDS[식약처 공공 API]
+    MALL[공식몰 상세 페이지]
+  end
+
+  subgraph OFF[오프라인 파이프라인]
+    AD[출처 어댑터 · 공통 소재 형식]
+    SEL[콘텐츠 유형 선별 · 제품 소재만 통과]
+    AN[소재 분석 에이전트 · Gemini · 훅 3초 + 전체 두 번 호출]
+    VAL[스키마 검증 · 1회 재요청 후 보류]
+    SYNC[증분 동기화 · 바뀐 행만 MERGE]
+  end
+
+  subgraph STORE[저장소]
+    PG[(PostgreSQL · 원본 소재 · 지표 이력 · 모델 출력 원문 · 작업 상태 · 체크포인터)]
+    NEO[(Neo4j · 온톨로지 1층 제품 지식 + 2층 광고 관찰)]
+  end
+
+  subgraph ON[온라인 에이전트]
+    WEB[웹 화면]
+    API[FastAPI · SSE 단계 이벤트]
+    SUP[Supervisor · 요청 유형 판정 · 과제 지시서]
+    RES[리서치 · 그래프 도구 4종]
+    PLAN[기획 · OpenAI]
+    EVAL[평가 · Anthropic · 코드 검사 + LLM 채점]
+  end
+
+  LLM[LLM 호출 래퍼 · LiteLLM SDK · 재시도 · 대기 · 비용 집계 · 공급사별 누적액 검사]
+  LF[Langfuse · 요청별 trace · 에이전트별 호출 수·비용·지연]
+
+  YT --> AD
+  IG --> AD
+  TT --> AD
+  MFDS -- 1층 제품 지식 --> PG
+  MALL -- 1층 제품 지식 --> PG
+  AD --> PG
+  PG --> SEL --> AN --> VAL --> PG
+  PG --> SYNC --> NEO
+
+  WEB <--> API
+  API --> SUP --> RES
+  RES --> NEO
+  SUP --> PLAN --> EVAL
+  EVAL -- 미달 시 사유와 함께 최대 2회 --> PLAN
+  EVAL --> API
+  API -- 승인·반려 사유 --> NEO
+
+  AN --- LLM
+  PLAN --- LLM
+  EVAL --- LLM
+  SUP --- LLM
+  RES --- LLM
+  ON -. trace .-> LF
+  ON -. 체크포인터 .-> PG
+```
+
+### 2. 요청 한 번의 흐름 (온라인)
+
+```mermaid
+sequenceDiagram
+  participant U as 사용자
+  participant A as API · SSE
+  participant S as Supervisor
+  participant R as 리서치
+  participant G as Neo4j
+  participant P as 기획
+  participant E as 평가
+
+  U->>A: 요청
+  A->>S: 요청 + 작업 공간(tenant_id는 세션에서)
+  S->>S: 유형 판정 (패턴·관계·기획·범위 밖)
+  S->>R: 과제 지시서 (목표 · 조건 · 산출 형식)
+  R->>G: 고수준 도구 호출 (조회·집계·비교)
+  G-->>R: 근거 소재 · 집계 값
+  R-->>S: 구조화 요약 (근거 소재 ID · 확신 수준 · 못 푼 것)
+  alt 근거가 기준 건수 미만
+    S-->>A: 근거 없음으로 종료
+  else 기획 요청
+    S->>P: 과제 지시서 + 근거 소재 ID 목록
+    P-->>E: 기획안 (주장마다 근거 소재 ID)
+    E->>E: 코드 검사 (근거 ID 존재 · 분류 값 유효 · 금지 표현)
+    E->>E: LLM 채점 (차별성 · 요청 적합성)
+    alt 미달 (최대 2회)
+      E-->>P: 사유와 함께 되돌림
+    else 통과 또는 미달 표시
+      E-->>A: 기획안 + 점수
+    end
+  end
+  A-->>U: 응답 + 근거 카드 + 그래프 조각
+  U->>A: 승인·반려 사유
+  A->>G: 피드백 저장
+```
+
+### 3. 계층 의존 방향 (코드 구조)
+
+```mermaid
+flowchart TB
+  EVAL[eval · 평가셋 · 실험 · 채점]
+  ASM[api · pipeline · 조립]
+  AGENTS[agents · supervisor · research · planning · evaluation]
+  ANALYSIS[analysis]
+  CHECKS[checks]
+  GRAPH[graph]
+  LLM[llm]
+  STORE[store]
+  SOURCES[sources]
+  OBS[obs]
+  DOMAIN[domain · 표준 라이브러리와 pydantic만]
+
+  EVAL --> ASM
+  EVAL -.->|다른 모든 계층도 import 가능| AGENTS
+  ASM --> AGENTS
+  ASM --> ANALYSIS
+  ASM --> SOURCES
+  ASM --> STORE
+  AGENTS --> CHECKS
+  AGENTS --> GRAPH
+  AGENTS --> LLM
+  AGENTS --> STORE
+  AGENTS --> OBS
+  ANALYSIS --> LLM
+  LLM --> OBS
+  OBS --> DOMAIN
+  LLM --> DOMAIN
+  CHECKS --> DOMAIN
+  GRAPH --> DOMAIN
+  STORE --> DOMAIN
+  SOURCES --> DOMAIN
+  ANALYSIS --> DOMAIN
+  AGENTS --> DOMAIN
+```
+
+화살표는 "import할 수 있다"는 방향이다. 출처는 `AGENTS.md`의 계층 경계 표와 `tests/test_architecture.py`의 `LAYER_IMPORTS`이며 정확한 허용표는 테스트가 기준이다. `api`와 `pipeline`은 `domain`부터 `agents`까지 모든 계층을 직접 import할 수 있고(그림은 중복을 줄여 일부 화살표를 생략했다), 서로를 import하지 않는다. `eval`은 `api`·`pipeline`을 포함한 다른 모든 계층을 import할 수 있고 다른 계층은 `eval`을 import하지 않는다. `settings`(루트 모듈, `.env`를 읽는 유일한 함수)는 `obs`·`llm`·`sources`·`store`·`graph`·`api`·`pipeline`·`eval`이 import할 수 있어(`LAYER_IMPORTS` 기준) 그림에서 뺐다. 외부 SDK는 `litellm`은 `llm`, `neo4j`는 `graph`, `httpx`는 `sources`, `langfuse`는 `obs`, `fastapi`는 `api`, `psycopg`는 `store`와 `api`, `langgraph`는 `agents`와 `api`에서만 쓴다.
+
 ## live-slice (P1)
 
 YouTube 소재 수집 → 첫 3초 훅 분석 → PostgreSQL 저장을 확인한다.
