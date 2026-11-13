@@ -62,7 +62,16 @@
     {
       "step": 5,
       "name": "taxonomy-v1",
-      "status": "pending"
+      "status": "blocked",
+      "started_at": "2026-11-13T22:51:06+0900",
+      "blocked_reason": "make verify 재실행 결과 1590 passed, 2 failed입니다. 두 실패 모두 phases/3-collect-freeze/step5.md의 형식 오류입니다: 수정 허용 경로 줄에서 9개 파일이 누락됐고, ‘열람 금지의 범위:’ 문단이 없습니다. “AC(Acceptance Criteria) 검증을 직접 실행하라.”와 “phases/ 아래 파일을 수정하지 마라.” 제약 아래에서는 이 실패를 수정할 수 없습니다. 실행기에서 step5.md 형식을 복구하고, 앞서 보고한 tests/test_analysis.py:159의 hook-v0 단언 갱신을 허용해야 합니다. 프로젝트 파일은 수정하지 않았습니다.",
+      "blocked_at": "2026-11-13T22:52:29+0900",
+      "usage": {
+        "input_tokens": 525990,
+        "cached_input_tokens": 459136,
+        "output_tokens": 2052,
+        "attempts": 1
+      }
     },
     {
       "step": 6,
