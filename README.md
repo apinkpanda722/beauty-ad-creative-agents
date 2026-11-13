@@ -5,6 +5,81 @@
 - 하네스 사용법: [scripts/README.md](scripts/README.md)
 - 요구사항·설계·결정 기록: [docs/](docs/)
 
+## E1 라벨링 시트 (P3)
+
+두 명령은 사용자가 직접 실행한다. `config/e1_sampling.yaml`과 사전 등록
+`docs/results/e1_preregistration.md`의 sha256을 각 단계의 키 파일과 시트 안내문
+메타데이터에 기록한다. 설정을 바꾸면 기존 1단계 키로 2단계를 만들 수 없다.
+모델 분석 결과·지표·게시 시각은 선정에 쓰지 않는다.
+
+```bash
+# 수집과 test 분할 확정, content_type·category 부분 동결 뒤 실행한다.
+# PostgreSQL만 사용한다. POSTGRES_PASSWORD 설정과 Docker·DB 준비가 필요하다.
+make e1-stage1
+# 기본 폴더를 바꾸려면 data/interim 아래를 지정한다.
+uv run python -m beautyads.eval.e1_sampling --out-dir data/interim/e1
+```
+
+기본 폴더 `data/interim/e1`에 `e1_stage1_sheet.csv`,
+`e1_stage1_codebook.csv`, `e1_stage1_instructions.md`, `e1_stage1_key.json`을
+만든다. test 브랜드의 명시적으로 분석 가능한 YouTube·Instagram 소재에서
+출처×브랜드 층을 번갈아 뽑는다. 중복 키는 YouTube의
+`(source, account, title, caption)`, Instagram의 `(source, account, caption)`이다.
+문자열 완전 일치로 묶어 그룹당 시드 무작위 대표 1건을 남기며,
+키 필드가 하나라도 비었거나 공백뿐이면 각각 남긴다. DB 행은 변경하지 않는다.
+요약에는 출처·브랜드별 프레임 건수, 중복 제거 전후·출처별 제외 건수,
+`shortfall`(전체 부족분과 균등 할당 대비 층별 부족분), 산출물 경로가 나온다.
+다른 층에서 보충되면 전체 부족분은 0이어도 층별 부족분이 있을 수 있다.
+
+시트를 위에서부터 **건너뛰지 않고** `content_type`·`category`를 함께 라벨링한다.
+사람이 `product_creative`로 판정한 건이 50건 이상이면서 100건 이상 라벨링한
+첫 행에서 멈춘다. 최대 200건이며, 뒤의 빈 행은 그대로 둬도 된다.
+사람 라벨은 `data/interim/e1/e1_stage1_sheet_labeled.csv`에 저장한다.
+**키 파일은 라벨링 뒤에만 연다.** CSV에는 영상 주소·제목·캡션과 라벨 칸만
+있고, Instagram은 만료되는 media_url 대신 permalink를 쓴다.
+
+```bash
+# 나머지 축의 전체 v1 동결 뒤, 1단계 라벨을 저장한 다음 직접 실행한다.
+make e1-stage2
+uv run python -m beautyads.eval.e1_stage2 \
+  --labels data/interim/e1/e1_stage1_sheet_labeled.csv \
+  --key data/interim/e1/e1_stage1_key.json --out-dir data/interim/e1
+```
+
+2단계는 DB·네트워크에 접속하지 않는다. 두 정지 조건을 처음 만족한 행까지만
+사용하고 이후 라벨 건수는 `unused_count`로 보고한다. 그 범위의 사람 제품
+라벨을 출처×사람 카테고리로 층화해 50건을 뽑는다. 제품이 부족해도 가능한
+건수로 계속하며 종료 코드는 0이다. `e1_stage2_sheet.csv`,
+`e1_stage2_codebook.csv`, `e1_stage2_instructions.md`, `e1_stage2_key.json`을
+만든다. 2단계 키에만 1단계 사람 라벨과 1단계 키 sha256을 남긴다.
+2단계 시트에는 content_type·category·ingredients가 없으며 `claims`는 쉼표로
+구분해 여럿 선택한다.
+
+첫 라벨을 `e1_stage2_sheet_labeled.csv`에 저장하고, **7일 뒤** 원래의 빈
+`e1_stage2_sheet.csv`를 복사해 같은 항목·순서를 다시 라벨링한다.
+첫 라벨과 키를 가린 채 `e1_stage2_sheet_retest.csv`에 저장한다.
+기존 산출물은 어느 단계도 덮어쓰지 않는다. 재생성이 필요하면 기존 라벨을
+보존할지 검토한 뒤 사용자가 해당 단계의 네 산출물을 직접 치워야 한다.
+두 Make 타깃은 `verify`에 포함하지 않는다.
+
+| 이유 코드 | 의미와 조치 |
+|---|---|
+| `PREREGISTRATION_MISSING` | 사전 등록 파일이 없거나 읽을 수 없다. 등록된 파일을 준비한다. |
+| `E1_CONFIG_INVALID` | 설정 파일 누락·키 누락·알 수 없는 키·형식·범위 오류다. 등록한 설정을 확인한다. |
+| `E1_SPLIT_FILE_INVALID` | 1단계의 브랜드 분할 파일 존재·형식을 확인한다. |
+| `ENV_MISSING:POSTGRES_PASSWORD` | 1단계 실행에 필요한 공백이 아닌 설정을 준비한다. |
+| `DOCKER_DOWN` / `POSTGRES_UNREACHABLE` | Docker·DB와 노출 포트(기본 5433, `BEAUTYADS_POSTGRES_PORT`)를 확인한다. |
+| `POSTGRES_AUTH_FAILED` / `POSTGRES_CONNECT_FAILED` | 비밀번호·DB 준비 상태를 확인한다. |
+| `E1_FRAME_EMPTY` | test 브랜드에 해당하는 분석 가능한 두 출처 소재가 없다. |
+| `OUTPUT_NOT_IGNORED` | 출력은 `data/interim` 아래만 허용한다. 경로·심볼릭 링크 이탈을 확인한다. |
+| `E1_OUTPUT_EXISTS` | 해당 단계 산출물이 이미 있다. 기존 파일을 덮어쓰지 않고 중단한다. |
+| `E1_OUTPUT_WRITE_FAILED` | 출력 폴더의 쓰기 권한·여유 공간을 확인한다. |
+| `LABEL_FILE_MISSING` | 1단계 사람 라벨 파일이 없다. `--labels` 경로를 확인한다. |
+| `LABEL_FILE_INVALID` | 열·코드북 값·항목 번호·연속 라벨링 순서·키 형식 또는 등록·설정 해시가 잘못됐다. |
+| `E1_PRODUCT_SHORTFALL <k>` | 정지 범위의 제품 소재가 목표보다 k건 부족하다. 가능한 제품으로 계속한다. |
+
+오류는 `PREFLIGHT_FAILED <코드>`와 종료 코드 2다. 정상 생성과 제품 부족은 0이다.
+
 ## live-slice (P1)
 
 YouTube 소재 수집 → 첫 3초 훅 분석 → PostgreSQL 저장을 확인한다.

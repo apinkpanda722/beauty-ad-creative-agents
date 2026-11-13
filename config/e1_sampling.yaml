@@ -1,0 +1,11 @@
+seed: 20261112
+stage1:
+  min_labeled: 100
+  max_labeled: 200
+  target_product: 50
+stage2:
+  size: 50
+sources: [youtube, instagram]
+dedupe:
+  youtube: [source, account, title, caption]
+  instagram: [source, account, caption]
