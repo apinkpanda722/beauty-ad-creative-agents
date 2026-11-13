@@ -30,7 +30,7 @@
 
 ### 입력
 
-- **사람 라벨**: 기본 `data/interim/pilot/pilot_sheet_labeled.csv`(상수 `DEFAULT_LABELS`, `--labels`로 변경). 열은 시트와 같다(`item_id`, `link`, `text`, `label_columns()`). 파일이 없으면 `LABEL_FILE_MISSING`, 열 이름이 다르거나 `item_id`가 키 파일에 없거나 값이 코드북 밖(`domain` enum 값 밖, 불리언 열이 `true`/`false`/빈 값이 아님, `claims`가 닫힌 목록 밖)이면 `LABEL_FILE_INVALID`이고 **키 파일을 읽기 전에** 종료 코드 2로 끝난다(라벨 검사가 먼저다). 원본 빈 시트와 백업 파일은 읽지 않는다.
+- **사람 라벨**: 기본 `data/interim/pilot/pilot_sheet_labeled.csv`(상수 `DEFAULT_LABELS`, `--labels`로 변경). 열은 시트와 같다(`item_id`, `link`, `text`, `label_columns()`). 파일이 없으면 `LABEL_FILE_MISSING`, 열 이름이 다르거나 값이 코드북 밖(`domain` enum 값 밖, 불리언 열이 `true`/`false`/빈 값이 아님, `claims`가 닫힌 목록 밖)이면 `LABEL_FILE_INVALID`이고 **키 파일을 읽기 전에** 종료 코드 2로 끝난다(라벨의 형식·값 검사가 먼저다). **그 검사를 통과한 뒤에** 키 파일을 읽고, 그 다음에 `item_id`가 키 파일에 없는 행이 있으면 같은 `LABEL_FILE_INVALID`(종료 코드 2)로 끝난다(`item_id` 포함 여부는 키 파일을 읽어야 알 수 있으므로 이 검사만 키를 읽은 뒤에 한다). 원본 빈 시트와 백업 파일은 읽지 않는다.
 - **모델 결과**: 기본 `data/interim/pilot/pilot_key.json`(`--key`)과 같은 폴더의 `pilot_key_supplement.json`(있으면). 보충 파일의 항목은 **같은 `item_id`의 해당 `run_tag` 실행만** 덮어쓴다(다른 실행·다른 항목은 건드리지 않는다). 키 파일이 없으면 `PILOT_KEY_MISSING`(`eval.sheets.SheetError` 재사용).
 - 각 실행의 결과는 `runs[<태그>][content_type|hook|full]` = `{status, labels, error_code, ...}` 또는 `null`이다. 열은 `label_columns()`의 평탄화 규칙에 따라 **그 열을 만드는 작업의 `labels`에서** 찾는다(`ContentTypeResult` 열은 `content_type` 작업, `HookResult` 열은 `hook` 작업, `FullResult` 열은 `full` 작업, 구조·플랫폼 적합성의 중첩은 열 이름으로 펼친다).
 
@@ -53,7 +53,7 @@
 ### 반드시 있어야 하는 테스트
 
 (합성 라벨 CSV와 합성 키 JSON을 tmp 경로에 만들어 쓴다. 실제 `data/interim` 파일을 읽지 않는다. 모델 라벨 값을 기대값으로 굳히지 않는다. 합성 키의 값은 테스트가 정한 임의의 enum 값이다.)
-- 라벨 파일이 없으면 `LABEL_FILE_MISSING`, 형식 오류는 `LABEL_FILE_INVALID`이고 **키 파일 읽기 함수가 불리지 않는다**(가짜로 감시), 키 파일이 없으면 `PILOT_KEY_MISSING`.
+- 라벨 파일이 없으면 `LABEL_FILE_MISSING`, 열 이름·값 형식 오류는 `LABEL_FILE_INVALID`이고 **키 파일 읽기 함수가 불리지 않는다**(가짜로 감시). 형식·값이 올바르면 키 파일을 읽고, 라벨의 `item_id`가 키 파일에 없으면 `LABEL_FILE_INVALID`(이때는 키 읽기 함수가 불린다), 키 파일이 없으면 `PILOT_KEY_MISSING`.
 - 제외: ① 한 실행의 `content_type` 작업이 `failed`·`held`·`null`이면 그 항목이 두 실행 모두에서, 모든 축에서 빠진다. ② 모델이 `product_creative`인데 `hook`/`full`이 없거나 `done`이 아니면 제외. ③ 모델이 제품이 아니면 `hook`/`full`이 `null`이어도 제외되지 않는다. 제외 목록에 항목 번호·태그·작업이 정확히 나온다.
 - 보충 파일: 같은 `item_id`·`run_tag`의 실패가 보충 결과로 `done`이 되면 제외에서 풀린다, 다른 실행·다른 항목은 그대로다, 보충 파일이 없어도 동작한다.
 - 교집합: 사람은 제품·모델은 비제품인 항목, 사람은 비제품·모델은 제품인 항목이 나머지 축에서 빠지고 `n`·교집합 크기가 손계산 값과 같다. 교집합은 실행마다 따로 계산되어 두 실행의 `n`이 다를 수 있다.
@@ -95,7 +95,7 @@ make verify   # lint + test 통과
 ## 이 step의 금지사항
 
 - 실제 `data/interim/pilot` 파일을 열거나 테스트에서 읽지 마라(CLI 코드가 런타임에 읽는 것은 사용자 실행이다). 이유: 열람 금지 경로이고 테스트는 합성 데이터만 쓴다.
-- 라벨 검사보다 먼저 키 파일을 읽지 마라. 이유: 라벨 파일이 없는데 모델 라벨을 먼저 보는 흐름이 되면 블라인드 규칙의 취지(사람 라벨이 모델 결과보다 먼저)에 어긋난다.
+- 라벨의 형식·값 검사보다 먼저 키 파일을 읽지 마라(`item_id`가 키 파일에 있는지의 검사만 키를 읽은 뒤에 한다). 이유: 라벨 파일이 없는데 모델 라벨을 먼저 보는 흐름이 되면 블라인드 규칙의 취지(사람 라벨이 모델 결과보다 먼저)에 어긋난다.
 - 교집합 규칙 밖의 항목(사람이나 모델이 제품이 아닌 항목)을 나머지 축 비교에 넣지 마라, 빈 교집합을 0%로 보고하지 마라. 이유: 사전 등록 규칙이고 비제품 항목의 빈 열이 불일치로 세어지거나 빈 집합이 0%로 읽히면 일치율이 왜곡된다(FP-C03의 "빈 집합" 방지).
 - `content_type` 축에 교집합 규칙을 적용하지 마라. 이유: 선별 정확도(혼동 행렬)는 모든 항목을 보아야 한다.
 - 한 실행이라도 실패한 항목을 축별로 달리 처리하지 마라(항목 단위 제외). 이유: 두 실행 비교의 모집단이 축마다 달라진다.
