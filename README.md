@@ -260,3 +260,70 @@ uv run python -m beautyads.eval.pilot_compare --labels <라벨.csv> --key <키.j
 
 종료 코드는 정상 비교 0, 입력 문제 2, 빈 비교가 하나라도 있으면 3이다.
 `pilot-compare`는 수동 타깃이며 `make verify`에는 포함하지 않는다.
+
+## cost-recalc (P3)
+
+Gemini 비용 원장을 읽어 시범 `minimal`·`default` 실행의 비용과 전체 분석
+시나리오를 보고한다. 네트워크·DB·모델·`.env`를 사용하지 않으며, 원장·설정·
+`docs/COST_ESTIMATE.md`를 수정하지 않는다. 기본 원장 경로와 현재 상한은
+`settings`에서 읽는다(기본 `data/manifest/costs.jsonl`, Gemini $12).
+환경 변수의 설정값은 적용하지만 `.env` 파일은 읽지 않는다.
+
+```bash
+# --items는 필수이므로 Make 타깃에 CLI 인수를 전달한다.
+make cost-recalc ARGS='--items 1500'
+# 모듈을 직접 실행할 수도 있다.
+uv run python -m beautyads.eval.cost_recalc --items 1500
+uv run python -m beautyads.eval.cost_recalc --ledger <합성또는실제원장.jsonl> \
+  --items 1500 --pilot-items 20 --hook-input-max 1000 \
+  --product-shares 0.25,0.5,0.75 --candidate-cap 14
+```
+
+`make cost-recalc`는 인수 없이 실행하면 `--items` 누락으로 종료 코드 2를
+반환한다. 소재 수를 지정할 때는 `ARGS` 또는 위의 직접 실행 명령을 사용한다.
+수동 타깃이며 `make verify`에는 포함하지 않는다.
+
+`pilot-<태그>-retry`는 같은 태그에 합산하고 다른 공급사는 제외한다.
+기타 purpose는 합계만 별도로 표시한다. 태그별 호출 수·비용 합계와 호출당
+입력·출력·thought·cached 토큰 및 비용의 평균·p50·p90·최댓값을 출력한다.
+백분위는 정렬 후 `(n-1)×q` 위치에서 선형 보간한다.
+`response_cost` 외 항목 수를 표시하고 있으면 비용이 추정치임을 알린다.
+원장 비용에는 이미 thought 비용이 포함되므로 토큰 비용을 다시 더하지 않는다.
+
+원장의 시범 purpose에는 호출 종류가 없다. 입력 토큰이 `--hook-input-max`
+이하이면 **짧은 호출(hook으로 보임)**, 나머지는 **구간 호출(content_type·full로
+보임)**이라는 가정으로 나눈다. 기본 경계 1000토큰은 시범 관찰에 맞춘 가정이며
+종류별 측정값이 아니다. `p=(호출 수−시범 항목 수)/2`와 짧은 호출 수가 다르면
+`COST_KIND_SPLIT_MISMATCH`와 함께 분리를 신뢰할 수 없다고 표시하고 계산은
+계속한다. 재시도가 포함되므로 p와 시범 제품 비율은 왜곡될 수 있는 참고값이다.
+
+전체 소재 수 `N`은 content_type 호출 수의 상한이다. 제품 비율 `s`는 기본
+0.25·0.5·0.75의 **가정(미실측)**이며 시범의 제품 비율을 적용하지 않는다.
+견적은 `N×c_구간 + N×s×(c_구간+c_짧음)`이다. content_type과 full의 평균 비용이
+같다는 가정이며, 높은 쪽 열은 구간 평균만 p90으로 대체하고 짧은 호출은 평균을
+유지한다. 이 열은 총비용 분포의 통계적 p90이 아니다. 필요한 묶음이 비면
+0으로 간주하지 않고 계산 불가로 표시한다.
+
+현재 누적+각 견적이 현재 상한과 후보 상한(기본 $14) 미만인지 출력한다.
+래퍼와 동일하게 상한에 정확히 닿으면 밖으로 표시한다. default/minimal의
+호출당·시범 소재당 비용 비율도 보고하며 소재당 비율을 전체 견적에 쓰지 않는다.
+상한과 `thinking_level`은 이 결과를 보고 사용자가 결정한다.
+
+첫 배치 이후 같은 CLI를 다시 실행하면 `analyze-target-content_type`·`-hook`·
+`-full`의 종류별 호출·토큰·비용을 측정값으로 따로 표시한다(없으면
+"종류별 측정 없음"). 세 종류가 모두 있으면 각각의 측정 단가로 별도 시나리오를
+계산한다. 이때도 제품 비율은 가정이며 원장에 서로 다른 실행 설정이 섞였을 수
+있다. 종류별 측정값은 기타 합계에도 포함되므로 합계를 중복해서 더하지 않는다.
+
+표 뒤에 JSON 한 줄, 마지막 줄에 작은 표본의 한계와 첫 `analyze-target`에서
+정확한 종류별 비용을 측정한다는 안내를 출력한다. JSON 숫자의 `basis`는 해당
+객체와 하위 항목에 적용되고 하위 `basis`가 있으면 그 표시를 따른다.
+
+| 이유 코드 | 의미 |
+|---|---|
+| `LEDGER_UNREADABLE` | 원장이 없거나 읽을 수 없거나 깨진 항목이 있다. 파싱 못 한 줄 수를 보고하며 견적을 내지 않는다. |
+| `COST_INPUT_INVALID` | 소재 수·시범 항목 수가 양수가 아니거나 비율이 [0,1] 밖인 등 입력값이 잘못됐다. |
+| `COST_NO_PILOT_ENTRIES` | minimal·default 중 해당 태그의 Gemini 시범 호출이 없다. 누락 태그를 표시한다. |
+| `COST_KIND_SPLIT_MISMATCH:<태그>` | 호출 수로 역산한 제품 소재 수와 짧은 호출 수가 맞지 않는다. 경고이며 견적은 계속 낸다. |
+
+종료 코드는 성공 0, 입력 문제 2(`--items` 누락 포함), 시범 태그 누락 3이다.
