@@ -62,16 +62,16 @@
     {
       "step": 5,
       "name": "taxonomy-v1",
-      "status": "blocked",
+      "status": "completed",
       "started_at": "2026-11-13T22:51:06+0900",
       "usage": {
-        "input_tokens": 236305,
-        "cached_input_tokens": 167680,
-        "output_tokens": 1672,
+        "input_tokens": 1566355,
+        "cached_input_tokens": 1454976,
+        "output_tokens": 12315,
         "attempts": 1
       },
-      "blocked_reason": "선점검에서 지시 충돌을 확인해 수정하지 않았습니다. “축을 제거하면 그 축을 가리키는 `StructureFlags`·프롬프트·코드북 열·테스트 단언이 한꺼번에 바뀌어야 한다(일부만 바꾸면 테스트가 깨진다).”와 “위 두 기존 단언 외의 기존 단언을 약화하거나 삭제하지 마라(가드 테스트 포함).”가 충돌합니다. tests/test_pilot_sheet.py의 test_label_columns_and_codebook_follow_domain은 열 개수를 17로 고정하여 축 제거 후 실패하지만 해당 단언 수정은 금지되어 있습니다. 또한 tests/test_analysis_full.py와 tests/test_domain.py의 전체 enum 순회 테스트는 has_cta=False인 상태에서 cta_type을 변경하므로 새 CTA 검증과 충돌하며, 필요한 수정이 허용되지 않습니다. 문서도 angle.other·format.other의 정의가 비어 있고 talent 대부분은 정의가 없어, 모든 값의 정의를 요구하는 테스트를 만족하려면 승인 범위 밖의 정의 확정이 필요합니다. 이 범위들을 조정해야 진행할 수 있습니다. make verify는 실행하지 않았습니다.",
-      "blocked_at": "2026-11-13T22:54:27+0900"
+      "summary": "2026-11-13 TAXONOMY v1·ADR-018 동결, 훅 구간 축 제거·CTA 동치 검증·프롬프트 3종 v1·코드북 반영; make verify 통과(1641 tests), 의존성 추가 없음. 사전 등록 기록은 별도 진행 필요.",
+      "completed_at": "2026-11-13T23:00:38+0900"
     },
     {
       "step": 6,
