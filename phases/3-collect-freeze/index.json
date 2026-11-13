@@ -48,16 +48,16 @@
     {
       "step": 2,
       "name": "e1-sampling",
-      "status": "blocked",
+      "status": "completed",
       "started_at": "2026-11-13T16:50:04+0900",
-      "blocked_reason": "사전 점검에서 열람 지시가 충돌합니다. 필수 열람 목록은 “`/docs/results/e1_preregistration.md` — 사전 등록 파일(구현 세션이 이 step 실행 전에 커밋한다. 읽기 전용. 없으면 `blocked`)”을 요구하지만, 금지사항은 “`docs/results/`의 사전 등록 파일과 `data/interim/`의 파일을 만들거나 고치거나 읽지 마라.”라고 명시합니다. 사전 등록 파일의 읽기 허용 여부를 명확히 해야 진행할 수 있습니다. 파일 열람·수정과 CLI 실행은 하지 않았습니다.",
-      "blocked_at": "2026-11-13T16:50:26+0900",
       "usage": {
-        "input_tokens": 24813,
-        "cached_input_tokens": 0,
-        "output_tokens": 480,
+        "input_tokens": 1817871,
+        "cached_input_tokens": 1720192,
+        "output_tokens": 26410,
         "attempts": 1
-      }
+      },
+      "summary": "E1 1·2단계 표본 추출 CLI, 블라인드 시트·코드북, SHA256 기록, 라벨·정지점 검증, 합성 테스트와 Makefile·README 구현; make verify 통과(1585 tests), 의존성 추가 없음.",
+      "completed_at": "2026-11-13T17:01:41+0900"
     },
     {
       "step": 5,
