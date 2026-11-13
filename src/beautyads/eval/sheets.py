@@ -7,6 +7,7 @@ import random
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
@@ -95,6 +96,9 @@ class AxisGuide:
     order: list[str]
     ordered: bool
     bullets: list[str]
+    # 3열 이상 표의 셋째 열 이후: 값 -> "열 제목: 내용"
+    extras: dict[str, str] = dataclass_field(default_factory=dict)
+    headers: list[str] = dataclass_field(default_factory=list)
 
 
 def parse_taxonomy(text: str) -> dict[str, AxisGuide]:
@@ -116,11 +120,18 @@ def parse_taxonomy(text: str) -> dict[str, AxisGuide]:
         if current is None:
             continue
         cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
-        if line.startswith("|") and len(cells) == 2:
+        if line.startswith("|") and len(cells) >= 2:
             token = re.fullmatch(r"`([a-z_]+)`", cells[0])
             if token:
-                current.definitions[token.group(1)] = cells[1]
-                current.order.append(token.group(1))
+                value = token.group(1)
+                current.definitions[value] = cells[1]
+                current.order.append(value)
+                extra = " ".join(cell for cell in cells[2:] if cell)
+                if extra:
+                    header = current.headers[2] if len(current.headers) > 2 else "참고"
+                    current.extras[value] = f"{header}: {extra}"
+            elif not current.headers and not set(cells[0]) <= {"-", ":", " "}:
+                current.headers = cells
             continue
         if "위쪽 값을 우선" in line:
             current.ordered = True
@@ -133,22 +144,40 @@ def parse_taxonomy(text: str) -> dict[str, AxisGuide]:
     return guides
 
 
-def _value_note(guide: AxisGuide | None, value: str) -> str:
+def _guide_for(guides: Mapping[str, AxisGuide], axis: str) -> AxisGuide | None:
+    """Section by axis name, or the table section that lists this column."""
+    return guides.get(axis) or next(
+        (guide for guide in guides.values() if axis in guide.definitions), None
+    )
+
+
+def _value_note(
+    guide: AxisGuide | None, value: str, *, flag_value: str | None = None
+) -> str:
+    """Note for one value; for a boolean column ``flag_value`` is "true" or "false"."""
     if guide is None:
         return ""
     parts = []
     definition = guide.definitions.get(value, "")
+    if flag_value == "false" and definition:
+        return "위 true 조건에 해당하지 않으면 false."
     if definition:
-        parts.append(f"정의: {definition}.")
+        label = "true인 경우" if flag_value == "true" else "정의"
+        parts.append(f"{label}: {definition}.")
     elif value in guide.order:
         parts.append(_NO_DEFINITION)
+    if value in guide.extras:
+        parts.append(f"{guide.extras[value]}.")
     if guide.ordered and value in guide.order:
         parts.append(
             f"우선순위 {guide.order.index(value) + 1}/{len(guide.order)}"
             "(둘 이상 해당하면 숫자가 작은 값)."
         )
     for bullet in guide.bullets:
-        if f"`{value}`" in bullet:
+        # 미확정 쟁점은 값 이름이 없으면 그 절의 모든 값에 보여 준다.
+        unresolved = bullet.startswith("**미확정")
+        names_section_value = any(f"`{name}`" in bullet for name in guide.order)
+        if f"`{value}`" in bullet or (unresolved and not names_section_value):
             parts.append(bullet)
     return " ".join(parts)
 
@@ -176,7 +205,13 @@ def codebook_rows(taxonomy_text: str | None = None) -> list[dict[str, str]]:
             if axis == "hook_type":
                 note += " 훅은 첫 3초 기준이며 둘 이상 해당하면 코드북의 위쪽 값을 우선한다."
             for value in values:
-                detail = _value_note(guides.get(axis), value)
+                guide = _guide_for(guides, axis)
+                # 불리언 열은 값(true/false)이 아니라 열 이름으로 정의를 찾는다.
+                detail = (
+                    _value_note(guide, axis, flag_value=value)
+                    if annotation is bool
+                    else _value_note(guide, value)
+                )
                 rows.append(
                     {
                         "axis": axis,

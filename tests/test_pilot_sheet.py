@@ -284,6 +284,16 @@ def test_real_taxonomy_gives_every_tabled_value_a_definition():
     for axis in ("content_type", "hook_type", "angle", "format"):
         rows = [note for (a, _), note in notes.items() if a == axis]
         assert rows and all(note.startswith(("정의:", "정의 없음")) for note in rows)
+    # 구조·플랫폼 적합성·행동 유도·소구점도 같은 문서에서 정의를 읽는다(초안 정의).
+    flags = set(StructureFlags.model_fields) | set(PlatformFitFlags.model_fields)
+    for axis in flags:
+        assert notes[(axis, "true")].startswith("true인 경우:")
+        assert notes[(axis, "false")].startswith("위 true 조건에 해당하지 않으면")
+    for axis in ("cta_type", "claims"):
+        rows = [note for (a, _), note in notes.items() if a == axis]
+        assert rows and all(note.startswith("정의:") for note in rows)
+        # 조언 세션이 정한 임의 규칙은 미확정 쟁점으로 표시돼 모든 값에 보인다.
+        assert all("미확정 쟁점" in note for note in rows)
     hook_notes = [note for (a, _), note in notes.items() if a == "hook_type"]
     assert all("우선순위" in note for note in hook_notes)
 
