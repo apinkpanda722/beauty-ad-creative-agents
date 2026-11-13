@@ -683,3 +683,14 @@ def test_echoed_transient_identifiers_are_redacted_before_persistence(run):
     for text in (result.model_dump_json(), repr(result), repr(store.calls)):
         assert MEDIA_URL not in text and FILE_ID not in text
     assert result.records[-1].labels["ingredients"] == ["[redacted] [redacted]"]
+
+
+@pytest.mark.parametrize("by_axis", [False, True])
+def test_optional_axis_purpose_preserves_legacy_calls(run, by_axis):
+    configured = run._replace(purpose_by_axis=True) if by_axis else run
+    result = analyze(configured, FakeMedia())
+    assert len(result.records) == 3
+    assert [call["purpose"] for call in run.interact.calls] == [
+        f"{run.purpose}-{axis}" if by_axis else run.purpose
+        for axis in ("content_type", "hook", "full")
+    ]

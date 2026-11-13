@@ -402,3 +402,90 @@ uv run python -m beautyads.eval.cost_recalc --ledger <합성또는실제원장.j
 | `COST_KIND_SPLIT_MISMATCH:<태그>` | 호출 수로 역산한 제품 소재 수와 짧은 호출 수가 맞지 않는다. 경고이며 견적은 계속 낸다. |
 
 종료 코드는 성공 0, 입력 문제 2(`--items` 누락 포함), 시범 태그 누락 3이다.
+
+## live-analyze (P3)
+
+수집된 소재를 전체 v1 분류로 분석한다. 먼저 OrbStack을 켜고 `make db-up`으로
+DB를 준비하고 수집을 마친다. `.env`에는 `GEMINI_API_KEY`·`POSTGRES_PASSWORD`,
+Instagram을 포함하면 `INSTAGRAM_ACCESS_TOKEN`·`INSTAGRAM_USER_ID`가 필요하다.
+`docs/results/e1_preregistration.md`에 현재 분석 모델 ID·프롬프트 버전 세 값과
+`전체 v1 동결: YYYY-MM-DD` 형식의 실제 날짜를 기록해야 시작한다.
+사전 등록 갱신은 분류 v1 승인 뒤 분석 전에 완료한다.
+
+```bash
+# DB·네트워크·모델 없이 계획만 확인
+make live-analyze ARGS='--dry-run --items 1500'
+# E1 시트를 만든 뒤 표본을 먼저 분석한다(두 단계 키의 합집합).
+make live-analyze ARGS='--only-keys-file data/interim/e1/e1_stage1_key.json --only-keys-file data/interim/e1/e1_stage2_key.json'
+# 이어서 옵션 없이 전체를 돌린다. 이미 done인 작업은 다시 호출하지 않는다.
+make live-analyze
+# 사용량 회복 뒤 재시도 가능한 실패만 다시 처리
+make live-analyze ARGS='--retry-failed'
+make cost-recalc ARGS='--items 1500'
+```
+
+키 경로는 실제 E1 시트 출력 폴더에 맞춘다. E1 시트를 만든 뒤
+`--only-keys-file`로 표본을 먼저 분석하고, 이어서 옵션 없이 전체를 돌린다.
+사용자가 2단계 라벨링을 하는 동안 E1 모델 결과를 먼저 확보할 수 있다.
+키 파일에서는 `source`·`source_id`만 사용하고 키 값·브랜드·URL·사람 라벨은
+출력하지 않는다. 여러 키 파일은 합집합이며 `--sources`와는 교집합이다.
+`--brands`·`--limit`와 함께 지정할 수 없다. DB에 없거나 분석 불가능한 키는
+`KEY_NOT_ANALYZABLE <건수>`로 보고하고 건너뛴다.
+
+기본 출처는 `youtube,instagram`이며 TikTok은 아직 지원하지 않는다.
+`--sources youtube`로 YouTube만, `--brands 브랜드1,브랜드2`로 브랜드를,
+`--limit N`으로 대상 소재 수를 제한할 수 있다. `--batch-size`는 기본 100(1~500),
+`--concurrency`는 기본 1(1~4), `--thinking-level`은 기본 `minimal`이다.
+`--content-type-window-s`·`--full-window-s`는 각각 기본 60초이고 훅은 3초다.
+`--items N`은 `--dry-run`에서만 사용하며 기본 호출 수 N~3N을 계산한다
+(스키마 재요청·전송 재시도 제외). 비용은 원장에 기록되며 `cost-recalc` 결과를 따른다.
+상한·thinking 수준 변경은 비용 결과를 확인한 사용자 결정에 따른다.
+
+작업은 `content_type@v1`·`hook@v1`·`full@v1`만 읽고 쓴다. 재실행하면
+DB의 `pending` 작업부터 이어가며 시범 `@minimal`·`@default`는 건드리지 않는다.
+`--retry-failed`는 `RETRYABLE_ERROR_CODES`에 있는 `failed`만 실행 시작에 한 번
+되돌린다(`MEDIA_REFRESH_STOPPED` 포함). `MEDIA_URL_MISSING`·`INVALID_OUTPUT`·
+`MEDIA_URL_GONE`이나 `held` 작업은 되돌리지 않는다.
+
+Instagram은 배치 분석 직전에 계정을 재조회하고 서명 URL로 받은 영상은
+메모리에서만 처리하며 업로드한 파일은 분석 뒤 삭제한다. 앱 사용량 중단은
+부재로 확정하지 않고 못 찾은 소재를 `MEDIA_REFRESH_STOPPED`로 기록한다.
+중단 뒤 자동 반복하지 않으므로 **시간을 두고 `--retry-failed`로 다시 실행한다**.
+계정별 재조회 횟수와 마지막 앱 사용량은 마지막 요약에서 확인한다.
+같은 계정의 소재가 같은 배치에 몰리는 순서는 보장하지 않는다.
+일일 한도·비용 상한에 닿으면 남은 작업을 `pending`으로 보존한다.
+
+매 배치 JSON 한 줄(`event: batch`)과 마지막 `summary`에 상태 분포·오류 코드·
+대기 건수·비용·경과 시간을 출력한다. 출처·category별 완료 수는
+`content_type@v1`의 `done` 기준이다. 실패율은 `(failed + held) / (done + failed + held)`로
+전체 축의 작업을 세며, 처리된 작업이 없으면 null이다. `full@v1`의 enum 축별
+`other` 비율은 값이 있는 완료 작업을 분모로 하고, `claims`는 목록에 `other`가
+포함된 작업을 한 번 센다. 분모가 없으면 null이다.
+
+원장의 `purpose`는 `analyze-target-content_type`·`analyze-target-hook`·
+`analyze-target-full`로 나눈다. 마지막 요약의 `cost_by_axis`에는 이번 실행 시작
+이후 추가된 해당 Gemini 항목만 집계해 종류별 호출 수·입력/출력/thought/cached
+토큰 평균·비용 합계·`response_cost`가 아닌 항목 수를 표시한다.
+**첫 배치 뒤 요약의 종류별 비용으로 전체 견적을 다시 계산한다**(`make cost-recalc`).
+비용 상한은 누적 원장 전체에 적용한다.
+
+| 이유 코드 | 의미와 조치 |
+|---|---|
+| `ENV_MISSING:<이름>` | 필요한 `.env` 키 이름을 확인한다. 값은 출력하지 않는다. |
+| `DOCKER_DOWN` | OrbStack을 켠다. |
+| `POSTGRES_UNREACHABLE` | `make db-up`과 PostgreSQL 포트(기본 5433)를 확인한다. |
+| `POSTGRES_AUTH_FAILED` / `POSTGRES_CONNECT_FAILED` | DB 인증·연결 설정을 확인한다. 기존 볼륨의 비밀번호는 `.env` 변경만으로 바뀌지 않는다. |
+| `LEDGER_NOT_WRITABLE` | 비용 원장과 부모 폴더의 쓰기 권한을 확인한다. |
+| `COST_CAP:gemini` | 누적 상한에 닿았다. 비용 결과를 보고 사용자가 상한을 결정한다. |
+| `PREREGISTRATION_NOT_UPDATED` | 사전 등록 파일의 모델·프롬프트 버전·전체 v1 동결 날짜를 갱신한다. 우회 옵션은 없다. |
+| `ONLY_KEYS_CONFLICT` | 키 파일 옵션에서 `--brands`·`--limit`를 뺀다. |
+| `ONLY_KEYS_FILE_MISSING` | 키 파일 경로를 확인한다. |
+| `ONLY_KEYS_FILE_INVALID` | JSON의 items 매핑·알려진 source·비어 있지 않은 source_id 문자열을 확인한다. |
+| `KEY_NOT_ANALYZABLE <건수>` | DB에 없거나 분석 불가능한 키 수다. 나머지는 계속 처리한다. |
+| `MEDIA_REFRESH_STOPPED` / `INSTAGRAM_USAGE_HIGH` | 자동 반복하지 않는다. 시간을 두고 `--retry-failed`로 재실행한다. |
+| `DAILY_LIMIT` / `RATE_LIMITED` | 한도 회복 뒤 재실행한다. |
+| `INVALID_SETTING:<이름>` | 설정 형식과 범위를 확인한다. |
+
+점검 실패는 `PREFLIGHT_FAILED <코드>`와 종료 코드 2, 중단은 `STOPPED <사유>`와
+종료 코드 3이다. 대기열 소진·처리 0건으로 반복 종료·계획 출력은 종료 코드 0이다.
+`live-analyze`는 사용자 수동 실행용이며 `make verify`에는 포함하지 않는다.

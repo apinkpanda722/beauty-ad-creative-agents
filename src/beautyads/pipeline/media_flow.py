@@ -68,6 +68,7 @@ class AnalysisRun(NamedTuple):
     full_window_s: float
     hook_window_max_s: float
     interact: Callable[..., InteractionResult]
+    purpose_by_axis: bool = False
 
 
 class MediaDeps(NamedTuple):
@@ -163,6 +164,8 @@ def _analyze(
         "caps": run.caps,
         "interact": run.interact,
     }
+    if run.purpose_by_axis:
+        kwargs["purpose"] = f"{run.purpose}-content_type"
     content = analyze_content_type(
         creative, video, window_max_s=run.content_type_window_s, **kwargs
     )
@@ -172,6 +175,8 @@ def _analyze(
     if not is_product_target(ContentTypeResult.model_validate(content.labels)):
         return
 
+    if run.purpose_by_axis:
+        kwargs["purpose"] = f"{run.purpose}-hook"
     hook = analyze_hook(
         creative, video=video, window_max_s=run.hook_window_max_s, **kwargs
     )
@@ -189,6 +194,8 @@ def _analyze(
     )
     if hook.status != JobStatus.done:
         return
+    if run.purpose_by_axis:
+        kwargs["purpose"] = f"{run.purpose}-full"
     full = analyze_full(creative, video, window_max_s=run.full_window_s, **kwargs)
     outcome.records.append(_axis_record(full, run))
 
