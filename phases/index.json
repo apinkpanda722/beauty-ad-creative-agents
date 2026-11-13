@@ -4,6 +4,11 @@
       "dir": "1-collect-analyze-core",
       "status": "completed",
       "completed_at": "2026-11-12T18:41:09+0900"
+    },
+    {
+      "dir": "2-sources-pilot",
+      "status": "completed",
+      "completed_at": "2026-11-13T00:13:35+0900"
     }
   ]
 }

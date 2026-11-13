@@ -84,3 +84,38 @@ def preflight(
     if not ledger_writable:
         problems.append(Problem("LEDGER_NOT_WRITABLE"))
     return problems
+
+
+def collect_preflight(
+    *,
+    sources,
+    environ: Mapping[str, str] | None = None,
+    env_file: Path | None = DEFAULT_ENV_FILE,
+    docker_check: Callable[[], bool] = docker_running,
+    tcp_check: Callable[[str, int, float], bool] = tcp_reachable,
+) -> list[Problem]:
+    """Collection needs only selected source credentials and PostgreSQL."""
+    names = []
+    if "youtube" in sources:
+        names.append("YOUTUBE_API_KEY")
+    if "instagram" in sources:
+        names.extend(("INSTAGRAM_ACCESS_TOKEN", "INSTAGRAM_USER_ID"))
+    names.append("POSTGRES_PASSWORD")
+    problems = [
+        Problem(f"ENV_MISSING:{name}")
+        for name in names
+        if get_setting(name, environ=environ, env_file=env_file) is None
+    ]
+    if not docker_check():
+        problems.append(Problem("DOCKER_DOWN"))
+    value = get_setting(
+        "BEAUTYADS_POSTGRES_PORT", "5433", environ=environ, env_file=env_file
+    )
+    try:
+        port = int(value)
+        reachable = 1 <= port <= 65535 and tcp_check("127.0.0.1", port, 1.0)
+    except (TypeError, ValueError, OSError):
+        reachable = False
+    if not reachable:
+        problems.append(Problem("POSTGRES_UNREACHABLE"))
+    return problems

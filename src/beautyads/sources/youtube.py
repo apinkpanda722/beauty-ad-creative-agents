@@ -145,7 +145,12 @@ def _metric(stats: Mapping[str, Any], name: str) -> int | None:
 
 
 def _creative(
-    item: Mapping[str, Any], collected_at: datetime, video_length_cut_s: float
+    item: Mapping[str, Any],
+    collected_at: datetime,
+    video_length_cut_s: float,
+    *,
+    brand: str | None = None,
+    account: str | None = None,
 ) -> Creative:
     snippet = _mapping(item.get("snippet"))
     stats = _mapping(item.get("statistics"))
@@ -166,6 +171,8 @@ def _creative(
         language=snippet.get("defaultLanguage"),
         duration_s=duration,
         analyzable=analyzable,
+        brand=brand,
+        account=account,
         metrics=Metrics(
             view_count=_metric(stats, "viewCount"),
             like_count=_metric(stats, "likeCount"),
@@ -182,6 +189,8 @@ def fetch_videos(
     *,
     collected_at: datetime,
     video_length_cut_s: float,
+    brand: str | None = None,
+    account: str | None = None,
 ) -> list[Creative]:
     creatives = []
     for offset in range(0, len(video_ids), 50):
@@ -194,7 +203,13 @@ def fetch_videos(
         )
         try:
             creatives.extend(
-                _creative(_mapping(item), collected_at, video_length_cut_s)
+                _creative(
+                    _mapping(item),
+                    collected_at,
+                    video_length_cut_s,
+                    brand=brand,
+                    account=account,
+                )
                 for item in _items(body)
             )
         except (ValidationError, TypeError, ValueError, OverflowError):
@@ -232,6 +247,8 @@ def collect_youtube(
                     ids,
                     collected_at=collected_at,
                     video_length_cut_s=video_length_cut_s,
+                    brand=channel.brand,
+                    account=channel.handle,
                 )
             )
         except YouTubeError as error:

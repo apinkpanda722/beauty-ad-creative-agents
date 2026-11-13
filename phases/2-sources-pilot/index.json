@@ -1,0 +1,232 @@
+{
+  "project": "beauty-ad-creative-agents",
+  "phase": "2-sources-pilot",
+  "steps": [
+    {
+      "step": 0,
+      "name": "live-fixes-config",
+      "status": "completed",
+      "started_at": "2026-11-12T22:00:45+0900",
+      "summary": "_read 헬퍼로 get_creative·next_pending의 읽기 트랜잭션을 rollback으로 종료하고 회귀 테스트 추가; SQL·쓰기 경로 유지, make verify 통과(658 tests).",
+      "completed_at": "2026-11-12T22:02:32+0900",
+      "usage": {
+        "input_tokens": 464649,
+        "cached_input_tokens": 398848,
+        "output_tokens": 2842,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 1,
+      "name": "brand-split",
+      "status": "completed",
+      "started_at": "2026-11-12T22:02:32+0900",
+      "summary": "결정적 브랜드 dev/test 분할·수집량 검사·1회 재분할 CLI 및 테스트 구현, CLI로 brand_split.yaml 생성(history 비움); make verify 통과(706 tests).",
+      "completed_at": "2026-11-12T22:07:19+0900",
+      "usage": {
+        "input_tokens": 574712,
+        "cached_input_tokens": 506880,
+        "output_tokens": 10980,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 2,
+      "name": "creative-brand",
+      "status": "completed",
+      "started_at": "2026-11-12T22:07:19+0900",
+      "summary": "Creative에 선택적 brand·account, CollectionStat·조회 Protocol, v2 마이그레이션과 저장·복원·수집 통계 구현; _read 트랜잭션 종료 유지, make verify 통과(721 tests).",
+      "completed_at": "2026-11-12T22:10:08+0900",
+      "usage": {
+        "input_tokens": 772986,
+        "cached_input_tokens": 686848,
+        "output_tokens": 5664,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 3,
+      "name": "youtube-brand",
+      "status": "completed",
+      "started_at": "2026-11-12T22:10:08+0900",
+      "summary": "YouTube 어댑터에 채널 설정의 brand·handle 전달 및 기본값 None 호환성 구현, 다중 채널 회귀 테스트 추가; 아키텍처 가드 포함 make verify 통과(725 tests).",
+      "completed_at": "2026-11-12T22:11:43+0900",
+      "usage": {
+        "input_tokens": 537278,
+        "cached_input_tokens": 465664,
+        "output_tokens": 2570,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 4,
+      "name": "instagram-source",
+      "status": "completed",
+      "started_at": "2026-11-12T22:11:43+0900",
+      "summary": "Instagram 설정 로더·Business Discovery 수집·오류 격리·사용량 방어·미디어 URL 만료 판정 및 재조회 구현; 아키텍처 가드 포함 make verify 통과(831 tests).",
+      "completed_at": "2026-11-12T22:17:56+0900",
+      "usage": {
+        "input_tokens": 867247,
+        "cached_input_tokens": 787200,
+        "output_tokens": 14606,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 5,
+      "name": "collect-runner",
+      "status": "completed",
+      "started_at": "2026-11-12T22:17:56+0900",
+      "summary": "YouTube·Instagram 전체 수집 실행기와 live-collect 타깃, 재시도·계정별 저장·재개·환경 점검·분할 보고 및 사용 안내 구현; 아키텍처 가드 포함 make verify 통과(892 tests), 실제 서비스 미호출.",
+      "completed_at": "2026-11-12T22:24:04+0900",
+      "usage": {
+        "input_tokens": 1066860,
+        "cached_input_tokens": 981248,
+        "output_tokens": 14899,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 6,
+      "name": "gemini-files",
+      "status": "completed",
+      "started_at": "2026-11-12T22:36:32+0900",
+      "summary": "Gemini Files 업로드·처리 대기·삭제 래퍼, 파일 오류 코드와 video_part MIME 인자 및 계약 기반 회귀 테스트 구현; 아키텍처 가드 포함 make verify 통과(935 tests), 실제 서비스 미호출.",
+      "completed_at": "2026-11-12T22:40:04+0900",
+      "usage": {
+        "input_tokens": 679115,
+        "cached_input_tokens": 604928,
+        "output_tokens": 7958,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 7,
+      "name": "media-download",
+      "status": "completed",
+      "started_at": "2026-11-12T22:40:04+0900",
+      "summary": "메모리 전용 영상 다운로드·스트리밍 크기 제한·응답 순차 검증·URL 비노출 오류 코드와 가짜 MediaGet 테스트 구현; 아키텍처 가드 포함 make verify 통과(953 tests), 실제 다운로드 미실행.",
+      "completed_at": "2026-11-12T22:42:25+0900",
+      "usage": {
+        "input_tokens": 563165,
+        "cached_input_tokens": 493184,
+        "output_tokens": 4402,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 8,
+      "name": "store-queries",
+      "status": "completed",
+      "started_at": "2026-11-12T22:42:25+0900",
+      "summary": "JobResult·저장소 Protocol 확장과 실패 작업 재대기·상태 집계·최신 출력·소재 필터 조회 구현; 기존 SQL·스키마 유지, 아키텍처 가드 포함 make verify 통과(1008 tests), 실제 서비스 미호출.",
+      "completed_at": "2026-11-12T22:46:36+0900",
+      "usage": {
+        "input_tokens": 925666,
+        "cached_input_tokens": 848384,
+        "output_tokens": 9401,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 9,
+      "name": "analysis-full",
+      "status": "completed",
+      "started_at": "2026-11-12T22:46:36+0900",
+      "summary": "TAXONOMY v0 콘텐츠 유형·전체 축 모델과 분석·재요청·보류, 성분 원문 보존, 모델 ID·버전 상수 및 훅 선택 영상 입력 구현; 기존 테스트 불변·아키텍처 가드 포함 make verify 통과(1127 tests), 실제 서비스 미호출.",
+      "completed_at": "2026-11-12T22:53:10+0900",
+      "usage": {
+        "input_tokens": 1395241,
+        "cached_input_tokens": 1299200,
+        "output_tokens": 15351,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 10,
+      "name": "media-flow",
+      "status": "completed",
+      "started_at": "2026-11-12T22:53:10+0900",
+      "summary": "Instagram 계정별 URL 계획·미디어 분석·결과 저장 흐름과 finally 삭제 보장·한도 예외 전파 구현; 아키텍처 가드 포함 make verify 통과(1228 tests), 실제 서비스 미호출.",
+      "completed_at": "2026-11-12T22:59:14+0900",
+      "usage": {
+        "input_tokens": 1313243,
+        "cached_input_tokens": 1219712,
+        "output_tokens": 13377,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 11,
+      "name": "batch-runner",
+      "status": "completed",
+      "started_at": "2026-11-12T22:59:14+0900",
+      "summary": "배치 분석 실행기·저장소 전체 호출 직렬화·실패 격리·재시도와 한도 중단·완료 축 호출 재사용·JSON 보고 구현; 아키텍처 가드 포함 make verify 통과(1256 tests), 실제 서비스 미호출.",
+      "completed_at": "2026-11-12T23:05:23+0900",
+      "usage": {
+        "input_tokens": 943769,
+        "cached_input_tokens": 869376,
+        "output_tokens": 13232,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 12,
+      "name": "pilot-sheet",
+      "status": "completed",
+      "started_at": "2026-11-12T23:05:23+0900",
+      "summary": "dev 브랜드의 결정적 시범 선정·블라인드 시트·코드북·안내문·분리 키 파일과 출력 경로 가드 구현; 아키텍처 가드 포함 make verify 통과(1280 tests), 실제 서비스 미호출.",
+      "completed_at": "2026-11-12T23:10:22+0900",
+      "usage": {
+        "input_tokens": 860247,
+        "cached_input_tokens": 776192,
+        "output_tokens": 11207,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 13,
+      "name": "pilot-live-target",
+      "status": "completed",
+      "started_at": "2026-11-12T23:10:22+0900",
+      "summary": "eval 시범 실행기·live-pilot 타깃·사용 안내와 가짜 의존성 테스트 구현; 환경·수집량 점검, minimal/default 분석·블라인드 시트 생성 지원, 아키텍처 가드 포함 make verify 통과(1333 tests), 실제 서비스 미호출.",
+      "completed_at": "2026-11-12T23:17:55+0900",
+      "usage": {
+        "input_tokens": 1936409,
+        "cached_input_tokens": 1837696,
+        "output_tokens": 17256,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 14,
+      "name": "creative-attributes",
+      "status": "completed",
+      "started_at": "2026-11-13T00:05:35+0900",
+      "summary": "Creative.attributes·마이그레이션 v3·정렬된 JSON 매개변수 저장·NULL→{} 복원과 회귀 테스트 구현; 아키텍처 가드 포함 make verify 통과(1364 tests), 실제 서비스 미호출.",
+      "completed_at": "2026-11-13T00:07:56+0900",
+      "usage": {
+        "input_tokens": 786851,
+        "cached_input_tokens": 707584,
+        "output_tokens": 4380,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 15,
+      "name": "tiktok-source",
+      "status": "completed",
+      "started_at": "2026-11-13T00:07:56+0900",
+      "summary": "TikTok 설정·판매처 초안·토큰 캐시·광고 수집·쪽 넘김·중복 제거·집행 주체 분류·영상 URL 재조회 구현; 아키텍처 가드 포함 make verify 통과(1432 tests), 실제 서비스 미호출.",
+      "completed_at": "2026-11-13T00:13:35+0900",
+      "usage": {
+        "input_tokens": 863442,
+        "cached_input_tokens": 792320,
+        "output_tokens": 13369,
+        "attempts": 1
+      }
+    }
+  ],
+  "created_at": "2026-11-12T22:00:45+0900",
+  "completed_at": "2026-11-13T00:13:35+0900"
+}

@@ -1,6 +1,23 @@
 """Draft v0 hook criteria in taxonomy priority order."""
 
-from beautyads.domain import Creative, HookType
+from collections.abc import Mapping
+from enum import StrEnum
+
+from beautyads.domain import (
+    Angle,
+    Category,
+    Claim,
+    ContentType,
+    ContentTypeResult,
+    Creative,
+    CtaType,
+    Format,
+    FullResult,
+    HookType,
+    PlatformFitFlags,
+    StructureFlags,
+    Talent,
+)
 
 HOOK_PROMPT_VERSION = "hook-v0"
 
@@ -29,4 +46,119 @@ def build_hook_prompt(creative: Creative) -> str:
         f"참고 제목: {creative.title or ''}\n"
         f"참고 캡션: {creative.caption or ''}\n"
         "출력은 hook_type 필드에 선택한 값을 담은 JSON 하나뿐이어야 한다."
+    )
+
+
+_CONTENT_CRITERIA = {
+    ContentType.product_creative: "특정 제품을 보여주거나 설명하는 것이 중심이다",
+    ContentType.event_place: "매장·팝업·행사·협업 공간 안내가 중심이다",
+    ContentType.brand_campaign: "특정 제품 없이 브랜드 메시지·모델·캠페인을 보여준다",
+    ContentType.other: "공지, 채용, 일상 등",
+}
+_CATEGORY_CRITERIA = {
+    Category.mask_pack: "마스크팩",
+    Category.serum_ampoule: "세럼·앰플",
+    Category.sun_care: "선케어",
+    Category.other: "앞의 카테고리에 해당하지 않거나 판정할 수 없다",
+}
+_ANGLE_CRITERIA = {
+    Angle.problem_solution: "고민을 제시하고 제품을 해결책으로 연결한다",
+    Angle.desire: "원하는 피부 상태·이미지를 보여주는 데 대부분을 쓴다",
+    Angle.social_proof: "후기, 판매량, 수상, 순위를 근거로 든다",
+    Angle.comparison: "다른 제품·이전 상태·사용 전과 비교한다",
+    Angle.ingredient_science: "성분·작용 원리 설명이 중심이다",
+    Angle.how_to: "사용법·루틴 시연이 중심이다",
+    Angle.other: "위 어느 것도 아니다",
+}
+_FORMAT_CRITERIA = {
+    Format.ugc_style: "손에 든 휴대폰 촬영처럼 보이고 1인칭으로 말한다",
+    Format.studio_film: "조명·세트·편집이 갖춰진 제작 영상이다",
+    Format.demo: "제품을 바르거나 쓰는 과정을 순서대로 보여준다",
+    Format.text_motion: "인물 없이 자막·그래픽·제품 컷 위주다",
+    Format.static_image: "정지 이미지 또는 이미지 묶음이다",
+    Format.other: "위 어느 것도 아니다",
+}
+_TALENT_CRITERIA = {
+    Talent.none: "출연자 없음",
+    Talent.ordinary_person: "일반인",
+    Talent.creator: "크리에이터",
+    Talent.celebrity: "유명인",
+    Talent.expert: "전문가",
+    Talent.staff: "직원",
+}
+_CTA_CRITERIA = {
+    CtaType.none: "행동 유도 없음",
+    CtaType.shop_now: "구매 유도",
+    CtaType.learn_more: "자세히 알아보기",
+    CtaType.store_mention: "판매처 언급",
+    CtaType.event: "할인·증정·기간",
+    CtaType.follow_engage: "팔로우·참여 유도",
+}
+_CLAIM_CRITERIA = {
+    Claim.hydration: "보습",
+    Claim.soothing: "진정",
+    Claim.brightening: "미백",
+    Claim.firming_elasticity: "탄력",
+    Claim.pore_sebum: "모공·피지",
+    Claim.acne_trouble: "여드름·트러블",
+    Claim.barrier: "피부 장벽",
+    Claim.anti_aging: "주름 개선·안티에이징",
+    Claim.sun_protection: "자외선 차단",
+    Claim.texture_finish: "제형·마무리감",
+    Claim.other: "위 목록에 해당하지 않는 명시된 효능",
+}
+
+
+def _criteria(enum: type[StrEnum], descriptions: Mapping[StrEnum, str]) -> str:
+    return "\n".join(f"{member.value}: {descriptions[member]}" for member in enum)
+
+
+def build_content_type_prompt(creative: Creative) -> str:
+    return (
+        "제공된 영상 구간 전체와 제목·캡션을 보고 콘텐츠 유형과 제품 카테고리를 "
+        "각각 하나 선택한다. 화면과 음성에서 관찰 가능한 사실만 판정한다.\n"
+        f"content_type:\n{_criteria(ContentType, _CONTENT_CRITERIA)}\n"
+        "특정 제품을 보여주거나 설명하는 것이 중심이 아니면 "
+        f"{ContentType.product_creative.value}로 억지 분류하지 않는다. "
+        "팝업·공간 안내는 제품이 잠깐 나와도 안내가 중심이면 "
+        f"{ContentType.event_place.value}, 특정 제품 없는 브랜드 메시지는 "
+        f"{ContentType.brand_campaign.value}, 그 밖에는 {ContentType.other.value}를 고른다.\n"
+        f"category:\n{_criteria(Category, _CATEGORY_CRITERIA)}\n"
+        "제목 키워드만으로 판단하지 않고 영상·캡션을 함께 본다. "
+        f"{Category.other.value}는 수집하되 후속 분석 대상에서 제외한다.\n"
+        f"참고 제목: {creative.title or ''}\n"
+        f"참고 캡션: {creative.caption or ''}\n"
+        f"출력은 {', '.join(ContentTypeResult.model_fields)} 필드를 모두 담은 JSON 하나다."
+    )
+
+
+def build_full_prompt(creative: Creative) -> str:
+    return (
+        "제품 소재의 제공된 영상 구간 전체와 제목·캡션을 보고 분류한다. "
+        "구간 밖 내용은 추정하지 않는다. 관찰 가능한 사실만 쓰며, "
+        "각 단일 선택 축은 하나, claims와 ingredients는 여럿을 선택한다.\n"
+        f"angle:\n{_criteria(Angle, _ANGLE_CRITERIA)}\n"
+        f"format:\n{_criteria(Format, _FORMAT_CRITERIA)}\n"
+        f"talent:\n{_criteria(Talent, _TALENT_CRITERIA)}\n"
+        f"{Talent.celebrity.value}와 {Talent.creator.value}는 캡션·제목의 "
+        "이름 표기나 협업 표기가 있을 때만 붙이고, "
+        f"없으면 {Talent.ordinary_person.value}으로 둔다. "
+        "손만 보이는데 성별을 적는 등 보이지 않는 특성은 추정하지 않는다.\n"
+        f"structure: {', '.join(StructureFlags.model_fields)} 각각을 예/아니오(bool)로 판정한다. "
+        "훅 구간·사용 시연 구간·근거 제시 구간·행동 유도가 있는지 전체 구간에서 관찰한다.\n"
+        f"platform_fit: {', '.join(PlatformFitFlags.model_fields)} 각각을 예/아니오(bool)로 판정한다. "
+        "세로 비율·텍스트 오버레이·음성·음악만 있음·자막 여부를 관찰한다.\n"
+        f"cta_type:\n{_criteria(CtaType, _CTA_CRITERIA)}\n"
+        f"claims:\n{_criteria(Claim, _CLAIM_CRITERIA)}\n"
+        "소구점은 자막이나 음성으로 명시된 효능만 붙인다. "
+        "화면 분위기에서 효능이나 성분을 추정하지 않는다. "
+        "명시된 효능이 없으면 claims는 빈 목록이다.\n"
+        "ingredients는 자막·음성·제품 표기에 나온 성분명만 원문 그대로 추출한다. "
+        "공백·대소문자·한글을 바꾸지 않으며 정규화·번역·사전 대조·폐기를 하지 않는다. "
+        "명시된 성분이 없으면 빈 목록이다.\n"
+        "닫힌 목록 어디에도 안 맞는 축은 해당 없음이나 기타 값으로 빠질 수 있다.\n"
+        f"참고 제목: {creative.title or ''}\n"
+        f"참고 캡션: {creative.caption or ''}\n"
+        f"출력은 {', '.join(FullResult.model_fields)} 필드를 모두 담은 JSON 하나다. "
+        "원문은 번역하지 않는다."
     )

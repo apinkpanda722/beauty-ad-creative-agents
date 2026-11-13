@@ -10,9 +10,12 @@ CHANGE_COLUMNS: tuple[str, ...] = (
     "duration_s",
     "language",
     "analyzable",
+    "brand",
+    "account",
     "latest_view_count",
     "latest_like_count",
     "latest_comment_count",
+    "attributes",
 )
 
 MIGRATIONS: list[tuple[int, str, str]] = [
@@ -75,7 +78,22 @@ MIGRATIONS: list[tuple[int, str, str]] = [
             last_synced_at timestamptz
         );
         """,
-    )
+    ),
+    (
+        2,
+        "creative_brand_account",
+        """
+        ALTER TABLE creatives ADD COLUMN IF NOT EXISTS brand text;
+        ALTER TABLE creatives ADD COLUMN IF NOT EXISTS account text;
+        """,
+    ),
+    (
+        3,
+        "creative_attributes",
+        """
+        ALTER TABLE creatives ADD COLUMN IF NOT EXISTS attributes jsonb;
+        """,
+    ),
 ]
 
 # Fixed identifiers and SQL types, never caller input. Explicit casts preserve
@@ -97,9 +115,12 @@ _INSERT_TYPES: tuple[str, ...] = (
     "double precision",
     "text",
     "boolean",
+    "text",
+    "text",
     "bigint",
     "bigint",
     "bigint",
+    "jsonb",
     "timestamptz",
     "timestamptz",
 )

@@ -29,6 +29,7 @@ from beautyads.llm import (
     video_part,
 )
 
+from .models import ANALYSIS_MODEL_ID, VideoInput
 from .prompts import HOOK_PROMPT_VERSION, build_hook_prompt
 
 HOOK_WINDOW_S = 3.0
@@ -103,6 +104,7 @@ def analyze_hook(
     window_max_s: float,
     interact: Callable[..., InteractionResult] = gemini_interact,
     max_validation_retries: int = 1,
+    video: VideoInput | None = None,
 ) -> AnalysisOutcome:
     """Retry invalid labels only; quota and cost exceptions reach the batch."""
     outcome = AnalysisOutcome(
@@ -115,24 +117,30 @@ def analyze_hook(
         attempts=0,
         prompt_version=HOOK_PROMPT_VERSION,
     )
-    if creative.source != Source.youtube:
+    if video is None and creative.source != Source.youtube:
         outcome.error_code = "UNSUPPORTED_SOURCE"
         return outcome
-    if not creative.url:
+    if video is None and not creative.url:
         outcome.error_code = "NO_URL"
         return outcome
 
     start, end = hook_window(creative.duration_s, window_max_s=window_max_s)
     input_parts = [
         text_part(build_hook_prompt(creative)),
-        video_part(creative.url, start_s=start, end_s=end, fps=1),
+        video_part(
+            video.uri if video is not None else creative.url,
+            start_s=start,
+            end_s=end,
+            fps=1,
+            mime_type=video.mime_type if video is not None else None,
+        ),
     ]
     response_format = json_schema_format(hook_response_schema())
     for attempt in range(max_validation_retries + 1):
         outcome.attempts = attempt + 1
         try:
             result = interact(
-                model="gemini-3.6-flash",
+                model=ANALYSIS_MODEL_ID,
                 input_parts=input_parts,
                 thinking_level=thinking_level,
                 purpose=purpose,

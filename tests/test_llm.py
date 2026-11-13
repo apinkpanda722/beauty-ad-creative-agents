@@ -526,3 +526,77 @@ assert os.environ["LITELLM_LOCAL_MODEL_COST_MAP"] == "True"
         capture_output=True,
         timeout=45,
     )
+
+
+@pytest.mark.parametrize(
+    ("name", "code"),
+    [
+        ("analyze_deleted_file", "FILE_NOT_FOUND"),
+        ("analyze_missing_file", "FILE_NOT_FOUND"),
+        ("analyze_junk", "FILE_NOT_ACTIVE"),
+    ],
+)
+def test_file_analysis_fatal_codes_without_retry(call_args, name, code):
+    probe = fixture("gemini_files_failures_thinking_burst_probe.json").get(name)
+    cls = (
+        litellm.PermissionDeniedError
+        if probe.get("http") == 403
+        else litellm.BadRequestError
+    )
+    error = sdk_error(cls, json.dumps(probe.get("body")), probe.get("http"))
+    fn, sleep = Mock(side_effect=error), Mock()
+    with pytest.raises(LlmCallError) as caught:
+        gemini_interact(**call_args, interactions_fn=fn, sleep=sleep)
+    assert caught.value.code == code
+    assert caught.value.kind == ErrorKind.FATAL
+    fn.assert_called_once()
+    sleep.assert_not_called()
+    assert not call_args["ledger_path"].exists()
+
+
+def test_unrelated_fatal_code_is_unchanged(call_args):
+    fn = Mock(side_effect=sdk_error(litellm.BadRequestError, "unrelated failure", 400))
+    sleep = Mock()
+    with pytest.raises(LlmCallError) as caught:
+        gemini_interact(**call_args, interactions_fn=fn, sleep=sleep)
+    assert caught.value.code == "FATAL"
+    assert caught.value.kind == ErrorKind.FATAL
+    fn.assert_called_once()
+    sleep.assert_not_called()
+
+
+def test_file_video_part_accepts_optional_mime_type():
+    uri = fixture("litellm_gemini_files_flow.json").get("create_file").get("id")
+    assert video_part(uri, mime_type="video/mp4") == {
+        "type": "video",
+        "uri": uri,
+        "mime_type": "video/mp4",
+    }
+    assert (
+        video_part(uri)
+        == video_part(uri, mime_type=None)
+        == {"type": "video", "uri": uri}
+    )
+    assert video_part(uri, mime_type="video/mp4", start_s=0, end_s=3, fps=1) == {
+        "type": "video",
+        "uri": uri,
+        "mime_type": "video/mp4",
+        "processing": {
+            "type": "static",
+            "start_offset": "0s",
+            "end_offset": "3s",
+            "fps": 1,
+        },
+    }
+
+
+@pytest.mark.parametrize("status", [429, 503])
+def test_file_message_does_not_change_nonfatal_classification(call_args, status):
+    cls = litellm.RateLimitError if status == 429 else litellm.ServiceUnavailableError
+    fn = Mock(side_effect=sdk_error(cls, "permission_denied", status))
+    with pytest.raises(LlmCallError) as caught:
+        gemini_interact(**call_args, interactions_fn=fn, max_attempts=1)
+    assert caught.value.code == ("RATE_LIMIT" if status == 429 else "RETRIES_EXHAUSTED")
+    assert caught.value.kind == (
+        ErrorKind.RATE_LIMIT if status == 429 else ErrorKind.RETRYABLE
+    )
