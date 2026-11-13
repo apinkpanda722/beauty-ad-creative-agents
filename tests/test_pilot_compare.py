@@ -9,6 +9,7 @@ from unittest.mock import Mock
 
 import pytest
 
+from beautyads.analysis.axes import is_product_target
 from beautyads.domain.labels import (
     Category,
     Claim,
@@ -52,6 +53,14 @@ def run(content=PRODUCT):
     tasks["content_type"]["labels"]["content_type"] = content
     if content != PRODUCT:
         tasks.update(hook=None, full=None)
+    return tasks
+
+
+def run_unanalyzed():
+    """Model says product but category other: hook/full are never created."""
+    tasks = run(PRODUCT)
+    tasks["content_type"]["labels"]["category"] = Category.other.value
+    tasks.update(hook=None, full=None)
     return tasks
 
 
@@ -348,3 +357,72 @@ def test_make_target_is_manual_only():
     )
     verify = makefile.split("verify:\n", 1)[1].split("\n\n", 1)[0]
     assert "pilot-compare" not in verify
+
+
+def test_product_with_category_other_is_analysis_exclusion_not_failure(tmp_path):
+    rows = [human("P001"), human("P002")]
+    items = {
+        "P001": item(),
+        "P002": {"runs": {tag: run_unanalyzed() for tag in TAGS}},
+    }
+    labels, key = files(tmp_path, rows, items)
+    code, output, report = cli(labels, key)
+    assert code == 0 and report["errors"] == []
+    assert report["included"] == 2 and report["excluded"] == []
+    assert report["human_product"] == 2
+    # content_type and category are compared for every retained product item.
+    for tag in TAGS:
+        assert metric(report, "content_type", tag)["n"] == 2
+        assert metric(report, "content_type", tag)["coverage"] is None
+        category = metric(report, "category", tag)
+        assert category["n"] == category["intersection_size"] == 2
+        assert category["not_analyzed"] == 0
+        # the model's category other against a supported human category shows up here
+        assert category["rate"] == 0.5
+    # hook/full-derived axes count the item separately, with the reason.
+    for tag in (*TAGS, "minimal_vs_default"):
+        row = metric(report, "hook_type", tag)
+        assert row["n"] == 1 and row["intersection_size"] == 2
+        assert row["not_analyzed"] == 1
+        assert row["not_analyzed_reason"] == compare.NOT_ANALYZED_REASON
+        assert row["coverage"] == 0.5 and row["human_product"] == 2
+    assert {(g["item_id"], g["run_tag"]) for g in report["not_analyzed"]} == {
+        ("P002", "minimal"),
+        ("P002", "default"),
+    }
+    assert "NOT_ANALYZED P002 minimal" in output
+    assert SENTINEL not in output
+
+
+def test_existing_downstream_task_that_is_not_done_still_excludes(tmp_path):
+    bad = {"runs": {tag: run_unanalyzed() for tag in TAGS}}
+    bad["runs"]["minimal"]["hook"] = {"status": "failed", "error_code": "TEST_FAILURE"}
+    labels, key = files(
+        tmp_path,
+        [human("P001"), human("P002")],
+        {
+            "P001": item(),
+            "P002": bad,
+        },
+    )
+    code, _, report = cli(labels, key)
+    assert code == 0 and report["included"] == 1
+    assert report["excluded"] == [
+        {
+            "item_id": "P002",
+            "run_tag": "minimal",
+            "task": "hook",
+            "error_code": "TEST_FAILURE",
+        }
+    ]
+
+
+def test_analysis_target_rule_matches_the_pipeline_rule():
+    for content in ContentType:
+        for category in Category:
+            labels = labels_for(ContentTypeResult)
+            labels.update(content_type=content.value, category=category.value)
+            tasks = {"content_type": {"status": "done", "labels": labels}}
+            assert compare._is_analysis_target(tasks) == is_product_target(
+                ContentTypeResult.model_validate(labels)
+            )

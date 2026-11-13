@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, TextIO
 
 from beautyads.domain import ContentTypeResult, FullResult, HookResult, JobStatus
-from beautyads.domain.labels import ContentType
+from beautyads.domain.labels import Category, ContentType
 from beautyads.eval.sheets import SheetError, _label_axes, label_columns
 
 DEFAULT_LABELS = Path("data/interim/pilot/pilot_sheet_labeled.csv")
@@ -22,6 +22,7 @@ RUN_TAGS = ("minimal", "default")
 CONTENT_AXIS = "content_type"
 PRODUCT = ContentType.product_creative.value
 INTERSECTION_AXES = tuple(axis for axis in label_columns() if axis != CONTENT_AXIS)
+NOT_ANALYZED_REASON = "category_other로 분석 제외"
 UNSETTLED_AXES = frozenset({"has_cta", "has_hook_segment"})
 UNSETTLED_NOTE = "정의 미확정, 참고용"
 TASK_MODELS = {
@@ -208,32 +209,56 @@ def _model_value(tasks: Mapping, axis: str) -> Any:
         raise SheetError("PILOT_KEY_INVALID") from None
 
 
+def _is_analysis_target(tasks: Mapping) -> bool:
+    """Mirror `analysis.axes.is_product_target`: hook/full exist only for these items.
+
+    The model calls an item a product but with category `other` is excluded from
+    hook/full analysis by design, so its missing downstream tasks are not failures.
+    """
+    return (
+        _model_value(tasks, CONTENT_AXIS) == PRODUCT
+        and _model_value(tasks, "category") != Category.other.value
+    )
+
+
 def _exclusions(item_id: str, item: Mapping) -> list[dict]:
+    """Exclude on (a) an existing task that is not done, (b) a missing hook/full
+    for an item that must have them (`is_product_target`). Nothing else."""
     failures = []
     for tag in RUN_TAGS:
         tasks = _tasks(item, tag)
 
-        def check(task, tasks=tasks, tag=tag):
-            result = tasks.get(task)
-            if result is None or (
-                isinstance(result, dict) and result.get("status") != JobStatus.done
-            ):
-                failures.append(
-                    {
-                        "item_id": item_id,
-                        "run_tag": tag,
-                        "task": task,
-                        "error_code": result.get("error_code") if result else None,
-                    }
-                )
-                return False
-            if not isinstance(result, dict):
+        def fail(task, result, tasks=tasks, tag=tag):
+            failures.append(
+                {
+                    "item_id": item_id,
+                    "run_tag": tag,
+                    "task": task,
+                    "error_code": result.get("error_code")
+                    if isinstance(result, dict)
+                    else None,
+                }
+            )
+
+        def usable(task, result):
+            if not isinstance(result, dict) and result is not None:
                 raise SheetError("PILOT_KEY_INVALID")
+            if result is None or result.get("status") != JobStatus.done:
+                fail(task, result)
+                return False
             return True
 
-        if check("content_type") and _model_value(tasks, CONTENT_AXIS) == PRODUCT:
-            check("hook")
-            check("full")
+        content = tasks.get("content_type")
+        if not usable("content_type", content):
+            continue
+        required = _is_analysis_target(tasks)
+        for task in ("hook", "full"):
+            result = tasks.get(task)
+            if result is None:
+                if required:
+                    fail(task, None)
+            else:
+                usable(task, result)
     return failures
 
 
@@ -248,17 +273,24 @@ def compare_labels(humans: Mapping[str, dict], items: Mapping[str, dict]) -> dic
         excluded.extend(failures)
         if not failures:
             retained.append(item_id)
+    human_product = sum(1 for i in retained if humans[i][CONTENT_AXIS] == PRODUCT)
     report = {
         "included": len(retained),
+        "human_product": human_product,
         "excluded": excluded,
+        "not_analyzed": [],
         "confusion_matrices": {},
         "metrics": [],
         "errors": [],
     }
 
-    def add_metric(axis, tag, population, pairs):
+    def add_metric(axis, tag, population, pairs, unanalyzed=0):
         pairs = [(a, b) for a, b in pairs if a is not None and b is not None]
-        row = {"axis": axis, "run": tag, "intersection_size": len(population)}
+        row = {
+            "axis": axis,
+            "run": tag,
+            "intersection_size": len(population) + unanalyzed,
+        }
         try:
             row.update(asdict(agreement(pairs)))
         except ValueError:
@@ -266,11 +298,21 @@ def compare_labels(humans: Mapping[str, dict], items: Mapping[str, dict]) -> dic
             code = f"COMPARE_EMPTY_SET:{axis}"
             if code not in report["errors"]:
                 report["errors"].append(code)
+        row["human_product"] = human_product
+        row["not_analyzed"] = unanalyzed
+        # Coverage is about hook/full-derived and category axes; content_type is the
+        # confusion matrix over every retained item, so it has no coverage.
+        row["coverage"] = (
+            row["n"] / human_product if human_product and axis != CONTENT_AXIS else None
+        )
+        if unanalyzed:
+            row["not_analyzed_reason"] = NOT_ANALYZED_REASON
         if axis in UNSETTLED_AXES:
             row["note"] = UNSETTLED_NOTE
         report["metrics"].append(row)
 
     intersections = {}
+    analyzed = {}
     for tag in RUN_TAGS:
         matrix = {human.value: dict.fromkeys(ContentType, 0) for human in ContentType}
         content_pairs = []
@@ -285,26 +327,42 @@ def compare_labels(humans: Mapping[str, dict], items: Mapping[str, dict]) -> dic
         report["confusion_matrices"][tag] = matrix
         add_metric(CONTENT_AXIS, tag, retained, content_pairs)
         intersections[tag] = intersection
+        analyzed[tag] = [
+            i for i in intersection if _is_analysis_target(_tasks(items[i], tag))
+        ]
+        for item_id in intersection:
+            if item_id not in analyzed[tag]:
+                report["not_analyzed"].append(
+                    {"item_id": item_id, "run_tag": tag, "reason": NOT_ANALYZED_REASON}
+                )
         for axis in INTERSECTION_AXES:
+            # category comes from content_type; hook/full axes need the later tasks.
+            downstream = AXIS_TASKS[axis] != "content_type"
+            population = analyzed[tag] if downstream else intersection
             add_metric(
                 axis,
                 tag,
-                intersection,
+                population,
                 (
                     (humans[i][axis], _model_value(_tasks(items[i], tag), axis))
-                    for i in intersection
+                    for i in population
                 ),
+                len(intersection) - len(population),
             )
     shared = [i for i in intersections[RUN_TAGS[0]] if i in intersections[RUN_TAGS[1]]]
+    shared_analyzed = [i for i in shared if all(i in analyzed[tag] for tag in RUN_TAGS)]
     for axis in INTERSECTION_AXES:
+        downstream = AXIS_TASKS[axis] != "content_type"
+        population = shared_analyzed if downstream else shared
         add_metric(
             axis,
             "minimal_vs_default",
-            shared,
+            population,
             (
                 tuple(_model_value(_tasks(items[i], tag), axis) for tag in RUN_TAGS)
-                for i in shared
+                for i in population
             ),
+            len(shared) - len(population),
         )
     return report
 
@@ -315,19 +373,31 @@ def _print_report(report: dict, out: TextIO) -> None:
             "EXCLUDED {item_id} {run_tag} {task} {error_code}".format(**failure),
             file=out,
         )
+    for gap in report.get("not_analyzed", []):
+        print(
+            "NOT_ANALYZED {item_id} {run_tag} {reason}".format(**gap),
+            file=out,
+        )
     for tag, matrix in report.get("confusion_matrices", {}).items():
         print(f"content_type {tag} 혼동 행렬 (행=사람, 열=모델)", file=out)
         print("사람/모델\t" + "\t".join(ContentType), file=out)
         for human, counts in matrix.items():
             print(human + "\t" + "\t".join(str(n) for n in counts.values()), file=out)
     if report.get("metrics"):
-        print("축\t실행\tn\t교집합 크기\t일치율 (content_type은 참고용)", file=out)
+        print(
+            "축\t실행\tn\t교집합 크기\t사람 제품 수\t분석 제외\t커버리지\t"
+            "일치율 (content_type은 참고용)",
+            file=out,
+        )
     for row in report.get("metrics", []):
         rate = "—" if row["rate"] is None else f"{row['rate']:.1%}"
         note = f" note: {row['note']}" if "note" in row else ""
+        coverage = "—" if row.get("coverage") is None else f"{row['coverage']:.1%}"
+        reason = f" ({row['not_analyzed_reason']})" if row.get("not_analyzed") else ""
         print(
             f"{row['axis']}\t{row['run']}\t{row['n']}\t"
-            f"{row['intersection_size']}\t{rate}{note}",
+            f"{row['intersection_size']}\t{row['human_product']}\t"
+            f"{row['not_analyzed']}{reason}\t{coverage}\t{rate}{note}",
             file=out,
         )
     for error in report["errors"]:
