@@ -35,7 +35,8 @@ _NON_PRODUCT = (
 _CLAIMS = "claims는 여럿 선택이며 쉼표로 구분한다(예: hydration,soothing)."
 _OBSERVATION = (
     "영상과 제목·캡션에서 관찰되는 것만 적는다. "
-    "자막·음성에 명시된 효능만 쓰고 분위기에서 추정하지 않는다. 확신이 없으면 other."
+    "영상 자막·음성 또는 캡션 본문 문장에 명시된 효능만 쓰고 "
+    "해시태그만 있는 경우는 제외한다. 분위기에서 추정하지 않는다. 확신이 없으면 other."
 )
 _KEY_RULE = "키 파일(pilot_key.json)은 라벨링을 마친 뒤에만 연다."
 _INGREDIENTS = "성분(ingredients)은 이 시범 시트의 라벨링 대상이 아니다."
@@ -80,7 +81,7 @@ def _label_axes(model: type[BaseModel]) -> list[tuple[str, type]]:
 
 
 def label_columns() -> list[str]:
-    """Flatten the v0 result axes, excluding the non-E1 ingredients field."""
+    """Flatten the v1 result axes, excluding the non-E1 ingredients field."""
     return [
         axis
         for model in (ContentTypeResult, HookResult, FullResult)
@@ -137,6 +138,11 @@ def parse_taxonomy(text: str) -> dict[str, AxisGuide]:
             current.ordered = True
         elif line.startswith("- "):
             current.bullets.append(line[2:].strip())
+            definition = re.fullmatch(r"- `([a-z_]+)`:\s*(.+)", line)
+            if definition:
+                current.definitions[definition.group(1)] = definition.group(
+                    2
+                ).removesuffix(".")
         elif line and not line.startswith(("|", ">")):
             for token, description in _TOKEN.findall(line):
                 if description:
@@ -177,7 +183,12 @@ def _value_note(
         # 미확정 쟁점은 값 이름이 없으면 그 절의 모든 값에 보여 준다.
         unresolved = bullet.startswith("**미확정")
         names_section_value = any(f"`{name}`" in bullet for name in guide.order)
-        if f"`{value}`" in bullet or (unresolved and not names_section_value):
+        shared_rule = not _TOKEN.search(bullet) or "고정 우선순위" in bullet
+        if (
+            f"`{value}`" in bullet
+            or shared_rule
+            or (unresolved and not names_section_value)
+        ):
             parts.append(bullet)
     return " ".join(parts)
 

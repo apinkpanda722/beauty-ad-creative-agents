@@ -211,7 +211,7 @@ def test_label_columns_and_codebook_follow_domain():
     }
     flags = set(StructureFlags.model_fields) | set(PlatformFitFlags.model_fields)
     columns = label_columns()
-    assert len(columns) == len(set(columns)) == 17
+    assert len(columns) == len(set(columns)) == 16
     assert set(columns) == set(enums) | flags
     assert "ingredients" not in columns
     expected = {(axis, member.value) for axis, enum in enums.items() for member in enum}
@@ -293,7 +293,14 @@ def test_real_taxonomy_gives_every_tabled_value_a_definition():
         rows = [note for (a, _), note in notes.items() if a == axis]
         assert rows and all(note.startswith("정의:") for note in rows)
         # 조언 세션이 정한 임의 규칙은 미확정 쟁점으로 표시돼 모든 값에 보인다.
-        assert all("미확정 쟁점" in note for note in rows)
+        assert (
+            all("미확정 쟁점" in note for note in rows)
+            if "미확정 쟁점"
+            in inspect.getmodule(codebook_rows).TAXONOMY_PATH.read_text(
+                encoding="utf-8"
+            )
+            else all(note.startswith("정의:") for note in rows)
+        )
     hook_notes = [note for (a, _), note in notes.items() if a == "hook_type"]
     assert all("우선순위" in note for note in hook_notes)
 

@@ -159,6 +159,8 @@ def test_every_enum_member_survives_analysis(
         for member in enum:
             data = payload(model)
             data[name] = [member.value] if name == "claims" else member.value
+            if name == "cta_type":
+                data["structure"]["has_cta"] = member is not CtaType.none
             raw = "\n```json\n" + json.dumps(data, ensure_ascii=False) + "\n```\n"
             fake = FakeInteract(raw)
             result = analyze(item, video_input_for(item), interact=fake, **call_kwargs)
@@ -442,9 +444,9 @@ def test_run_and_prompt_versions():
     assert FINAL_RUN_TAG == "v1"
     assert FINAL_RUN_TAG not in {"minimal", "default"}
     assert PROMPT_VERSIONS == {
-        "content_type": "content-type-v0",
-        "hook": "hook-v0",
-        "full": "full-v0",
+        "content_type": "content-type-v1",
+        "hook": "hook-v1",
+        "full": "full-v1",
     }
 
 

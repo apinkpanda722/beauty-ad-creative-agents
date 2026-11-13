@@ -156,7 +156,7 @@ def test_all_domain_values_validate_without_changing_raw_output(member, call_kwa
     assert result.model == "fake-response-model"
     assert result.attempts == 1
     assert result.error_code is None
-    assert result.prompt_version == HOOK_PROMPT_VERSION == "hook-v0"
+    assert result.prompt_version == HOOK_PROMPT_VERSION == "hook-v1"
 
 
 @pytest.mark.parametrize("thinking_level", ["minimal", "default", "high"])

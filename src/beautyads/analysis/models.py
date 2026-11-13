@@ -8,9 +8,9 @@ from beautyads.domain import Creative, CreativeKey, JobStatus, Source
 
 ANALYSIS_MODEL_ID = "gemini-3.6-flash"
 PROMPT_VERSIONS = {
-    "content_type": "content-type-v0",
-    "hook": "hook-v0",
-    "full": "full-v0",
+    "content_type": "content-type-v1",
+    "hook": "hook-v1",
+    "full": "full-v1",
 }
 FINAL_RUN_TAG = "v1"
 
