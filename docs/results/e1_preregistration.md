@@ -1,4 +1,4 @@
-# E1 사전 등록 (2026-11-13 커밋, §6은 11-18~19에 추가 커밋)
+# E1 사전 등록 (2026-11-13 커밋, §6은 2026-11-13 동결 뒤 추가 커밋)
 
 상태: **등록됨**. 결과를 보기 전에 커밋했다. step 2·3·6·8이 이 파일을 읽는다. §6(분류 동결 날짜, 프롬프트 버전, 모델 ID)은 해당 step 뒤에 별도 커밋으로 채운다. 그 외 절은 결과를 본 뒤 바꾸지 않는다.
 
@@ -37,11 +37,14 @@
 - 한계로 기록: 교집합 κ는 모델이 제품으로 본 소재에 대한 값이다. 누락은 재현율로만 드러나고, 두 축(κ와 재현율)이 모두 기준을 넘어야 그 라벨을 쓴다.
 - 모델이 `product_creative`로 보고 category를 `other`로 본 소재는 누락이 아니라 분석 제외이므로 `content_type` 재현율의 정의는 바뀌지 않고, 커버리지 손실 사유로 따로 세며, 사람 기준으로 지원 3종이었다면 `category` 축의 혼동으로도 드러난다(2026-11-13 추가).
 
-## 6. 분류 동결 (step 1·5 뒤에 채운다)
-- 부분 동결(`content_type`·`category`): 미기록 (2026-11-18 사용자 승인 뒤 추가 커밋)
-- 전체 v1 동결 날짜: 미기록 (사용자 승인 뒤 추가 커밋. 기록할 때 `전체 v1 동결: YYYY-MM-DD` 형식의 한 줄로 적는다)
-- `ANALYSIS_MODEL_ID`: 미기록 (step 5 뒤 추가 커밋)
-- `PROMPT_VERSIONS`: 미기록 (step 5 뒤 추가 커밋. content_type / hook / full 세 값)
+## 6. 분류 동결 (2026-11-13 기록)
+- 부분 동결(`content_type`·`category`): 2026-11-13, 사용자 승인. 정의는 `docs/TAXONOMY.md` §0·§10과 ADR-017(구현 커밋 167fa36).
+- 전체 v1 동결: 2026-11-13
+  - 사용자 승인으로 예정일(11-19)보다 앞당겼다. E1 1단계가 11-13에 끝나 2단계 라벨링과 7일 재라벨 일정에 여유를 만들기 위함이며 2단계 라벨링과 일괄 분석 전이므로 사전 등록 위반이 아니다. 정의는 `docs/TAXONOMY.md`(v1)와 ADR-018, 구현 커밋 98f1fec.
+  - 결정 요약: `has_hook_segment` 축 제거, `has_cta` ⇔ `cta_type != none`(스키마 검증), `claims`는 자막·음성과 캡션 본문 문장 인정(해시태그만이면 제외), 다중 CTA 고정 우선순위, format 우선순위·`ordinary_person` 정의 문구 정리.
+- `ANALYSIS_MODEL_ID`: gemini-3.6-flash
+- `PROMPT_VERSIONS`: content-type-v1 / hook-v1 / full-v1 (`analysis/models.py`)
+- 분석 실행 조건(2026-11-13 결정): `thinking_level` minimal, Gemini 누적 상한 $12(필요 시 $14까지).
 - `analyze-target`(step 6)은 이 절에 `전체 v1 동결: YYYY-MM-DD` 줄과 현재 코드의 `ANALYSIS_MODEL_ID`·`PROMPT_VERSIONS` 세 값 문자열이 모두 있어야 시작한다.
 
 ## 7. 정정 기록 (2026-11-13): E1 1단계 사용 범위와 2단계 표집
