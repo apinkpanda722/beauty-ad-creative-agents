@@ -19,10 +19,27 @@
 
 ## 작업
 
-**수정할 파일**: `docs/TAXONOMY.md`, `docs/ADR.md`, `src/beautyads/domain/labels.py`, `src/beautyads/analysis/models.py`, `src/beautyads/analysis/prompts.py`, `src/beautyads/eval/sheets.py`, `tests/test_taxonomy_freeze.py`, `tests/test_analysis_full.py`, `tests/test_pilot_sheet.py`, `tests/test_domain.py`
+**수정할 파일**: `docs/TAXONOMY.md`, `docs/ADR.md`, `src/beautyads/domain/labels.py`, `src/beautyads/analysis/models.py`, `src/beautyads/analysis/prompts.py`, `src/beautyads/eval/sheets.py`, `tests/test_taxonomy_freeze.py`, `tests/test_analysis_full.py`, `tests/test_pilot_sheet.py`, `tests/test_domain.py`, `tests/test_analysis.py`
 
 열람 금지 경로: `data/interim/`
-수정 허용 경로: `docs/TAXONOMY.md`(§1~§8과 헤더·초안 표시의 v1 동결 표기에 한함. §1~§4는 `## 확정된 결정
+수정 허용 경로: `docs/TAXONOMY.md`(§1~§8과 헤더·초안 표시의 v1 동결 표기에 한함, §1~§4는 확정된 결정 6번 (a)~(d)의 문구에 한함), `docs/ADR.md`(새 ADR 하나를 끝에 추가하는 것에 한함), `src/beautyads/domain/labels.py`(`## 확정된 결정`이 요구하는 변경에 한함), `src/beautyads/analysis/models.py`(`PROMPT_VERSIONS` 값 갱신에 한함), `src/beautyads/analysis/prompts.py`(`## 확정된 결정`이 요구하는 프롬프트 변경에 한함), `src/beautyads/eval/sheets.py`(코드북·시트가 새 축 구성을 따르게 하는 것에 한함), `tests/test_taxonomy_freeze.py`(축 확장에 한함), `tests/test_analysis_full.py`(`test_run_and_prompt_versions`의 `PROMPT_VERSIONS` 기대값 한 군데에 한함, 다른 단언 약화 금지), `tests/test_pilot_sheet.py`(`test_real_taxonomy_gives_every_tabled_value_a_definition`의 "미확정 쟁점" 단언 한 줄에 한함, 다른 단언 약화 금지), `tests/test_domain.py`(축을 제거하는 결정이 있을 때 그 필드를 가리키는 단언에 한함), `tests/test_analysis.py`(프롬프트 버전 hook-v0을 기대하는 단언의 기대값 갱신에 한함, 다른 단언 약화 금지)
+열람 금지의 범위: 이 금지는 **Codex 세션이 해당 경로의 파일을 직접 열람·출력·인용하는 것**에 대한 것이다. 이 step의 코드가 런타임에 그 경로를 다루는 것(기본 입력·출력 경로 등)은 대상이 아니다. 테스트가 그 경로의 실제 파일 **내용**을 읽는 것은 여전히 금지이며 테스트는 임시 디렉터리와 합성 데이터만 쓴다.
+
+소비자 테스트 점검 결과: `tests/test_analysis.py`·`tests/test_analyze_runner.py`·`tests/test_media_flow.py`는 `domain/labels.py`의 enum(`HookType` 등)과 `analysis/models.py`를 import한다. 이 step이 값·필드를 바꿔 이 테스트들의 단언이 깨지면(수정 허용 경로에 없다) 고치지 말고 `blocked`로 보고한다. `scripts/test_step_files.py`는 `docs/ADR.md`를 참조하지만 ADR을 끝에 추가하는 것은 영향이 없다.
+
+> **이 step은 사용자의 전체 v1 동결 승인(2026-11-13) 뒤에만 실행한다.** 승인은 예정일(11-19)보다 앞당겨졌다(E1 1단계가 11-13에 끝나 2단계 라벨링·7일 재라벨 일정에 여유를 만들기 위함이며 사전 등록 위반이 아니다). 아래 확정된 결정 절에 승인된 내용이 붙어 있다. 비어 있으면 코드를 쓰지 않고 `blocked`로 보고한다. reason에 "확정된 결정 절이 비어 있음"을 적는다.
+
+**전체 v1 동결**: 나머지 축의 정의를 고정하고 프롬프트 버전을 올린다. 이 동결은 E1 2단계 라벨링 전이고 일괄 분석(`analyze-target`) 전이다. 시범(`@minimal`·`@default`) 결과는 v0 프롬프트의 것이므로 `@v1`과 섞지 않는다(`FINAL_RUN_TAG`가 이미 분리한다).
+
+1. **TAXONOMY 미확정 쟁점 4건을 `## 확정된 결정`대로 문서에 반영하고 해당 "미확정 쟁점" 문구를 지운다**: (a) `has_hook_segment`(정의 확정 **또는** 축 제거), (b) `has_cta`와 `cta_type`의 연동(`has_cta` ⇔ `cta_type != none`이 확정되면 `FullResult`에 이 관계를 강제하는 검증을 둔다), (c) `claims`에 캡션 본문 문장을 인정할지(현재 분석 프롬프트는 제목·캡션을 "참고" 입력으로 넣는다 — 확정된 결정과 프롬프트의 입력 설명이 일치해야 한다), (d) 다중 CTA 선택 규칙. 문서 헤더의 버전을 `v1`로 바꾸고 동결 날짜를 적는다.
+2. **코드가 문서를 따르게 한다**: 결정이 값 목록·필드를 바꾸면 `domain/labels.py`, `analysis/prompts.py`, `eval/sheets.py`를 함께 고친다(값은 문서가 정하고 코드가 따른다). 축을 제거하면 그 축을 가리키는 `StructureFlags`·프롬프트·코드북 열·테스트 단언이 한꺼번에 바뀌어야 한다(일부만 바꾸면 테스트가 깨진다).
+3. **`PROMPT_VERSIONS`를 v1로 올린다**: `analysis/models.py`의 세 값(`content_type`·`hook`·`full`)을 새 버전 문자열로 바꾼다. `ANALYSIS_MODEL_ID`와 `FINAL_RUN_TAG`는 바꾸지 않는다. 프롬프트 본문이 바뀐 축은 버전도 바뀌어야 한다(본문이 바뀌지 않은 축의 버전을 올릴지는 `## 확정된 결정`을 따른다).
+4. **기존 단언 두 개를 새 계약으로 바꾼다(그 줄만)**: `tests/test_analysis_full.py::test_run_and_prompt_versions`의 `PROMPT_VERSIONS` 기대값(코드 상수이며 모델이 만든 값이 아니다), `tests/test_pilot_sheet.py::test_real_taxonomy_gives_every_tabled_value_a_definition`의 `cta_type`·`claims` "미확정 쟁점" 단언(문서에서 쟁점이 해소되어 표시가 사라지므로, 문서에 표시가 **있으면** 모든 값 note에 보이고 **없으면** `정의:`로 시작하기만 하면 되는 형태로). 나머지 단언(`정의:` 접두, true/false 문구, `FINAL_RUN_TAG == "v1"`, 시범 태그와 겹치지 않음)은 그대로 둔다.
+5. **`tests/test_taxonomy_freeze.py`를 모든 축으로 넓힌다**: `domain` 값 목록(모든 닫힌 값 축)과 `docs/TAXONOMY.md`의 값 집합이 같고, 불리언 열이 문서의 열과 같으며, 값마다 정의가 있고, 문서에 "미확정 쟁점"이 하나도 남아 있지 않고(결정이 모두 끝났다는 뜻), 문서 헤더가 v1 동결 날짜를 갖는지 검사한다. 값 목록은 테스트가 정하지 않고 문서·enum에서 읽는다.
+6. **`docs/ADR.md` 끝에 ADR 하나를 추가한다**: 결정(전체 v1 동결, 날짜 2026-11-13, 확정된 결정 1~6번의 요약), 이유(2단계 라벨링과 일괄 분석이 같은 기준을 써야 한다; 동결을 예정일 11-19보다 앞당긴 사유: E1 1단계가 11-13에 끝나 2단계 라벨링·7일 재라벨 일정에 여유를 만든다), 트레이드오프(시범 v0 결과와 v1 결과가 달라 직접 비교하지 않는다, 시범 사람 라벨은 옛 규칙(마지막 CTA 등)이므로 E1 판정에 시범을 쓰지 않는다).
+7. **사전 등록 파일(`docs/results/e1_preregistration.md`)은 이 step이 고치지 않는다.** 구현 세션이 이 step 뒤에 전체 동결 날짜·프롬프트 버전 3개·`ANALYSIS_MODEL_ID`를 기록해 별도로 커밋한다. `analyze-target`(step 6)은 그 기록이 없으면 시작하지 않는다.
+
+## 확정된 결정
 
 사용자가 조언 세션의 권고를 전부 승인했다(2026-11-13). 동결 날짜는 모든 곳(TAXONOMY 헤더, ADR, 사전 등록 §6)에서 **2026-11-13**이다.
 
