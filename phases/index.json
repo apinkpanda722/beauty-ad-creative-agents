@@ -12,7 +12,8 @@
     },
     {
       "dir": "3-collect-freeze",
-      "status": "pending"
+      "status": "blocked",
+      "blocked_at": "2026-11-13T15:11:06+0900"
     }
   ]
 }
