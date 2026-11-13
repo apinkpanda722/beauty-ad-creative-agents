@@ -34,7 +34,16 @@
     {
       "step": 1,
       "name": "taxonomy-partial",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-13T16:44:09+0900",
+      "summary": "content_type·category 승인 정의 부분 동결, category 표 전환, ADR-017 및 문서·enum 일치와 누락·빈 정의 검증 테스트 추가; make verify 통과(1518 tests).",
+      "completed_at": "2026-11-13T16:46:58+0900",
+      "usage": {
+        "input_tokens": 884397,
+        "cached_input_tokens": 805632,
+        "output_tokens": 5391,
+        "attempts": 1
+      }
     },
     {
       "step": 2,
