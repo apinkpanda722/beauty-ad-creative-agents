@@ -188,6 +188,8 @@ Instagram 주소 재조회가 사용량 한도로 도중에 멈추면 못 찾은
 `MEDIA_REFRESH_STOPPED`(재시도 대상)로 기록하고, 재조회가 끝까지 돌았는데도 없으면
 `MEDIA_URL_MISSING`으로 확정한다. 키가 사라진 게시물(`MEDIA_URL_GONE`)과는 다르다.
 `--retry-missing`은 호출 전 점검과 비용 상한 검사를 시범과 똑같이 한다.
+재시도 출력에는 `REFRESH_SCAN` 줄이 계정마다 붙는다. 스캔한 쪽수(`pages`), 못 찾은 게시물 수(`remaining`),
+마지막 앱 사용량 세 지표(`usage`), 중단 코드(`stopped`)이며, 사용량이 높아 멈춘 시점을 보여 준다.
 
 출력은 실행 태그별 상태 분포, 이번 실행의 `gemini_cost_usd`, 분할 파일의
 `split_sha256`, 네 파일의 경로다. 기본 출력 폴더 `data/interim/pilot` 아래에

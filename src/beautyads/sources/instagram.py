@@ -322,13 +322,34 @@ def refresh_media_urls(
     now: datetime,
     max_pages: int = 5,
     usage_stop_pct: float = 80.0,
+    scan_log: list[dict[str, Any]] | None = None,
 ) -> RefreshResult:
-    """Rescan an account; URLs remain transient even if their expiry is unchanged."""
+    """Rescan an account; URLs remain transient even if their expiry is unchanged.
+
+    `scan_log` receives one entry per scan (pages fetched, ids still unfound, the last
+    app-usage values and the stop code) so callers can see where a scan ended.
+    """
     urls: dict[str, str] = {}
     gone: set[str] = set()
     missing = set(wanted_ids)
     after = None
     seen: set[str] = set()
+    pages = 0
+    last_usage: dict[str, float] | None = None
+
+    def finish(stopped: str | None) -> RefreshResult:
+        if scan_log is not None:
+            scan_log.append(
+                {
+                    "account": account.username,
+                    "pages": pages,
+                    "remaining": len(missing),
+                    "stopped": stopped,
+                    "usage": last_usage,
+                }
+            )
+        return RefreshResult(urls, gone, missing, stopped)
+
     for _ in range(max_pages):
         if not missing:
             break
@@ -342,11 +363,16 @@ def refresh_media_urls(
             )
         except InstagramError as error:
             stopped = error.code
+            if error.usage is not None:
+                last_usage = error.usage
             if error.code not in _STOP_ERRORS and _usage_high(
                 error.usage_pct, usage_stop_pct
             ):
                 stopped = "INSTAGRAM_USAGE_HIGH"
-            return RefreshResult(urls, gone, missing, stopped)
+            return finish(stopped)
+        pages += 1
+        if page.usage is not None:
+            last_usage = page.usage
         for post in page.posts:
             source_id = post.get("id")
             if not isinstance(source_id, (str, int)):
@@ -361,8 +387,8 @@ def refresh_media_urls(
             elif post.get("media_type") == "VIDEO" and isinstance(url, str) and url:
                 urls[source_id] = url
         if _usage_high(page.usage_pct, usage_stop_pct):
-            return RefreshResult(urls, gone, missing, "INSTAGRAM_USAGE_HIGH")
+            return finish("INSTAGRAM_USAGE_HIGH")
         after = page.next_after
         if after is None:
             break
-    return RefreshResult(urls, gone, missing, None)
+    return finish(None)

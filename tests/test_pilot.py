@@ -753,7 +753,7 @@ def _fail(rig, key, code, status=JobStatus.failed, tag="default"):
 
 def _retry(rig, **kwargs):
     return pilot.retry_pilot(
-        rig.deps,
+        kwargs.pop("deps", rig.deps),
         tag=kwargs.pop("tag", "default"),
         content_type_window_s=2,
         full_window_s=4,
@@ -812,6 +812,30 @@ def test_retry_reruns_only_refresh_failures_and_never_rewrites_sheet_or_key(rig)
         rig.store.jobs["content_type@minimal", stopped_key].status == JobStatus.failed
     )
     assert report.files["key"].read_bytes() == before["pilot_key.json"]
+
+
+def test_retry_summary_reports_refresh_scan_usage_and_stop_point(rig):
+    for tag in pilot.RUN_TAGS:
+        rig.store.enqueue_analysis(f"content_type@{tag}", rig.items)
+    run(rig)
+    key = rig.fake.call_args_list[0].args[0].key
+    _fail(rig, key, "MEDIA_REFRESH_STOPPED")
+    scan = {
+        "account": "account",
+        "pages": 2,
+        "remaining": 1,
+        "stopped": "INSTAGRAM_USAGE_HIGH",
+        "usage": {"call_count": 3, "total_cputime": 2, "total_time": 81},
+    }
+    log = [scan]
+    result = _retry(rig, deps=rig.deps._replace(scan_log=log))
+    assert result.refresh_scans == [scan]
+    lines = [
+        line
+        for line in rig.out.getvalue().splitlines()
+        if line.startswith("REFRESH_SCAN ")
+    ]
+    assert [json.loads(line.removeprefix("REFRESH_SCAN ")) for line in lines] == [scan]
 
 
 def test_retry_with_nothing_to_retry_makes_no_call_and_no_file(rig):

@@ -530,6 +530,35 @@ def test_refresh_usage_stop_keeps_matches(token):
     assert len(get.calls) == 1
 
 
+def test_refresh_scan_log_records_usage_pages_and_stop_point(token):
+    usage = '{"call_count": 3, "total_cputime": 2, "total_time": 81}'
+    get = FakeGet(
+        reply(body()),
+        reply(
+            last_page("business_discovery_without_media_url"),
+            headers={"x-app-usage": usage},
+        ),
+    )
+    log: list = []
+    result = refresh(get, token, ["not-found"], scan_log=log)
+    assert result.stopped == "INSTAGRAM_USAGE_HIGH"
+    assert len(log) == 1
+    entry = log[0]
+    assert entry["account"] == account().username
+    assert entry["pages"] == 2
+    assert entry["remaining"] == 1
+    assert entry["stopped"] == "INSTAGRAM_USAGE_HIGH"
+    assert entry["usage"] == {"call_count": 3, "total_cputime": 2, "total_time": 81}
+
+
+def test_refresh_scan_log_is_optional_and_records_clean_scans(token):
+    video = next(post for post in posts(body()) if post.get("media_type") == "VIDEO")
+    log: list = []
+    refresh(FakeGet(reply(body())), token, [video.get("id")], scan_log=log)
+    assert [(e["pages"], e["remaining"], e["stopped"]) for e in log] == [(1, 0, None)]
+    refresh(FakeGet(reply(body())), token, [video.get("id")])
+
+
 @pytest.mark.parametrize("code", [110, 190, 4, 17, 32, 613, 100])
 def test_refresh_returns_sanitized_error_without_retry(token, code):
     get = FakeGet(error_reply(code, token))

@@ -13,7 +13,7 @@ from functools import partial
 from io import StringIO
 from math import isfinite
 from pathlib import Path
-from typing import NamedTuple, TextIO
+from typing import Any, NamedTuple, TextIO
 
 from pydantic import BaseModel
 
@@ -84,6 +84,8 @@ class PilotDeps(NamedTuple):
     analysis: AnalysisDeps
     store: MediaStore
     now: Callable[[], datetime]
+    # 재시도 요약이 읽는 Instagram 스캔 기록(사용량·중단 시점). 실서비스 조립만 채운다.
+    scan_log: list[dict[str, Any]] | None = None
 
 
 class PilotReport(BaseModel):
@@ -105,6 +107,7 @@ class RetryReport(BaseModel):
     stopped: str | None
     gemini_cost_usd: float
     supplement: Path | None
+    refresh_scans: list[dict[str, Any]] = []
 
 
 class PilotError(Exception):
@@ -403,6 +406,9 @@ def retry_pilot(
     )
     if report.stopped:
         print(f"STOPPED {report.stopped}", file=out)
+    scans = list(deps.scan_log or [])
+    for scan in scans:
+        print(f"REFRESH_SCAN {json.dumps(scan, sort_keys=True)}", file=out)
     result = RetryReport(
         tag=tag,
         retried=len(failed),
@@ -410,6 +416,7 @@ def retry_pilot(
         stopped=report.stopped,
         gemini_cost_usd=provider_total(ledger_path, "gemini") - initial_cost,
         supplement=supplement,
+        refresh_scans=scans,
     )
     print(result.model_dump_json(), file=out)
     return result
@@ -422,6 +429,7 @@ def _live_deps(*, environ, env_file, stack: ExitStack) -> PilotDeps:
         for account in load_instagram_accounts(Path("config/sources.yaml"))
     }
     gemini_key = require_setting("GEMINI_API_KEY", environ=environ, env_file=env_file)
+    scan_log: list[dict[str, Any]] = []
     refresh = partial(
         refresh_media_urls,
         with_retries(instagram_httpx_get),
@@ -433,6 +441,7 @@ def _live_deps(*, environ, env_file, stack: ExitStack) -> PilotDeps:
             environ=environ,
             env_file=env_file,
         ),
+        scan_log=scan_log,
     )
 
     def now():
@@ -468,7 +477,7 @@ def _live_deps(*, environ, env_file, stack: ExitStack) -> PilotDeps:
         sleep=time.sleep,
         now=now,
     )
-    return PilotDeps(analysis, store, now)
+    return PilotDeps(analysis, store, now, scan_log)
 
 
 def _n(value: str) -> int:
