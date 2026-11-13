@@ -22,8 +22,14 @@ ROOT = Path(__file__).resolve().parents[1]
 def config_data():
     return {
         "seed": 20261112,
-        "stage1": {"min_labeled": 4, "max_labeled": 8, "target_product": 2},
-        "stage2": {"size": 2},
+        "stage1": {
+            "min_labeled": 4,
+            "max_labeled": 8,
+            "target_product": 2,
+            "use_all_labeled": False,
+        },
+        "stage2": {"size": 2, "categories": ["mask_pack", "serum_ampoule", "sun_care"]},
+        "accepted_stage1_provenance": {},
         "sources": ["youtube", "instagram"],
         "dedupe": {
             "youtube": ["source", "account", "title", "caption"],

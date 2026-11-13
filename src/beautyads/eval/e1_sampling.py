@@ -55,6 +55,9 @@ class Stage1Config(BaseModel):
     min_labeled: int = Field(gt=0)
     max_labeled: int = Field(gt=0)
     target_product: int = Field(gt=0)
+    # True: use every labeled row up to max_labeled instead of stopping at the first
+    # point that meets min_labeled and target_product (registration correction 2026-11-13).
+    use_all_labeled: bool
 
     @model_validator(mode="after")
     def ordered_limits(self):
@@ -69,7 +72,19 @@ class Stage1Config(BaseModel):
 class Stage2Config(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
+    # Upper bound. When fewer eligible items exist, all of them are taken (census).
     size: int = Field(gt=0)
+    # Supported categories only: `other` products never get hook/full analysis, so
+    # they cannot be compared with model labels (registration correction 2026-11-13).
+    categories: list[Literal["mask_pack", "serum_ampoule", "sun_care"]] = Field(
+        min_length=1
+    )
+
+    @model_validator(mode="after")
+    def distinct_categories(self):
+        if len(set(self.categories)) != len(self.categories):
+            raise ValueError("duplicate stage2 categories")
+        return self
 
 
 class DedupeConfig(BaseModel):
@@ -97,6 +112,11 @@ class E1Config(BaseModel):
     seed: int
     stage1: Stage1Config
     stage2: Stage2Config
+    # Hashes of the registration/config files that were current when the first-stage
+    # sheet was generated; stage two accepts a first-stage key recorded under them.
+    accepted_stage1_provenance: dict[
+        Literal["preregistration_sha256", "config_sha256"], list[str]
+    ]
     sources: list[Literal["youtube", "instagram"]]
     dedupe: DedupeConfig
 

@@ -9,6 +9,7 @@ from unittest.mock import Mock
 
 import pytest
 import yaml
+from pydantic import ValidationError
 
 from beautyads.eval import e1_sampling as e1
 from beautyads.eval import e1_stage2 as stage2
@@ -30,8 +31,14 @@ def workspace(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     config = {
         "seed": 1,
-        "stage1": {"min_labeled": 4, "max_labeled": 8, "target_product": 3},
-        "stage2": {"size": 3},
+        "stage1": {
+            "min_labeled": 4,
+            "max_labeled": 8,
+            "target_product": 3,
+            "use_all_labeled": False,
+        },
+        "stage2": {"size": 3, "categories": ["mask_pack", "serum_ampoule", "sun_care"]},
+        "accepted_stage1_provenance": {},
         "sources": ["youtube", "instagram"],
         "dedupe": {
             "youtube": ["source", "account", "title", "caption"],
@@ -203,11 +210,99 @@ def test_stage2_rounds_fill_available_strata_before_reusing(workspace):
     write_labels(labels, rows)
     loaded = stage2.read_stage1_labels(labels, key, config)
     selected = stage2.select_stage2(loaded.items, config, 5)
-    assert {(item.source, item.category) for item in selected.items} == {
-        ("youtube", "other"),
-        ("youtube", "mask_pack"),
-        ("instagram", "mask_pack"),
+    # `other` is not eligible (registration correction 2026-11-13); both sources fill.
+    assert {item.category for item in selected.items} == {"mask_pack"}
+    assert {item.source for item in selected.items} == {"youtube", "instagram"}
+    assert selected.mode == "sample" and len(selected.items) == 3
+    assert selected.eligible_count == 7 and selected.not_eligible_product_count == 1
+
+
+def test_stage2_excludes_other_and_takes_every_eligible_item_as_census(workspace):
+    _, labels, key, rows, config = workspace
+    for i, row in enumerate(rows):
+        row["content_type"] = "product_creative"
+        row["category"] = ["other", "other", "other", "serum_ampoule", "sun_care"][
+            min(i, 4)
+        ]
+    write_labels(labels, rows)
+    loaded = stage2.read_stage1_labels(labels, key, config)
+    config = config.model_copy(
+        update={"stage2": config.stage2.model_copy(update={"size": 10})}
+    )
+    selected = stage2.select_stage2(loaded.items, config, 1)
+    categories = [item.category for item in selected.items]
+    # rows 3.. are serum_ampoule (1) and sun_care (4): everything eligible is taken.
+    assert selected.mode == "census" and selected.eligible_count == 5
+    assert len(selected.items) == 5 and "other" not in categories
+    assert selected.not_eligible_product_count == 3
+    assert selected.shortfall["total"] == 5
+    assert selected.shortfall["note"] == stage2.SHORTFALL_CENSUS_NOTE
+    assert {item.item_id for item in selected.items} == {
+        item.item_id for item in loaded.items if item.category != "other"
     }
+    # the blind order does not depend on input order
+    assert selected == stage2.select_stage2(list(reversed(loaded.items)), config, 1)
+
+
+def test_use_all_labeled_ignores_the_first_stop_point(workspace):
+    _, labels, key, _, config = workspace
+    loaded = stage2.read_stage1_labels(labels, key, config)
+    assert stage2.stop_point(loaded, config).position == 5
+    everything = config.model_copy(
+        update={"stage1": config.stage1.model_copy(update={"use_all_labeled": True})}
+    )
+    stop = stage2.stop_point(loaded, everything)
+    assert (stop.position, stop.unused_count) == (8, 0)
+    capped = everything.model_copy(
+        update={"stage1": everything.stage1.model_copy(update={"max_labeled": 6})}
+    )
+    stop = stage2.stop_point(loaded, capped)
+    assert (stop.position, stop.unused_count) == (6, 2)
+
+
+def test_stage2_accepts_only_listed_earlier_registration_hashes(workspace):
+    folder, _, key, _, _ = workspace
+    old_config_hash = e1.sha256_of(Path("config/e1_sampling.yaml"))
+    old_prereg_hash = e1.sha256_of(Path("docs/results/e1_preregistration.md"))
+    # the registration and config change after the first-stage sheet was made
+    Path("docs/results/e1_preregistration.md").write_text("corrected registration")
+    document = yaml.safe_load(Path("config/e1_sampling.yaml").read_text())
+    document["stage2"]["size"] = 4
+    Path("config/e1_sampling.yaml").write_text(yaml.safe_dump(document))
+    before = {p.name: p.read_bytes() for p in folder.iterdir()}
+    code, text = call_main(folder)
+    assert code == 2 and "LABEL_FILE_INVALID" in text
+    assert before == {p.name: p.read_bytes() for p in folder.iterdir()}
+    # listing only one of the two hashes is still not enough
+    document["accepted_stage1_provenance"] = {"config_sha256": [old_config_hash]}
+    Path("config/e1_sampling.yaml").write_text(yaml.safe_dump(document))
+    code, text = call_main(folder)
+    assert code == 2 and "LABEL_FILE_INVALID" in text
+    document["accepted_stage1_provenance"] = {
+        "config_sha256": [old_config_hash],
+        "preregistration_sha256": [old_prereg_hash],
+    }
+    Path("config/e1_sampling.yaml").write_text(yaml.safe_dump(document))
+    code, text = call_main(folder)
+    assert code == 0, text
+    written = json.loads((folder / "e1_stage2_key.json").read_text())
+    assert written["stage1_recorded_provenance"] == {
+        "preregistration_sha256": old_prereg_hash,
+        "config_sha256": old_config_hash,
+    }
+    assert written["mode"] in {"census", "sample"}
+    assert key.exists()
+
+
+@pytest.mark.parametrize(
+    "categories", [[], ["other"], ["mask_pack", "mask_pack"], ["unknown"]]
+)
+def test_stage2_categories_must_be_supported_distinct_values(workspace, categories):
+    _, _, _, _, config = workspace
+    data = config.model_dump()
+    data["stage2"]["categories"] = categories
+    with pytest.raises(ValidationError):
+        e1.E1Config.model_validate(data)
 
 
 @pytest.mark.parametrize(
@@ -278,6 +373,7 @@ def test_product_shortfall_is_success(workspace):
     write_labels(labels, rows[:2])
     code, text = call_main(folder)
     assert code == 0 and "E1_PRODUCT_SHORTFALL 2" in text
+    assert "SHORTFALL_NOTE 전수 모드라 참고용" in text
     document = json.loads((folder / "e1_stage2_key.json").read_text())
     assert len(document["items"]) == 1
     assert document["shortfall"]["total"] == 2

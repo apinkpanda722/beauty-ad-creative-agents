@@ -152,43 +152,73 @@ def stop_point(labels: Stage1Labels, config: E1Config) -> StopPoint:
         scope.append(item)
         products += item.content_type == "product_creative"
         if (
-            len(scope) >= config.stage1.min_labeled
+            not config.stage1.use_all_labeled
+            and len(scope) >= config.stage1.min_labeled
             and products >= config.stage1.target_product
         ):
             break
     return StopPoint(scope, len(scope), products, len(labels.items) - len(scope))
 
 
+SHORTFALL_CENSUS_NOTE = "전수 모드라 참고용"
+
+
 class Stage2Selection(NamedTuple):
     items: list[HumanItem]
     shortfall: dict
+    mode: str = "sample"  # "census" when every eligible item fits within size
+    eligible_count: int = 0
+    not_eligible_product_count: int = 0  # human products outside stage2.categories
 
 
 def select_stage2(
     labels_in_scope: Sequence[HumanItem], config: E1Config, seed: int
 ) -> Stage2Selection:
-    grouped = defaultdict(list)
-    for item in labels_in_scope:
-        if item.content_type == "product_creative":
+    """Human-product items in the supported categories; `other` is not eligible.
+
+    At most `size` items: a census when the eligible pool fits, otherwise the
+    (source, category) round-robin used before.
+    """
+    allowed = set(config.stage2.categories)
+    products = [i for i in labels_in_scope if i.content_type == "product_creative"]
+    eligible = [i for i in products if i.category in allowed]
+    size = config.stage2.size
+    if len(eligible) <= size:
+        mode = "census"
+        selected = sorted(eligible, key=lambda item: item.source_id)
+    else:
+        mode = "sample"
+        grouped = defaultdict(list)
+        for item in eligible:
             grouped[item.source, item.category].append(item)
-    selected = round_robin(
-        grouped,
-        size=config.stage2.size,
-        seed=seed,
-        identity=lambda item: item.source_id,
-    )
-    counts = Counter({key: len(items) for key, items in grouped.items()})
-    # Every codebook category, including other, remains eligible for human products.
-    categories = {row["value"] for row in e1_codebook(("category",), 1)}
+        selected = round_robin(
+            grouped, size=size, seed=seed, identity=lambda item: item.source_id
+        )
+    counts = Counter((item.source, item.category) for item in eligible)
     shortfall = stratum_shortfall(
         counts,
-        [(source, category) for source in config.sources for category in categories],
-        config.stage2.size,
+        [(source, category) for source in config.sources for category in allowed],
+        size,
         len(selected),
     )
+    if mode == "census":
+        shortfall["note"] = SHORTFALL_CENSUS_NOTE
     # The second-stage labeling order is blind and independently shuffled.
     random.Random(seed).shuffle(selected)
-    return Stage2Selection(selected, shortfall)
+    return Stage2Selection(
+        selected, shortfall, mode, len(eligible), len(products) - len(eligible)
+    )
+
+
+def provenance_accepted(recorded: dict, current: dict, config: E1Config) -> bool:
+    """Recorded hashes must be current or explicitly listed as the stage-1 hashes."""
+    if recorded.get("seed") != config.seed:
+        return False
+    for name, value in current.items():
+        got = recorded.get(name)
+        if got != value and got not in config.accepted_stage1_provenance.get(name, []):
+            return False
+    return True
 
 
 def main(argv=None, *, out=None) -> int:
@@ -209,13 +239,7 @@ def main(argv=None, *, out=None) -> int:
         config, provenance = provenance_files()
         paths = output_paths(args.out_dir, 2)
         labels = read_stage1_labels(args.labels, args.key, config)
-        if (
-            any(
-                labels.provenance.get(name) != value
-                for name, value in provenance.items()
-            )
-            or labels.provenance.get("seed") != config.seed
-        ):
+        if not provenance_accepted(labels.provenance, provenance, config):
             raise E1Error("LABEL_FILE_INVALID")
         ensure_new_outputs(paths)
         stop = stop_point(labels, config)
@@ -253,6 +277,12 @@ def main(argv=None, *, out=None) -> int:
             "product_count": stop.product_count,
             "unused_count": stop.unused_count,
             "shortfall": selection.shortfall,
+            "mode": selection.mode,
+            "eligible_count": selection.eligible_count,
+            "not_eligible_product_count": selection.not_eligible_product_count,
+            "stage1_recorded_provenance": {
+                name: labels.provenance.get(name) for name in provenance
+            },
             "generated_at": datetime.now(UTC).isoformat(),
             "items": items,
         }
@@ -278,6 +308,8 @@ def main(argv=None, *, out=None) -> int:
                 f"E1_PRODUCT_SHORTFALL {config.stage1.target_product - stop.product_count}",
                 file=out,
             )
+        if selection.mode == "census":
+            print(f"SHORTFALL_NOTE {SHORTFALL_CENSUS_NOTE}(층별 shortfall)", file=out)
         print(
             json.dumps(
                 {
@@ -285,6 +317,9 @@ def main(argv=None, *, out=None) -> int:
                     "product_count": stop.product_count,
                     "unused_count": stop.unused_count,
                     "shortfall": selection.shortfall,
+                    "mode": selection.mode,
+                    "eligible_count": selection.eligible_count,
+                    "not_eligible_product_count": selection.not_eligible_product_count,
                     "selected": len(selection.items),
                     "files": {k: str(v) for k, v in paths.items()},
                 },

@@ -125,3 +125,7 @@ make verify   # lint + test 통과
 - `docs/results/`의 사전 등록 파일을 만들거나 고치지 마라(읽는 것은 허용된다). `data/interim/`의 파일은 만들거나 고치거나 읽지 마라. 이유: 사전 등록은 구현 세션이 커밋하고(읽기 전용) `data/interim`은 열람 금지다.
 - 기존 시범 코드(`pilot.py`, `sheets.py`, `pilot_run.py`)를 수정하지 마라(읽고 재사용만). 이유: 사용자가 이미 시범 라벨링을 끝냈고 파일 형식이 바뀌면 `pilot-compare`가 깨진다.
 - 이미 있는 산출물을 덮어쓰지 마라(`E1_OUTPUT_EXISTS`). 이유: 라벨링이 시작된 시트가 바뀌면 사람의 라벨이 헛수고가 된다.
+
+## 정정 기록 (2026-11-13, 실행 뒤 반영)
+
+step 2 실행 뒤 E1 1단계 라벨링 결과(`other`가 제품의 67%)를 보고 사전 등록 §7로 정정했다. 이 step 파일의 "멈춘 위치"와 "2단계 추출" 설명은 아래로 대체된다(구현은 `config/e1_sampling.yaml`의 `stage1.use_all_labeled`, `stage2.categories`, `accepted_stage1_provenance`와 `e1_stage2.py`에 반영됨): 1단계는 라벨링한 건수 전부(상한 200)를 쓰고, 2단계는 사람 제품 중 지원 3종(`other` 제외)만 대상으로 `stage2.size`(50) 이하이면 전수, 넘으면 (출처, category) 층화로 뽑으며, 1단계 키 파일의 사전 등록·설정 해시가 정정 전 값이면 설정의 허용 목록에 한해 받아들인다.
