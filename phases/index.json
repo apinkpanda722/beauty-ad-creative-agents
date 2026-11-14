@@ -12,8 +12,9 @@
     },
     {
       "dir": "3-collect-freeze",
-      "status": "blocked",
-      "blocked_at": "2026-11-13T22:54:27+0900"
+      "status": "completed",
+      "blocked_at": "2026-11-13T22:54:27+0900",
+      "completed_at": "2026-11-14T23:05:58+0900"
     }
   ]
 }
