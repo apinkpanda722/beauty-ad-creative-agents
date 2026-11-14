@@ -548,3 +548,17 @@ def main(argv: Sequence[str] | None = None, *, out: TextIO | None = None) -> int
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+def single_run_exclusions(tasks: Mapping) -> list[str]:
+    """Return unusable task names under the registered pilot exclusion rules.
+
+    This single-run adapter preserves the pilot's existing two-run behavior and
+    lets E1 apply exactly the same exclusions to its one frozen run.
+    """
+    item = {"runs": {tag: tasks for tag in RUN_TAGS}}
+    return [
+        failure["task"]
+        for failure in _exclusions("", item)
+        if failure["run_tag"] == RUN_TAGS[0]
+    ]

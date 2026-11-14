@@ -489,3 +489,69 @@ Instagram은 배치 분석 직전에 계정을 재조회하고 서명 URL로 받
 점검 실패는 `PREFLIGHT_FAILED <코드>`와 종료 코드 2, 중단은 `STOPPED <사유>`와
 종료 코드 3이다. 대기열 소진·처리 0건으로 반복 종료·계획 출력은 종료 코드 0이다.
 `live-analyze`는 사용자 수동 실행용이며 `make verify`에는 포함하지 않는다.
+
+## e1-score (P3)
+
+사람 라벨링을 모두 마친 뒤 **사용자가 직접** 실행한다. 기본 입력 폴더는
+`data/interim/e1`이며 다음 다섯 파일이 필요하다.
+
+| 입력 | 파일 |
+|---|---|
+| 1단계 사람 라벨 | `e1_stage1_sheet_labeled.csv` |
+| 1단계 키 | `e1_stage1_key.json` |
+| 2단계 첫 라벨 | `e1_stage2_sheet_labeled.csv` |
+| 2단계 재검사 라벨 | `e1_stage2_sheet_retest.csv` |
+| 2단계 키 | `e1_stage2_key.json` |
+
+2단계 첫 라벨을 끝낸 **7일 뒤**, 원래의 빈 2단계 시트를 복사하고 첫 라벨과
+키를 가린 채 같은 항목·순서를 다시 라벨링해 재검사 파일에 저장한다.
+세 라벨 파일 중 하나라도 없으면 어떤 파일도 열거나 DB에 접속하지 않는다.
+세 CSV의 열·값 검사를 모두 마친 다음 키와 등록 규칙을 검사하고,
+`POSTGRES_PASSWORD`·Docker·PostgreSQL(기본 포트 5433)을 점검한다.
+저장소의 `content_type@v1`·`hook@v1`·`full@v1` 작업만 읽으며 파일·DB를 수정하거나
+모델을 호출하지 않는다. `make verify`에는 포함되지 않는다.
+
+```bash
+make e1-score
+# 경로가 다를 때 (나머지 기본 경로도 개별 옵션으로 바꿀 수 있다)
+make e1-score ARGS='--stage1-labels <1단계.csv> --stage2-labels <첫라벨.csv> --retest-labels <재검사.csv> --stage1-key <1단계.json> --stage2-key <2단계.json>'
+```
+
+1단계 범위는 `e1_stage2.stop_point`와 등록된 `config/e1_sampling.yaml`을 그대로
+사용한다. 정지 범위 밖 라벨은 사용하지 않는다. 현재 §7 정정의
+`use_all_labeled: true`에서는 상한까지 라벨링한 전부가 정지 범위다.
+콘텐츠 유형 재현율은 사람이 제품으로 본 소재 전체가 분모다. `done`인 콘텐츠
+유형 결과가 없으면 `model_missing`으로 혼동 행렬과 건수를 따로 내며 분모에 남긴다.
+훅·전체 작업 실패는 축별 비교에서 항목 전체를 제외하되 콘텐츠 유형 재현율을
+바꾸지 않는다. 축별 일치율·κ·합격 판정은 §5의 사람·모델 제품 교집합에서만
+계산하고 축마다 `n`, 사람 제품 수, 교집합 크기, 커버리지(`n ÷ 사람 제품 수`),
+분석 제외 건수를 표시한다. 모델 category가 `other`이면 category 비교에는
+포함하고 훅·전체 축에서만 분석 제외로 센다. 빈 불리언은 해당 축에서만 빠진다.
+
+재검사는 모델과 무관하게 2단계 시트 전체의 유효한 첫 라벨·재라벨 쌍으로
+계산한다. 2단계 시트에는 content_type·category가 없으므로 두 축의 재검사 κ를
+만들지 않는다. claims는 두 비교 모두 기존 `claim_scores`의 항목별 정밀도·재현율과
+micro 값을 사용한다. 집합 일치율이나 claims κ를 내지 않는다.
+`docs/EVAL.md`의 동결 기준(사람 재검사 κ 0.7, 사람·모델 κ 0.6, 콘텐츠 유형 재현율
+0.9)을 그대로 표시하며 변경 옵션은 없다. 재검사 κ 미달은 "정의 모호 후보"로
+표시한다. 현재 활성 축은 §6에서 동결한 v1 스키마를 따르며 시범 비교의 과거
+미확정 표시를 적용하지 않는다.
+
+결과는 사람이 읽는 표와 마지막 JSON 한 줄이다. 제목·캡션·개별 라벨 원문은
+출력하지 않는다. 입력·준비 오류에는 이유 코드만 출력하며 부분 점수를 내지 않는다.
+계산할 수 없는 축은 숫자를 채우지 않고 다른 결과와 함께 이유를 표시한다.
+종료 코드는 완료 0(기준 미달 포함), 입력 문제 2, 일부 지표 계산 불가 3이다.
+
+| 이유 코드 | 의미와 조치 |
+|---|---|
+| `NOT_READY:<파일 이름>` | 세 라벨 파일 중 해당 파일이 없다. 재검사까지 완료한 뒤 실행한다. |
+| `LABEL_FILE_INVALID` | CSV 열·값·순서·CTA 동치, 키의 형식·항목·1단계 범위·사람 라벨 연결을 확인한다. DB 접속 전 중단한다. |
+| `PREREGISTRATION_RULE_MISSING` | 사전 등록 §5의 교집합·합격 판정·커버리지 분모 규칙이 없거나 읽을 수 없다. 등록 기록을 확인한다. |
+| `PREREGISTRATION_DEFINITIONS_MISSING` | §6의 전체 v1 동결 기록이 없다. 등록 기록을 확인한다. |
+| `E1_CONFIG_INVALID` | 등록한 표집 설정의 형식·범위를 확인한다. |
+| `ENV_MISSING:POSTGRES_PASSWORD` | 공백이 아닌 PostgreSQL 설정을 준비한다. |
+| `DOCKER_DOWN` / `POSTGRES_UNREACHABLE` | Docker·DB와 `BEAUTYADS_POSTGRES_PORT`를 확인한다. |
+| `POSTGRES_AUTH_FAILED` / `POSTGRES_CONNECT_FAILED` | DB 인증·연결 준비를 확인한다. |
+| `MODEL_READ_FAILED` / `MODEL_RESULT_INVALID` | 저장 결과 조회 실패 또는 완료 작업의 라벨 형식 오류다. 점수는 출력하지 않는다. |
+| `KAPPA_UNDEFINED:<축>` | 한쪽이 단일 값이거나 기대 일치가 1이라 κ를 정의할 수 없다. 판정은 비워 둔다. |
+| `SCORE_EMPTY_SET:<축>` | 유효 비교 쌍 또는 재현율의 사람 제품 분모가 없다. 0으로 해석하지 않는다. |
