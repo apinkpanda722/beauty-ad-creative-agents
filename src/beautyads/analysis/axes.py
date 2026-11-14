@@ -33,6 +33,7 @@ from .models import (
     PROMPT_VERSIONS,
     AxisOutcome,
     VideoInput,
+    log_llm_failure,
     models_match,
 )
 from .prompts import build_content_type_prompt, build_full_prompt
@@ -132,6 +133,7 @@ def _analyze_axis(
         except LlmCallError as exc:
             if exc.kind == ErrorKind.RATE_LIMIT:
                 raise
+            log_llm_failure(axis, exc)
             outcome.error_code = f"LLM_{exc.kind}"
             return outcome
         except LlmResponseError as exc:

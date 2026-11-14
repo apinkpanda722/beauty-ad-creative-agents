@@ -602,3 +602,28 @@ def test_rate_retry_does_not_pay_twice_for_completed_content(rig, monkeypatch):
 def test_empty_or_zero_limit_does_not_plan_media(rig):
     assert execute(rig, limit=0).processed == 0
     rig.deps.plans.assert_not_called()
+
+
+def test_repeated_llm_fatal_becomes_a_permanent_exclusion_reason(rig):
+    # A first LLM_FATAL stays retryable; failing the same way again after a retry is
+    # recorded as a permanent exclusion so --retry-failed never requeues it again.
+    repeated, first = rig.items[0], rig.items[1]
+    job = set_job(rig, repeated, code="LLM_FATAL")
+    job.attempts = 1
+
+    def analyze(item, **kwargs):
+        return outcome(item, rig.run, JobStatus.failed, "LLM_FATAL")
+
+    rig.fake.side_effect = analyze
+    report = execute(rig, retry_failed=True, only_keys={repeated.key, first.key})
+    codes = {
+        key.source_id: rig.store.jobs["content_type@test", key].error_code
+        for key in (repeated.key, first.key)
+    }
+    assert codes[repeated.source_id] == "LLM_FATAL_REPEATED"
+    assert codes[first.source_id] == "LLM_FATAL"
+    assert "LLM_FATAL_REPEATED" not in RETRYABLE_ERROR_CODES
+    assert report.error_codes["LLM_FATAL_REPEATED"] == 1
+    # the permanent one is not requeued by another retry
+    rig.store.jobs["content_type@test", first.key].status = JobStatus.done
+    assert rig.store.requeue_jobs("content_type@test", RETRYABLE_ERROR_CODES) == 0

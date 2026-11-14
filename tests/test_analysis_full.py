@@ -484,3 +484,25 @@ def test_prompts_include_taxonomy_criteria_and_observation_limits():
         assert all(name in full for name in model.model_fields)
     assert "None" not in build_content_type_prompt(creative())
     assert "None" not in build_full_prompt(creative())
+
+
+@pytest.mark.parametrize("analyze,model,schema_fn,axis", AXES)
+def test_call_failure_reason_is_logged_without_urls_or_keys(
+    analyze, model, schema_fn, axis, call_kwargs, caplog
+):
+    error = LlmCallError(
+        kind=ErrorKind.FATAL,
+        code="SYNTHETIC",
+        message="HTTP 400 bad request https://example.invalid/watch?v=SYNTHETIC_ID",
+    )
+    with caplog.at_level("WARNING", logger="beautyads.analysis"):
+        analyze(
+            creative(),
+            VideoInput("files/synthetic", "video/mp4"),
+            interact=FakeInteract(error),
+            **call_kwargs,
+        )
+    text = " ".join(record.getMessage() for record in caplog.records)
+    assert "LLM_CALL_FAILED" in text and "kind=FATAL" in text
+    assert "SYNTHETIC" in text and "HTTP 400" in text
+    assert "example.invalid" not in text and "SYNTHETIC_ID" not in text

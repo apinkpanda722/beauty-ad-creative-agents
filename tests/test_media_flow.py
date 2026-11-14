@@ -436,6 +436,7 @@ def test_retryable_codes_exclude_every_held_code():
             "FILE_PROCESS_TIMEOUT",
             "FILE_RETRIEVE_FAILED",
             "LLM_RETRYABLE",
+            "LLM_FATAL",  # 2026-11-14: 일시 오류로 확인돼 재시도 대상에 추가
             "MEDIA_REFRESH_STOPPED",
         }
     )
@@ -694,3 +695,10 @@ def test_optional_axis_purpose_preserves_legacy_calls(run, by_axis):
         f"{run.purpose}-{axis}" if by_axis else run.purpose
         for axis in ("content_type", "hook", "full")
     ]
+
+
+def test_unclassified_llm_failures_can_be_requeued():
+    # 2026-11-14: 118 LLM_FATAL content_type failures at the end of the YouTube run
+    # succeeded when called again, so --retry-failed must be able to requeue them.
+    assert "LLM_FATAL" in RETRYABLE_ERROR_CODES
+    assert "INVALID_OUTPUT" not in RETRYABLE_ERROR_CODES

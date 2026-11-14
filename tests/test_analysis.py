@@ -414,3 +414,43 @@ def test_hook_explicit_none_retains_original_input_errors(
     assert result.error_code == code
     assert result.attempts == 0
     assert fake.calls == []
+
+
+def test_hook_call_failure_reason_is_logged_without_urls(call_kwargs, caplog):
+    error = LlmCallError(
+        kind=ErrorKind.FATAL,
+        code="SYNTHETIC",
+        message="HTTP 500 https://example.invalid/watch?v=SYNTHETIC_ID",
+    )
+    with caplog.at_level("WARNING", logger="beautyads.analysis"):
+        analyze_hook(creative(), interact=FakeInteract(error), **call_kwargs)
+    text = " ".join(record.getMessage() for record in caplog.records)
+    assert "LLM_CALL_FAILED axis=hook" in text and "HTTP 500" in text
+    assert "example.invalid" not in text
+
+
+@pytest.mark.parametrize(
+    "secret",
+    [
+        "AIzaSyA1234567890abcdefghijklmnopqrstuv",
+        "key=SYNTHETIC_QUERY_KEY_123",
+        "api_key: SYNTHETIC_HEADER_VALUE",
+        "x-goog-api-key: SYNTHETIC_GOOG_VALUE",
+        "Authorization: Bearer synthetic.token-value_123",
+        "Bearer synthetic.bare-token_456",
+        "sk-synthetic0123456789abcdef",
+        "ya29.synthetic_oauth_token_value",
+    ],
+)
+def test_failure_log_masks_key_like_strings(secret, call_kwargs, caplog):
+    error = LlmCallError(
+        kind=ErrorKind.FATAL,
+        code="SYNTHETIC",
+        message=f"HTTP 401 while calling with {secret} attached",
+    )
+    with caplog.at_level("WARNING", logger="beautyads.analysis"):
+        analyze_hook(creative(), interact=FakeInteract(error), **call_kwargs)
+    text = " ".join(record.getMessage() for record in caplog.records)
+    assert "HTTP 401" in text
+    token = secret.split()[-1].split("=")[-1]
+    assert token not in text and secret not in text

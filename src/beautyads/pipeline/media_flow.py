@@ -36,10 +36,16 @@ RETRYABLE_ERROR_CODES = frozenset(
         "FILE_PROCESS_TIMEOUT",
         "FILE_RETRIEVE_FAILED",
         "LLM_RETRYABLE",
+        # 분류되지 않은 호출 실패. 2026-11-14 YouTube 실행 끝에서 118건이 몰려 실패했고
+        # 다시 호출하자 성공했다(시간 의존 일시 오류). 영구 사유면 재시도해도 같은 코드로 다시 실패한다.
+        "LLM_FATAL",
         # 사용량 등으로 재조회가 중간에 멈춰 못 찾은 것이라 소재 문제가 아니다.
         "MEDIA_REFRESH_STOPPED",
     }
 )
+# 재시도 뒤에도 같은 LLM_FATAL로 다시 실패한 작업의 제외 사유. RETRYABLE_ERROR_CODES에 없으므로
+# --retry-failed가 다시 집지 않는다.
+LLM_FATAL_REPEATED = "LLM_FATAL_REPEATED"
 _HELD_CODES = frozenset(
     {
         "MEDIA_NOT_VIDEO",
