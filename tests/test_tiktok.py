@@ -25,6 +25,7 @@ from beautyads.sources.tiktok import (
     build_query_body,
     classify_executor,
     collect_tiktok,
+    collect_tiktok_brand,
     refresh_tiktok_video_urls,
     tiktok_httpx_post,
 )
@@ -536,3 +537,56 @@ def test_absence_is_only_reported_after_a_scan_that_ended_with_has_more_false():
     both = FakePost([page(), page("tiktok_ad_query_mixsoon_last.json")])
     exact = refresh(both, ["absent"], max_pages=2)
     assert exact.stopped is None and exact.missing == {"absent"}
+
+
+def _brand_collect(post, *, cfg=None, max_pages=5, sleep=lambda _s: None):
+    cfg = cfg or config()
+    return collect_tiktok_brand(
+        post,
+        provider(post),
+        cfg,
+        retailers(),
+        cfg.brands[0],
+        base_url=TIKTOK_BASE_URL,
+        max_pages=max_pages,
+        collected_at=NOW,
+        sleep=sleep,
+    )
+
+
+def test_brand_collection_keeps_signed_urls_in_memory_only():
+    first = page(last=True)
+    items = first.body["data"]["ads"]
+    ids = [str(item["ad"]["id"]) for item in items]
+    result = _brand_collect(FakePost([first]))
+    assert result.error is None
+    assert [c.source_id for c in result.creatives] == ids
+    # every ad with a video has its URL in the memory map, never on the creative
+    with_video = {
+        str(i["ad"]["id"]): i["ad"]["videos"][0]["url"]
+        for i in items
+        if i["ad"].get("videos")
+    }
+    assert result.urls == with_video
+    assert all(c.url is None for c in result.creatives)
+    assert not any(
+        url in result.creatives[0].model_dump_json() for url in with_video.values()
+    )
+    assert all(c.brand == "mixsoon" for c in result.creatives)
+
+
+def test_brand_collection_deduplicates_by_ad_id_across_pages():
+    first, second = page(), page("tiktok_ad_query_mixsoon_last.json")
+    overlap = second.body["data"]["ads"][0]
+    second.body["data"]["ads"].append(copy.deepcopy(first.body["data"]["ads"][0]))
+    result = _brand_collect(FakePost([first, second]), max_pages=2)
+    ids = [c.source_id for c in result.creatives]
+    assert len(ids) == len(set(ids))
+    assert str(overlap["ad"]["id"]) in ids
+
+
+def test_brand_collection_error_returns_nothing_for_that_brand():
+    post = FakePost([_failure(500)] * 4)
+    result = _brand_collect(post)
+    assert result.error == "TIKTOK_HTTP_500"
+    assert result.creatives == [] and result.urls == {}

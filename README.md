@@ -652,3 +652,19 @@ micro 값을 사용한다. 집합 일치율이나 claims κ를 내지 않는다.
 | `MODEL_READ_FAILED` / `MODEL_RESULT_INVALID` | 저장 결과 조회 실패 또는 완료 작업의 라벨 형식 오류다. 점수는 출력하지 않는다. |
 | `KAPPA_UNDEFINED:<축>` | 한쪽이 단일 값이거나 기대 일치가 1이라 κ를 정의할 수 없다. 판정은 비워 둔다. |
 | `SCORE_EMPTY_SET:<축>` | 유효 비교 쌍 또는 재현율의 사람 제품 분모가 없다. 0으로 해석하지 않는다. |
+
+## live-tiktok-analyze (P3)
+
+TikTok 검색 결과는 실행마다 달라서 수집한 광고를 나중에 다시 찾을 수 없다. 이 명령은 **브랜드마다 수집한 직후 같은
+응답에서 시드 고정 표본을 골라 바로 분석**한다. 영상 주소는 메모리에서만 쓰고 저장·출력하지 않는다.
+
+```bash
+make live-tiktok-analyze ARGS="--brands anua --per-brand-limit 20"   # 한 브랜드로 먼저 확인
+make live-tiktok-analyze ARGS="--per-brand-limit 20"                 # 전체 14곳
+```
+
+- 선택 규칙: 분석 가능 소재를 브랜드별로 `source_id` 정렬 후 시드 20261114로 섞어 앞에서 N건(최신순 아님).
+  이미 분석이 끝난 소재는 브랜드당 목표 N건에 포함하고, 실패한 소재는 건드리지 않는다.
+- 소재는 광고 id로 기존 저장분과 병합한다(멱등). `--retry-failed` 재조회는 TikTok에 쓰지 않는다.
+- 정지: 토큰·요청 오류는 전체 정지, 브랜드 하나의 서버 오류는 그 브랜드만 건너뜀, 일일 한도·크레딧 소진·비용 상한은 정지(남은 소재는 대기).
+- 환경 점검은 `live-analyze`와 같다(TikTok 키, Gemini 키, 사전 등록, 비용 상한).

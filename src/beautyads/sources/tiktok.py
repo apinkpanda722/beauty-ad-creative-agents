@@ -421,6 +421,86 @@ def collect_tiktok(
     return CollectResult(creatives, errors, None)
 
 
+class BrandCollection(NamedTuple):
+    creatives: list[Creative]
+    # 광고 id -> 서명된 영상 주소. 이번 실행의 메모리에서만 쓰고 절대 저장하지 않는다.
+    urls: dict[str, str]
+    error: str | None
+
+
+# 브랜드 하나의 실패가 아니라 계정 수준 실패라서 실행 전체를 멈춰야 하는 코드.
+STOP_ERROR_CODES = frozenset(_STOP_ERRORS)
+
+
+def _video_url(item: Mapping[str, Any]) -> str | None:
+    return next(
+        (
+            v.get("url")
+            for v in _videos(_mapping(item.get("ad")))
+            if isinstance(v.get("url"), str) and v.get("url")
+        ),
+        None,
+    )
+
+
+def collect_tiktok_brand(
+    post: TikTokPost,
+    token: TokenProvider,
+    config: TikTokConfig,
+    retailers: Retailers,
+    brand: TikTokBrand,
+    *,
+    base_url: str = TIKTOK_BASE_URL,
+    max_pages: int,
+    collected_at: datetime,
+    sleep: Callable[[float], None] = time.sleep,
+) -> BrandCollection:
+    """One brand's ads plus their video URLs for same-run analysis.
+
+    The search result set differs between runs, so an ad can only be analyzed with
+    the URL from the response that returned it. A brand that fails midway returns
+    nothing (its partial pages are not used), like the batch collection.
+    """
+    creatives: list[Creative] = []
+    urls: dict[str, str] = {}
+    seen: set[str] = set()
+    try:
+        for ads in _pages(
+            post,
+            token,
+            config,
+            brand,
+            base_url=base_url,
+            today=collected_at.date(),
+            max_pages=max_pages,
+            sleep=sleep,
+        ):
+            for item in ads:
+                source_id = _ad_id(item)
+                if source_id in seen:
+                    continue
+                executor = classify_executor(
+                    _mapping(item.get("advertiser")),
+                    brand_names=(brand.brand, brand.search_term),
+                    retailers=retailers,
+                )
+                creatives.append(
+                    ad_to_creative(
+                        item,
+                        brand=brand.brand,
+                        collected_at=collected_at,
+                        executor=executor,
+                    )
+                )
+                url = _video_url(item)
+                if url is not None:
+                    urls[source_id] = url
+                seen.add(source_id)
+    except TikTokError as error:
+        return BrandCollection([], {}, error.code)
+    return BrandCollection(creatives, urls, None)
+
+
 def refresh_tiktok_video_urls(
     post: TikTokPost,
     token: TokenProvider,
