@@ -702,3 +702,90 @@ def test_unclassified_llm_failures_can_be_requeued():
     # succeeded when called again, so --retry-failed must be able to requeue them.
     assert "LLM_FATAL" in RETRYABLE_ERROR_CODES
     assert "INVALID_OUTPUT" not in RETRYABLE_ERROR_CODES
+
+
+def test_tiktok_plans_refresh_once_per_brand_with_partial_results():
+    from beautyads.pipeline.media_flow import prepare_tiktok_plans
+    from beautyads.sources.config import TikTokBrand
+    from beautyads.sources.tiktok import RefreshResult
+
+    brands = {name: TikTokBrand(brand=name, search_term=name) for name in ("a", "b")}
+    items = [
+        creative(source_id, source=Source.tiktok, brand=brand)
+        for brand, source_id in (("a", "1"), ("a", "2"), ("b", "3"), ("b", "4"))
+    ]
+    refresh = Mock(
+        side_effect=[
+            RefreshResult({"1": MEDIA_URL}, {"2"}, set(), "TIKTOK_HTTP_429"),
+            RefreshResult({"3": MEDIA_URL}, {"4"}, set(), None),
+        ]
+    )
+    plans = prepare_tiktok_plans(items, brands, refresh=refresh)
+    assert [call.args for call in refresh.call_args_list] == [
+        (brands["a"], {"1", "2"}),
+        (brands["b"], {"3", "4"}),
+    ]
+    assert [plans[item.key] for item in items] == [
+        UrlPlan(MEDIA_URL, "ok"),
+        UrlPlan(None, "gone"),
+        UrlPlan(MEDIA_URL, "ok"),
+        UrlPlan(None, "gone"),
+    ]
+
+
+@pytest.mark.parametrize(
+    "stopped,state", [(None, "missing"), ("TIKTOK_HTTP_429", "refresh_stopped")]
+)
+def test_tiktok_plans_distinguish_missing_from_stop_and_ignore_other_sources(
+    stopped, state
+):
+    from beautyads.pipeline.media_flow import prepare_tiktok_plans
+    from beautyads.sources.config import TikTokBrand
+    from beautyads.sources.tiktok import RefreshResult
+
+    brand = TikTokBrand(brand="a", search_term="a")
+    target = creative("1", source=Source.tiktok, brand="a")
+    unknown = creative("2", source=Source.tiktok, brand="unknown")
+    other = [
+        creative("3", source=Source.instagram),
+        creative("4", source=Source.youtube),
+    ]
+    refresh = Mock(return_value=RefreshResult({}, set(), {"1"}, stopped))
+    plans = prepare_tiktok_plans(
+        [target, unknown, *other], {"a": brand}, refresh=refresh
+    )
+    refresh.assert_called_once_with(brand, {"1"})
+    assert plans == {
+        target.key: UrlPlan(None, state),
+        unknown.key: UrlPlan(None, "missing"),
+    }
+    assert all(item.key not in plans for item in other)
+
+
+@pytest.mark.parametrize("state", ["refresh_stopped", "ok", "gone"])
+def test_tiktok_plan_uses_existing_media_processing(run, state):
+    fake = FakeMedia()
+    item = creative(source=Source.tiktok)
+    result = analyze_creative(
+        item,
+        plan=UrlPlan(MEDIA_URL if state == "ok" else None, state),
+        run=run,
+        media=fake.deps(),
+    )
+    if state == "ok":
+        assert fake.download_urls == [MEDIA_URL]
+        assert fake.delete_ids == [FILE_ID]
+        assert all(record.status == JobStatus.done for record in result.records)
+        assert MEDIA_URL not in result.model_dump_json()
+    else:
+        assert fake.events == [] and run.interact.calls == []
+        record = result.records[0]
+        assert record.status == (
+            JobStatus.failed if state == "refresh_stopped" else JobStatus.held
+        )
+        assert record.error_code == (
+            "MEDIA_REFRESH_STOPPED" if state == "refresh_stopped" else "MEDIA_URL_GONE"
+        )
+        assert (record.error_code in RETRYABLE_ERROR_CODES) == (
+            state == "refresh_stopped"
+        )

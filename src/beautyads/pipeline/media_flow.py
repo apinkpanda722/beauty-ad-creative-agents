@@ -24,9 +24,10 @@ from beautyads.domain import (
     Source,
 )
 from beautyads.llm import FileError, InteractionResult, ThinkingLevel, UploadedFile
-from beautyads.sources.config import InstagramAccount
+from beautyads.sources.config import InstagramAccount, TikTokBrand
 from beautyads.sources.instagram import RefreshResult
 from beautyads.sources.media import DownloadedMedia, MediaError
+from beautyads.sources.tiktok import RefreshResult as TikTokRefreshResult
 
 RETRYABLE_ERROR_CODES = frozenset(
     {
@@ -130,6 +131,34 @@ def prepare_instagram_plans(
                 plans[item.key] = UrlPlan(None, "gone")
             elif result.stopped is not None:
                 # 스캔이 끝까지 돌지 못했으므로 "없다"가 아니라 "못 찾았다"다.
+                plans[item.key] = UrlPlan(None, "refresh_stopped")
+    return plans
+
+
+def prepare_tiktok_plans(
+    creatives: Sequence[Creative],
+    brands: Mapping[str, TikTokBrand],
+    *,
+    refresh: Callable[[TikTokBrand, set[str]], TikTokRefreshResult],
+) -> dict[CreativeKey, UrlPlan]:
+    """Refresh each configured brand once; an unfinished scan is not absence."""
+    plans = {}
+    grouped: dict[str, list[Creative]] = defaultdict(list)
+    for creative in creatives:
+        if creative.source != Source.tiktok:
+            continue
+        plans[creative.key] = UrlPlan(None, "missing")
+        if creative.brand in brands:
+            grouped[creative.brand].append(creative)
+    for brand, items in grouped.items():
+        result = refresh(brands[brand], {item.source_id for item in items})
+        for item in items:
+            url = result.urls.get(item.source_id)
+            if url:
+                plans[item.key] = UrlPlan(url, "ok")
+            elif item.source_id in result.gone:
+                plans[item.key] = UrlPlan(None, "gone")
+            elif result.stopped is not None:
                 plans[item.key] = UrlPlan(None, "refresh_stopped")
     return plans
 

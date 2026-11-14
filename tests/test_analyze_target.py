@@ -720,3 +720,391 @@ def test_invalid_postgres_port_has_stable_code(rig, port):
     assert "PREFLIGHT_FAILED POSTGRES_UNREACHABLE" in rig.out.getvalue()
     rig.factory.assert_not_called()
     rig.tcp.assert_not_called()
+
+
+def sampled_creatives():
+    from datetime import timedelta
+
+    return [
+        creative(f"{brand}-{index:03}").model_copy(
+            update={
+                "brand": brand,
+                "published_at": NOW + timedelta(days=index),
+                "analyzable": index != 0,
+            }
+        )
+        for brand, count in (("alpha", 30), ("beta", 18), (None, 3))
+        for index in range(count)
+    ]
+
+
+def test_per_brand_selection_is_reproducible_independent_and_prefix():
+    from collections import Counter
+    from datetime import timedelta
+
+    items = sampled_creatives()
+    selected = cli.select_per_brand(items, 10, cli.PER_BRAND_SAMPLE_SEED)
+    assert Counter(item.brand for item in selected) == {
+        "alpha": 10,
+        "beta": 10,
+        None: 2,
+    }
+    assert all(item.analyzable is True for item in selected)
+    assert selected == cli.select_per_brand(items[::-1], 10, cli.PER_BRAND_SAMPLE_SEED)
+    assert selected == cli.select_per_brand(items, 10, cli.PER_BRAND_SAMPLE_SEED)
+    assert any(selected != cli.select_per_brand(items, 10, seed) for seed in range(5))
+    larger = cli.select_per_brand(items, 20, cli.PER_BRAND_SAMPLE_SEED)
+    extra = creative("alpha-extra").model_copy(update={"brand": "alpha"})
+    extended = cli.select_per_brand([*items, extra], 10, cli.PER_BRAND_SAMPLE_SEED)
+    for brand in ("alpha", "beta", None):
+        small = [item for item in selected if item.brand == brand]
+        assert small == [item for item in larger if item.brand == brand][:10]
+        if brand != "alpha":
+            assert small == [item for item in extended if item.brand == brand]
+    changed_dates = [item.model_copy(update={"published_at": None}) for item in items]
+    assert [item.key for item in selected] == [
+        item.key
+        for item in cli.select_per_brand(changed_dates, 10, cli.PER_BRAND_SAMPLE_SEED)
+    ]
+    for size in (12, 25, 40):
+        pool = [
+            creative(i, published_at=NOW + timedelta(days=i)).model_copy(
+                update={"brand": "alpha"}
+            )
+            for i in range(size)
+        ]
+        latest = {
+            item.key
+            for item in sorted(pool, key=lambda item: item.published_at, reverse=True)[
+                :5
+            ]
+        }
+        assert any(
+            {item.key for item in cli.select_per_brand(pool, 5, seed)} != latest
+            for seed in range(6)
+        )
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        ["--limit", "1"],
+        ["--only-keys-file", "absent.json"],
+        ["--only-keys-file", "absent.json", "--brands", "alpha"],
+    ],
+)
+def test_per_brand_conflicts_before_dependencies(rig, extra):
+    assert execute(rig, ["--per-brand-limit", "2", *extra]) == 2
+    assert "PER_BRAND_CONFLICT" in rig.out.getvalue()
+    rig.factory.assert_not_called()
+    rig.docker.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["--per-brand-limit", "0"],
+        ["--per-brand-limit", "501"],
+        ["--tiktok-max-pages", "0"],
+    ],
+)
+def test_sampling_and_tiktok_invalid_ranges(rig, args):
+    assert execute(rig, args) == 2
+    rig.factory.assert_not_called()
+    rig.docker.assert_not_called()
+
+
+def test_sampling_enqueues_and_runs_only_selected_keys_and_resumes_done(
+    rig, monkeypatch
+):
+    items = sampled_creatives()
+    outside_source = creative("instagram-only").model_copy(
+        update={"source": Source.instagram, "brand": "alpha"}
+    )
+    rig.store.creatives = {item.key: item for item in [*items, outside_source]}
+    expected = cli.select_per_brand(
+        [item for item in items if item.brand == "alpha"], 3, cli.PER_BRAND_SAMPLE_SEED
+    )
+    selected = {item.key for item in expected}
+    outside = next(
+        item for item in items if item.analyzable is True and item.key not in selected
+    )
+    rig.store.enqueue_analysis("content_type@v1", [outside])
+    rig.store.enqueued.clear()
+    calls = Mock(wraps=cli.run_analysis)
+    monkeypatch.setattr(cli, "run_analysis", calls)
+    args = [
+        "--per-brand-limit",
+        "3",
+        "--sources",
+        "youtube",
+        "--brands",
+        "alpha",
+        "--batch-size",
+        "2",
+    ]
+    assert execute(rig, args) == 0
+    assert set(rig.store.enqueued) == selected
+    assert all(
+        set(call.kwargs["only_keys"]) == selected for call in calls.call_args_list
+    )
+    assert rig.store.jobs["content_type@v1", outside.key].status == JobStatus.pending
+    assert len(rig.model.calls) == 9
+    sampling = events(rig, "summary")[-1]["sampling"]
+    assert sampling == {
+        "seed": 20261114,
+        "per_brand_limit": 3,
+        "selected_total": 3,
+        "rule": cli.PER_BRAND_SAMPLE_RULE,
+    }
+    assert "alpha" not in rig.out.getvalue() and "beta" not in rig.out.getvalue()
+    assert execute(rig, args + ["--retry-failed"]) == 0
+    assert len(rig.model.calls) == 9
+
+
+def test_sampling_dry_run_is_local_and_reports_rule_seed_limit(rig):
+    rig.env = {}
+    assert (
+        execute(rig, ["--dry-run", "--sources", "tiktok", "--per-brand-limit", "40"])
+        == 0
+    )
+    preview = json.loads(rig.out.getvalue().removeprefix("ESTIMATE "))
+    assert preview["tiktok_max_pages"] == 20
+    assert preview["sampling"] == {
+        "seed": 20261114,
+        "per_brand_limit": 40,
+        "selected_total": None,
+        "rule": cli.PER_BRAND_SAMPLE_RULE,
+    }
+    rig.factory.assert_not_called()
+    rig.docker.assert_not_called()
+
+
+@pytest.mark.parametrize("missing", ["TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET"])
+def test_tiktok_credentials_required_only_for_selected_source(rig, missing):
+    rig.env.update(
+        {
+            name: "synthetic-private-setting"
+            for name in ("TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET")
+            if name != missing
+        }
+    )
+    assert execute(rig, ["--sources", "tiktok"]) == 2
+    assert f"ENV_MISSING:{missing}" in rig.out.getvalue()
+    rig.factory.assert_not_called()
+    rig.env.pop("INSTAGRAM_ACCESS_TOKEN")
+    rig.env.pop("INSTAGRAM_USER_ID")
+    assert execute(rig, ["--sources", "youtube"]) == 0
+
+
+def test_tiktok_source_acceptance_with_fake_dependencies(rig):
+    rig.env.update(
+        {
+            name: "synthetic-private-setting"
+            for name in ("TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET")
+        }
+    )
+    rig.env.pop("INSTAGRAM_ACCESS_TOKEN")
+    rig.env.pop("INSTAGRAM_USER_ID")
+    item = creative("tt").model_copy(update={"source": Source.tiktok})
+    rig.store.creatives = {item.key: item}
+    rig.deps.analysis.plans.return_value = {
+        item.key: UrlPlan("https://example.invalid/transient", "ok")
+    }
+    assert execute(rig, ["--sources", "tiktok"]) == 0
+    assert len(rig.model.calls) == 3
+    assert "transient" not in rig.out.getvalue()
+
+
+@pytest.mark.parametrize("max_pages", [20, 35])
+def test_live_tiktok_instagram_plan_composition_and_single_id_rerefresh(
+    rig, monkeypatch, max_pages
+):
+    from contextlib import ExitStack
+
+    from test_media_flow import downloaded
+
+    from beautyads.sources.config import InstagramAccount, TikTokBrand, TikTokConfig
+    from beautyads.sources.media import MediaError
+    from beautyads.sources.tiktok import RefreshResult
+
+    brand = TikTokBrand(brand="alpha", search_term="alpha")
+    config = TikTokConfig(
+        countries=["FR"], lookback_days=330, search_type="exact_phrase", brands=[brand]
+    )
+    account = InstagramAccount(brand="alpha", username="ig")
+    monkeypatch.setattr(cli, "load_tiktok_config", Mock(return_value=config))
+    monkeypatch.setattr(cli, "load_instagram_accounts", Mock(return_value=[account]))
+    connection = Mock()
+    monkeypatch.setattr(cli, "connect", Mock(return_value=connection))
+    monkeypatch.setattr(cli, "apply_migrations", Mock())
+    monkeypatch.setattr(cli, "PostgresCreativeStore", Mock(return_value=rig.store))
+    provider = Mock()
+    token_class = Mock(return_value=provider)
+    monkeypatch.setattr(cli, "TokenProvider", token_class)
+    post = Mock(side_effect=AssertionError("no network"))
+    monkeypatch.setattr(cli, "tiktok_httpx_post", post)
+    tt_refresh = Mock(
+        side_effect=[
+            RefreshResult(
+                {
+                    "tt1": "https://example.invalid/first",
+                    "tt2": "https://example.invalid/other",
+                },
+                set(),
+                set(),
+                None,
+            ),
+            RefreshResult(
+                {"tt1": "https://example.invalid/renewed"}, set(), set(), None
+            ),
+        ]
+    )
+    monkeypatch.setattr(cli, "refresh_tiktok_video_urls", tt_refresh)
+    ig_refresh = Mock(
+        return_value=RefreshResult(
+            {"ig1": "https://example.invalid/ig"}, set(), set(), None
+        )
+    )
+    monkeypatch.setattr(cli, "refresh_media_urls", ig_refresh)
+    rig.env.update(
+        {
+            name: "synthetic-private-setting"
+            for name in ("TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET")
+        }
+    )
+    items = [
+        creative(i).model_copy(
+            update={"source": source, "brand": "alpha", "account": "ig"}
+        )
+        for i, source in (
+            ("ig1", Source.instagram),
+            ("tt1", Source.tiktok),
+            ("tt2", Source.tiktok),
+            ("yt", Source.youtube),
+        )
+    ]
+    tt = items[1]
+    with ExitStack() as stack:
+        kwargs = {} if max_pages == 20 else {"tiktok_max_pages": max_pages}
+        deps = cli._live_deps(
+            sources={Source.instagram, Source.tiktok},
+            environ=rig.env,
+            env_file=None,
+            stack=stack,
+            **kwargs,
+        )
+        plans = deps.analysis.plans(items)
+        assert set(plans) == {item.key for item in items[:3]}
+        assert all(plan.state == "ok" for plan in plans.values())
+        assert tt_refresh.call_count == ig_refresh.call_count == 1
+        assert tt_refresh.call_args.args == (
+            post,
+            provider,
+            config,
+            brand,
+            {"tt1", "tt2"},
+        )
+        assert tt_refresh.call_args.kwargs["max_pages"] == max_pages
+        assert tt_refresh.call_args.kwargs["today"] <= datetime.now(UTC).date()
+        assert ig_refresh.call_args.args[3:] == (account, {"ig1"})
+        fake = FakeMedia(
+            downloads=[
+                MediaError("MEDIA_URL_UNAVAILABLE"),
+                downloaded(),
+            ]
+        )
+        from beautyads.pipeline.media_flow import AnalysisRun, analyze_creative
+
+        run = AnalysisRun(
+            "minimal",
+            "v1",
+            "test",
+            Path(rig.env["BEAUTYADS_LEDGER_PATH"]),
+            {"gemini": 12},
+            60,
+            60,
+            3,
+            rig.model,
+        )
+        result = analyze_creative(
+            tt,
+            plan=plans[tt.key],
+            run=run,
+            media=fake.deps(),
+            rerefresh=deps.analysis.rerefresh(tt),
+        )
+        assert tt_refresh.call_count == 2
+        assert tt_refresh.call_args.args[-1] == {"tt1"}
+        assert fake.download_urls == [
+            "https://example.invalid/first",
+            "https://example.invalid/renewed",
+        ]
+        assert "example.invalid" not in result.model_dump_json()
+        assert deps.analysis.rerefresh(items[-1]) is None
+        lost = creative("lost").model_copy(
+            update={"source": Source.tiktok, "brand": "alpha"}
+        )
+        tt_refresh.side_effect = None
+        tt_refresh.return_value = RefreshResult(
+            {"tt1": "https://example.invalid/partial"},
+            {"tt2"},
+            {"lost"},
+            "TIKTOK_HTTP_429",
+        )
+        stopped_plans = deps.analysis.plans([tt, items[2], lost])
+        assert stopped_plans[tt.key].state == "ok"
+        assert stopped_plans[items[2].key] == UrlPlan(None, "gone")
+        assert stopped_plans[lost.key] == UrlPlan(None, "refresh_stopped")
+        count = tt_refresh.call_count
+        assert deps.analysis.plans([lost])[lost.key].state == "refresh_stopped"
+        assert deps.analysis.rerefresh(lost)() is None
+        assert tt_refresh.call_count == count
+        assert deps.scan_log[-1] == {"source": "tiktok", "stopped": "TIKTOK_HTTP_429"}
+        assert "example.invalid" not in json.dumps(deps.scan_log)
+        post.assert_not_called()
+    connection.close.assert_called_once()
+
+
+@pytest.mark.parametrize("pages", [None, 35])
+def test_cli_forwards_tiktok_page_bound_to_live_assembly(rig, monkeypatch, pages):
+    rig.env.update(
+        {
+            name: "synthetic-private-setting"
+            for name in ("TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET")
+        }
+    )
+    factory = Mock(return_value=rig.deps)
+    monkeypatch.setattr(cli, "_live_deps", factory)
+    args = ["--sources", "tiktok"]
+    if pages is not None:
+        args.extend(["--tiktok-max-pages", str(pages)])
+    assert (
+        cli.main(
+            args,
+            environ=rig.env,
+            preregistration_path=rig.prereg,
+            out=rig.out,
+            docker_check=rig.docker,
+            tcp_check=rig.tcp,
+        )
+        == 0
+    )
+    assert factory.call_args.kwargs["tiktok_max_pages"] == (
+        20 if pages is None else pages
+    )
+
+
+def test_sampling_excludes_unset_eligibility_and_handles_shared_ids():
+    items = [
+        creative("same").model_copy(update={"brand": None, "source": source})
+        for source in (Source.youtube, Source.instagram, Source.tiktok)
+    ]
+    items.append(
+        creative("unset").model_copy(update={"brand": None, "analyzable": None})
+    )
+    for seed in range(4):
+        selected = cli.select_per_brand(items, 2, seed)
+        assert len(selected) == 2
+        assert selected == cli.select_per_brand(items[::-1], 2, seed)
+        assert all(item.analyzable is True for item in selected)

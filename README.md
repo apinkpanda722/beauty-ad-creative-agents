@@ -408,6 +408,7 @@ uv run python -m beautyads.eval.cost_recalc --ledger <합성또는실제원장.j
 수집된 소재를 전체 v1 분류로 분석한다. 먼저 OrbStack을 켜고 `make db-up`으로
 DB를 준비하고 수집을 마친다. `.env`에는 `GEMINI_API_KEY`·`POSTGRES_PASSWORD`,
 Instagram을 포함하면 `INSTAGRAM_ACCESS_TOKEN`·`INSTAGRAM_USER_ID`가 필요하다.
+TikTok을 포함할 때만 `TIKTOK_CLIENT_KEY`·`TIKTOK_CLIENT_SECRET`도 점검한다.
 `docs/results/e1_preregistration.md`에 현재 분석 모델 ID·프롬프트 버전 세 값과
 `전체 v1 동결: YYYY-MM-DD` 형식의 실제 날짜를 기록해야 시작한다.
 사전 등록 갱신은 분류 v1 승인 뒤 분석 전에 완료한다.
@@ -432,7 +433,8 @@ make cost-recalc ARGS='--items 1500'
 `--brands`·`--limit`와 함께 지정할 수 없다. DB에 없거나 분석 불가능한 키는
 `KEY_NOT_ANALYZABLE <건수>`로 보고하고 건너뛴다.
 
-기본 출처는 `youtube,instagram`이며 TikTok은 아직 지원하지 않는다.
+기본 출처는 `youtube,instagram`이며 `--sources tiktok` 또는
+`--sources youtube,instagram,tiktok`으로 TikTok을 포함할 수 있다.
 `--sources youtube`로 YouTube만, `--brands 브랜드1,브랜드2`로 브랜드를,
 `--limit N`으로 대상 소재 수를 제한할 수 있다. `--batch-size`는 기본 100(1~500),
 `--concurrency`는 기본 1(1~4), `--thinking-level`은 기본 `minimal`이다.
@@ -440,6 +442,36 @@ make cost-recalc ARGS='--items 1500'
 `--items N`은 `--dry-run`에서만 사용하며 기본 호출 수 N~3N을 계산한다
 (스키마 재요청·전송 재시도 제외). 비용은 원장에 기록되며 `cost-recalc` 결과를 따른다.
 상한·thinking 수준 변경은 비용 결과를 확인한 사용자 결정에 따른다.
+
+TikTok은 분석 직전에 브랜드별로 한 번 재조회해 영상 주소를 얻고 기존
+Instagram 플랜과 합성한다. `--tiktok-max-pages` 기본값은 **20**이며 1 이상이어야
+한다. **수집 때 쓴 `--max-pages`보다 작게 주지 말 것**(이번 수집은 20쪽).
+재조회 결과의 중단 사유를 그대로 사용하며 쪽 수 부족을 별도로 추정하지 않는다.
+중단돼 못 찾은 소재는 `missing`으로 확정하지 않고 `MEDIA_REFRESH_STOPPED`로
+기록한다. 다운로드에서 주소를 사용할 수 없으면 해당 ID 하나로 1회 재조회한다.
+토큰의 7200초 만료·재발급은 `TokenProvider`가 처리한다. 영상 주소·토큰은
+DB·로그·출력에 남기지 않고 영상은 메모리 처리·업로드 후 분석이 끝나면 삭제한다.
+TikTok은 그래프·에이전트 데이터용이며 E1 정확도 표본에는 포함하지 않는다.
+
+비용을 제한하려면 `--per-brand-limit N`(1~500)을 쓴다. 출처·브랜드 필터를 적용한
+`analyzable == true` 소재에서 **시드 20261114, 분석 가능 소재를 브랜드별로
+`source_id` 정렬 후 섞어 앞에서 N건(최신순 아님)**을 고른다. 브랜드마다
+`random.Random(f"{seed}:{brand}")`로 독립적으로 섞으며 브랜드가 없으면 한 묶음이다.
+대상이 N건 이하면 전부 선택한다. 같은 소재 집합·시드에서는 입력 순서와 무관하게
+같은 표본이고, N을 늘리면 기존 표본이 앞부분에 포함된다. 선택한 소재만 대기열에
+넣고 처리하므로 같은 옵션으로 재개해도 이미 `done`인 작업은 다시 호출하지 않는다.
+`--brands`와 함께 쓸 수 있지만 `--only-keys-file`·`--limit`와 함께 쓰면
+`PER_BRAND_CONFLICT`(종료 코드 2)다.
+
+```bash
+make live-analyze ARGS='--sources tiktok --per-brand-limit 40 --tiktok-max-pages 20'
+make live-analyze ARGS='--sources tiktok --per-brand-limit 40 --dry-run'
+```
+
+결과 문서에는 위 시드·N·선택 규칙과 요약 `sampling.selected_total`을 옮긴다.
+`sampling`에는 시드·N·선택 합계·규칙만 출력하며 브랜드별 선택 건수는 출력하지
+않는다. `--dry-run`도 시드·N·규칙을 표시하되 DB를 읽지 않으므로 선택 합계는
+미계산(`null`)이다. 실제 선택 합계는 실행 마지막 요약에서 확인한다.
 
 작업은 `content_type@v1`·`hook@v1`·`full@v1`만 읽고 쓴다. 재실행하면
 DB의 `pending` 작업부터 이어가며 시범 `@minimal`·`@default`는 건드리지 않는다.
@@ -479,6 +511,7 @@ Instagram은 배치 분석 직전에 계정을 재조회하고 서명 URL로 받
 | `COST_CAP:gemini` | 누적 상한에 닿았다. 비용 결과를 보고 사용자가 상한을 결정한다. |
 | `PREREGISTRATION_NOT_UPDATED` | 사전 등록 파일의 모델·프롬프트 버전·전체 v1 동결 날짜를 갱신한다. 우회 옵션은 없다. |
 | `ONLY_KEYS_CONFLICT` | 키 파일 옵션에서 `--brands`·`--limit`를 뺀다. |
+| `PER_BRAND_CONFLICT` | `--per-brand-limit`에서 `--only-keys-file`·`--limit`를 뺀다. |
 | `ONLY_KEYS_FILE_MISSING` | 키 파일 경로를 확인한다. |
 | `ONLY_KEYS_FILE_INVALID` | JSON의 items 매핑·알려진 source·비어 있지 않은 source_id 문자열을 확인한다. |
 | `KEY_NOT_ANALYZABLE <건수>` | DB에 없거나 분석 불가능한 키 수다. 나머지는 계속 처리한다. |

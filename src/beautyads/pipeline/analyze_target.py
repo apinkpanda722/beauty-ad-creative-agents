@@ -2,11 +2,12 @@
 
 import argparse
 import json
+import random
 import re
 import sys
 import tempfile
 import time
-from collections import Counter
+from collections import Counter, defaultdict
 from collections.abc import Callable, Collection, Mapping, Sequence
 from contextlib import ExitStack
 from datetime import UTC, date, datetime
@@ -18,7 +19,7 @@ from threading import Lock
 from typing import Any, NamedTuple, TextIO, get_args
 
 from beautyads.analysis.models import ANALYSIS_MODEL_ID, FINAL_RUN_TAG, PROMPT_VERSIONS
-from beautyads.domain import CreativeKey, FullResult, JobStatus, Source
+from beautyads.domain import Creative, CreativeKey, FullResult, JobStatus, Source
 from beautyads.llm import (
     CostCapExceeded,
     InteractionResult,
@@ -41,6 +42,7 @@ from beautyads.pipeline.media_flow import (
     MediaDeps,
     MediaStore,
     prepare_instagram_plans,
+    prepare_tiktok_plans,
 )
 from beautyads.pipeline.preflight import Problem, docker_running, tcp_reachable
 from beautyads.settings import (
@@ -51,13 +53,22 @@ from beautyads.settings import (
     load_settings,
     require_setting,
 )
-from beautyads.sources.config import ConfigError, load_instagram_accounts
+from beautyads.sources.config import (
+    ConfigError,
+    load_instagram_accounts,
+    load_tiktok_config,
+)
 from beautyads.sources.instagram import (
     RefreshResult,
     instagram_httpx_get,
     refresh_media_urls,
 )
 from beautyads.sources.media import download_media, httpx_media_get
+from beautyads.sources.tiktok import (
+    TokenProvider,
+    refresh_tiktok_video_urls,
+    tiktok_httpx_post,
+)
 from beautyads.store import (
     PostgresCreativeStore,
     StoreConnectError,
@@ -68,6 +79,11 @@ from beautyads.store import (
 
 PREREGISTRATION_PATH = Path("docs/results/e1_preregistration.md")
 TOKEN_FIELDS = ("input_tokens", "output_tokens", "thought_tokens", "cached_tokens")
+TIKTOK_MAX_PAGES = 20
+PER_BRAND_SAMPLE_SEED = 20261114
+PER_BRAND_SAMPLE_RULE = (
+    "분석 가능 소재를 브랜드별로 source_id 정렬 후 섞어 앞에서 N건(최신순 아님)"
+)
 
 
 class TargetDeps(NamedTuple):
@@ -80,6 +96,32 @@ class TargetError(Exception):
     def __init__(self, code: str):
         self.code = code
         super().__init__(code)
+
+
+def select_per_brand(
+    creatives: Sequence[Creative], per_brand_limit: int, seed: int
+) -> list[Creative]:
+    """Use an independent seeded shuffle for each brand, including no brand."""
+    grouped: dict[str | None, list[Creative]] = defaultdict(list)
+    for creative in creatives:
+        if creative.analyzable is True:
+            grouped[creative.brand].append(creative)
+    selected = []
+    for brand in sorted(grouped, key=lambda value: (value is not None, value or "")):
+        # Source breaks ties when different platforms share a source_id.
+        items = sorted(grouped[brand], key=lambda item: (item.source_id, item.source))
+        random.Random(f"{seed}:{brand}").shuffle(items)
+        selected.extend(items[:per_brand_limit])
+    return selected
+
+
+def _sampling(per_brand_limit: int, selected_total: int | None) -> dict:
+    return {
+        "seed": PER_BRAND_SAMPLE_SEED,
+        "per_brand_limit": per_brand_limit,
+        "selected_total": selected_total,
+        "rule": PER_BRAND_SAMPLE_RULE,
+    }
 
 
 def read_only_keys(paths: Sequence[Path]) -> set[CreativeKey] | None:
@@ -147,6 +189,8 @@ def preflight_target(
     names = ["GEMINI_API_KEY", "POSTGRES_PASSWORD"]
     if Source.instagram in sources:
         names.extend(("INSTAGRAM_ACCESS_TOKEN", "INSTAGRAM_USER_ID"))
+    if Source.tiktok in sources:
+        names.extend(("TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET"))
     problems = [
         Problem(f"ENV_MISSING:{name}")
         for name in names
@@ -331,9 +375,20 @@ def run_target(
     only_keys: Collection[CreativeKey] | None,
     ledger_start: int,
     out: TextIO,
+    per_brand_limit: int | None = None,
 ) -> int:
     store = deps.analysis.store
     started = deps.analysis.now()
+    if per_brand_limit is not None:
+        candidates = store.list_creatives(
+            analyzable_only=True, sources=sources, brands=brands, limit=None
+        )
+        only_keys = {
+            item.key
+            for item in select_per_brand(
+                candidates, per_brand_limit, PER_BRAND_SAMPLE_SEED
+            )
+        }
     if only_keys is None:
         targets = enqueue_targets(
             store, FINAL_RUN_TAG, sources=sources, brands=brands, limit=limit
@@ -415,18 +470,29 @@ def run_target(
             None,
         ),
     }
+    if per_brand_limit is not None:
+        summary["sampling"] = _sampling(per_brand_limit, len(keys))
     if stopped:
         print(f"STOPPED {stopped}", file=out)
     print(json.dumps(summary, ensure_ascii=False), file=out, flush=True)
     return 3 if stopped else 0
 
 
-def _live_deps(*, sources, environ, env_file, stack: ExitStack) -> TargetDeps:
+def _live_deps(
+    *,
+    sources,
+    environ,
+    env_file,
+    stack: ExitStack,
+    tiktok_max_pages: int = TIKTOK_MAX_PAGES,
+) -> TargetDeps:
     """Connect runtime layer boundaries after preflight, without eval dependencies."""
     scan_log: list[dict[str, Any]] = []
     accounts = {}
+    brands = {}
     lock = Lock()
     stop = None
+    tiktok_stop = None
     if Source.instagram in sources:
         accounts = {
             item.username: item
@@ -449,6 +515,44 @@ def _live_deps(*, sources, environ, env_file, stack: ExitStack) -> TargetDeps:
     def now():
         return datetime.now(UTC)
 
+    if Source.tiktok in sources:
+        tiktok_config = load_tiktok_config(Path("config/sources.yaml"))
+        brands = {item.brand: item for item in tiktok_config.brands}
+        tiktok_token = TokenProvider(
+            tiktok_httpx_post,
+            client_key=require_setting(
+                "TIKTOK_CLIENT_KEY", environ=environ, env_file=env_file
+            ),
+            client_secret=require_setting(
+                "TIKTOK_CLIENT_SECRET", environ=environ, env_file=env_file
+            ),
+            now=now,
+        )
+
+    def refresh_tiktok(brand, wanted_ids):
+        nonlocal tiktok_stop
+        with lock:
+            if tiktok_stop is not None:
+                return RefreshResult({}, set(), set(wanted_ids), tiktok_stop)
+            result = refresh_tiktok_video_urls(
+                tiktok_httpx_post,
+                tiktok_token,
+                tiktok_config,
+                brand,
+                wanted_ids,
+                today=now().date(),
+                max_pages=tiktok_max_pages,
+            )
+            tiktok_stop = result.stopped
+            scan_log.append({"source": "tiktok", "stopped": result.stopped})
+            return result
+
+    def plans(creatives):
+        return {
+            **prepare_instagram_plans(creatives, accounts, refresh=refresh),
+            **prepare_tiktok_plans(creatives, brands, refresh=refresh_tiktok),
+        }
+
     def refresh(account, wanted_ids):
         nonlocal stop
         # One refresh may exhaust the shared app quota. Latch the stop for this
@@ -470,6 +574,13 @@ def _live_deps(*, sources, environ, env_file, stack: ExitStack) -> TargetDeps:
             return result
 
     def rerefresh(creative):
+        if creative.source == Source.tiktok:
+            brand = brands.get(creative.brand)
+            if brand is None:
+                return None
+            return lambda: refresh_tiktok(brand, {creative.source_id}).urls.get(
+                creative.source_id
+            )
         account = (
             accounts.get(creative.account)
             if creative.source == Source.instagram
@@ -494,7 +605,7 @@ def _live_deps(*, sources, environ, env_file, stack: ExitStack) -> TargetDeps:
                 partial(wait_processed, api_key=gemini_key),
                 partial(delete_file, api_key=gemini_key),
             ),
-            partial(prepare_instagram_plans, accounts=accounts, refresh=refresh),
+            plans,
             rerefresh,
             time.sleep,
             now,
@@ -528,8 +639,8 @@ def _window(value: str) -> float:
 
 def _sources(value: str) -> set[Source]:
     names = {part.strip() for part in value.split(",")}
-    if not names or not names <= {"youtube", "instagram"}:
-        raise argparse.ArgumentTypeError("sources must be youtube,instagram")
+    if not names or not names <= {"youtube", "instagram", "tiktok"}:
+        raise argparse.ArgumentTypeError("sources must be youtube,instagram,tiktok")
     return {Source(name) for name in names}
 
 
@@ -548,6 +659,8 @@ def main(
     parser.add_argument("--sources", type=_sources, default="youtube,instagram")
     parser.add_argument("--brands")
     parser.add_argument("--limit", type=_integer)
+    parser.add_argument("--per-brand-limit", type=partial(_integer, maximum=500))
+    parser.add_argument("--tiktok-max-pages", type=_integer, default=TIKTOK_MAX_PAGES)
     parser.add_argument(
         "--batch-size", type=partial(_integer, maximum=500), default=100
     )
@@ -568,6 +681,10 @@ def main(
     except SystemExit as exc:
         return int(exc.code)
     try:
+        if args.per_brand_limit is not None and (
+            args.only_keys_file or args.limit is not None
+        ):
+            raise TargetError("PER_BRAND_CONFLICT")
         if args.only_keys_file and (args.brands is not None or args.limit is not None):
             raise TargetError("ONLY_KEYS_CONFLICT")
         keys = read_only_keys(args.only_keys_file)
@@ -586,6 +703,10 @@ def main(
             }
             if keys is not None:
                 preview["key_count"] = sum(key.source in args.sources for key in keys)
+            if Source.tiktok in args.sources:
+                preview["tiktok_max_pages"] = args.tiktok_max_pages
+            if args.per_brand_limit is not None:
+                preview["sampling"] = _sampling(args.per_brand_limit, None)
             if args.items is not None:
                 preview.update(calls_min=args.items, calls_max=args.items * 3)
             print("ESTIMATE " + json.dumps(preview, ensure_ascii=False), file=out)
@@ -616,6 +737,7 @@ def main(
                     environ=environ,
                     env_file=env_file,
                     stack=stack,
+                    tiktok_max_pages=args.tiktok_max_pages,
                 )
             )
             run = AnalysisRun(
@@ -644,6 +766,7 @@ def main(
                 only_keys=keys,
                 ledger_start=ledger_start,
                 out=out,
+                per_brand_limit=args.per_brand_limit,
             )
     except SettingError as exc:
         print(f"PREFLIGHT_FAILED {exc.code}:{exc.name}", file=out)
