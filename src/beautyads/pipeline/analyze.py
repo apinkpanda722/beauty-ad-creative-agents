@@ -309,9 +309,14 @@ def _process(
                     for record in outcome.records
                 ]
                 return _Result(creative, outcome, None)
-            except DailyLimitReached:
+            except DailyLimitReached as exc:
                 stop.set()
-                return _Result(creative, None, "DAILY_LIMIT")
+                reason = (
+                    "CREDITS_DEPLETED"
+                    if exc.kind == ErrorKind.CREDITS_DEPLETED
+                    else "DAILY_LIMIT"
+                )
+                return _Result(creative, None, reason)
             except CostCapExceeded as exc:
                 stop.set()
                 return _Result(creative, None, f"COST_CAP:{exc.provider}")

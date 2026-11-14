@@ -600,3 +600,33 @@ def test_file_message_does_not_change_nonfatal_classification(call_args, status)
     assert caught.value.kind == (
         ErrorKind.RATE_LIMIT if status == 429 else ErrorKind.RETRYABLE
     )
+
+
+CREDITS_BODY = (
+    'GeminiException - {"error": {"code": 402, "message": "Your prepayment credits '
+    'are depleted. Please go to AI Studio to manage your project and billing.", '
+    '"status": "RESOURCE_EXHAUSTED"}}'
+)
+
+
+def test_depleted_prepayment_credits_are_a_stop_condition_not_fatal():
+    error = sdk_error(litellm.BadRequestError, CREDITS_BODY)
+    assert classify_error(error) == ErrorKind.CREDITS_DEPLETED
+    # an ordinary bad request or unrelated 402 text is still fatal
+    assert classify_error(sdk_error(litellm.BadRequestError, "bad input")) == (
+        ErrorKind.FATAL
+    )
+
+
+def test_credits_depleted_stops_without_retry_or_ledger(call_args):
+    fn, sleep = (
+        Mock(side_effect=sdk_error(litellm.BadRequestError, CREDITS_BODY)),
+        Mock(),
+    )
+    with pytest.raises(DailyLimitReached) as caught:
+        gemini_interact(**call_args, interactions_fn=fn, sleep=sleep)
+    assert caught.value.kind == ErrorKind.CREDITS_DEPLETED
+    assert caught.value.code == "CREDITS_DEPLETED"
+    fn.assert_called_once()
+    sleep.assert_not_called()
+    assert not call_args["ledger_path"].exists()

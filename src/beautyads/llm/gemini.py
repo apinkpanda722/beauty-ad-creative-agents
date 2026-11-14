@@ -168,7 +168,9 @@ def gemini_interact(
                 continue
             message = str(exc).replace(key, "[redacted]") if key else str(exc)
             error_type = (
-                DailyLimitReached if kind == ErrorKind.DAILY_LIMIT else LlmCallError
+                DailyLimitReached
+                if kind in (ErrorKind.DAILY_LIMIT, ErrorKind.CREDITS_DEPLETED)
+                else LlmCallError
             )
             code = "RETRIES_EXHAUSTED" if kind == ErrorKind.RETRYABLE else kind.value
             if kind == ErrorKind.FATAL:

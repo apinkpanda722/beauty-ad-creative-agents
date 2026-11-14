@@ -280,6 +280,10 @@ def daily():
     return DailyLimitReached(kind=ErrorKind.DAILY_LIMIT, code="DAILY_LIMIT")
 
 
+def credits():
+    return DailyLimitReached(kind=ErrorKind.CREDITS_DEPLETED, code="CREDITS_DEPLETED")
+
+
 def rate(wait=None):
     return LlmCallError(
         kind=ErrorKind.RATE_LIMIT, code="RATE_LIMIT", retry_after_s=wait
@@ -290,6 +294,7 @@ def rate(wait=None):
     ("error", "stop"),
     [
         (daily(), "DAILY_LIMIT"),
+        (credits(), "CREDITS_DEPLETED"),
         (CostCapExceeded("gemini", 12, 12), "COST_CAP:gemini"),
         (rate(), "RATE_LIMITED"),
     ],
