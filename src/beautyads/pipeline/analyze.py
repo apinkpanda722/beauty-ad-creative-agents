@@ -267,15 +267,16 @@ class _Result(NamedTuple):
     stopped: str | None
 
 
-def _adjust_repeat_code(record, creative: Creative, attempts: int):
-    """LLM_FATAL repeating after a retry is permanent; a TikTok absence is confirmed
-    only on the second scan (its result set changes between runs)."""
+def _adjust_repeat_code(record, creative: Creative, attempts: int, prior_code):
+    """LLM_FATAL repeating after a retry is permanent. A TikTok absence is confirmed
+    only when the previous attempt already ended as an unconfirmed absence: the
+    result set changes between runs, and an unfinished scan is not an absence."""
     if record.error_code == "LLM_FATAL" and attempts >= 1:
         return record.model_copy(update={"error_code": LLM_FATAL_REPEATED})
     if (
         record.error_code == "MEDIA_URL_MISSING"
         and creative.source == Source.tiktok
-        and attempts == 0
+        and prior_code != MEDIA_URL_MISSING_UNCONFIRMED
     ):
         return record.model_copy(update={"error_code": MEDIA_URL_MISSING_UNCONFIRMED})
     return record
@@ -315,9 +316,14 @@ def _process(
                     if record.kind not in done_kinds
                 ]
                 # 이미 한 번 실패했던 작업이 재시도에서도 LLM_FATAL이면 영구 제외로 기록한다.
-                prior = {job.kind: job.attempts for job in jobs.values()}
+                prior = {job.kind: job for job in jobs.values()}
                 outcome.records = [
-                    _adjust_repeat_code(record, creative, prior.get(record.kind, 0))
+                    _adjust_repeat_code(
+                        record,
+                        creative,
+                        prior[record.kind].attempts if record.kind in prior else 0,
+                        prior[record.kind].error_code if record.kind in prior else None,
+                    )
                     for record in outcome.records
                 ]
                 return _Result(creative, outcome, None)

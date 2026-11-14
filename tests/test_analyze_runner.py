@@ -634,8 +634,9 @@ def test_repeated_llm_fatal_becomes_a_permanent_exclusion_reason(rig):
     assert rig.store.requeue_jobs("content_type@test", RETRYABLE_ERROR_CODES) == 0
 
 
-def _absence_run(rig, item, attempts):
-    job = set_job(rig, item, code=None, status=JobStatus.pending)
+def _absence_run(rig, item, attempts, prior_code=None):
+    # a requeued job keeps the error code of its previous attempt
+    job = set_job(rig, item, code=prior_code, status=JobStatus.pending)
     job.attempts = attempts
     rig.store.creatives[item.key] = item
     rig.fake.side_effect = lambda it, **kw: outcome(
@@ -647,14 +648,23 @@ def _absence_run(rig, item, attempts):
 
 
 def test_tiktok_absence_needs_a_second_scan_before_it_is_permanent(rig):
-    first = rig.items[0].model_copy(update={"source": Source.tiktok, "source_id": "t1"})
-    second = rig.items[1].model_copy(
-        update={"source": Source.tiktok, "source_id": "t2"}
+    def tiktok(index, source_id):
+        return rig.items[index].model_copy(
+            update={"source": Source.tiktok, "source_id": source_id}
+        )
+
+    # first absence: retryable
+    assert _absence_run(rig, tiktok(0, "t1"), 0) == "MEDIA_URL_MISSING_UNCONFIRMED"
+    # missing again after that unconfirmed absence: confirmed
+    assert (
+        _absence_run(rig, tiktok(1, "t2"), 1, "MEDIA_URL_MISSING_UNCONFIRMED")
+        == "MEDIA_URL_MISSING"
     )
-    # first miss: retryable; the same item missing again after a retry: confirmed
-    assert _absence_run(rig, first, attempts=0) == "MEDIA_URL_MISSING_UNCONFIRMED"
+    # a retry after an unfinished scan or other failure is still the first absence
+    for index, prior in ((3, "MEDIA_REFRESH_STOPPED"), (4, "LLM_FATAL")):
+        found = _absence_run(rig, tiktok(index, f"t{index}"), 1, prior)
+        assert found == "MEDIA_URL_MISSING_UNCONFIRMED"
     assert "MEDIA_URL_MISSING_UNCONFIRMED" in RETRYABLE_ERROR_CODES
-    assert _absence_run(rig, second, attempts=1) == "MEDIA_URL_MISSING"
     assert "MEDIA_URL_MISSING" not in RETRYABLE_ERROR_CODES
 
 
