@@ -45,6 +45,7 @@
 | 32 | **P3 설계 승인(2026-11-13)**: `e1-sampling`에 출처별 중복 그룹 키(YouTube `(source, account, title, caption)`, Instagram `(source, account, caption)`, 상한 1, 빈 캡션은 그룹 없음), `pilot-compare` 입력·제외 규칙과 `product_creative` 교집합·혼동 행렬 규칙, `taxonomy-v1`에 미확정 4건 결정과 기존 단언 두 개 갱신 추가. TikTok 수집 실행기가 없던 빈칸을 `tiktok-collect`(step 9)로 메우고 `tiktok-plans`를 step 10으로 뒤에 둠. `live-fixes`는 Instagram 0건 계정 확인 결과 전달 뒤에 작성 | 사용자 승인, 조언 세션 DB 조회 |
 | 33 | **P3 step 0(`live-fixes`) 제거, step 1~10 파일 확정**(`phases/3-collect-freeze/`). Instagram 0건 계정 4개는 코드 변경 없이 한계로 기록(CONTRACTS·결과 문서). 실행기의 진행 표시(`Step N/total-1`)는 step이 0부터 시작한다고 가정하므로 P3는 `Step 10/9`처럼 보일 수 있다(표시만의 문제, 실행 순서는 `index.json`의 첫 `pending`을 따른다) | 사용자 결정 D4 |
 | 34 | **E1 1단계 사용 범위·2단계 표집 정정(2026-11-13)**: 1단계는 라벨링한 200건 전부를 쓰고, 2단계는 사람 제품 소재 중 지원 3종(`mask_pack`·`serum_ampoule`·`sun_care`) 전수 48건(목표 50건, `other` 제외, shortfall 2). 근거: 1단계 사람 라벨에서 제품 147건 중 `other`가 99건(67%)이고 `other`는 `hook`·`full`이 만들어지지 않아 모델 비교 불가, 100건에서 멈추면 지원 3종이 17건뿐. 정정 시점에 E1 모델 결과는 보지 않았다. 자세한 내용은 `docs/results/e1_preregistration.md` §7 | 사용자 승인, 사전 등록 정정 |
+| 35 | **P3 step 실행 순서 변경(2026-11-13)**: 부분 동결(11-18 예정)이 시범 비교 결과를 보고 정해야 해서 `pilot-compare`(3)와 `cost-recalc`(4)를 먼저 실행하고 이어 1·2·5·6·7 순으로 진행했다. 방법은 `phases/3-collect-freeze/index.json`의 step 배열 순서만 3, 4, 1, 2, 5, 6, 7, 8, 9, 10으로 바꾼 것이며 step 번호와 파일 이름은 그대로다(PHASES.md·사전 등록의 번호 불변). 실행기는 배열의 첫 `pending`을 고르므로 진행 표시는 `Step N/9` 꼴로 보인다 | 사용자 결정 |
 
 ## 1. 전제와 일정
 
