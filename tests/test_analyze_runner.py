@@ -632,3 +632,31 @@ def test_repeated_llm_fatal_becomes_a_permanent_exclusion_reason(rig):
     # the permanent one is not requeued by another retry
     rig.store.jobs["content_type@test", first.key].status = JobStatus.done
     assert rig.store.requeue_jobs("content_type@test", RETRYABLE_ERROR_CODES) == 0
+
+
+def _absence_run(rig, item, attempts):
+    job = set_job(rig, item, code=None, status=JobStatus.pending)
+    job.attempts = attempts
+    rig.store.creatives[item.key] = item
+    rig.fake.side_effect = lambda it, **kw: outcome(
+        it, rig.run, JobStatus.failed, "MEDIA_URL_MISSING"
+    )
+    rig.deps.now.side_effect = [NOW, NOW + timedelta(seconds=9)]
+    execute(rig, only_keys={item.key})
+    return rig.store.jobs["content_type@test", item.key].error_code
+
+
+def test_tiktok_absence_needs_a_second_scan_before_it_is_permanent(rig):
+    first = rig.items[0].model_copy(update={"source": Source.tiktok, "source_id": "t1"})
+    second = rig.items[1].model_copy(
+        update={"source": Source.tiktok, "source_id": "t2"}
+    )
+    # first miss: retryable; the same item missing again after a retry: confirmed
+    assert _absence_run(rig, first, attempts=0) == "MEDIA_URL_MISSING_UNCONFIRMED"
+    assert "MEDIA_URL_MISSING_UNCONFIRMED" in RETRYABLE_ERROR_CODES
+    assert _absence_run(rig, second, attempts=1) == "MEDIA_URL_MISSING"
+    assert "MEDIA_URL_MISSING" not in RETRYABLE_ERROR_CODES
+
+
+def test_other_sources_keep_the_single_scan_absence_rule(rig):
+    assert _absence_run(rig, rig.items[2], attempts=0) == "MEDIA_URL_MISSING"

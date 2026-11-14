@@ -1108,3 +1108,19 @@ def test_sampling_excludes_unset_eligibility_and_handles_shared_ids():
         assert len(selected) == 2
         assert selected == cli.select_per_brand(items[::-1], 2, seed)
         assert all(item.analyzable is True for item in selected)
+
+
+@pytest.mark.parametrize(
+    ("code", "global_stop"),
+    [
+        (None, False),
+        ("TIKTOK_HTTP_500", False),
+        ("TIKTOK_HTTP_503", False),
+        ("TIKTOK_PAGES_INCOMPLETE", False),
+        ("TIKTOK_HTTP_429", True),
+        ("TIKTOK_TOKEN_INVALID", True),
+        ("TIKTOK_INVALID_PARAMS", True),
+    ],
+)
+def test_only_account_level_tiktok_stops_latch_for_every_brand(code, global_stop):
+    assert cli.tiktok_stop_is_global(code) is global_stop

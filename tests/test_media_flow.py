@@ -437,6 +437,7 @@ def test_retryable_codes_exclude_every_held_code():
             "FILE_RETRIEVE_FAILED",
             "LLM_RETRYABLE",
             "LLM_FATAL",  # 2026-11-14: 일시 오류로 확인돼 재시도 대상에 추가
+            "MEDIA_URL_MISSING_UNCONFIRMED",
             "MEDIA_REFRESH_STOPPED",
         }
     )
@@ -789,3 +790,8 @@ def test_tiktok_plan_uses_existing_media_processing(run, state):
         assert (record.error_code in RETRYABLE_ERROR_CODES) == (
             state == "refresh_stopped"
         )
+
+
+def test_first_absence_is_retryable_and_only_the_confirmed_one_is_not():
+    assert "MEDIA_URL_MISSING_UNCONFIRMED" in RETRYABLE_ERROR_CODES
+    assert "MEDIA_URL_MISSING" not in RETRYABLE_ERROR_CODES

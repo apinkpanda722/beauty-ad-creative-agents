@@ -99,7 +99,7 @@ def retailers():
     return load_retailers(Path(__file__).resolve().parents[1] / "config/retailers.yaml")
 
 
-def collect(post, *, cfg=None, max_pages=5, brands=None):
+def collect(post, *, cfg=None, max_pages=5, brands=None, sleep=lambda _s: None):
     return collect_tiktok(
         post,
         provider(post),
@@ -109,6 +109,7 @@ def collect(post, *, cfg=None, max_pages=5, brands=None):
         max_pages=max_pages,
         collected_at=NOW,
         brands=brands,
+        sleep=sleep,
     )
 
 
@@ -258,7 +259,7 @@ def test_invalid_params_stop_all_brands(filename):
     assert len(post.calls) == 1
 
 
-@pytest.mark.parametrize("status", [500, 503, 429])
+@pytest.mark.parametrize("status", [429, 403])
 def test_http_failure_isolated_without_retry(status):
     body = response("tiktok_error_bad_token.json")
     body["error"].update(code="internal_error", message=uuid4().hex)
@@ -396,7 +397,7 @@ def test_executor_token_normalization(name, brands, shops, expected):
     )
 
 
-def refresh(post, wanted, *, max_pages=5):
+def refresh(post, wanted, *, max_pages=5, sleep=lambda _s: None):
     cfg = config()
     return refresh_tiktok_video_urls(
         post,
@@ -407,6 +408,7 @@ def refresh(post, wanted, *, max_pages=5):
         base_url=TIKTOK_BASE_URL,
         today=NOW.date(),
         max_pages=max_pages,
+        sleep=sleep,
     )
 
 
@@ -480,6 +482,57 @@ def test_provider_messages_do_not_escape_results():
     post = FakePost()
     body = response("tiktok_error_bad_token.json")
     body["error"]["message"] = post.secret + post.access_token
-    post.replies = iter([TikTokHttpResponse(500, body)])
+    post.replies = iter([TikTokHttpResponse(500, body)] * 4)
     result = collect(post)
     assert post.secret not in repr(result) and post.access_token not in repr(result)
+
+
+def _failure(status):
+    body = response("tiktok_error_bad_token.json")
+    body["error"].update(code="internal_error", message=uuid4().hex)
+    return TikTokHttpResponse(status, body)
+
+
+@pytest.mark.parametrize("status", [500, 502, 503, 504])
+def test_server_errors_retry_with_backoff_then_succeed(status):
+    sleeps = []
+    post = FakePost([_failure(status)] * 3 + [page(last=True)])
+    result = collect(post, sleep=sleeps.append)
+    assert result.errors == {} and result.creatives
+    assert len(post.calls) == 4
+    assert sleeps == [2.0, 5.0, 15.0]
+
+
+def test_persistent_server_error_fails_only_that_brand_after_three_retries():
+    sleeps = []
+    post = FakePost([_failure(500)] * 4 + [page(last=True)])
+    result = collect(post, cfg=config("mixsoon", "dalba"), sleep=sleeps.append)
+    assert result.errors == {"mixsoon": "TIKTOK_HTTP_500"}
+    assert result.stopped is None
+    assert result.creatives and all(c.brand == "dalba" for c in result.creatives)
+    assert len(post.calls) == 5 and sleeps == [2.0, 5.0, 15.0]
+
+
+def test_refresh_retries_server_errors_and_reports_the_final_code():
+    sleeps = []
+    post = FakePost([_failure(502)] * 4)
+    result = refresh(post, ["absent"], sleep=sleeps.append)
+    assert result.stopped == "TIKTOK_HTTP_502" and result.missing == {"absent"}
+    assert len(post.calls) == 4 and sleeps == [2.0, 5.0, 15.0]
+    recovered = FakePost([_failure(503), page(last=True)])
+    ok = refresh(recovered, ["absent"], sleep=lambda _s: None)
+    assert ok.stopped is None and ok.missing == {"absent"}
+
+
+def test_absence_is_only_reported_after_a_scan_that_ended_with_has_more_false():
+    # the result set can differ between runs, so a capped scan proves nothing
+    capped = FakePost([page()])
+    result = refresh(capped, ["absent"], max_pages=1)
+    assert result.stopped == "TIKTOK_PAGES_INCOMPLETE" and result.missing == {"absent"}
+    complete = FakePost([page(last=True)])
+    done = refresh(complete, ["absent"], max_pages=1)
+    assert done.stopped is None and done.missing == {"absent"}
+    # has_more false exactly on the last allowed page still counts as complete
+    both = FakePost([page(), page("tiktok_ad_query_mixsoon_last.json")])
+    exact = refresh(both, ["absent"], max_pages=2)
+    assert exact.stopped is None and exact.missing == {"absent"}

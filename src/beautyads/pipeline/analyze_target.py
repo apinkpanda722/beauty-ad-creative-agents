@@ -478,6 +478,13 @@ def run_target(
     return 3 if stopped else 0
 
 
+def tiktok_stop_is_global(code: str | None) -> bool:
+    """Server errors and capped scans only fail that brand; account-level errors stop all."""
+    if code is None:
+        return False
+    return not (code.startswith("TIKTOK_HTTP_5") or code == "TIKTOK_PAGES_INCOMPLETE")
+
+
 def _live_deps(
     *,
     sources,
@@ -543,7 +550,8 @@ def _live_deps(
                 today=now().date(),
                 max_pages=tiktok_max_pages,
             )
-            tiktok_stop = result.stopped
+            if tiktok_stop_is_global(result.stopped):
+                tiktok_stop = result.stopped
             scan_log.append({"source": "tiktok", "stopped": result.stopped})
             return result
 

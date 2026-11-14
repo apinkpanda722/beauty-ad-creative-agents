@@ -233,10 +233,19 @@ def test_store_connect_error_is_safe(setup, environment, reason):
     assert environment["POSTGRES_PASSWORD"] not in text and not setup[2]
 
 
-def test_only_complete_brands_saved_and_progress_is_immediate(setup, environment):
+def test_only_complete_brands_saved_and_progress_is_immediate(
+    setup, environment, monkeypatch
+):
+    # a 500 is retried three times before the brand fails (no real waiting here)
+    monkeypatch.setattr("beautyads.sources.tiktok._BACKOFF_S", (0.0, 0.0, 0.0))
     store = MemoryStore()
     good, partial = page(), page(more=True)
-    post = FakePost(good, partial, failure(500), page(names=("Anua Limited",)))
+    post = FakePost(
+        good,
+        partial,
+        *[failure(500) for _ in range(4)],
+        page(names=("Anua Limited",)),
+    )
 
     def check_progress():
         if post.calls:
