@@ -118,7 +118,16 @@
     {
       "step": 9,
       "name": "tiktok-collect",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-14T22:24:12+0900",
+      "summary": "TikTok 브랜드별 수집 CLI·점검·부분 결과 폐기·중단 처리·JSON 보고·합성 테스트와 live-tiktok 타깃·README 구현; make verify 통과(1860 tests), 의존성 추가 없음.",
+      "completed_at": "2026-11-14T22:30:29+0900",
+      "usage": {
+        "input_tokens": 1071359,
+        "cached_input_tokens": 980352,
+        "output_tokens": 13901,
+        "attempts": 1
+      }
     },
     {
       "step": 10,
