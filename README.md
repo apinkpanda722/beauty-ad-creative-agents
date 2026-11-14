@@ -490,6 +490,70 @@ Instagram은 배치 분석 직전에 계정을 재조회하고 서명 URL로 받
 종료 코드 3이다. 대기열 소진·처리 0건으로 반복 종료·계획 출력은 종료 코드 0이다.
 `live-analyze`는 사용자 수동 실행용이며 `make verify`에는 포함하지 않는다.
 
+## live-tiktok (P3)
+
+TikTok Commercial Content API의 EU 게재 광고를 브랜드별로 수집해 PostgreSQL에
+저장한다. OrbStack을 켜고 `make db-up`으로 DB를 준비한다. `.env`에는
+`TIKTOK_CLIENT_KEY`·`TIKTOK_CLIENT_SECRET`·`POSTGRES_PASSWORD`가 필요하다.
+TikTok 키는 승인된 연구용 클라이언트의 **My research**에서 확인한다.
+`config/retailers.yaml`은 사용자 확인을 기다리는 판매처 시드 초안이므로
+실제 실행 전에 목록을 확인한다. 실행기가 시드를 수정하지는 않는다.
+
+```bash
+# 키·네트워크·DB 없이 광고 조회 호출 수 범위만 확인
+make live-tiktok ARGS='--dry-run'
+# 어댑터의 첫 실서비스 실행은 반드시 작게 시작한다.
+make live-tiktok ARGS='--brands mixsoon --max-pages 1'
+# 모듈 직접 실행 및 여러 브랜드 선택
+uv run python -m beautyads.pipeline.collect_tiktok --brands mixsoon,dalba --max-pages 2
+```
+
+`--brands` 기본값은 `config/sources.yaml`의 전체 브랜드다. `--max-pages`는
+브랜드당 쪽 수 상한으로 기본 **1**, 허용 범위는 1~50이다. 한 쪽은 최대 10건이며
+`has_more == false`이면 상한 전에 종료한다. `--dry-run`은 의존성 생성과 환경·DB
+접속 점검도 생략하고 `ESTIMATE` 한 줄을 출력한다. 광고 조회 호출 수는 선택한
+브랜드 수~브랜드 수×쪽 수 범위이며, 토큰 발급·어댑터의 토큰 갱신 재조회는 별도다.
+호출당 시간은 가정(미실측)이다.
+
+브랜드가 끝날 때마다 JSON 한 줄(`event: brand`)에 브랜드·고유 수집 수(`fetched`)·
+집행 주체 분포(`executor`)·오류(`error`)·저장 수(`stored`)를 출력한다. 분류기의
+`brand_direct`·`retailer`·`unknown` 값을 그대로 쓰며 숫자 이름·목록 밖은
+`unknown`(불명)이다. 마지막 `summary`에는 브랜드별 수집·저장 수, 집행 주체 분포,
+오류·중단 코드, 판매처 시드 경로·중복 제거한 항목 수, 총 수집 소요 초를 표시한다.
+수집 수와 집행 주체 분포에는 실패한 브랜드에서 받은 부분 결과도 포함되지만,
+그 브랜드는 **한 건도 저장하지 않는다**. 브랜드 간에도 같은 `ad.id`는 실행당
+한 번만 저장하므로 수집 수와 저장 수는 다를 수 있다. 재실행하면 처음 쪽부터
+받고 기존 저장소의 upsert로 갱신한다. 중단 전에 완료한 브랜드는 보존한다.
+
+토큰 유효 기간은 **7200초**이고 리프레시 토큰은 없다. 기존 `TokenProvider`가
+만료 직전에 재발급하며 어댑터는 만료된 토큰 응답에 한 번만 갱신 조회한다.
+실행기는 인증 오류·400대 응답을 추가 재시도하지 않는다. 토큰 발급 실패,
+잘못된 토큰·요청, 429는 다음 브랜드를 호출하지 않고 멈춘다.
+영상 주소는 저장·출력하지 않는다. 서명 URL은 만료되므로 분석 직전
+`tiktok-plans`가 재조회한다. 키·토큰·인증 헤더·응답 진단 본문도 출력하지 않는다.
+
+**TikTok은 E1 표본에서 제외된다(그래프·에이전트 데이터).** 모델 정확도는
+YouTube·Instagram 소재로만 측정하며 TikTok 소재 분석 정확도는 미측정이다.
+`live-tiktok`은 사용자가 직접 실행하는 별도 타깃이며 `make verify`에 포함되지 않는다.
+
+| 이유 코드 | 의미와 조치 |
+|---|---|
+| `ENV_MISSING:TIKTOK_CLIENT_KEY` / `ENV_MISSING:TIKTOK_CLIENT_SECRET` / `ENV_MISSING:POSTGRES_PASSWORD` | 해당 설정에 공백이 아닌 값을 준비한다. 값은 출력하지 않는다. |
+| `DOCKER_DOWN` | OrbStack을 켠다. |
+| `POSTGRES_UNREACHABLE` | `make db-up`과 포트(`BEAUTYADS_POSTGRES_PORT`, 기본 5433)를 확인한다. |
+| `POSTGRES_AUTH_FAILED` / `POSTGRES_CONNECT_FAILED` | DB 인증·연결 설정을 확인한다. DSN은 출력하지 않는다. |
+| `TIKTOK_CONFIG_UNREADABLE` / `TIKTOK_CONFIG_INVALID` | `config/sources.yaml`의 읽기 권한·TikTok 설정 형식을 확인한다. |
+| `RETAILERS_CONFIG_UNREADABLE` / `RETAILERS_CONFIG_INVALID` | 판매처 시드 경로·문자열 목록 형식을 확인한다. |
+| `TIKTOK_BRANDS_INVALID` | `--brands`를 설정에 등록된 브랜드 이름으로 지정한다. |
+| `TIKTOK_TOKEN_INVALID` | My research의 승인된 연구용 자격 증명을 확인한 뒤 재실행한다. |
+| `TIKTOK_INVALID_PARAMS` | 국가·검색·날짜 설정을 확인한다. 자동 반복하지 않는다. |
+| `TIKTOK_HTTP_429` | 한도 회복 뒤 재실행한다. 호출 한도는 아직 미확인이다. |
+| `TIKTOK_HTTP_<상태>` / `TIKTOK_REQUEST_FAILED` / `TIKTOK_INVALID_RESPONSE` | 해당 브랜드는 저장하지 않는다. 서비스 상태·응답 계약을 확인한다. 토큰 발급 단계에서 발생하면 전체를 중단한다. |
+| `COLLECTION_BRAND_FAILED` | 예상하지 못한 브랜드 처리 실패다. 진단 원문은 출력하지 않으며 해당 브랜드를 저장하지 않는다. |
+
+점검 실패는 `PREFLIGHT_FAILED <코드>`와 종료 코드 2, 중단 또는 브랜드 오류는
+종료 코드 3, 성공과 `--dry-run`은 0이다. 옵션 오류도 2다.
+
 ## e1-score (P3)
 
 사람 라벨링을 모두 마친 뒤 **사용자가 직접** 실행한다. 기본 입력 폴더는
