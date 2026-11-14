@@ -132,7 +132,16 @@
     {
       "step": 10,
       "name": "tiktok-plans",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-14T22:59:57+0900",
+      "summary": "TikTok 브랜드별 재조회 플랜·분석 연결, 기본 20쪽 옵션, 고정 시드 브랜드별 표본 선택·재개와 README·합성 테스트 구현; make verify 통과(1883 tests), 의존성 추가 없음.",
+      "completed_at": "2026-11-14T23:05:58+0900",
+      "usage": {
+        "input_tokens": 1579444,
+        "cached_input_tokens": 1489920,
+        "output_tokens": 13052,
+        "attempts": 1
+      }
     }
   ]
 }

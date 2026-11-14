@@ -45,6 +45,17 @@ def prepare_tiktok_plans(
 - **`analyze_target` 연결**: `--sources`에 `tiktok`을 허용하고, `AnalysisDeps.plans`를 **출처별 플랜 함수의 합성**으로 만든다(Instagram은 기존 그대로). `TIKTOK_CLIENT_KEY`·`TIKTOK_CLIENT_SECRET`은 TikTok을 대상에 포함할 때만 점검한다(`ENV_MISSING:…`). 토큰은 `TokenProvider`가 7200초 만료를 처리하며 이 CLI가 출력하지 않는다.
 - 기존 `AnalysisDeps` 필드와 `prepare_instagram_plans` 시그니처·동작은 바꾸지 않는다(시범 코드와 기존 테스트가 쓴다).
 
+### 브랜드당 표본 `--per-brand-limit` (사용자 결정 2026-11-14)
+
+TikTok 분석 가능 소재가 많아(수천 건) 비용 상한 안에서 돌리도록 **브랜드당 N건 표본**만 분석한다. `analyze_target`에 옵션을 추가한다.
+
+- `--per-brand-limit N`(정수 1~500): 대상 소재(`analyzable == true`, `--sources`·`--brands` 필터 적용 뒤)를 브랜드별로 모은 뒤 **시드 고정 무작위로 N건**을 고른다. **최신순·인기순 같은 정렬 선택을 하지 않는다.** 브랜드의 대상이 N건 이하이면 전부.
+- 선택 규칙(코드 상수 한 곳 `PER_BRAND_SAMPLE_SEED = 20261114`와 함수 `select_per_brand(creatives, per_brand_limit, seed)`): 브랜드마다 대상을 `source_id` 오름차순으로 정렬한 뒤 `random.Random(f"{seed}:{brand}")`로 섞고 앞에서 N건을 취한다. 브랜드별로 독립 시드라 **`N=10`의 선택은 `N=40`의 선택의 앞부분(prefix)**이고, 소재의 입력 순서나 다른 브랜드의 소재 수가 바뀌어도 그 브랜드의 선택은 같다(같은 소재 집합에서). `brand`가 없는 소재는 `None` 브랜드로 한 묶음이다.
+- 이 옵션이 있으면 선택된 소재만 대기열에 넣고(`enqueue_analysis`) `run_analysis(..., only_keys=…)`로 그 소재만 처리한다(`--only-keys-file`과 같은 방식). 이미 `done`인 작업은 다시 호출되지 않는다. 같은 옵션·시드·소재 집합으로 다시 실행하면 같은 소재가 선택되어 재개된다.
+- `--only-keys-file`·`--limit`와 함께 쓰면 `PER_BRAND_CONFLICT`(종료 코드 2). `--brands`와는 함께 쓸 수 있다.
+- 요약과 `--dry-run`에 시드, N, 브랜드별 선택 건수의 **합계**(출력에 브랜드별 건수는 쓰지 않는다)와 선택 규칙 문구를 출력한다. README에 "시드 20261114, 분석 가능 소재를 브랜드별로 `source_id` 정렬 후 섞어 앞에서 N건(최신순 아님)"을 쓰고 결과 문서에 옮길 수 있게 한다.
+- 수집 때 쓴 쪽 수는 20이었으므로 `--tiktok-max-pages`의 기본값은 **20**(수집의 `--max-pages 20`과 같은 값 이상)으로 둔다.
+
 ### 반드시 있어야 하는 테스트
 
 (가짜 `refresh`는 `RefreshResult`를 돌려준다. 모델 값을 기대값으로 굳히지 않는다.)
@@ -52,6 +63,8 @@ def prepare_tiktok_plans(
 - **중단**: `stopped`가 있고 id가 `urls`·`gone`에 없으면 `refresh_stopped`이고 **`missing`이 아니다**. 중단이 없고 어디에도 없으면 `missing`.
 - 설정에 없는 브랜드나 TikTok이 아닌 소재는 이 함수가 다루지 않는다(Instagram·YouTube 소재가 섞여도 결과에 키가 없다).
 - `analyze_creative`가 `refresh_stopped` TikTok 플랜에서 `MEDIA_REFRESH_STOPPED`(failed, 재시도 대상)를 기록한다(기존 동작 재확인), `ok` 플랜은 다운로드 경로로 간다.
+- **`--per-brand-limit`**(합성 소재): 브랜드마다 정확히 N건(대상이 N건 이하면 전부)만 선택되고 `analyzable`이 아닌 소재는 선택되지 않는다. 선택이 **게시 시각·소재 입력 순서에 의존하지 않는다**(최신순이 아님: 게시 시각이 서로 다른 합성 소재의 선택이 입력 순서를 뒤집어도 같고, 가장 최신 N건과 같은 집합이 아니라는 것을 시드 한 개로 확인하지 말고 여러 시드/소재 구성으로 최신순과 일치하지 않는 경우가 있음을 확인한다). 같은 입력은 같은 선택, 시드가 다르면 달라질 수 있다. **N이 작은 선택이 큰 선택의 앞부분(prefix)**이다. 한 브랜드의 소재를 추가해도 다른 브랜드의 선택은 같다. 선택된 소재만 대기열에 들어가고 `run_analysis`의 `only_keys`로 처리된다(가짜 저장소로 확인), 이미 `done`인 작업은 다시 호출되지 않는다. `--only-keys-file`·`--limit`와 함께 쓰면 `PER_BRAND_CONFLICT`, N이 0·501이면 오류 종료. 출력에 브랜드별 선택 건수가 없다(합계만). `--dry-run`이 시드와 N을 출력한다.
+- `--tiktok-max-pages`의 기본값이 20이다.
 - `analyze_target`: `--sources tiktok`을 허용하고, TikTok 키가 없으면 `ENV_MISSING:TIKTOK_CLIENT_KEY`(TikTok을 대상에 포함할 때만, 포함하지 않으면 점검하지 않음), `--tiktok-max-pages 0`은 오류 종료, 합성된 플랜에서 Instagram 소재는 기존 `prepare_instagram_plans`로·TikTok 소재는 새 함수로 처리된다. 기존 `tests/test_analyze_target.py`·`tests/test_media_flow.py`·`tests/test_pilot.py`의 단언이 그대로 통과한다.
 
 ## Acceptance Criteria
@@ -90,3 +103,5 @@ make verify   # lint + test 통과
 - 영상 주소를 DB·로그·출력에 남기지 마라. 이유: 서명 URL은 만료되고 저장 금지다.
 - `max_pages`를 수집 때보다 작게 고정하는 기본값을 두지 마라. 이유: 작으면 있는 광고도 못 찾는다(`refresh_tiktok_video_urls`는 수집의 `max_pages` 이상을 요구한다).
 - 모델·네트워크를 호출하지 마라(테스트는 가짜). `make live-analyze`를 실행하지 마라. 이유: 실제 호출·과금은 사용자의 live 실행이다.
+- 표본을 게시 시각·조회수·도달 구간으로 정렬해 뽑지 마라(최신순·인기순 금지). 이유: 사용자 결정 — 시드 고정 무작위로 뽑아야 선택 편향이 없고 재개해도 같다.
+- `--per-brand-limit`의 출력에 브랜드별 건수를 쓰지 마라. 이유: 분포를 보고하지 않는 규칙(합계만).
