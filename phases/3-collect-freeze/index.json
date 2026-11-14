@@ -90,7 +90,16 @@
     {
       "step": 7,
       "name": "metrics-normalize",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-14T22:02:39+0900",
+      "summary": "채널별 조회수 평균순위 백분위·상하위 구분·미계산 사유를 반환하는 순수 함수와 합성 테스트 구현; make verify 통과(1749 tests), 의존성 추가 없음.",
+      "completed_at": "2026-11-14T22:05:40+0900",
+      "usage": {
+        "input_tokens": 445566,
+        "cached_input_tokens": 387456,
+        "output_tokens": 6949,
+        "attempts": 1
+      }
     },
     {
       "step": 8,
