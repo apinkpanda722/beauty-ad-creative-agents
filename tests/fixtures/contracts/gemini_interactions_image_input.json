@@ -1,0 +1,193 @@
+{
+  "description": "Gemini Interactions 이미지 입력 실측(2026-11-15). 합성 PNG(흰 배경, 검은 가로 막대, 빨간 사각형) 2장을 인라인 base64로 보냈다. 요청의 이미지 데이터는 생략했다. 모델 gemini-3.6-flash, thinking_level minimal, 구조화 출력(response_format).",
+  "probes": [
+    {
+      "request_shape": {
+        "model": "gemini/gemini-3.6-flash",
+        "input": [
+          {
+            "type": "text",
+            "text": "Look at the image. Answer in JSON: whether a red rectangle is visible, and how many horizontal black bars you can count."
+          },
+          {
+            "type": "image",
+            "data": "<base64 omitted>",
+            "mime_type": "image/png",
+            "image_px": [
+              1000,
+              2000
+            ],
+            "png_bytes": 8986
+          }
+        ],
+        "generation_config": {
+          "thinking_level": "minimal"
+        },
+        "response_format": {
+          "type": "text",
+          "mime_type": "application/json",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "has_red_block": {
+                "type": "boolean"
+              },
+              "black_bar_count": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "has_red_block",
+              "black_bar_count"
+            ]
+          }
+        }
+      },
+      "usage_summary": {
+        "input_tokens": 1108,
+        "output_tokens": 25,
+        "thought_tokens": 0,
+        "cost_usd": 0.00092475
+      },
+      "response": {
+        "id": "v1_ChdnMFQ1YXVhdEFjTDgxZThQaXN6cjhRZxIXZzBUNWF1YXRBY0w4MWU4UGlzenI4UWc",
+        "object": "interaction",
+        "model": "gemini-3.6-flash",
+        "agent": null,
+        "status": "completed",
+        "created": "2026-11-15T05:35:00Z",
+        "updated": "2026-11-15T05:35:00Z",
+        "outputs": null,
+        "steps": [
+          {
+            "signature": "EmkKZwFpFH0TUQbmjWyvPN6sofYDoGxAtkBMY9zJdv25rz5NnP8nNEFEE7VocBaTO+PDWVz3wuG73wxxevA4lVNzmevEDVKHvq3yFCknQwJ9c1LbUGGjVf9qmRb4tJwNluwxb/lJmhAU1EE=",
+            "type": "thought"
+          },
+          {
+            "content": [
+              {
+                "text": "{\n  \"has_red_block\": true,\n  \"black_bar_count\": 9\n}",
+                "type": "text"
+              }
+            ],
+            "type": "model_output"
+          }
+        ],
+        "usage": {
+          "total_tokens": 1133,
+          "total_input_tokens": 1108,
+          "input_tokens_by_modality": [
+            {
+              "modality": "text",
+              "tokens": 27
+            },
+            {
+              "modality": "image",
+              "tokens": 1081
+            }
+          ],
+          "total_cached_tokens": 0,
+          "total_output_tokens": 25,
+          "total_tool_use_tokens": 0,
+          "total_thought_tokens": 0,
+          "initial_input_tokens": 1108
+        },
+        "service_tier": "standard"
+      }
+    },
+    {
+      "request_shape": {
+        "model": "gemini/gemini-3.6-flash",
+        "input": [
+          {
+            "type": "text",
+            "text": "Look at the image. Answer in JSON: whether a red rectangle is visible, and how many horizontal black bars you can count."
+          },
+          {
+            "type": "image",
+            "data": "<base64 omitted>",
+            "mime_type": "image/png",
+            "image_px": [
+              1000,
+              4000
+            ],
+            "png_bytes": 17101
+          }
+        ],
+        "generation_config": {
+          "thinking_level": "minimal"
+        },
+        "response_format": {
+          "type": "text",
+          "mime_type": "application/json",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "has_red_block": {
+                "type": "boolean"
+              },
+              "black_bar_count": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "has_red_block",
+              "black_bar_count"
+            ]
+          }
+        }
+      },
+      "usage_summary": {
+        "input_tokens": 1083,
+        "output_tokens": 26,
+        "thought_tokens": 0,
+        "cost_usd": 0.0009097500000000001
+      },
+      "response": {
+        "id": "v1_ChdqVVQ1YW83a0E3R18wLWtQd0w2NXlBYxIXalVUNWFvN2tBN0dfMC1rUHdMNjV5QWM",
+        "object": "interaction",
+        "model": "gemini-3.6-flash",
+        "agent": null,
+        "status": "completed",
+        "created": "2026-11-15T05:35:10Z",
+        "updated": "2026-11-15T05:35:10Z",
+        "outputs": null,
+        "steps": [
+          {
+            "signature": "EmkKZwFpFH0T/ti/P1HFkgEL7YeJqEyedTHahfoJw/4auo4TFCP/EXkbSrEx4vR3QQD5ho3G7yH2Fs1c1mbHPVXYzRtGI4HIYoRWWnLySiEEotKGioNP4e3CVbkRdj7OSwwGdnrzE+43Ux0=",
+            "type": "thought"
+          },
+          {
+            "content": [
+              {
+                "text": "{\n  \"has_red_block\": true,\n  \"black_bar_count\": 18\n}",
+                "type": "text"
+              }
+            ],
+            "type": "model_output"
+          }
+        ],
+        "usage": {
+          "total_tokens": 1109,
+          "total_input_tokens": 1083,
+          "input_tokens_by_modality": [
+            {
+              "modality": "image",
+              "tokens": 1056
+            },
+            {
+              "modality": "text",
+              "tokens": 27
+            }
+          ],
+          "total_cached_tokens": 0,
+          "total_output_tokens": 26,
+          "total_tool_use_tokens": 0,
+          "total_thought_tokens": 0,
+          "initial_input_tokens": 1083
+        },
+        "service_tier": "standard"
+      }
+    }
+  ]
+}
