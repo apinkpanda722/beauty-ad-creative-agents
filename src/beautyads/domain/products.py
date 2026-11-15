@@ -275,6 +275,40 @@ class ProductExtraction(BaseModel):
     raw_output: str
 
 
+class ProductDetailIngredient(BaseModel):
+    """One printed ingredient; parenthesized amounts remain separate raw text."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    raw_name: str = Field(min_length=1)
+    amount_text: str | None
+
+    @field_validator("raw_name")
+    @classmethod
+    def nonblank_name(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("ingredient name must not be blank")
+        return value
+
+
+class ProductDetailResult(BaseModel):
+    """Image facts only, with required empty/nullable fields for absent evidence.
+
+    Ingredients retain printed order, spelling, whitespace and repetitions.
+    Form and claim texts are source wording, not inferred classifications.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    ingredients: list[ProductDetailIngredient]
+    volume: float | None = Field(gt=0, allow_inf_nan=False)
+    volume_unit: Literal["ml", "g", "매", "입", "ea"] | None
+    form: str | None
+    skin_types: list[SkinType]
+    efficacy_texts: list[str]
+    functional_texts: list[str]
+
+
 class CachedIngredientStandard(IngredientStandard):
     name_ko: str = Field(min_length=1)
     queried_at: AwareDatetime
