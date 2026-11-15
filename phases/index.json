@@ -18,7 +18,8 @@
     },
     {
       "dir": "4-ontology",
-      "status": "pending"
+      "status": "completed",
+      "completed_at": "2026-11-15T22:20:51+0900"
     }
   ]
 }
