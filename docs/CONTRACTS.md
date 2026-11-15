@@ -198,6 +198,7 @@
 | 고도몰(달바) | 메타 태그 없음. JSON-LD `offers.price` `"29900.00"`(문자열), hidden input `set_goods_price`가 `29900`, `set_goods_fixedPrice`가 `0.00`(정가 없음, 2026-11-12 관측과 같다) | `mall_godomall_product.html` |
 | **단종 상품이 HTTP 404로 왔다** | 믹순 `product_no=552`가 2026-11-12에는 HTTP 200 안내 HTML이었는데 2026-11-15에는 **HTTP 404**(본문 3.3KB 안내 HTML)였다. 단종 표현이 200과 404 두 형태일 수 있으므로 HTTP 상태를 먼저 보고, 200이면 가격 메타 유무로 판정한다 | `mall_discontinued_404.html` |
 | robots.txt | 아누아 `User-agent: *` `Allow: /`. 코스알엑스·이즈앤트리·믹순은 `*`에 관리·주문·검색 경로만 막고 상품 경로는 막지 않는다. 달바는 `*` 그룹이 없고 이름 지정 봇 목록에만 규칙·`Crawl-delay: 10`이 있으며 응답은 CRLF 줄바꿈이다 | `mall_robots_mixsoon.txt`, `mall_robots_dalba.txt` |
+| **이미지 전용 호스트의 robots.txt** | 코스알엑스 상세 이미지는 `cosrxinc.jpg3.kr`에 있고 그 호스트의 `/robots.txt`는 **404**(HTML 오류 페이지)다. robots.txt가 없는 호스트는 제한이 없는 것으로 읽고(RFC 9309, 404·410), 오류 페이지 본문을 규칙으로 읽지 않는다. 401·403·5xx·연결 실패·너무 큰 파일은 읽을 수 없음으로 거부한다. 요청 간격은 그대로 지킨다. 어댑터가 404를 읽을 수 없음으로 거부해 코스알엑스·바이오던스 제품 2개의 이미지 4장씩이 모두 `MALL_ROBOTS_UNREADABLE`이었다(2026-11-15) | `tests/test_mall.py` |
 | 달바 제품 주소 | `https://dalba.co.kr/goods/goods_view.php?goodsNo=<숫자>`, 첫 화면의 링크에서 찾았다 | — |
 | 후보 파일의 범위 | `config/product_candidates.yaml`에는 abib·anua·cosrx·isntree·mediheal·round_lab·skin1004 7개 브랜드만 있고 믹순·달바 등 나머지 몰 브랜드는 후보가 없다 | — |
 

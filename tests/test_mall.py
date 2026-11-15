@@ -260,7 +260,8 @@ def test_named_delay_is_read_even_when_config_has_only_default_interval():
     [
         page("discontinued_404.html", 500),
         ConnectionError("private"),
-        page("discontinued_404.html", 404),
+        page("discontinued_404.html", 403),
+        page("discontinued_404.html", 401),
     ],
 )
 def test_unreadable_robots_fails_closed(response):
@@ -490,3 +491,71 @@ def test_image_http_status_is_checked_before_oversized_error_body(status):
         )
     assert caught.value.code == f"MALL_HTTP_{status}"
     assert caught.value.retryable is (status == 500)
+
+
+@pytest.mark.parametrize("status", [404, 410])
+def test_missing_robots_allows_access_and_ignores_the_error_body(status):
+    # An image host whose /robots.txt does not exist has no rules (RFC 9309:
+    # unavailable means allowed). Its HTML error page must not be read as rules.
+    disallow_all = MallHttpResponse(status, b"User-agent: *\nDisallow: /\n")
+    data = b"synthetic image bytes"
+    get = FakeGet(disallow_all, MallHttpResponse(200, data))
+    result = download_detail_image(
+        "https://cosrxinc.jpg3.kr/detail/image.jpg",
+        client=client(get),
+        brand="cosrx",
+        max_bytes=len(data),
+    )
+    assert result == data
+    assert [urlsplit(url).path for url, _ in get.calls] == [
+        "/robots.txt",
+        "/detail/image.jpg",
+    ]
+
+
+def test_missing_robots_is_cached_per_origin_and_the_interval_still_applies():
+    clock = Clock()
+    data = b"synthetic image bytes"
+    get = FakeGet(
+        MallHttpResponse(404, b"<html></html>"),
+        MallHttpResponse(200, data),
+        MallHttpResponse(200, data),
+    )
+    mall = client(get, clock=clock)
+    for name in ("one.jpg", "two.jpg"):
+        assert (
+            download_detail_image(
+                f"https://cosrxinc.jpg3.kr/detail/{name}",
+                client=mall,
+                brand="cosrx",
+                max_bytes=len(data),
+            )
+            == data
+        )
+    paths = [urlsplit(url).path for url, _ in get.calls]
+    assert paths == ["/robots.txt", "/detail/one.jpg", "/detail/two.jpg"]
+    # The 404 does not remove politeness: consecutive requests keep the interval.
+    assert clock.waits == [6, 6]
+
+
+def test_missing_robots_on_one_host_does_not_relax_another_host():
+    data = b"synthetic image bytes"
+    get = FakeGet(
+        MallHttpResponse(404, b""),
+        MallHttpResponse(200, data),
+        robots(),  # the mall's own host still has real rules
+    )
+    mall = client(get)
+    download_detail_image(
+        "https://cosrxinc.jpg3.kr/detail/image.jpg",
+        client=mall,
+        brand="cosrx",
+        max_bytes=len(data),
+    )
+    with pytest.raises(MallError, match="MALL_ROBOTS_DISALLOWED"):
+        download_detail_image(
+            "https://www.cosrx.co.kr/admin/image.jpg",
+            client=mall,
+            brand="cosrx",
+            max_bytes=len(data),
+        )

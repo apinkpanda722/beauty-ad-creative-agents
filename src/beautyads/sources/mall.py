@@ -26,6 +26,8 @@ from beautyads.domain.mall import MallProduct
 _TIMEOUT_S = 30.0
 _HTML_MAX_BYTES = 8 * 1024 * 1024
 _ROBOTS_MAX_BYTES = 1024 * 1024
+# Statuses meaning the host has no robots.txt at all (not an access denial).
+_ROBOTS_ABSENT_STATUSES = frozenset({404, 410})
 _VOID_TAGS = frozenset(
     {
         "area",
@@ -354,14 +356,21 @@ class MallClient:
                 raise MallError(
                     "MALL_ROBOTS_UNREADABLE", retryable=error.retryable
                 ) from None
-            if response.status != 200 or len(response.body) > _ROBOTS_MAX_BYTES:
+            parser = RobotFileParser()
+            if response.status in _ROBOTS_ABSENT_STATUSES:
+                # No robots.txt exists (RFC 9309: unavailable means no rules). The
+                # error page body is never read as rules. The request interval
+                # still applies to this host.
+                parser.parse([])
+            elif response.status != 200 or len(response.body) > _ROBOTS_MAX_BYTES:
+                # 401/403, server errors and oversized files stay fail-closed.
                 raise MallError(
                     "MALL_ROBOTS_UNREADABLE", retryable=500 <= response.status < 600
                 )
-            parser = RobotFileParser()
-            parser.parse(
-                response.body.decode("utf-8-sig", errors="replace").splitlines()
-            )
+            else:
+                parser.parse(
+                    response.body.decode("utf-8-sig", errors="replace").splitlines()
+                )
             delay = parser.crawl_delay(self.config.user_agent)
             # Dalba has no '*' entry. Honor the named bots' delay as well.
             if delay is None and parser.default_entry is None:
