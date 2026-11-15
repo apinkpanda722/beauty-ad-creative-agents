@@ -48,7 +48,16 @@
     {
       "step": 3,
       "name": "mall-source",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-15T15:45:22+0900",
+      "summary": "공식몰 가격·전성분·상세 이미지 주소 어댑터와 robots·호스트별 간격·제외 몰·메모리 이미지 다운로드 구현. make verify 2,207개 통과, 추가 패키지 설치 없음.",
+      "completed_at": "2026-11-15T15:51:58+0900",
+      "usage": {
+        "input_tokens": 1291516,
+        "cached_input_tokens": 1208576,
+        "output_tokens": 14700,
+        "attempts": 1
+      }
     },
     {
       "step": 4,
