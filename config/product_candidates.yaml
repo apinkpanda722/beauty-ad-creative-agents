@@ -5,6 +5,7 @@
 # 근거의 한계: 71개 중 광고 텍스트에서 이름이 확인되는 것(hits_A 또는 hits_B가 1건 이상)은 31개이고 나머지 40개는 공식몰 목록 순서로 채웠다(docs/COMPETENCY_QUESTIONS.md).
 # 후보 풀은 2026-11-15에 받은 공식몰 목록 페이지(전체 목록 방식 몰은 6쪽까지)이며 목록을 끝까지 보지 못한 몰이 있다.
 # hits_A·hits_B는 선정 시점(2026-11-15)의 값이다. 별칭은 이 파일에 두지 않고 제품명에서 기계적으로 만든다(derive_aliases).
+# 교체(2026-11-15): abib 마스크팩 2번째 후보 '히알루로닉 프렙 스킨팩 퀵 부스터'(product_no=778)는 상세 페이지에 성분이 공개돼 있지 않아(텍스트 없음, 이미지 4장에도 없음) M1 순위상 다음 후보인 'PDRN 광채 시트 마스크 데일리 픽'(product_no=775)으로 바꿨다.
 # 가격은 메타 태그의 정가를 쓰고(고도몰은 판매가와 price_basis), 값은 이 파일에 두지 않는다.
 
 candidates:
@@ -16,8 +17,8 @@ candidates:
   hits_B: 1
 - brand: abib
   category: mask_pack
-  title: 히알루로닉 프렙 스킨팩 퀵 부스터
-  url: https://abib.com/product/detail.html?product_no=778
+  title: PDRN 광채 시트 마스크 데일리 픽
+  url: https://abib.com/product/detail.html?product_no=775
   hits_A: 0
   hits_B: 0
 - brand: abib
