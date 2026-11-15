@@ -1012,3 +1012,43 @@ def test_a_403_body_is_read_but_bounded(monkeypatch):
     assert result.status == 403 and result.content_type == "application/xml"
     assert result.body.startswith(b"<Error><Code>AccessDenied</Code>")
     assert len(result.body) <= 4096
+
+
+def test_inline_bracket_label_ingredients_are_read_as_text():
+    # Real biodance structure: no label/value element; the 상품정보고시 paragraph has
+    # a text run "[전성분] 정제수, …" inside a span. The page has no ingredient image.
+    product = _product(
+        "cafe24_inline_ingredients.html",
+        "biodance",
+        "https://biodance.co.kr/product/x/132/category/28/display/2/",
+    )
+    assert product.ingredients_text
+    assert product.ingredients_text.startswith("정제수, 갈락토미세스발효여과물")
+    assert "1,2-헥산다이올" in product.ingredients_text
+    assert "[전성분]" not in product.ingredients_text
+    assert "세안 후" not in product.ingredients_text  # the usage text is not included
+    assert product.detail_image_urls == ()
+
+
+def test_inline_ingredient_label_stops_at_the_next_bracket_label():
+    body = recorded("cafe24_inline_ingredients.html").replace(
+        "토코페롤</span>".encode(), "토코페롤\n[사용방법] 세안 후 사용</span>".encode()
+    )
+    assert b"[\xec\x82\xac\xec\x9a\xa9\xeb\xb0\xa9\xeb\xb2\x95]" in body
+    product = _product(
+        None, "biodance", "https://biodance.co.kr/product/x/132/", body=body
+    )
+    assert product.ingredients_text.endswith("토코페롤")
+
+
+def test_an_empty_inline_ingredient_label_is_not_text():
+    body = re.sub(
+        r"\[전성분\][^<]*".encode(),
+        "[전성분]".encode(),
+        recorded("cafe24_inline_ingredients.html"),
+    )
+    assert "정제수".encode() not in body
+    product = _product(
+        None, "biodance", "https://biodance.co.kr/product/x/132/", body=body
+    )
+    assert product.ingredients_text is None

@@ -242,6 +242,24 @@ def _ingredients(root: _Node) -> str | None:
             value = " ".join(content.text().split())
             if value:
                 return value
+    return _inline_ingredients(root)
+
+
+_INLINE_LABEL = "[전성분]"
+
+
+def _inline_ingredients(root: _Node) -> str | None:
+    """A text run "[전성분] a, b, c" inside a paragraph, with no label/value element."""
+    for node in root.walk():
+        for child in node.children:
+            if not isinstance(child, str) or _INLINE_LABEL not in child:
+                continue
+            value = child.split(_INLINE_LABEL, 1)[1]
+            # Another bracket label on a later line starts a different item.
+            value = re.split(r"\n\s*\[", value, maxsplit=1)[0]
+            value = " ".join(value.split())
+            if value:
+                return value
     return None
 
 
