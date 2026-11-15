@@ -264,6 +264,7 @@ def _mfds_system(result) -> None:
         "MFDS_HTTP_429",
         "MFDS_KEY_NOT_REGISTERED",
         "MFDS_API_ERROR",
+        "MFDS_CONSECUTIVE_FAILURES",
         "ENV_MISSING:DATA_GO_KR_SERVICE_KEY",
     }:
         raise _Stop(code, detail=_mfds_detail(error))

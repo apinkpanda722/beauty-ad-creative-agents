@@ -23,6 +23,14 @@ _REPORT = "1471000/FtnltCosmRptPrdlstInfoService01/getRptPrdlstInq01"
 _SCREENING = "1471057/FtnltCosmSrngPrdlstInfoService05/getSrngPrdlstInq05"
 _TIMEOUT_S = 30.0
 _MAX_ATTEMPTS = 3
+# Provider result codes in a 200 response header (data.go.kr common codes).
+_NO_DATA_RESULT_CODE = "03"  # "no data": a complete, empty answer, not an error
+# Account-level problems (access denied, request limit, key problems): stop the run.
+_ACCOUNT_RESULT_CODES = frozenset({"20", "22", "30", "31", "32"})
+# Any other non-"00" code (e.g. 01 "System Error!!") is treated as a transient
+# problem of one lookup: retried with backoff, then a retryable lookup failure.
+_PROVIDER_RETRY_BACKOFF_S = (1.0, 2.0, 4.0)
+_MAX_CONSECUTIVE_LOOKUP_FAILURES = 20
 
 
 class MFDSHttpResponse(NamedTuple):
@@ -138,10 +146,19 @@ def _response_body(response: MFDSHttpResponse, secret: str) -> Mapping[str, Any]
         )
     header = _mapping(payload.get("header"))
     code = header.get("resultCode")
+    if code == _NO_DATA_RESULT_CODE:
+        return {"totalCount": 0}
     if code != "00":
+        text = _text(code)
+        if code is None:
+            kind = "MFDS_INVALID_RESPONSE"
+        elif text in _ACCOUNT_RESULT_CODES:
+            kind = "MFDS_API_ERROR"
+        else:
+            kind = "MFDS_TRANSIENT_API_ERROR"
         raise MFDSError(
-            "MFDS_API_ERROR" if code is not None else "MFDS_INVALID_RESPONSE",
-            provider_code=_text(code),
+            kind,
+            provider_code=text,
             provider_message=_text(header.get("resultMsg")),
             http_status=200,
         )
@@ -226,8 +243,30 @@ class MFDSClient:
         self._sleep = sleep
         self._min_interval_s = min_interval_s
         self._last_request: float | None = None
+        self._consecutive_failures = 0
 
     def _request(self, endpoint: str, params: Mapping[str, str]) -> Mapping[str, Any]:
+        """One request with provider-code retries (backoff), within the shared cap."""
+        for retry in range(len(_PROVIDER_RETRY_BACKOFF_S) + 1):
+            try:
+                return self._request_once(endpoint, params)
+            except MFDSError as error:
+                if error.code != "MFDS_TRANSIENT_API_ERROR":
+                    raise
+                if retry < len(_PROVIDER_RETRY_BACKOFF_S):
+                    self._sleep(_PROVIDER_RETRY_BACKOFF_S[retry])
+                    continue
+                raise MFDSError(
+                    "MFDS_LOOKUP_FAILED",
+                    provider_code=error.provider_code,
+                    provider_message=error.provider_message,
+                    http_status=error.http_status,
+                ) from None
+        raise MFDSError("MFDS_LOOKUP_FAILED")  # defensive, the loop always returns
+
+    def _request_once(
+        self, endpoint: str, params: Mapping[str, str]
+    ) -> Mapping[str, Any]:
         for attempt in range(_MAX_ATTEMPTS):
             if self._requests >= self._max_requests:
                 raise MFDSError("MFDS_REQUEST_CAP")
@@ -271,6 +310,45 @@ class MFDSClient:
         raise MFDSError("MFDS_REQUEST_FAILED")  # defensive, attempts are nonzero
 
     def _search[T](
+        self,
+        query: str,
+        *,
+        endpoint: str,
+        parameter: str,
+        convert: Callable[[Mapping[str, Any]], T | None],
+        max_pages: int,
+        num_of_rows: int,
+        exact: bool = False,
+    ) -> MFDSResult[T]:
+        """Track consecutive lookup failures; 20 in a row stop the whole run."""
+        if self._consecutive_failures >= _MAX_CONSECUTIVE_LOOKUP_FAILURES:
+            error = MFDSError("MFDS_CONSECUTIVE_FAILURES")
+            return MFDSResult([], error.code, error)
+        result = self._search_pages(
+            query,
+            endpoint=endpoint,
+            parameter=parameter,
+            convert=convert,
+            max_pages=max_pages,
+            num_of_rows=num_of_rows,
+            exact=exact,
+        )
+        if result.stopped is None:
+            self._consecutive_failures = 0
+        elif result.stopped == "MFDS_LOOKUP_FAILED":
+            self._consecutive_failures += 1
+            if self._consecutive_failures >= _MAX_CONSECUTIVE_LOOKUP_FAILURES:
+                cause = result.error
+                error = MFDSError(
+                    "MFDS_CONSECUTIVE_FAILURES",
+                    provider_code=getattr(cause, "provider_code", None),
+                    provider_message=getattr(cause, "provider_message", None),
+                    http_status=getattr(cause, "http_status", None),
+                )
+                return MFDSResult(result.items, error.code, error)
+        return result
+
+    def _search_pages[T](
         self,
         query: str,
         *,

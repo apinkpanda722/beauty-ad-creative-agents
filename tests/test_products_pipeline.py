@@ -879,3 +879,39 @@ def test_product_with_no_ingredients_is_held_not_done(tmp_path):
     assert not dep.store.products and not dep.store.ingredients
     assert report["by_status"] == {"held": 1}
     dep.mfds.search_reports.assert_not_called()  # no certification work for it
+
+
+def test_lookup_failed_ingredients_stay_pending_and_the_batch_continues(tmp_path):
+    # A transient provider error for one item is retryable work, never a stop.
+    dep, _ = deps()
+    dep.mfds.search_ingredients.return_value = MFDSResult(
+        [],
+        "MFDS_LOOKUP_FAILED",
+        MFDSError(
+            "MFDS_LOOKUP_FAILED",
+            provider_code="01",
+            provider_message="System Error!!",
+            http_status=200,
+        ),
+    )
+    report, _ = run(tmp_path, dep, [candidate(index=1), candidate(index=2)])
+    assert report["stopped"] is None
+    assert [r["status"] for r in report["products"]] == ["pending", "pending"]
+    assert all(
+        r["error_code"] == "INGREDIENT_RETRY_REQUIRED" for r in report["products"]
+    )
+    assert dep.mfds.search_ingredients.call_count > 2  # both products were tried
+    assert not dep.store.products  # nothing is recorded as a permanent failure
+
+
+def test_consecutive_failures_are_a_system_stop(tmp_path):
+    dep, _ = deps()
+    dep.mfds.search_ingredients.return_value = MFDSResult(
+        [],
+        "MFDS_CONSECUTIVE_FAILURES",
+        MFDSError("MFDS_CONSECUTIVE_FAILURES", provider_code="01", http_status=200),
+    )
+    report, output = run(tmp_path, dep, [candidate(index=1), candidate(index=2)])
+    assert report["stopped"] == "MFDS_CONSECUTIVE_FAILURES"
+    assert [r["status"] for r in report["products"]] == ["pending", "pending"]
+    assert "STOPPED MFDS_CONSECUTIVE_FAILURES provider_code=01" in output

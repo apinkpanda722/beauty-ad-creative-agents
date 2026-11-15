@@ -344,10 +344,11 @@ def test_http_status_precedes_body(status, payload):
 
 def test_nonzero_result_code_preserved():
     response = body("ingredient_query_no_match")
-    response.get("header").update(resultCode="99", resultMsg="synthetic failure")
+    # An account-level provider code (22: request limit exceeded) stops the run.
+    response.get("header").update(resultCode="22", resultMsg="synthetic failure")
     result = client(FakeGet(MFDSHttpResponse(200, response))).search_reports("품목")
     assert result.stopped == "MFDS_API_ERROR"
-    assert result.error.provider_code == "99"
+    assert result.error.provider_code == "22"
     assert result.error.provider_message == "synthetic failure"
 
 
@@ -471,3 +472,88 @@ def test_missing_item_fields_and_cert_status_contract():
     assert set(functional_kinds(item).values()) == {CertStatus.unknown}
     assert {status.value for status in CertStatus} == {"certified", "unknown"}
     assert str(MFDSError("MFDS_REQUEST_CAP")) == "MFDS_REQUEST_CAP"
+
+
+def coded(code, message="synthetic"):
+    response = body("ingredient_query_no_match")
+    response.get("header").update(resultCode=code, resultMsg=message)
+    return MFDSHttpResponse(200, response)
+
+
+@pytest.mark.parametrize(
+    "operation", ["search_ingredients", "search_reports", "search_screenings"]
+)
+def test_result_code_03_is_no_data_not_an_error(operation):
+    get = FakeGet(coded("03", "NODATA_ERROR"))
+    result = getattr(client(get), operation)("품목")
+    assert result.stopped is None and result.error is None and result.items == []
+    assert len(get.calls) == 1  # no retry: "no data" is a complete answer
+
+
+@pytest.mark.parametrize("code", ["20", "22", "30", "31", "32"])
+def test_account_level_codes_stop_without_retry(code):
+    get = FakeGet(coded(code, "synthetic account problem"))
+    result = client(get, min_interval_s=0).search_reports("품목")
+    assert result.stopped == "MFDS_API_ERROR"
+    assert result.error.provider_code == code
+    assert result.error.provider_message == "synthetic account problem"
+    assert len(get.calls) == 1
+
+
+@pytest.mark.parametrize("code", ["01", "02", "04", "05", "99"])
+def test_other_provider_codes_retry_with_backoff_then_become_a_lookup_failure(code):
+    waits = []
+    get = FakeGet(*(coded(code, "System Error!!") for _ in range(4)))
+    result = client(get, min_interval_s=0, sleep=waits.append).search_ingredients(
+        "성분"
+    )
+    assert result.stopped == "MFDS_LOOKUP_FAILED"
+    assert result.error.provider_code == code
+    assert result.error.provider_message == "System Error!!"
+    assert len(get.calls) == 4  # the first try and three retries
+    assert waits == [1.0, 2.0, 4.0]
+
+
+def test_transient_provider_code_recovers_on_a_retry():
+    waits = []
+    get = FakeGet(coded("01", "System Error!!"), page("ingredient_query_no_match"))
+    result = client(get, min_interval_s=0, sleep=waits.append).search_ingredients(
+        "성분"
+    )
+    assert result.stopped is None and len(get.calls) == 2 and waits == [1.0]
+
+
+def test_provider_retries_count_toward_the_request_cap():
+    get = FakeGet(*(coded("01") for _ in range(4)))
+    result = client(get, min_interval_s=0, max_requests=2).search_reports("품목")
+    assert result.stopped == "MFDS_REQUEST_CAP" and len(get.calls) == 2
+
+
+def test_twenty_consecutive_lookup_failures_stop_the_run():
+    get = FakeGet(*(coded("01") for _ in range(4 * 21)))
+    adapter = client(get, min_interval_s=0, max_requests=1000)
+    for _ in range(19):
+        assert adapter.search_reports("품목").stopped == "MFDS_LOOKUP_FAILED"
+    last = adapter.search_reports("품목")
+    assert last.stopped == "MFDS_CONSECUTIVE_FAILURES"
+    assert last.error.provider_code == "01"
+    calls_before = len(get.calls)
+    # After the stop, nothing more is sent.
+    assert adapter.search_ingredients("성분").stopped == "MFDS_CONSECUTIVE_FAILURES"
+    assert len(get.calls) == calls_before
+
+
+def test_a_success_resets_the_consecutive_failure_count():
+    responses = []
+    for _ in range(19):
+        responses += [coded("01")] * 4
+    responses.append(page("ingredient_query_no_match"))
+    for _ in range(19):
+        responses += [coded("01")] * 4
+    get = FakeGet(*responses)
+    adapter = client(get, min_interval_s=0, max_requests=1000)
+    for _ in range(19):
+        assert adapter.search_reports("품목").stopped == "MFDS_LOOKUP_FAILED"
+    assert adapter.search_ingredients("성분").stopped is None
+    for _ in range(19):
+        assert adapter.search_reports("품목").stopped == "MFDS_LOOKUP_FAILED"
