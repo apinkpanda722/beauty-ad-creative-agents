@@ -3,6 +3,7 @@
 # isort: off
 # The wrapper must be imported before litellm to disable remote pricing downloads.
 import ast
+import base64
 import json
 import os
 import subprocess
@@ -37,6 +38,7 @@ from beautyads.llm import (
     video_part,
 )
 from beautyads.obs import LedgerEntry, append_entry, read_entries
+from beautyads.llm.gemini import image_part, usage_by_modality
 
 # Import the SDK only after the wrapper has selected its bundled price map.
 import httpx
@@ -629,4 +631,169 @@ def test_credits_depleted_stops_without_retry_or_ledger(call_args):
     assert caught.value.code == "CREDITS_DEPLETED"
     fn.assert_called_once()
     sleep.assert_not_called()
+    assert not call_args["ledger_path"].exists()
+
+
+@pytest.fixture(
+    params=fixture("gemini_interactions_image_input.json").get("probes"),
+    ids=["first-image-probe", "second-image-probe"],
+)
+def image_probe(request):
+    return deepcopy(request.param)
+
+
+def test_inline_image_part_matches_measured_contract(image_probe):
+    measured = next(
+        part
+        for part in image_probe.get("request_shape").get("input")
+        if part.get("type") == "image"
+    )
+    data = b"synthetic-image-payload\x00\xff"
+    part = image_part(data, measured.get("mime_type"), max_bytes=len(data))
+    assert set(part) == set(measured) - {"image_px", "png_bytes"}
+    assert part.get("type") == measured.get("type")
+    assert part.get("mime_type") == measured.get("mime_type")
+    assert isinstance(part.get("data"), str)
+    assert base64.b64decode(part.get("data"), validate=True) == data
+
+
+@pytest.mark.parametrize(
+    ("data", "mime_type", "max_bytes", "code"),
+    [
+        (b"", "image/png", 1, "IMAGE_EMPTY"),
+        (b"image-privacy-sentinel", "text/plain", 100, "IMAGE_MIME_INVALID"),
+        (b"image-privacy-sentinel", "image", 100, "IMAGE_MIME_INVALID"),
+        (b"image-privacy-sentinel", "", 100, "IMAGE_MIME_INVALID"),
+        (b"image-privacy-sentinel", "image/png", 1, "IMAGE_TOO_LARGE"),
+    ],
+)
+def test_inline_image_validation_has_safe_codes(data, mime_type, max_bytes, code):
+    with pytest.raises(ValueError) as caught:
+        image_part(data, mime_type, max_bytes=max_bytes)
+    assert str(caught.value) == code
+    if data:
+        assert data.decode() not in str(caught.value)
+        assert base64.b64encode(data).decode() not in str(caught.value)
+
+
+def test_inline_image_requires_explicit_keyword_byte_limit():
+    with pytest.raises(TypeError):
+        image_part(b"synthetic", "image/png")
+    with pytest.raises(TypeError):
+        image_part(b"synthetic", "image/png", 100)
+
+
+@pytest.mark.parametrize("as_object", [False, True])
+def test_image_usage_by_modality_is_independent_of_order(image_probe, as_object):
+    raw = image_probe.get("response")
+    modalities = raw.get("usage").get("input_tokens_by_modality")
+    expected = {item.get("modality"): item.get("tokens") for item in modalities}
+    assert set(expected) == {"image", "text"}
+    for items in (modalities, list(reversed(modalities))):
+        reordered = deepcopy(raw)
+        reordered.get("usage")["input_tokens_by_modality"] = items
+        response = ResponseObject(reordered) if as_object else reordered
+        assert usage_by_modality(response) == expected
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        {},
+        {"usage": None},
+        {"usage": {}},
+        {"usage": {"input_tokens_by_modality": None}},
+        {"usage": {"input_tokens_by_modality": []}},
+    ],
+)
+def test_image_usage_missing_modalities_is_empty(raw):
+    assert usage_by_modality(raw) == {}
+
+
+def test_inline_image_interaction_records_usage_and_checks_cap_first(
+    call_args, image_probe, monkeypatch, caplog
+):
+    from beautyads.llm import gemini
+
+    data = b"image-privacy-sentinel\x00\xff"
+    part = image_part(data, "image/png", max_bytes=len(data))
+    request = image_probe.get("request_shape")
+    prompt = next(
+        item.get("text") for item in request.get("input") if item.get("type") == "text"
+    )
+    call_args["input_parts"] = [text_part(prompt), part]
+    call_args["purpose"] = "image-wrapper-test"
+    raw = image_probe.get("response")
+    fn = Mock(return_value=raw)
+    check = Mock(wraps=gemini.check_cap)
+    order = Mock()
+    order.attach_mock(check, "check_cap")
+    order.attach_mock(fn, "interact")
+    monkeypatch.setattr(gemini, "check_cap", check)
+
+    result = gemini_interact(
+        **call_args, interactions_fn=fn, response_format=request.get("response_format")
+    )
+
+    expected_text = "".join(
+        item.get("text")
+        for step in raw.get("steps")
+        if step.get("type") == "model_output"
+        for item in step.get("content")
+        if item.get("type") == "text"
+    )
+    assert extract_output_text(raw) == result.text == expected_text
+    assert result.raw == raw
+    assert [call[0] for call in order.mock_calls] == ["check_cap", "interact"]
+    check.assert_called_once_with(
+        call_args["ledger_path"], provider="gemini", caps=call_args["caps"]
+    )
+    kwargs = fn.call_args.kwargs
+    assert kwargs.get("input") == call_args["input_parts"]
+    assert "temperature" not in kwargs
+    assert "temperature" not in kwargs.get("generation_config", {})
+    assert kwargs.get("generation_config") == request.get("generation_config")
+    assert kwargs.get("response_format") == request.get("response_format")
+    entries = read_entries(call_args["ledger_path"]).entries
+    assert len(entries) == 1
+    entry = entries[0]
+    assert entry.purpose == call_args["purpose"]
+    usage = raw.get("usage")
+    for field, key in (
+        ("input_tokens", "total_input_tokens"),
+        ("output_tokens", "total_output_tokens"),
+        ("thought_tokens", "total_thought_tokens"),
+        ("cached_tokens", "total_cached_tokens"),
+    ):
+        assert getattr(entry, field) == usage.get(key)
+    assert part.get("data") not in call_args["ledger_path"].read_text()
+    assert part.get("data") not in caplog.text
+
+
+def test_inline_image_cap_blocks_call_without_exposing_data(call_args, image_probe):
+    part = image_part(b"image-privacy-sentinel", "image/png", max_bytes=100)
+    call_args["input_parts"] = [text_part("test"), part]
+    spend(call_args["ledger_path"], call_args["caps"].get("gemini") + 1)
+    before = call_args["ledger_path"].read_text()
+    fn = Mock(return_value=image_probe.get("response"))
+    with pytest.raises(CostCapExceeded) as caught:
+        gemini_interact(**call_args, interactions_fn=fn)
+    assert caught.value.code == "COST_CAP:gemini"
+    fn.assert_not_called()
+    assert call_args["ledger_path"].read_text() == before
+    assert part.get("data") not in before
+    assert part.get("data") not in str(caught.value)
+
+
+def test_inline_image_call_failure_does_not_include_input(call_args, caplog):
+    part = image_part(b"image-privacy-sentinel", "image/png", max_bytes=100)
+    call_args["input_parts"] = [text_part("test"), part]
+    fn = Mock(side_effect=RuntimeError("synthetic call failure"))
+    with pytest.raises(LlmCallError) as caught:
+        gemini_interact(**call_args, interactions_fn=fn)
+    fn.assert_called_once()
+    assert part.get("data") not in str(caught.value)
+    assert part.get("data") not in repr(caught.value)
+    assert part.get("data") not in "".join(traceback.format_exception(caught.value))
+    assert part.get("data") not in caplog.text
     assert not call_args["ledger_path"].exists()
