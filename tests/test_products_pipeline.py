@@ -1096,3 +1096,31 @@ def test_cert_coverage_counts_products_and_each_kind(tmp_path):
     assert cert["by_kind"]["brightening"] == {"certified": 1, "unknown": 1}
     assert cert["by_kind"]["sun_protection"] == {"certified": 0, "unknown": 2}
     assert cert["coverage"] == 0.5
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        (
+            "정제수, 1,2-헥산다이올, 글리세린",
+            ["정제수", " 1,2-헥산다이올", " 글리세린"],
+        ),
+        ("Water, 1,2-Hexanediol, Glycerin", ["Water", " 1,2-Hexanediol", " Glycerin"]),
+        (
+            "2,4-다이메틸, C12,13알킬벤조에이트",
+            ["2,4-다이메틸", " C12,13알킬벤조에이트"],
+        ),
+        ("글리세린,1,2-헥산다이올,정제수", ["글리세린", "1,2-헥산다이올", "정제수"]),
+        # Existing rules stay: parenthesized commas, full-width comma, semicolon, newline.
+        (
+            "에스에이치-올리고펩타이드-1(2.5ppm, a), 정제수",
+            ["에스에이치-올리고펩타이드-1(2.5ppm, a)", " 정제수"],
+        ),
+        ("가，나;다\n라", ["가", "나", "다", "라"]),
+        # A comma next to a space or a letter is still a delimiter.
+        ("비타민 B6, 3 글리세린", ["비타민 B6", " 3 글리세린"]),
+        ("a1, 2b", ["a1", " 2b"]),
+    ],
+)
+def test_ingredient_text_splits_on_commas_but_not_between_digits(text, expected):
+    assert p._split_ingredients(text) == expected

@@ -470,25 +470,41 @@ def _retry_mall(call, *args):
             time.sleep(1)
 
 
+def _split_ingredients(text: str) -> list[str]:
+    """Split on , ， ; and newlines, except inside parentheses or between digits.
+
+    A comma between two digits is a locant or range (1,2-헥산다이올, C12,13), not a
+    delimiter.
+    """
+    names = []
+    start = depth = 0
+    for index, char in enumerate(text):
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth = max(0, depth - 1)
+        elif char in ",，;\n" and depth == 0:
+            if (
+                char == ","
+                and 0 < index < len(text) - 1
+                and text[index - 1].isdigit()
+                and text[index + 1].isdigit()
+            ):
+                continue
+            raw = text[start:index]
+            if raw.strip():
+                names.append(raw)
+            start = index + 1
+    raw = text[start:]
+    if raw.strip():
+        names.append(raw)
+    return names
+
+
 def _product_facts(deps, item, report):
     page = _retry_mall(deps.mall.fetch_product, item.brand, item.url)
     if page.ingredients_text and page.ingredients_text.strip():
-        # Commas within parenthesized amounts are not ingredient delimiters.
-        names = []
-        start = depth = 0
-        for index, char in enumerate(page.ingredients_text):
-            if char == "(":
-                depth += 1
-            elif char == ")":
-                depth = max(0, depth - 1)
-            elif char in ",，;\n" and depth == 0:
-                raw = page.ingredients_text[start:index]
-                if raw.strip():
-                    names.append(raw)
-                start = index + 1
-        raw = page.ingredients_text[start:]
-        if raw.strip():
-            names.append(raw)
+        names = _split_ingredients(page.ingredients_text)
         return page, names, {}, [], []
     extractions, issues = [], []
     fields = {}
