@@ -882,3 +882,36 @@ def test_accordion_with_an_empty_ingredient_list_is_not_text():
     assert b"Water (Aqua)" not in body
     product = _product(None, "abib", "https://abib.com/product/x/721/", body=body)
     assert product.ingredients_text is None
+
+
+def test_ingredients_in_a_popup_layer_are_read_as_text():
+    # Real medicube structure: the 전성분 link opens <div class="dePop"> whose
+    # <div class="depContent"> holds the list; the 주의사항 popup is another dePop.
+    product = _product(
+        "cafe24_popup_ingredients.html",
+        "medicube",
+        "https://themedicube.co.kr/product/detail.html?product_no=2698",
+    )
+    assert product.ingredients_text
+    assert product.ingredients_text.startswith("정제수, 부틸렌글라이콜")
+    assert "화장품 사용 시" not in product.ingredients_text  # not the caution popup
+    assert product.detail_image_urls == ()
+
+
+def test_an_empty_popup_ingredient_list_is_not_text():
+    body = re.sub(
+        rb'(<div class="depContent">)[^<]*(</div>\s*</div>\s*<!-- \.dePop -->\s*'
+        rb'<div class="bgshadow">&nbsp;</div>\s*</div>\s*<div class="dePop_layer" '
+        rb'id="cpopBody2">)',
+        rb"\1 \2",
+        recorded("cafe24_popup_ingredients.html"),
+        count=1,
+    )
+    assert "정제수".encode() not in body
+    product = _product(
+        None,
+        "medicube",
+        "https://themedicube.co.kr/product/detail.html?product_no=2698",
+        body=body,
+    )
+    assert product.ingredients_text is None

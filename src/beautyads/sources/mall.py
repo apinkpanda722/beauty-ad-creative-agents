@@ -206,6 +206,10 @@ def _ingredients(root: _Node) -> str | None:
         elif row.tag == "div" and row.has_class("info-row"):
             label = next((n for n in row.walk() if n.has_class("info-label")), None)
             content = next((n for n in row.walk() if n.has_class("info-content")), None)
+        elif row.tag == "div" and row.has_class("dePop"):
+            # Popup layer opened by the 전성분 link: a header and a depContent block.
+            label = next((n for n in row.walk() if n.has_class("pp_header")), None)
+            content = next((n for n in row.walk() if n.has_class("depContent")), None)
         elif row.tag == "li":
             # Accordion item: <li>전성분<span/><ul><li>values</li></ul></li>. The
             # label is the item's own text, the value its nested list or block.
