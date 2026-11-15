@@ -6,7 +6,16 @@
     {
       "step": 0,
       "name": "graph-sync",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-15T15:00:25+0900",
+      "summary": "PostgreSQL 기반 증분 MERGE 동기화, Neo4j 스키마·오류 변환, sync·live-graph 타깃과 테스트 구현. make verify 1976개 통과. neo4j==6.4.1 설치(전이 의존성 pytz==2026.6).",
+      "completed_at": "2026-11-15T15:10:01+0900",
+      "usage": {
+        "input_tokens": 1502226,
+        "cached_input_tokens": 1409408,
+        "output_tokens": 22564,
+        "attempts": 1
+      }
     },
     {
       "step": 1,
