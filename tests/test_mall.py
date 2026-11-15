@@ -660,3 +660,196 @@ def test_page_without_a_detail_anchor_has_no_detail_images_not_an_error():
     )
     product = _product(None, "cosrx", "https://www.cosrx.co.kr/product/9/", body=body)
     assert product.detail_image_urls == ()
+
+
+HTML_ERROR_PAGE = MallHttpResponse(
+    200,
+    b"<!doctype html><html><body>error</body></html>",
+    content_type="text/html; charset=utf-8",
+)
+
+
+def redirect(location, status=302):
+    return MallHttpResponse(status, b"", location=location)
+
+
+def _urls(get):
+    return [url for url, _ in get.calls]
+
+
+def test_robots_redirect_to_an_html_error_page_means_no_valid_robots_and_allows():
+    # Real dalba image host: /robots.txt answers 302 to an HTML error page.
+    data = b"synthetic image bytes"
+    get = FakeGet(
+        redirect("https://godomall.example.net/error.html"),
+        HTML_ERROR_PAGE,
+        MallHttpResponse(200, data),
+    )
+    result = download_detail_image(
+        "https://cdn.example.net/a.jpg",
+        client=client(get),
+        brand="dalba",
+        max_bytes=len(data),
+    )
+    assert result == data
+    assert _urls(get) == [
+        "https://cdn.example.net/robots.txt",
+        "https://godomall.example.net/error.html",
+        "https://cdn.example.net/a.jpg",
+    ]
+
+
+def test_robots_redirect_to_real_robots_rules_still_applies_them():
+    data = b"x"
+    rules = MallHttpResponse(
+        200, b"User-agent: *\nDisallow: /admin/\n", content_type="text/plain"
+    )
+    get = FakeGet(redirect("/real-robots.txt"), rules, MallHttpResponse(200, data))
+    mall = client(get)
+    assert (
+        download_detail_image(
+            "https://cdn.example.net/ok.jpg", client=mall, brand="cosrx", max_bytes=9
+        )
+        == data
+    )
+    # A relative Location resolves against the URL that redirected.
+    assert _urls(get)[1] == "https://cdn.example.net/real-robots.txt"
+    with pytest.raises(MallError, match="MALL_ROBOTS_DISALLOWED"):
+        download_detail_image(
+            "https://cdn.example.net/admin/x.jpg",
+            client=mall,
+            brand="cosrx",
+            max_bytes=9,
+        )
+
+
+def test_robots_follows_at_most_five_redirects():
+    data = b"x"
+    five = [redirect(f"https://cdn.example.net/hop{i}") for i in range(5)]
+    get = FakeGet(*five, HTML_ERROR_PAGE, MallHttpResponse(200, data))
+    assert (
+        download_detail_image(
+            "https://cdn.example.net/a.jpg",
+            client=client(get),
+            brand="cosrx",
+            max_bytes=9,
+        )
+        == data
+    )
+    assert len(get.calls) == 7  # robots + five followed redirects + image
+    six = [redirect(f"https://cdn.example.net/hop{i}") for i in range(6)]
+    get = FakeGet(*six)
+    with pytest.raises(MallError, match="MALL_ROBOTS_UNREADABLE"):
+        download_detail_image(
+            "https://cdn.example.net/a.jpg",
+            client=client(get),
+            brand="cosrx",
+            max_bytes=9,
+        )
+    assert len(get.calls) == 6  # the sixth redirect is not followed
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        MallHttpResponse(302, b""),
+        redirect("ftp://cdn.example.net/robots.txt"),
+        redirect("file:///etc/passwd"),
+        redirect(""),
+    ],
+)
+def test_robots_redirect_without_a_usable_http_location_fails_closed(bad):
+    get = FakeGet(bad)
+    with pytest.raises(MallError, match="MALL_ROBOTS_UNREADABLE"):
+        download_detail_image(
+            "https://cdn.example.net/a.jpg",
+            client=client(get),
+            brand="cosrx",
+            max_bytes=9,
+        )
+    assert len(get.calls) == 1
+
+
+@pytest.mark.parametrize(
+    "final, expected",
+    [(MallHttpResponse(404, b""), True), (MallHttpResponse(500, b""), False)],
+)
+def test_robots_redirect_chain_keeps_the_final_status_rules(final, expected):
+    data = b"x"
+    responses = [redirect("https://cdn.example.net/gone"), final]
+    if expected:
+        responses.append(MallHttpResponse(200, data))
+    get = FakeGet(*responses)
+    call = lambda: download_detail_image(
+        "https://cdn.example.net/a.jpg", client=client(get), brand="cosrx", max_bytes=9
+    )
+    if expected:
+        assert call() == data
+    else:
+        with pytest.raises(MallError, match="MALL_ROBOTS_UNREADABLE"):
+            call()
+
+
+def test_robots_redirect_hops_keep_the_host_interval():
+    # Dalba's 10 second interval also spaces a redirected robots request that
+    # stays on the same host.
+    clock = Clock()
+    data = b"x"
+    get = FakeGet(
+        redirect("https://dalba.co.kr/error.html"),
+        HTML_ERROR_PAGE,
+        MallHttpResponse(200, data),
+    )
+    download_detail_image(
+        "https://dalba.co.kr/a.jpg",
+        client=client(get, clock=clock),
+        brand="dalba",
+        max_bytes=9,
+    )
+    assert clock.waits == [10, 10]
+
+
+def test_non_robots_requests_never_follow_redirects():
+    get = FakeGet(robots(), redirect("https://elsewhere.example.net/"))
+    with pytest.raises(MallError, match="MALL_HTTP_302"):
+        client(get).fetch_product("mixsoon", "https://mixsoon.co.kr/product/1/")
+    assert len(get.calls) == 2
+
+
+def test_http_boundary_exposes_location_and_content_type_without_following(
+    monkeypatch,
+):
+    from contextlib import contextmanager
+
+    from beautyads.sources import mall as module
+
+    seen = {}
+
+    class Response:
+        def __init__(self, status, headers, body=b""):
+            self.status_code = status
+            self.headers = headers
+            self._body = body
+
+        def iter_bytes(self, chunk_size=0):
+            yield self._body
+
+    answers = iter(
+        [
+            Response(302, {"location": "https://x.example.net/error.html"}),
+            Response(200, {"content-type": "text/html; charset=utf-8"}, b"<html>"),
+        ]
+    )
+
+    @contextmanager
+    def stream(method, url, **kwargs):
+        seen.update(kwargs)
+        yield next(answers)
+
+    monkeypatch.setattr(module.httpx, "stream", stream)
+    redirected = httpx_mall_get("https://cdn.example.net/robots.txt", {}, 1.0, 10)
+    assert redirected.status == 302
+    assert redirected.location == "https://x.example.net/error.html"
+    assert seen["follow_redirects"] is False
+    final = httpx_mall_get("https://x.example.net/error.html", {}, 1.0, 10)
+    assert final.status == 200 and final.content_type.startswith("text/html")

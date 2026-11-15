@@ -29,6 +29,9 @@ _HTML_MAX_BYTES = 8 * 1024 * 1024
 _ROBOTS_MAX_BYTES = 1024 * 1024
 # Statuses meaning the host has no robots.txt at all (not an access denial).
 _ROBOTS_ABSENT_STATUSES = frozenset({404, 410})
+# robots.txt may redirect (RFC 9309 asks crawlers to follow at least five hops).
+_ROBOTS_MAX_REDIRECTS = 5
+_REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
 _VOID_TAGS = frozenset(
     {
         "area",
@@ -88,6 +91,10 @@ def load_mall_config(path: Path = Path("config/malls.yaml")) -> MallConfig:
 class MallHttpResponse(NamedTuple):
     status: int
     body: bytes
+    # Redirect target and media type, exposed only so the robots.txt request can
+    # follow redirects and tell an HTML error page from a real rules file.
+    location: str | None = None
+    content_type: str | None = None
 
 
 MallGet = Callable[[str, Mapping[str, str], float, int], MallHttpResponse]
@@ -98,21 +105,31 @@ def httpx_mall_get(
 ) -> MallHttpResponse:
     """Single HTTP boundary, bounded after httpx decompresses gzip.
 
-    Redirects are returned as HTTP errors: automatic following would bypass the
-    destination's robots check and host interval. Non-200 bodies are not parsed.
+    Redirects are returned as HTTP errors with their Location: automatic following
+    would bypass the destination's robots check and host interval. Only the
+    robots.txt request follows them, by hand, through the client (so every hop keeps
+    its host interval). Non-200 bodies are not parsed.
     """
     try:
         with httpx.stream(
             "GET", url, headers=headers, timeout=timeout_s, follow_redirects=False
         ) as response:
+            content_type = response.headers.get("content-type")
             if response.status_code != 200:
-                return MallHttpResponse(response.status_code, b"")
+                return MallHttpResponse(
+                    response.status_code,
+                    b"",
+                    location=response.headers.get("location"),
+                    content_type=content_type,
+                )
             data = bytearray()
             for chunk in response.iter_bytes(chunk_size=64 * 1024):
                 if len(data) + len(chunk) > max_bytes:
                     raise MallError("MALL_RESPONSE_TOO_LARGE")
                 data.extend(chunk)
-            return MallHttpResponse(response.status_code, bytes(data))
+            return MallHttpResponse(
+                response.status_code, bytes(data), content_type=content_type
+            )
     except (httpx.ConnectError, httpx.TimeoutException):
         raise MallError("MALL_REQUEST_FAILED", retryable=True) from None
     except httpx.RequestError:
@@ -390,6 +407,30 @@ class MallClient:
         except httpx.RequestError:
             raise MallError("MALL_REQUEST_FAILED") from None
 
+    def _fetch_robots(self, url: str) -> MallHttpResponse:
+        """Request robots.txt, following redirects by hand (at most five).
+
+        Each hop goes through the shared request path, so its host keeps the
+        request interval. Only this request follows redirects; product and image
+        requests never do.
+        """
+        for _ in range(_ROBOTS_MAX_REDIRECTS + 1):
+            response = self._request(
+                url, max_bytes=_ROBOTS_MAX_BYTES, timeout_s=_TIMEOUT_S
+            )
+            if response.status not in _REDIRECT_STATUSES:
+                return response
+            target = urljoin(url, (response.location or "").strip())
+            parts = urlsplit(target)
+            if (
+                not (response.location or "").strip()
+                or parts.scheme not in {"http", "https"}
+                or not parts.hostname
+            ):
+                raise MallError("MALL_ROBOTS_UNREADABLE")
+            url = target
+        raise MallError("MALL_ROBOTS_UNREADABLE")
+
     def _allowed_url(self, brand: str, url: str) -> str:
         definition = self.config.malls.get(brand)
         if definition is None:
@@ -407,20 +448,20 @@ class MallClient:
         parser = self._robots.get(origin)
         if parser is None:
             try:
-                response = self._request(
-                    f"{origin}/robots.txt",
-                    max_bytes=_ROBOTS_MAX_BYTES,
-                    timeout_s=_TIMEOUT_S,
-                )
+                response = self._fetch_robots(f"{origin}/robots.txt")
             except MallError as error:
                 raise MallError(
                     "MALL_ROBOTS_UNREADABLE", retryable=error.retryable
                 ) from None
             parser = RobotFileParser()
-            if response.status in _ROBOTS_ABSENT_STATUSES:
-                # No robots.txt exists (RFC 9309: unavailable means no rules). The
-                # error page body is never read as rules. The request interval
-                # still applies to this host.
+            html_page = response.status == 200 and (
+                (response.content_type or "").lower().startswith("text/html")
+            )
+            if response.status in _ROBOTS_ABSENT_STATUSES or html_page:
+                # No robots.txt exists (RFC 9309: unavailable means no rules), or
+                # the host answers with an HTML (error) page, which is not a rules
+                # file. That body is never read as rules. The request interval still
+                # applies to this host.
                 parser.parse([])
             elif response.status != 200 or len(response.body) > _ROBOTS_MAX_BYTES:
                 # 401/403, server errors and oversized files stay fail-closed.
