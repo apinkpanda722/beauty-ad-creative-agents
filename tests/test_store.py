@@ -236,11 +236,11 @@ def test_product_migration_v4_is_additive_repeatable_and_preserves_prior_version
     executed = []
     for _ in range(2):
         conn = FakeConnection([FakeCursor(), FakeCursor([(1,), (2,), (3,)])])
-        assert apply_migrations(conn) == [4]
+        assert apply_migrations(conn) == [4, 5]
         executed.append([query for query, _ in conn.calls if query == sql])
-        assert conn.commits == 1 and conn.rollbacks == 0
+        assert conn.commits == 2 and conn.rollbacks == 0
     assert executed == [[sql], [sql]]
-    conn = FakeConnection([FakeCursor(), FakeCursor([(1,), (2,), (3,), (4,)])])
+    conn = FakeConnection([FakeCursor(), FakeCursor([(1,), (2,), (3,), (4,), (5,)])])
     assert apply_migrations(conn) == []
     assert not calls_for(conn, "CREATE TABLE IF NOT EXISTS products")
 
@@ -1085,3 +1085,14 @@ def test_existing_analysis_methods_preserve_run_tag_and_serialize_general_labels
     assert json.loads(update_params[2]) == labels
     assert all(kind not in query for query, _ in conn.calls)
     assert conn.commits == 2 and conn.rollbacks == 1
+
+
+def test_migration_5_only_adds_the_ingredient_lookup_cache():
+    [(version, name, sql)] = [item for item in MIGRATIONS if item[0] == 5]
+    assert version == 5 and name == "ingredient_lookup_cache"
+    normalized = " ".join(sql.split()).upper()
+    assert "CREATE TABLE IF NOT EXISTS INGREDIENT_LOOKUPS" in normalized
+    assert "PRIMARY KEY (QUERY_KEY, KIND)" in normalized
+    # Additive: nothing is removed or altered, and no other table is touched.
+    assert "DR" + "OP " not in normalized and "ALT" + "ER " not in normalized
+    assert normalized.count("CREATE TABLE") == 1

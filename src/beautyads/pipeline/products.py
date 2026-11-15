@@ -28,6 +28,7 @@ from beautyads.domain.labels import Category
 from beautyads.domain.mfds import CertStatus, FunctionalKind, functional_kinds
 from beautyads.domain.products import (
     CachedIngredientStandard,
+    IngredientLookup,
     Product,
     ProductCert,
     ProductIngredient,
@@ -277,6 +278,9 @@ class IngredientResolver:
         self.aliases = aliases
         self.now = now
         self.memo: dict[str, str | None] = {}
+        # Where each ingredient's answer came from: this run's memory, the persisted
+        # lookup cache, or a request to the API.
+        self.stats = Counter({"memo_hits": 0, "db_hits": 0, "api_lookups": 0})
 
     def match(self, names: Sequence[str]) -> list[dict]:
         rows = []
@@ -296,16 +300,29 @@ class IngredientResolver:
             ).strip()
             name = self.aliases.get(name, name)
             try:
-                if name not in self.memo:
+                if name in self.memo:
+                    self.stats["memo_hits"] += 1
+                else:
+                    lookup = (
+                        self.store.get_ingredient_lookup(name, "kor_exact")
+                        if name
+                        else None
+                    )
                     cached = self.store.get_ingredient_standard(name)
-                    if cached is not None and cached.name_ko == name:
+                    if lookup is not None:
+                        self.memo[name] = lookup.standard_name
+                        self.stats["db_hits"] += 1
+                    elif cached is not None and cached.name_ko == name:
                         self.memo[name] = name
+                        self.stats["db_hits"] += 1
                     elif not name:
                         self.memo[name] = None
                     else:
                         result = self.mfds.search_ingredients(name)
+                        self.stats["api_lookups"] += 1
                         _mfds_system(result)
                         if result.stopped:
+                            # An incomplete answer is never cached.
                             row["error_code"] = result.stopped
                             rows.append(row)
                             continue
@@ -315,6 +332,14 @@ class IngredientResolver:
                             None,
                         )
                         self.memo[name] = standard.name_ko if standard else None
+                        self.store.upsert_ingredient_lookup(
+                            IngredientLookup(
+                                query_key=name,
+                                kind="kor_exact",
+                                standard_name=self.memo[name],
+                                queried_at=self.now(),
+                            )
+                        )
                         if standard:
                             self.store.upsert_ingredient_standard(
                                 CachedIngredientStandard(
@@ -697,6 +722,7 @@ def run_products(
         "product_count": len(items),
         "by_status": dict(Counter(row["status"] for row in reports)),
         "ingredient_count": len(all_rows),
+        "ingredient_cache": dict(resolver.stats),
         "resolved_ratio": resolved / len(all_rows) if all_rows else None,
         "unresolved": sum(row["status"] == "unresolved" for row in all_rows),
         "ingredient_pending": sum(row["status"] == "pending" for row in all_rows),

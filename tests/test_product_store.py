@@ -12,6 +12,7 @@ from test_store import FakeConnection, FakeCursor
 from beautyads.domain.mfds import CertStatus
 from beautyads.domain.products import (
     CachedIngredientStandard,
+    IngredientLookup,
     Product,
     ProductCert,
     ProductExtraction,
@@ -31,6 +32,7 @@ class MemoryConnection(FakeConnection):
         "product_ingredients": ("brand", "source_url", "ingredient_order"),
         "product_certs": ("brand", "source_url", "kind"),
         "ingredient_standards": ("name_ko",),
+        "ingredient_lookups": ("query_key", "kind"),
     }
 
     def __init__(self, *, native_json=True):
@@ -63,7 +65,7 @@ class MemoryConnection(FakeConnection):
                 (old for old in rows if keys and all(old[k] == row[k] for k in keys)),
                 None,
             )
-            if keys and table != "ingredient_standards":
+            if keys and table not in {"ingredient_standards", "ingredient_lookups"}:
                 assert "updated_at = now()" in query
                 assert "IS DISTINCT FROM" in query
                 for column in columns:
@@ -93,6 +95,12 @@ class MemoryConnection(FakeConnection):
                 ]
             if "WHERE name_ko = %s" in query:
                 rows = [row for row in rows if row["name_ko"] == params[0]]
+            if "WHERE query_key = %s AND kind = %s" in query:
+                rows = [
+                    row
+                    for row in rows
+                    if (row["query_key"], row["kind"]) == tuple(params)
+                ]
             if "updated_at > %s" in query:
                 rows = [row for row in rows if row["updated_at"] > params[0]]
             return FakeCursor(
@@ -399,3 +407,42 @@ def test_sql_values_are_bound_not_interpolated():
     for query, params in conn.calls:
         assert item.brand not in query and item.name_ko not in query
         assert query.count("%s") == len(params)
+
+
+def test_ingredient_lookup_cache_keeps_both_outcomes_per_lookup_kind():
+    conn = MemoryConnection()
+    store = PostgresProductStore(conn)
+    assert store.get_ingredient_lookup("합성성분", "kor_exact") is None
+    resolved = IngredientLookup(
+        query_key="합성성분",
+        kind="kor_exact",
+        standard_name="합성성분",
+        queried_at=NOW,
+    )
+    absent = IngredientLookup(
+        query_key="미등재", kind="kor_exact", standard_name=None, queried_at=NOW
+    )
+    store.upsert_ingredient_lookup(resolved)
+    store.upsert_ingredient_lookup(absent)
+    assert store.get_ingredient_lookup("합성성분", "kor_exact") == resolved
+    # "Looked up and not found" is stored, not merely missing from the cache.
+    assert store.get_ingredient_lookup("미등재", "kor_exact") == absent
+    # The same text under another lookup kind is a different cache entry.
+    assert store.get_ingredient_lookup("합성성분", "eng_exact") is None
+    newer = resolved.model_copy(update={"queried_at": NOW + timedelta(days=1)})
+    store.upsert_ingredient_lookup(newer)
+    assert store.get_ingredient_lookup("합성성분", "kor_exact") == newer
+    assert len(conn.tables["ingredient_lookups"]) == 2
+
+
+def test_ingredient_lookup_sql_values_are_bound():
+    conn = MemoryConnection()
+    store = PostgresProductStore(conn)
+    sentinel = "quoted'; sentinel-statement; --"
+    store.upsert_ingredient_lookup(
+        IngredientLookup(
+            query_key=sentinel, kind="kor_exact", standard_name=None, queried_at=NOW
+        )
+    )
+    store.get_ingredient_lookup(sentinel, "kor_exact")
+    assert all(sentinel not in query for query, _ in conn.calls)

@@ -187,6 +187,19 @@ MIGRATIONS: list[tuple[int, str, str]] = [
             ON product_extractions (brand, source_url, id);
         """,
     ),
+    (
+        5,
+        "ingredient_lookup_cache",
+        """
+        CREATE TABLE IF NOT EXISTS ingredient_lookups (
+            query_key text NOT NULL,
+            kind text NOT NULL CHECK (kind IN ('kor_exact', 'eng_exact')),
+            standard_name text,
+            queried_at timestamptz NOT NULL,
+            PRIMARY KEY (query_key, kind)
+        );
+        """,
+    ),
 ]
 
 # Fixed identifiers and SQL types, never caller input. Explicit casts preserve

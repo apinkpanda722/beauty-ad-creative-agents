@@ -314,6 +314,17 @@ class CachedIngredientStandard(IngredientStandard):
     queried_at: AwareDatetime
 
 
+class IngredientLookup(BaseModel):
+    """One completed ingredient lookup, stored whether or not it matched."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    query_key: str = Field(min_length=1)
+    kind: Literal["kor_exact", "eng_exact"]
+    standard_name: str | None = None
+    queried_at: AwareDatetime
+
+
 class ProductRepository(Protocol):
     def upsert_product(self, product: Product) -> None:
         """Persist one record and append its price observation atomically."""
@@ -342,6 +353,12 @@ class ProductRepository(Protocol):
     def get_ingredient_standard(
         self, name_ko: str
     ) -> CachedIngredientStandard | None: ...
+
+    def get_ingredient_lookup(
+        self, query_key: str, kind: str
+    ) -> IngredientLookup | None: ...
+
+    def upsert_ingredient_lookup(self, lookup: IngredientLookup) -> None: ...
 
     def upsert_ingredient_standard(
         self, standard: CachedIngredientStandard

@@ -13,7 +13,7 @@ import yaml
 
 from beautyads.domain import JobStatus
 from beautyads.domain.mfds import FunctionalReport, IngredientStandard
-from beautyads.domain.products import Product
+from beautyads.domain.products import IngredientLookup, Product
 from beautyads.pipeline import products as p
 from beautyads.sources.mall import MallClient, MallHttpResponse, load_mall_config
 from beautyads.sources.mfds import MFDSError, MFDSResult
@@ -33,6 +33,7 @@ class Store:
         self.certs = []
         self.extractions = []
         self.standards = {}
+        self.lookups = {}
 
     def upsert_product(self, product):
         self.products.append(product)
@@ -51,6 +52,12 @@ class Store:
 
     def upsert_ingredient_standard(self, row):
         self.standards[row.name_ko] = row
+
+    def get_ingredient_lookup(self, query_key, kind):
+        return self.lookups.get((query_key, kind))
+
+    def upsert_ingredient_lookup(self, lookup):
+        self.lookups[(lookup.query_key, lookup.kind)] = lookup
 
 
 def candidate(title="합성 세럼", brand="cosrx", index=1):
@@ -915,3 +922,51 @@ def test_consecutive_failures_are_a_system_stop(tmp_path):
     assert report["stopped"] == "MFDS_CONSECUTIVE_FAILURES"
     assert [r["status"] for r in report["products"]] == ["pending", "pending"]
     assert "STOPPED MFDS_CONSECUTIVE_FAILURES provider_code=01" in output
+
+
+def test_resolved_and_unresolved_lookups_are_cached_across_runs():
+    dep, _ = deps()
+    first = p.IngredientResolver(dep.mfds, dep.store, {}, dep.now)
+    first.match(["병풀추출물", "미등재", "미등재"])
+    assert dep.mfds.search_ingredients.call_count == 2
+    assert dict(first.stats) == {"api_lookups": 2, "memo_hits": 1, "db_hits": 0}
+    # A new resolver (a later run) starts with an empty memo but a persisted cache.
+    second = p.IngredientResolver(dep.mfds, dep.store, {}, dep.now)
+    rows = second.match(["병풀추출물", "미등재"])
+    assert [r["status"] for r in rows] == ["resolved", "unresolved"]
+    assert dep.mfds.search_ingredients.call_count == 2  # no new request
+    assert dict(second.stats) == {"api_lookups": 0, "memo_hits": 0, "db_hits": 2}
+    assert dep.store.lookups[("미등재", "kor_exact")].standard_name is None
+
+
+def test_pending_lookups_are_never_cached():
+    dep, _ = deps()
+    dep.mfds.search_ingredients.return_value = MFDSResult(
+        [], "MFDS_LOOKUP_FAILED", MFDSError("MFDS_LOOKUP_FAILED", provider_code="01")
+    )
+    rows = p.IngredientResolver(dep.mfds, dep.store, {}, dep.now).match(["미등재"])
+    assert rows[0]["status"] == "pending" and not dep.store.lookups
+    dep.mfds.search_ingredients.return_value = MFDSResult([])
+    rows = p.IngredientResolver(dep.mfds, dep.store, {}, dep.now).match(["미등재"])
+    assert rows[0]["status"] == "unresolved"
+    assert dep.mfds.search_ingredients.call_count == 2  # asked again, then cached
+    assert ("미등재", "kor_exact") in dep.store.lookups
+
+
+def test_lookup_cache_is_keyed_by_kind_so_another_kind_never_answers():
+    dep, _ = deps()
+    dep.store.lookups[("병풀추출물", "eng_exact")] = IngredientLookup(
+        query_key="병풀추출물", kind="eng_exact", standard_name=None, queried_at=NOW
+    )
+    rows = p.IngredientResolver(dep.mfds, dep.store, {}, dep.now).match(["병풀추출물"])
+    assert rows[0]["status"] == "resolved"
+    assert dep.mfds.search_ingredients.call_count == 1
+
+
+def test_summary_counts_every_ingredient_lookup_by_source(tmp_path):
+    dep, _ = deps()
+    report, _ = run(tmp_path, dep, [candidate(index=1), candidate(index=2)])
+    cache = report["ingredient_cache"]
+    assert set(cache) == {"api_lookups", "memo_hits", "db_hits"}
+    assert cache["api_lookups"] > 0 and cache["memo_hits"] > 0
+    assert sum(cache.values()) == report["ingredient_count"]

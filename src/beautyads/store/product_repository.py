@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from beautyads.domain.products import (
     CachedIngredientStandard,
+    IngredientLookup,
     Product,
     ProductCert,
     ProductExtraction,
@@ -63,6 +64,7 @@ _PRICE_COLUMNS = (
 )
 _EXTRACTION_COLUMNS = ("brand", "source_url", "prompt_version", "raw_output")
 _STANDARD_COLUMNS = ("name_ko", "name_en", "cas_no", "queried_at")
+_LOOKUP_COLUMNS = ("query_key", "kind", "standard_name", "queried_at")
 _JSON_COLUMNS = frozenset(
     {"aliases", "skin_types", "efficacy_texts", "functional_texts"}
 )
@@ -104,6 +106,11 @@ _STANDARD_UPSERT = (
     _insert_sql("ingredient_standards", _STANDARD_COLUMNS)
     + " ON CONFLICT (name_ko) DO UPDATE SET name_en = EXCLUDED.name_en,"
     + " cas_no = EXCLUDED.cas_no, queried_at = EXCLUDED.queried_at"
+)
+_LOOKUP_UPSERT = (
+    _insert_sql("ingredient_lookups", _LOOKUP_COLUMNS)
+    + " ON CONFLICT (query_key, kind) DO UPDATE SET"
+    + " standard_name = EXCLUDED.standard_name, queried_at = EXCLUDED.queried_at"
 )
 
 
@@ -274,6 +281,22 @@ class PostgresProductStore(ProductRepository):
 
     def upsert_ingredient_standard(self, standard: CachedIngredientStandard) -> None:
         self._write([(_STANDARD_UPSERT, _values(standard, _STANDARD_COLUMNS))])
+
+    def get_ingredient_lookup(
+        self, query_key: str, kind: str
+    ) -> IngredientLookup | None:
+        rows = self._read(
+            IngredientLookup,
+            "ingredient_lookups",
+            _LOOKUP_COLUMNS,
+            condition=" WHERE query_key = %s AND kind = %s",
+            params=(query_key, kind),
+            order="query_key",
+        )
+        return next(iter(rows), None)
+
+    def upsert_ingredient_lookup(self, lookup: IngredientLookup) -> None:
+        self._write([(_LOOKUP_UPSERT, _values(lookup, _LOOKUP_COLUMNS))])
 
     def _changed[Record: BaseModel](
         self,
