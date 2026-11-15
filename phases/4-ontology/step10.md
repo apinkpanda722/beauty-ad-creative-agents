@@ -18,10 +18,10 @@
 
 ## 작업
 
-**수정할 파일**: `src/beautyads/graph/queries.py`(새 파일), `src/beautyads/eval/cq_verify.py`(새 파일), `Makefile`, `README.md`, `tests/test_graph_queries.py`, `tests/test_cq_verify.py`
+**수정할 파일**: `src/beautyads/graph/queries.py`(새 파일), `src/beautyads/eval/cq_verify.py`(새 파일), `src/beautyads/sources/advertiser_classes.py`(새 파일), `src/beautyads/graph/load.py`, `src/beautyads/store/sync_source.py`, `Makefile`, `README.md`, `tests/test_graph_queries.py`, `tests/test_cq_verify.py`, `tests/test_advertiser_classes.py`(새 파일), `tests/test_graph_load.py`, `tests/test_sync_source.py`
 
 열람 금지 경로: `data/interim/`
-수정 허용 경로: `src/beautyads/graph/queries.py`, `src/beautyads/eval/cq_verify.py`, `Makefile`(`live-cq` 타깃과 `.PHONY` 추가에 한함, 기존 타깃·`verify` 불변), `README.md`(live-cq 절 추가에 한함), `tests/test_graph_queries.py`, `tests/test_cq_verify.py`
+수정 허용 경로: `src/beautyads/graph/queries.py`, `src/beautyads/eval/cq_verify.py`, `src/beautyads/sources/advertiser_classes.py`, `src/beautyads/graph/load.py`(Creative 속성 `advertiser_name` 추가에 한함, 기존 동작·단언 불변), `src/beautyads/store/sync_source.py`(`advertiser_name` 열 추가에 한함, 기존 열·동작·단언 불변), `tests/test_advertiser_classes.py`, `tests/test_graph_load.py`(해당 케이스 추가에 한함, 단언 약화 금지), `tests/test_sync_source.py`(해당 케이스 추가에 한함, 단언 약화 금지), `Makefile`(`live-cq` 타깃과 `.PHONY` 추가에 한함, 기존 타깃·`verify` 불변), `README.md`(live-cq 절 추가에 한함), `tests/test_graph_queries.py`, `tests/test_cq_verify.py`
 열람 금지의 범위: 이 금지는 **Codex 세션이 해당 경로의 파일을 직접 열람·출력·인용하는 것**에 대한 것이다. 이 step의 코드가 런타임에 그 경로를 다루는 것(기본 입력·출력 경로 등)은 대상이 아니다. 테스트가 그 경로의 실제 파일 **내용**을 읽는 것은 여전히 금지이며 테스트는 임시 디렉터리와 합성 데이터만 쓴다.
 
 소비자 테스트 점검 결과: `tests/test_compose.py`·`tests/test_slice.py`·`tests/test_collect.py`·`tests/test_pilot.py`는 저장소 `Makefile`을 읽고 `.PHONY`는 부분집합으로, 기존 타깃의 레시피 원문은 정확히, `verify` 레시피는 `live-`가 없음을 단언한다. 따라서 **새 타깃은 추가하되 기존 타깃의 레시피 원문·`verify` 레시피·형식은 바꾸지 않는다.** 이 테스트 파일들은 수정하지 않는다. 깨지면 고치지 말고 `blocked`로 보고한다.
@@ -30,7 +30,7 @@
 
 - **질문 도구(`graph/queries.py`)**: 질문마다 고정 Cypher 하나와 파라미터 이름 목록, **선언한 홉 수**를 가진 상수 표다. 에이전트가 Cypher를 쓰지 않으므로 입력은 분류의 닫힌 값(`Claim`·`Category`·`HookType` 등)과 기준일뿐이다. 값은 항상 파라미터다. 테스트가 각 Cypher 패턴의 **관계 수를 세어 선언한 홉 수와 같고 4 이하임을 확인한다**(속성 필터는 세지 않는다, 홉의 정의). 입력에 테넌트·사용자·오늘 날짜 칸을 두지 않는다 — 기준일은 실행기가 정해 파라미터로 넣는다.
 - **실행기(`eval/cq_verify.py`)**: 질문 15개(CQ-01~06, 08~16)를 각각 실행해 한 줄씩 출력한다: 질문 ID, 선언 홉 수, 실행 성공 여부(오류 코드), 결과 행 수, **연결된 소재 수(`PROMOTES` 커버리지: 해당 질문의 답에 쓰인 `Creative` 중 `PROMOTES`로 제품에 이어진 수 / 질문 범위의 제품 소재 수)**, 질문별 한계 문구(`docs/COMPETENCY_QUESTIONS.md`의 한계와 조건을 상수로 옮긴 것). 요약에 홉 기준(1~4홉)을 충족한 질문 수(실행이 오류 없이 끝나고 선언 홉 수 ≤ 4)와 결과가 0행인 질문 수를 **따로** 낸다(0행은 "데이터 부족"이지 "그래프 설계 실패"가 아니다. 두 판정을 섞지 않는다, B-FP-040).
-- **질문별 범위**: CQ-09는 `source == 'tiktok'`로 한정하고 집행 주체 속성으로 나눈다(한계: 소규모 시드 표본, `config/retailers.yaml` 사용자 확인 대기). CQ-12는 **합성 데이터로만** 검증한다: 실행기는 임시 테넌트 표식 데이터를 만들지 않고 그래프에 있는 `Feedback`이 없으면 `SKIPPED_SYNTHETIC_ONLY`로 보고한다(P5 피드백 메모리 이후 실데이터 검증). CQ-03·10·11은 제품과 식약처 품목 연결의 커버리지(`certified`·`unknown`·제품 수)를 답과 함께 낸다. CQ-06은 조회수 값이 없는 소재를 백분위에서 빼고 뺀 수를 낸다(조회수 상위는 출처별로 값이 있는 소재에서만).
+- **질문별 범위**: CQ-09는 `source == 'tiktok'`로 한정하고, **광고주 이름→분류 매핑 `config/advertiser_classes.yaml`(사용자 분류와 규칙 분류, 2026-11-15)로 `brand_direct`·`retailer`·`unknown`을 나눈다.** 분류는 DB의 `executor`가 아니라 이 파일이 기준이다. 이를 위해 `Creative` 노드에 TikTok 소재의 광고주 이름 속성 `advertiser_name`(원본 `attributes.advertiser_business_name`)을 추가한다(`store/sync_source.py`가 `c.attributes->>'advertiser_business_name'`을 `advertiser_name`으로 읽고 `graph/load.py`가 속성으로 올린다. 다른 출처는 `NULL`, 기존 열·속성·단언은 바꾸지 않는다). `sources/advertiser_classes.py`는 파일을 읽어 이름을 strip·NFKC·소문자로 정규화해 매핑을 돌려주고, **목록에 없는 이름·비어 있는 이름은 `unknown`**이다. 파일이 없거나 형식이 틀리면 `ADVERTISER_CLASSES_UNREADABLE`·`ADVERTISER_CLASSES_INVALID`로 CQ-09를 실행하지 않는다(다른 질문은 계속). 요약에 `brand_direct`·`retailer`·`unknown` 소재 수를 내고 **`brand_direct`·`retailer` 중 한쪽이라도 30건 미만이면 "표본 부족으로 방향만 제시"를 출력**한다(기준 30건은 바꾸지 않는다). 한계: 소규모 시드 표본. CQ-12는 **합성 데이터로만** 검증한다: 실행기는 임시 테넌트 표식 데이터를 만들지 않고 그래프에 있는 `Feedback`이 없으면 `SKIPPED_SYNTHETIC_ONLY`로 보고한다(P5 피드백 메모리 이후 실데이터 검증). CQ-03·10·11은 제품과 식약처 품목 연결의 커버리지(`certified`·`unknown`·제품 수)를 답과 함께 낸다. CQ-06은 조회수 값이 없는 소재를 백분위에서 빼고 뺀 수를 낸다(조회수 상위는 출처별로 값이 있는 소재에서만).
 - **`make live-cq`**: `python -m beautyads.eval.cq_verify`. 점검(`ENV_MISSING:NEO4J_PASSWORD`, `DOCKER_DOWN`, `NEO4J_UNREACHABLE`, 그래프가 비어 있으면 `GRAPH_EMPTY` — 먼저 `make sync`) 뒤 시작한다. 결과는 출력만 하고 `docs/EVAL.md`의 기준 숫자를 바꾸거나 새 판정 기준을 만들지 않는다. 모델 호출 없음, 비용 0.
 - `eval`은 다른 모든 계층을 import할 수 있고 다른 계층은 `eval`을 import하지 않는다(질문 도구가 `graph`에 있는 이유).
 
@@ -41,6 +41,7 @@
 - 실행기: 오류 없이 끝난 질문과 0행인 질문이 따로 집계된다, 질문 하나의 오류가 다음 질문을 막지 않는다(A-FP-030), 오류 본문의 종류별 코드(`Neo.ClientError.Statement.SyntaxError`→`CQ_SYNTAX_ERROR`, 연결 실패→`NEO4J_UNREACHABLE`)가 구분된다.
 - 커버리지: 합성 결과로 `PROMOTES` 커버리지 수가 손계산 값과 같다, `PROMOTES`가 0건이면 0이라고 보고하고 오류가 아니다, 질문별 한계 문구가 출력에 붙는다.
 - CQ-09는 TikTok 한정 파라미터가 걸리고 CQ-12는 피드백이 없으면 `SKIPPED_SYNTHETIC_ONLY`다.
+- **광고주 분류**: 합성 매핑 파일에서 `brand_direct`·`retailer`·`unknown`이 읽힌다, 목록에 없는 이름·빈 이름·이름 뒤 공백·전각/대소문자 변형은 정규화되어 같은 광고주로 읽히거나 `unknown`이다, 없는 파일·깨진 YAML·알 수 없는 분류 값이 각 코드로 거부된다, 실제 `config/advertiser_classes.yaml`이 로더를 통과하고 모든 항목의 `class`가 세 값 안이다(**항목 수나 이름을 단언하지 않는다**). CQ-09 요약은 한쪽이 30건 미만이면 "표본 부족으로 방향만 제시"를 출력하고 둘 다 30건 이상이면 출력하지 않는다(합성 수치, 29·30·31 경계값). `advertiser_name`: 동기화 읽기가 이 열을 포함하고 TikTok이 아닌 소재는 `NULL`이며 `graph/load.py`가 속성으로 올린다(기존 `CREATIVE_PROPERTIES` 단언은 약화하지 않고 추가만 한다).
 - 점검: 이유 코드가 해당 조건에서 나오고 점검 실패 시 드라이버 생성이 **한 번도** 없다, 빈 그래프는 `GRAPH_EMPTY`.
 - `Makefile`에 `live-cq`가 있고 `verify` 레시피에 `live-`가 없다, `tests/test_architecture.py` 통과.
 

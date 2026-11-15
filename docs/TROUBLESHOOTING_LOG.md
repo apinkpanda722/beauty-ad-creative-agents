@@ -148,3 +148,16 @@
 - **해결**: 새 `--sample N` 모드를 만들었다. 훅·전체 라벨이 완료된 소재, 그다음 분석 완료 소재, 그다음 오래된 변경 순으로 고르고 **워터마크를 올리지 않는다**(변경 시각이 아닌 순서로 고른 표본으로 워터마크를 올리면 이후 증분 동기화가 오래된 소재를 건너뛴다). `--limit`·`--full`과는 함께 쓸 수 없다(`SYNC_OPTIONS_CONFLICT`). 검증 모드는 요약에 `graph_check`(표본의 라벨 있는 소재 수, 분류 축 관계 수)를 내고, **표본에 분석 완료 소재가 없으면 `GRAPH_VERIFY_NO_LABELED_SAMPLE`, 라벨이 있는데 관계가 0이면 `GRAPH_VERIFY_NO_RELATIONSHIPS`로 실패한다.** `make live-graph`는 `--sample 50 --verify`가 됐다. 테스트를 먼저 썼다.
 - **결과**: 해결(오프라인 테스트로 검증, 사용자의 재실행 대기). 기존 단언은 `live-graph` 레시피 문자열 한 곳만 바꿨다.
 - **근거**: `src/beautyads/store/sync_source.py`, `src/beautyads/pipeline/sync.py`, `tests/test_sync_source.py`, `tests/test_sync_pipeline.py`.
+
+## 2026-11-15 상세 이미지가 0개로 잡힌 제품 24개(4개 몰)
+- **문제**: `--scan`에서 이미지를 읽어야 하는 59개 제품 중 24개(abib·dalba·isntree·round_lab 각 6개)가 상세 이미지 0개였다. 현재 어댑터로는 전성분을 얻을 수 없다.
+- **원인**: 어댑터가 `#prdDetail`의 `ec-data-src` 이미지만 읽는다. 달바(고도몰)는 이미지가 `#prdDetail` 밖(`/data/editor`)에 있고 이즈앤트리는 `#prdDetail`에 정적 이미지가 없다(저장한 원본으로 확인). abib·round_lab은 원본을 저장하지 않아 미진단. 픽스처가 `ec-data-src` 이미지만 남긴 최소본이라 다른 구조를 잡지 못했다(FP-C08).
+- **해결**: 미해결. 실제 HTML 원본으로 만든 픽스처·테스트를 먼저 쓰고 어댑터를 보강한다(`fix:` 커밋).
+- **근거**: `src/beautyads/sources/mall.py`, `tests/test_mall.py`.
+
+## 2026-11-15 소규모 상세 추출에서 제품 2개 실패와 식약처 API 오류 중단
+- **문제**: 이미지가 잡힌 제품 5개(브랜드 5곳)로 한 첫 Gemini 추출에서 3개가 완료, 2개가 `PRODUCT_DETAIL_FAILED`(Gemini 호출 0회, 추출 0건)였고 실행이 `STOPPED MFDS_API_ERROR`(종료 코드 3)로 멈췄다. 비용은 4호출 $0.0151이고 성분 86개 중 표준명 일치 91.9%(미해결 7)였다. 제품 인증 대조는 3개 모두 `unknown`이다.
+- **원인**: 미확인. 코드상 `PRODUCT_DETAIL_FAILED`는 이미지를 읽는 모든 시도가 추출에 성공하지 못했을 때이고 개별 이미지의 오류 코드(`MALL_*`·`PRODUCT_IMAGE_*`)는 `issues`에만 담겨 기록에 남지 않는다. `MFDS_API_ERROR`는 식약처 응답 본문의 `resultCode`가 `"00"`이 아닐 때이고 어떤 코드인지는 출력되지 않는다.
+- **해결**: 미해결(조언 세션 지시 대기). 실패 시 원인 코드를 기록에 남기는 보강과 식약처 `resultCode`·`resultMsg` 확인이 필요하다.
+- **근거**: `src/beautyads/pipeline/products.py`, `src/beautyads/sources/mfds.py`.
+
