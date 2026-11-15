@@ -67,6 +67,8 @@ ASSUMED_PIECES_PER_IMAGE = 4
 ASSUMED_COST_PER_PIECE_USD = 0.0009
 MATCH_KIND = "ingredient-matches@v1"
 _MAX_IMAGE_BYTES = 32 * 1024 * 1024
+# Images read per product while no ingredient has turned up; past this it is held.
+_MAX_IMAGES_PER_PRODUCT = 20
 
 
 class ProductsError(Exception):
@@ -449,7 +451,13 @@ def _product_facts(deps, item, report):
     names = []
     held = False
     successful = False
+    reads = 0
+    capped = False
     for url in reversed(page.detail_image_urls):
+        if reads >= _MAX_IMAGES_PER_PRODUCT:
+            capped = True
+            break
+        reads += 1
         try:
             data = _retry_mall(deps.download, item.brand, url)
             try:
@@ -491,6 +499,10 @@ def _product_facts(deps, item, report):
             "PRODUCT_DETAIL_HELD" if held else "PRODUCT_DETAIL_FAILED",
             extractions=extractions,
             issues=issues,
+        )
+    if capped and not names:
+        raise ProductsError(
+            "PRODUCT_IMAGE_READ_CAP", extractions=extractions, issues=issues
         )
     if not names:
         # Reading finished but no ingredient was found: hold it rather than let an
@@ -693,13 +705,19 @@ def run_products(
                     error_code=exc.code,
                 )
         except ProductsError as exc:
-            held_code = exc.code in {"PRODUCT_DETAIL_HELD", "PRODUCT_INGREDIENTS_EMPTY"}
+            held_code = exc.code in {
+                "PRODUCT_DETAIL_HELD",
+                "PRODUCT_INGREDIENTS_EMPTY",
+                "PRODUCT_IMAGE_READ_CAP",
+            }
             report.update(
                 status="held" if held_code else "failed",
                 error_code=exc.code,
             )
             if exc.code == "PRODUCT_INGREDIENTS_EMPTY":
                 report["hold_reason"] = "성분 없음"
+            elif exc.code == "PRODUCT_IMAGE_READ_CAP":
+                report["hold_reason"] = "이미지 읽기 상한"
             report["extractions"] = [
                 row.model_dump(mode="json") for row in exc.extractions
             ]

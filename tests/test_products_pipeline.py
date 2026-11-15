@@ -933,3 +933,68 @@ def test_matched_by_is_saved_with_each_product_ingredient(tmp_path):
     assert saved and all(
         (row.status == "resolved") == (row.matched_by is not None) for row in saved
     )
+
+
+def _empty_detail(dep):
+    from beautyads.analysis.product_detail import ProductDetailOutcome
+    from beautyads.domain.products import ProductDetailResult, ProductExtraction
+
+    facts = {
+        "ingredients": [],
+        "volume": None,
+        "volume_unit": None,
+        "form": None,
+        "skin_types": [],
+        "efficacy_texts": [],
+        "functional_texts": [],
+    }
+    dep.extract.side_effect = lambda *_: ProductDetailOutcome(
+        status=JobStatus.done,
+        result=ProductDetailResult.model_validate(facts),
+        extractions=[
+            ProductExtraction(
+                product=candidate().key, prompt_version="synthetic", raw_output="{}"
+            )
+        ],
+    )
+
+
+def test_image_read_cap_holds_the_product_and_reads_no_more_images(
+    tmp_path, monkeypatch
+):
+    dep, _ = deps("image_only")
+    urls = dep.mall.fetch_product("cosrx", candidate().url).detail_image_urls
+    assert len(urls) > 2
+    monkeypatch.setattr(p, "_MAX_IMAGES_PER_PRODUCT", 2)
+    _empty_detail(dep)
+    report, _ = run(tmp_path, dep)
+    row = report["products"][0]
+    assert row["status"] == "held" and row["error_code"] == "PRODUCT_IMAGE_READ_CAP"
+    assert row["hold_reason"] == "이미지 읽기 상한"
+    assert dep.extract.call_count == 2 and len(row["extractions"]) == 2
+    assert dep.download.call_count == 2
+    assert not dep.store.products and not dep.store.ingredients
+    dep.mfds.search_reports.assert_not_called()
+
+
+def test_ingredients_found_before_the_cap_are_not_held(tmp_path, monkeypatch):
+    # The cap only applies while nothing was found.
+    dep, _ = deps("image_only")
+    monkeypatch.setattr(p, "_MAX_IMAGES_PER_PRODUCT", 1)
+    from beautyads.analysis.product_detail import ProductDetailOutcome
+    from beautyads.domain.products import ProductDetailResult
+
+    facts = {
+        "ingredients": [{"raw_name": "병풀추출물", "amount_text": None}],
+        "volume": None,
+        "volume_unit": None,
+        "form": None,
+        "skin_types": [],
+        "efficacy_texts": [],
+        "functional_texts": [],
+    }
+    dep.extract.return_value = ProductDetailOutcome(
+        status=JobStatus.done, result=ProductDetailResult.model_validate(facts)
+    )
+    report, _ = run(tmp_path, dep)
+    assert report["products"][0]["status"] == "done"
