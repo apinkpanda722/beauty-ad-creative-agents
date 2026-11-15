@@ -2,6 +2,71 @@
 
 뷰티 광고 크리에이티브를 분석해 근거가 달린 기획안을 만드는 멀티에이전트 프로젝트.
 
+## live-graph (P4)
+
+PostgreSQL 원본에서 Creative와 분류 축(Hook·Angle·Format·Talent·CtaType)을
+Neo4j로 증분 동기화한다. OrbStack을 켜고 `.env`에 `POSTGRES_PASSWORD`와
+`NEO4J_PASSWORD`(8자 이상)를 준비한 뒤 사용자가 다음 명령을 실행한다.
+수집·분석 결과가 PostgreSQL에 있어야 하며 모델 호출과 다운로드는 없다.
+
+```bash
+make db-up
+# 컨테이너가 준비된 뒤 사용자가 실행한다.
+make live-graph
+# 전체 변경분 동기화와 선택적 읽기 상한·재구축
+make sync
+make sync ARGS='--limit 50'
+make sync ARGS='--full'
+```
+
+Neo4j 주소 기본값은 `bolt://127.0.0.1:7688`이며 필요하면
+`BEAUTYADS_NEO4J_URI`로 바꾼다. PostgreSQL 호스트 포트는 기본 5433이고
+기존 `BEAUTYADS_POSTGRES_PORT`를 따른다. Neo4j 드라이버는 `6.4.1`이다.
+
+`make live-graph`는 `--limit 50 --verify`로 읽은 동일 소재 묶음을 두 번
+적재한다(변경분이 적으면 50건 미만). 두 번째 `nodes_created`와
+`relationships_created`가 0인지, 두 번의 Creative `count`가 같은지,
+분류 값 노드가 닫힌 목록 안인지 `count`로 확인하고 요약의 `verification`에
+출력한다. 기본 동기화 요약에는 `read`, `nodes_created`,
+`relationships_created`, `skipped_invalid`, `watermark`, `elapsed_s`가 나온다.
+변경분이 없으면 정상 0건 요약이며 워터마크는 유지된다.
+
+변경 판정은 소재와 최종 분석 작업의 PostgreSQL `updated_at`으로 한다.
+워터마크보다 10분 앞에서 겹쳐 읽고, 모든 적재와 선택적 검증이 성공한 뒤에만
+읽은 행의 최대 변경 시각으로 워터마크를 올린다. `--full`은 워터마크를
+무시하고 처음부터 MERGE하며 그래프를 삭제하지 않는다. `properties_set`은
+같은 값을 다시 써도 증가하므로 변경 판정에 쓰지 않는다.
+라벨은 `FINAL_RUN_TAG`의 `content_type@v1`·`hook@v1`·`full@v1` 중
+`done` 작업만 사용한다. 제품 소재에만 분류 축 관계를 만들고 목록 밖 값은
+`skipped_invalid`로 센다. 기존 v1 훅 라벨은 묘사 필드가 없으므로,
+훅 묘사는 원본 라벨에 `hook_description`이 있을 때만 관계에 기록한다.
+
+**첫 볼륨 비밀번호 함정:** Neo4j 비밀번호는 데이터 볼륨을 처음 만들 때만
+적용된다. 나중에 `.env`만 바꾸면 인증에 실패한다. 원래 비밀번호를 확인하고,
+그래프를 원본에서 다시 만들기로 결정한 경우에만 사용자가 기존
+`make graph-reset CONFIRM=yes`와 `make db-up`, `make sync ARGS='--full'`을
+차례로 실행한다. `graph-reset`은 그래프 데이터를 삭제한다.
+PostgreSQL도 비밀번호가 첫 볼륨에 적용되므로 기존 원본 볼륨의 비밀번호를
+확인한다.
+
+실패 출력은 `PREFLIGHT_FAILED <코드>`와 종료 코드 2, 정상 완료는 0이다.
+점검이 실패하면 드라이버 생성과 저장소 접속을 하지 않는다. 키·비밀번호·URI의
+인증 정보는 출력하지 않으며 두 Make 타깃은 `verify`에 포함하지 않는다.
+
+| 이유 코드 | 의미와 조치 |
+|---|---|
+| `ENV_MISSING:NEO4J_PASSWORD` | 공백이 아닌 Neo4j 비밀번호를 설정한다. |
+| `ENV_MISSING:POSTGRES_PASSWORD` | 공백이 아닌 PostgreSQL 비밀번호를 설정한다. |
+| `INVALID_SETTING:NEO4J_PASSWORD` | Neo4j 비밀번호를 8자 이상으로 설정한다. |
+| `DOCKER_DOWN` | OrbStack을 켜고 Docker 데몬 준비를 기다린다. |
+| `POSTGRES_UNREACHABLE` | `make db-up`과 PostgreSQL 노출 포트를 확인한다. |
+| `NEO4J_UNREACHABLE` | `make db-up`과 Neo4j 주소·노출 포트를 확인한다. |
+| `NEO4J_AUTH_VOLUME_STALE` | 비밀번호는 데이터 볼륨을 처음 만들 때만 적용된다. 원래 값을 확인하거나 명시적으로 `make graph-reset`으로 재구축한다. |
+| `NEO4J_CONSTRAINT_VIOLATION` | 원본 키와 기존 그래프의 유일 제약 위반 데이터를 확인한다. |
+| `POSTGRES_AUTH_FAILED` / `POSTGRES_CONNECT_FAILED` | 원본 DB의 비밀번호·컨테이너·포트를 확인한다. |
+| `GRAPH_VERIFY_FAILED` | 반복 적재의 생성 수·Creative 수·닫힌 목록 검증이 실패했다. 워터마크를 갱신하지 않는다. |
+| `SYNC_FAILED` | 원본 스키마·데이터 형식·실행 환경을 확인하고 다시 실행한다. 워터마크 이전에 실패했다면 겹쳐 읽어 재적재한다. |
+
 - 하네스 사용법: [scripts/README.md](scripts/README.md)
 - 요구사항·설계·결정 기록: [docs/](docs/)
 

@@ -14,6 +14,7 @@ from beautyads.settings import (
     get_setting,
     load_settings,
     neo4j_password,
+    neo4j_uri,
     read_env_file,
     require_setting,
 )
@@ -96,6 +97,24 @@ def test_password_boundary_and_missing_value():
     assert neo4j_password(environ={"NEO4J_PASSWORD": value}, env_file=None) == value
     with pytest.raises(MissingSetting):
         neo4j_password(environ={}, env_file=None)
+
+
+@pytest.mark.parametrize("blank", [None, "", " \t "])
+def test_neo4j_uri_defaults_and_blank_fallback(blank):
+    env = {} if blank is None else {"BEAUTYADS_NEO4J_URI": blank}
+    assert neo4j_uri(environ=env, env_file=None) == "bolt://127.0.0.1:7688"
+
+
+def test_neo4j_uri_file_and_environment(tmp_path):
+    path = tmp_path / ".env"
+    path.write_text("BEAUTYADS_NEO4J_URI=bolt://127.0.0.1:9999\n")
+    assert neo4j_uri(environ={}, env_file=path) == "bolt://127.0.0.1:9999"
+    assert (
+        neo4j_uri(
+            environ={"BEAUTYADS_NEO4J_URI": "bolt://localhost:8888"}, env_file=path
+        )
+        == "bolt://localhost:8888"
+    )
 
 
 def test_settings_defaults_and_missing_file(tmp_path):

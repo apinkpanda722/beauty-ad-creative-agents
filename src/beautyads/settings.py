@@ -92,6 +92,19 @@ def neo4j_password(
     return value
 
 
+def neo4j_uri(
+    *,
+    environ: Mapping[str, str] | None = None,
+    env_file: Path | None = DEFAULT_ENV_FILE,
+) -> str:
+    return get_setting(
+        "BEAUTYADS_NEO4J_URI",
+        "bolt://127.0.0.1:7688",
+        environ=environ,
+        env_file=env_file,
+    )
+
+
 class Settings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
