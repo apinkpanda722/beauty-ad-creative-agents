@@ -69,14 +69,38 @@ _MAX_IMAGE_BYTES = 32 * 1024 * 1024
 
 
 class ProductsError(Exception):
-    def __init__(self, code: str, *, extractions=()):
+    def __init__(self, code: str, *, extractions=(), issues=()):
         self.code = code
         self.extractions = extractions
+        # Per-image error codes, kept so a failed product can be diagnosed later.
+        self.issues = list(issues)
         super().__init__(code)
 
 
 class _Stop(ProductsError):
-    pass
+    def __init__(self, code: str, *, detail: dict | None = None, **kwargs):
+        super().__init__(code, **kwargs)
+        # Provider diagnostics (already credential-redacted by the adapter).
+        self.detail = detail
+
+
+_DETAIL_MESSAGE_MAX = 200
+
+
+def _mfds_detail(error) -> dict | None:
+    """Bounded one-line provider diagnostics for a system stop, or None."""
+    if error is None:
+        return None
+    message = getattr(error, "provider_message", None)
+    if message is not None:
+        message = " ".join(str(message).split())[:_DETAIL_MESSAGE_MAX] or None
+    detail = {
+        "provider_code": getattr(error, "provider_code", None),
+        "http_status": getattr(error, "http_status", None),
+        "provider_message": message,
+    }
+    detail = {key: value for key, value in detail.items() if value is not None}
+    return detail or None
 
 
 class _Retry(ProductsError):
@@ -231,7 +255,7 @@ def _mfds_system(result) -> None:
     if error and (
         error.http_status in {401, 402, 403, 429} or error.provider_code == "30"
     ):
-        raise _Stop(code or "MFDS_ACCOUNT_STOPPED")
+        raise _Stop(code or "MFDS_ACCOUNT_STOPPED", detail=_mfds_detail(error))
     if code in {
         "MFDS_REQUEST_CAP",
         "MFDS_HTTP_401",
@@ -242,7 +266,7 @@ def _mfds_system(result) -> None:
         "MFDS_API_ERROR",
         "ENV_MISSING:DATA_GO_KR_SERVICE_KEY",
     }:
-        raise _Stop(code)
+        raise _Stop(code, detail=_mfds_detail(error))
 
 
 class IngredientResolver:
@@ -424,6 +448,7 @@ def _product_facts(deps, item, report):
         raise ProductsError(
             "PRODUCT_DETAIL_HELD" if held else "PRODUCT_DETAIL_FAILED",
             extractions=extractions,
+            issues=issues,
         )
     return page, names, fields, extractions, issues
 
@@ -523,6 +548,7 @@ def run_products(
     cert_products = Counter()
     cert_by_kind = {kind.value: Counter() for kind in FunctionalKind}
     stopped = None
+    stopped_detail = None
     alias_count = 0
     for item, report in zip(items, reports, strict=True):
         try:
@@ -597,6 +623,7 @@ def run_products(
             stopped = "COST_CAP:gemini"
         except _Stop as exc:
             stopped = exc.code
+            stopped_detail = exc.detail
         except _Retry as exc:
             report["error_code"] = exc.code
         except LlmCallError as exc:
@@ -624,6 +651,7 @@ def run_products(
             report["extractions"] = [
                 row.model_dump(mode="json") for row in exc.extractions
             ]
+            report["issues"] = list(exc.issues)
         except Exception:  # noqa: BLE001 -- suppress unsafe diagnostics and continue
             report.update(status="failed", error_code="PRODUCT_FAILED")
         if stopped:
@@ -635,6 +663,7 @@ def run_products(
             ads, ad_errors = _ad_matches(deps, resolver)
         except _Stop as exc:
             stopped = exc.code
+            stopped_detail = exc.detail
         except Exception:  # noqa: BLE001 -- source/persistence diagnostics are private
             ad_errors = {"AD_READ_FAILED": 1}
     entries = read_entries(ledger_path).entries[ledger_start:] if ledger_path else []
@@ -683,6 +712,7 @@ def run_products(
             Counter(row["error_code"] for row in reports if row["error_code"])
         ),
         "stopped": stopped,
+        "stopped_detail": stopped_detail,
     }
     report = {**summary, "products": reports}
     report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -690,7 +720,12 @@ def run_products(
     temporary.write_text(json.dumps(report, ensure_ascii=False), encoding="utf-8")
     temporary.replace(report_path)
     if stopped:
-        print(f"STOPPED {stopped}", file=out)
+        detail_text = "".join(
+            f" {key}={stopped_detail[key]}"
+            for key in ("provider_code", "http_status", "provider_message")
+            if stopped_detail and key in stopped_detail
+        )
+        print(f"STOPPED {stopped}{detail_text}", file=out)
     print(json.dumps(summary, ensure_ascii=False), file=out)
     print(
         json.dumps(

@@ -956,7 +956,7 @@ BEAUTYADS_CAP_GEMINI_USD=14 make live-products ARGS='--products 1,2 --max-mfds-r
 보존한다(이미지는 저장하지 않는다). 재실행은 선택한 후보를 다시 조회하고,
 기존 표준명 캐시와 저장소 upsert를 사용한다. 성분·제품 하나의 실패는 다음
 항목을 막지 않는다. 402·인증·일일 한도·요청 수/비용 상한은 즉시 중단하며 현재와
-남은 제품은 대기로 남긴다. `STOPPED <코드>`를 확인하고 원인을 해소한 뒤 재실행한다.
+남은 제품은 대기로 남긴다. `STOPPED <코드>`를 확인하고 원인을 해소한 뒤 재실행한다. 식약처 오류로 멈추면 `STOPPED <코드> provider_code=… http_status=… provider_message=…`(마스킹·한 줄·200자 이하)가 출력되고 요약과 기록의 `stopped_detail`에도 남는다. 제품이 `PRODUCT_DETAIL_FAILED`·`PRODUCT_DETAIL_HELD`이면 기록의 `issues`에 이미지·조각별 오류 코드가 남는다.
 
 점검 실패는 `PREFLIGHT_FAILED <코드>`와 종료 코드 2다. 이유 코드는
 `ENV_MISSING:<이름>`·`DOCKER_DOWN`·`POSTGRES_UNREACHABLE`·`COST_CAP:gemini`·

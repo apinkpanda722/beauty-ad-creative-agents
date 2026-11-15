@@ -763,3 +763,82 @@ def test_cert_coverage_counts_products_and_each_kind(tmp_path):
     assert report["certification"]["unknown"] == 1
     assert report["certification"]["coverage"] == 0.5
     assert report["certification"]["by_kind"]["sun_protection"]["unknown"] == 2
+
+
+def test_failed_product_records_each_image_error_code(tmp_path):
+    # PRODUCT_DETAIL_FAILED used to drop the per-image causes, so a live failure
+    # could not be diagnosed afterwards.
+    from beautyads.sources.mall import MallError
+
+    dep, _ = deps("image_only")
+    dep.download.side_effect = MallError("MALL_IMAGE_TOO_LARGE")
+    urls = dep.mall.fetch_product("cosrx", candidate().url).detail_image_urls
+    report, _ = run(tmp_path, dep)
+    row = report["products"][0]
+    assert row["status"] == "failed"
+    assert row["error_code"] == "PRODUCT_DETAIL_FAILED"
+    assert row["issues"] == ["MALL_IMAGE_TOO_LARGE"] * len(urls)
+    saved = json.loads((tmp_path / "state.json").read_text())["products"][0]
+    assert saved["issues"] == row["issues"]
+    dep.extract.assert_not_called()
+
+
+def test_held_product_records_chunk_issue_codes(tmp_path):
+    from beautyads.analysis.product_detail import DetailIssue, ProductDetailOutcome
+
+    dep, _ = deps("image_only")
+    dep.extract.return_value = ProductDetailOutcome(
+        status=JobStatus.held,
+        issues=[DetailIssue(image_index=0, top=0, error_code="INVALID_OUTPUT")],
+    )
+    report, _ = run(tmp_path, dep)
+    row = report["products"][0]
+    assert row["status"] == "held" and row["error_code"] == "PRODUCT_DETAIL_HELD"
+    assert "INVALID_OUTPUT" in row["issues"]
+
+
+def test_mfds_stop_prints_provider_code_and_message(tmp_path):
+    dep, _ = deps()
+    dep.mfds.search_ingredients.return_value = MFDSResult(
+        [],
+        "MFDS_API_ERROR",
+        MFDSError(
+            "MFDS_API_ERROR",
+            provider_code="22",
+            provider_message="LIMITED\nNUMBER " + "x" * 400,
+            http_status=200,
+        ),
+    )
+    report, output = run(tmp_path, dep, [candidate(index=1), candidate(index=2)])
+    assert report["stopped"] == "MFDS_API_ERROR"
+    detail = report["stopped_detail"]
+    assert detail["provider_code"] == "22" and detail["http_status"] == 200
+    # One line, bounded length, no raw newline from the provider.
+    assert "\n" not in detail["provider_message"]
+    assert len(detail["provider_message"]) <= 200
+    stopped_line = next(
+        line for line in output.splitlines() if line.startswith("STOPPED ")
+    )
+    assert stopped_line.startswith("STOPPED MFDS_API_ERROR provider_code=22 ")
+    assert "provider_message=LIMITED NUMBER" in stopped_line
+    saved = json.loads((tmp_path / "state.json").read_text())
+    assert saved["stopped_detail"] == detail
+
+
+def test_stop_without_provider_error_prints_only_the_code(tmp_path):
+    dep, _ = deps()
+    dep.mfds.search_ingredients.return_value = MFDSResult([], "MFDS_REQUEST_CAP")
+    report, output = run(tmp_path, dep)
+    assert report["stopped"] == "MFDS_REQUEST_CAP"
+    assert report["stopped_detail"] is None
+    assert "STOPPED MFDS_REQUEST_CAP\n" in output
+
+
+def test_http_status_stop_reports_status_in_detail(tmp_path):
+    dep, _ = deps()
+    dep.mfds.search_ingredients.return_value = MFDSResult(
+        [], "MFDS_HTTP_402", MFDSError("MFDS_HTTP_402", http_status=402)
+    )
+    report, output = run(tmp_path, dep)
+    assert report["stopped_detail"] == {"http_status": 402}
+    assert "STOPPED MFDS_HTTP_402 http_status=402\n" in output
