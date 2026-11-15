@@ -59,4 +59,4 @@ sync:
 	uv run python -m beautyads.pipeline.sync $(ARGS)
 
 live-graph:
-	uv run python -m beautyads.pipeline.sync --limit 50 --verify
+	uv run python -m beautyads.pipeline.sync --sample 50 --verify

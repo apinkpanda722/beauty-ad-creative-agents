@@ -38,6 +38,15 @@ class GraphSyncSource(Protocol):
         """Return source changes strictly after since, or all rows if it is None."""
         ...
 
+    def read_sample(self, *, limit: int, run_tag: str) -> list[SyncCreative]:
+        """Return up to limit creatives for a live check, analysed ones first.
+
+        Axis-labelled (hook/full done) creatives come first, then any analysed
+        creative, then the oldest changes. It ignores the watermark and must never
+        be used to advance it.
+        """
+        ...
+
     def read_labels(self, key: CreativeKey, *, run_tag: str) -> list[SyncLabel]: ...
 
     def get_watermark(self) -> datetime | None: ...

@@ -122,3 +122,34 @@ def test_failed_database_operations_rollback(method):
     with pytest.raises(RuntimeError):
         arguments[method]()
     assert conn.rollbacks == 1 and conn.commits == 0
+
+
+def test_sample_query_prefers_analyzed_creatives_and_ignores_the_watermark():
+    values = {"source": "youtube", "source_id": "marker", "updated_at": NOW}
+    conn = Connection([tuple(values.get(c) for c in SYNC_COLUMNS)])
+    rows = PostgresGraphSyncSource(conn).read_sample(limit=50, run_tag="v1")
+    query, params = conn.calls[0]
+    order = query.split("ORDER BY", 1)[1]
+    # Axis-labelled creatives first, then any analysed creative, then oldest change.
+    assert (
+        order.index("has_axis") < order.index("has_label") < order.index("updated_at")
+    )
+    assert order.count("DESC") >= 2
+    assert "LIMIT %s" in query and "> %s" not in query
+    assert params[-1] == 50
+    assert ["hook@v1", "full@v1"] in params
+    assert ["content_type@v1", "hook@v1", "full@v1"] in params
+    assert "@v1" not in query and NOW.isoformat() not in query
+    assert rows[0].updated_at == NOW and rows[0].key.source_id == "marker"
+    assert conn.rollbacks == 1
+
+
+def test_sample_read_failure_rolls_back():
+    class Broken(Connection):
+        def execute(self, query, params=()):
+            raise RuntimeError("synthetic")
+
+    conn = Broken()
+    with pytest.raises(RuntimeError):
+        PostgresGraphSyncSource(conn).read_sample(limit=1, run_tag="v1")
+    assert conn.rollbacks == 1

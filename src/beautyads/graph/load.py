@@ -179,3 +179,19 @@ def verify_counts(graph: GraphConnection) -> dict[str, int]:
         for _, label, _, enum in AXES
     )
     return {"creative_count": creative_count, "invalid_values": invalid}
+
+
+def count_axis_relationships(graph: GraphConnection) -> int:
+    """Count the classification-axis relationships that hang off creatives."""
+    total = 0
+    for _, label, relationship, _ in AXES:
+        result = graph.run(
+            f"MATCH (:Creative)-[r:{relationship}]->(:{label}) RETURN count(r) AS count"
+        )
+        if len(result.records) != 1:
+            raise GraphError("GRAPH_VERIFY_FAILED")
+        value = result.records[0].get("count")
+        if not isinstance(value, int):
+            raise GraphError("GRAPH_VERIFY_FAILED")
+        total += value
+    return total

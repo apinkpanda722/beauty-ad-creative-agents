@@ -145,6 +145,6 @@
 ## 2026-11-15 `make live-graph`의 표본 50건이 라벨 없는 소재라 분류 축 관계를 검증하지 못했다
 - **문제**: 첫 `make live-graph`가 `nodes_created 50`, `relationships_created 0`이고 두 번째 적재는 `nodes_created 0`·`relationships_created 0`(노드 수 불변)이었다. 멱등성은 확인됐지만 분류 축 관계(`USES_HOOK` 등)는 한 건도 검증되지 않았다.
 - **원인**: `--limit 50`이 갱신 시각 오름차순의 처음 50건을 읽는데, 갱신 시각이 가장 이른 소재는 수집만 되고 분석되지 않은 소재다(읽기 전용 조회: 그 50건 중 완료된 `*@v1` 작업이 있는 소재 0건). 분석된 소재는 작업 갱신 시각이 더 늦어 표본에 들어가지 않았다. 표본이 라벨이 있는 소재를 포함하는지 확인하지 않았다.
-- **해결**: 코드는 아직 바꾸지 않았다. 전체 적재(`make sync`)와 라벨 있는 소재를 포함한 검증(예: `--full --verify`)으로 관계 적재를 확인하고, `live-graph`의 표본이 라벨 있는 소재를 포함하도록 고치는 것은 사용자 결정을 기다린다.
-- **결과**: 미해결(확인 대기).
-- **근거**: `src/beautyads/store/sync_source.py`, `src/beautyads/pipeline/sync.py`.
+- **해결**: 새 `--sample N` 모드를 만들었다. 훅·전체 라벨이 완료된 소재, 그다음 분석 완료 소재, 그다음 오래된 변경 순으로 고르고 **워터마크를 올리지 않는다**(변경 시각이 아닌 순서로 고른 표본으로 워터마크를 올리면 이후 증분 동기화가 오래된 소재를 건너뛴다). `--limit`·`--full`과는 함께 쓸 수 없다(`SYNC_OPTIONS_CONFLICT`). 검증 모드는 요약에 `graph_check`(표본의 라벨 있는 소재 수, 분류 축 관계 수)를 내고, **표본에 분석 완료 소재가 없으면 `GRAPH_VERIFY_NO_LABELED_SAMPLE`, 라벨이 있는데 관계가 0이면 `GRAPH_VERIFY_NO_RELATIONSHIPS`로 실패한다.** `make live-graph`는 `--sample 50 --verify`가 됐다. 테스트를 먼저 썼다.
+- **결과**: 해결(오프라인 테스트로 검증, 사용자의 재실행 대기). 기존 단언은 `live-graph` 레시피 문자열 한 곳만 바꿨다.
+- **근거**: `src/beautyads/store/sync_source.py`, `src/beautyads/pipeline/sync.py`, `tests/test_sync_source.py`, `tests/test_sync_pipeline.py`.

@@ -13,7 +13,11 @@ from urllib.parse import urlsplit
 from beautyads.analysis.models import FINAL_RUN_TAG
 from beautyads.domain.sync import SYNC_OVERLAP, GraphSyncSource
 from beautyads.graph.connection import GraphConnection, GraphError, connect_graph
-from beautyads.graph.load import load_creatives, verify_counts
+from beautyads.graph.load import (
+    count_axis_relationships,
+    load_creatives,
+    verify_counts,
+)
 from beautyads.graph.schema import apply_schema
 from beautyads.settings import (
     DEFAULT_ENV_FILE,
@@ -86,20 +90,29 @@ def run_sync(
     limit: int | None = None,
     full: bool = False,
     verify: bool = False,
+    sample: int | None = None,
 ) -> dict:
+    if sample is not None and (limit is not None or full):
+        raise ValueError("sample excludes limit and full")
     started = time.monotonic()
     apply_schema(deps.graph)
     watermark = deps.source.get_watermark()
-    since = None if full or watermark is None else watermark - SYNC_OVERLAP
-    creatives = deps.source.read_changed(
-        since=since, limit=limit, run_tag=FINAL_RUN_TAG
-    )
+    if sample is not None:
+        # A live-check sample is ordered by analysis state, not by change time, so
+        # it must never move the watermark (older changes would be skipped later).
+        creatives = deps.source.read_sample(limit=sample, run_tag=FINAL_RUN_TAG)
+    else:
+        since = None if full or watermark is None else watermark - SYNC_OVERLAP
+        creatives = deps.source.read_changed(
+            since=since, limit=limit, run_tag=FINAL_RUN_TAG
+        )
     entries = [
         (creative, deps.source.read_labels(creative.key, run_tag=FINAL_RUN_TAG))
         for creative in creatives
     ]
     loaded = load_creatives(deps.graph, entries, run_tag=FINAL_RUN_TAG)
     verification = None
+    graph_check = None
     if verify:
         before = verify_counts(deps.graph)
         replay = load_creatives(deps.graph, entries, run_tag=FINAL_RUN_TAG)
@@ -119,9 +132,27 @@ def run_sync(
             or after["invalid_values"] != 0
         ):
             raise GraphError("GRAPH_VERIFY_FAILED")
+        labeled = sum(
+            1
+            for _, jobs in entries
+            if any(
+                job.status == "done" and job.kind.split("@")[0] in {"hook", "full"}
+                for job in jobs
+            )
+        )
+        axis_relationships = count_axis_relationships(deps.graph)
+        graph_check = {
+            "labeled_in_sample": labeled,
+            "axis_relationships": axis_relationships,
+        }
+        if sample is not None and labeled == 0:
+            # Checking zero analysed creatives must not look like a pass.
+            raise GraphError("GRAPH_VERIFY_NO_LABELED_SAMPLE")
+        if labeled > 0 and axis_relationships == 0:
+            raise GraphError("GRAPH_VERIFY_NO_RELATIONSHIPS")
     # Graph counters are reporting only. The durable checkpoint comes exclusively
     # from the source rows, and only after every batch (and optional replay).
-    if creatives:
+    if creatives and sample is None:
         latest = max(creative.updated_at for creative in creatives)
         watermark = max(watermark, latest) if watermark is not None else latest
         deps.source.set_watermark(watermark)
@@ -134,8 +165,12 @@ def run_sync(
         "watermark": watermark.isoformat() if watermark is not None else None,
         "elapsed_s": time.monotonic() - started,
     }
+    if sample is not None:
+        report["sample"] = sample
     if verification is not None:
         report["verification"] = verification
+    if graph_check is not None:
+        report["graph_check"] = graph_check
     return report
 
 
@@ -169,12 +204,16 @@ def main(
     out = sys.stdout if out is None else out
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--limit", type=_limit)
+    parser.add_argument("--sample", type=_limit)
     parser.add_argument("--full", action="store_true")
     parser.add_argument("--verify", action="store_true")
     try:
         args = parser.parse_args(argv)
     except SystemExit as error:
         return int(error.code)
+    if args.sample is not None and (args.limit is not None or args.full):
+        print("PREFLIGHT_FAILED SYNC_OPTIONS_CONFLICT", file=out)
+        return 2
     env_file = DEFAULT_ENV_FILE if environ is None else None
     problems = sync_preflight(
         environ=environ,
@@ -194,7 +233,11 @@ def main(
                 else _live_deps(environ=environ, env_file=env_file, stack=stack)
             )
             report = run_sync(
-                deps, limit=args.limit, full=args.full, verify=args.verify
+                deps,
+                limit=args.limit,
+                full=args.full,
+                verify=args.verify,
+                sample=args.sample,
             )
     except GraphError as error:
         print(f"PREFLIGHT_FAILED {error}", file=out)

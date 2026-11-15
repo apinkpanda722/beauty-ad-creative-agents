@@ -23,11 +23,17 @@ Neo4j 주소 기본값은 `bolt://127.0.0.1:7688`이며 필요하면
 `BEAUTYADS_NEO4J_URI`로 바꾼다. PostgreSQL 호스트 포트는 기본 5433이고
 기존 `BEAUTYADS_POSTGRES_PORT`를 따른다. Neo4j 드라이버는 `6.4.1`이다.
 
-`make live-graph`는 `--limit 50 --verify`로 읽은 동일 소재 묶음을 두 번
-적재한다(변경분이 적으면 50건 미만). 두 번째 `nodes_created`와
+`make live-graph`는 `--sample 50 --verify`로 **분석 완료(`*@v1`) 소재를 우선**
+고른 50건을 두 번 적재한다(`--sample`은 `--limit`·`--full`과 함께 쓸 수
+없고 워터마크를 올리지 않는다). 두 번째 `nodes_created`와
 `relationships_created`가 0인지, 두 번의 Creative `count`가 같은지,
 분류 값 노드가 닫힌 목록 안인지 `count`로 확인하고 요약의 `verification`에
-출력한다. 기본 동기화 요약에는 `read`, `nodes_created`,
+출력한다. 요약의 `graph_check`는 표본 중 훅·전체 라벨이 있는 소재 수
+(`labeled_in_sample`)와 그래프의 분류 축 관계 수(`axis_relationships`)다.
+**표본에 분석 완료 소재가 없으면 `GRAPH_VERIFY_NO_LABELED_SAMPLE`, 라벨이 있는데
+관계가 0이면 `GRAPH_VERIFY_NO_RELATIONSHIPS`로 실패한다**(검사한 것이 없는 것을
+통과로 보지 않는다). 전체를 처음부터 적재하며 검증하려면
+`make sync ARGS='--full --verify'`를 쓴다. 기본 동기화 요약에는 `read`, `nodes_created`,
 `relationships_created`, `skipped_invalid`, `watermark`, `elapsed_s`가 나온다.
 변경분이 없으면 정상 0건 요약이며 워터마크는 유지된다.
 

@@ -8,8 +8,10 @@ from unittest.mock import Mock
 import pytest
 
 from beautyads.analysis.models import FINAL_RUN_TAG
-from beautyads.domain.sync import SYNC_OVERLAP, SyncCreative
-from beautyads.graph.connection import GraphConnection
+from beautyads.domain.labels import HookType
+from beautyads.domain.sync import SYNC_OVERLAP, SyncCreative, SyncLabel
+from beautyads.graph.connection import GraphConnection, GraphError
+from beautyads.graph.load import AXES
 from beautyads.pipeline.sync import SyncDeps, main, run_sync
 
 NOW = datetime(2026, 11, 15, tzinfo=UTC)
@@ -225,8 +227,136 @@ def test_make_targets_preserve_offline_verify():
     assert {"sync", "live-graph"} <= set(makefile.splitlines()[0].split()[1:])
     assert "sync:\n\tuv run python -m beautyads.pipeline.sync $(ARGS)" in makefile
     assert (
-        "live-graph:\n\tuv run python -m beautyads.pipeline.sync --limit 50 --verify"
+        "live-graph:\n\tuv run python -m beautyads.pipeline.sync --sample 50 --verify"
         in makefile
     )
     verify = makefile.split("verify:\n", 1)[1].split("\n\n", 1)[0]
     assert "live-" not in verify
+
+
+class SampleSource(Source):
+    """Offline sample source whose creatives have final (v1) labels or not."""
+
+    def __init__(self, *, labeled=True, watermark=NOW):
+        super().__init__([NOW - timedelta(days=3)], watermark=watermark)
+        self.labeled = labeled
+        self.sampled = []
+
+    def read_changed(self, **kwargs):
+        raise AssertionError("sample mode must not read the incremental changes")
+
+    def read_sample(self, *, limit, run_tag):
+        assert run_tag == FINAL_RUN_TAG
+        self.sampled.append(limit)
+        return self.rows[:limit]
+
+    def read_labels(self, key, *, run_tag):
+        if not self.labeled:
+            return []
+        hook = next(iter(HookType)).value
+        return [
+            SyncLabel("content_type@v1", "done", {"content_type": "product_creative"}),
+            SyncLabel("hook@v1", "done", {"hook_type": hook}),
+        ]
+
+
+class AxisDriver(Driver):
+    def __init__(self, axis_relationships):
+        super().__init__()
+        self.axis_relationships = axis_relationships
+
+    def execute_query(self, query, *, parameters_, **kwargs):
+        if "RETURN count(r)" in query:
+            return SimpleNamespace(
+                records=[{"count": self.axis_relationships}],
+                summary=SimpleNamespace(
+                    counters=SimpleNamespace(
+                        nodes_created=0, relationships_created=0, properties_set=0
+                    )
+                ),
+            )
+        return super().execute_query(query, parameters_=parameters_, **kwargs)
+
+
+def test_sample_mode_reads_analysed_sample_and_never_moves_the_watermark():
+    source = SampleSource()
+    report = run_sync(
+        SyncDeps(source, GraphConnection(AxisDriver(3))), sample=50, verify=True
+    )
+    assert source.sampled == [50]
+    assert source.writes == [] and source.watermark == NOW
+    assert report["sample"] == 50 and report["read"] == 1
+    assert report["graph_check"] == {
+        "labeled_in_sample": 1,
+        "axis_relationships": 3 * len(AXES),  # the fake answers 3 per axis
+    }
+    assert report["verification"]["relationships_created"] == 0
+
+
+def test_sample_with_axis_labels_but_no_axis_relationships_fails_verification():
+    source = SampleSource()
+    with pytest.raises(GraphError) as error:
+        run_sync(
+            SyncDeps(source, GraphConnection(AxisDriver(0))), sample=50, verify=True
+        )
+    assert str(error.value) == "GRAPH_VERIFY_NO_RELATIONSHIPS"
+    assert source.writes == []
+
+
+def test_sample_verification_without_analysed_creatives_is_not_a_pass():
+    # Checking zero labelled creatives must not look like a successful check.
+    source = SampleSource(labeled=False)
+    with pytest.raises(GraphError) as error:
+        run_sync(
+            SyncDeps(source, GraphConnection(AxisDriver(0))), sample=50, verify=True
+        )
+    assert str(error.value) == "GRAPH_VERIFY_NO_LABELED_SAMPLE"
+
+
+def test_full_verify_also_checks_axis_relationships_when_labels_exist():
+    class FullSource(SampleSource):
+        def read_changed(self, *, since, limit, run_tag):
+            return self.rows
+
+    with pytest.raises(GraphError) as error:
+        run_sync(
+            SyncDeps(FullSource(), GraphConnection(AxisDriver(0))),
+            full=True,
+            verify=True,
+        )
+    assert str(error.value) == "GRAPH_VERIFY_NO_RELATIONSHIPS"
+
+
+@pytest.mark.parametrize("extra", [["--limit", "10"], ["--full"]])
+def test_sample_is_exclusive_with_limit_and_full(extra):
+    factory = Mock()
+    out = io.StringIO()
+    code = main(
+        ["--sample", "50", *extra],
+        environ=ENV,
+        out=out,
+        docker_check=lambda: True,
+        tcp_check=lambda *args: True,
+        deps_factory=factory,
+    )
+    assert code == 2
+    factory.assert_not_called()
+
+
+def test_cli_sample_verify_reports_graph_check():
+    source = SampleSource()
+    out = io.StringIO()
+    assert (
+        main(
+            ["--sample", "50", "--verify"],
+            environ=ENV,
+            out=out,
+            docker_check=lambda: True,
+            tcp_check=lambda *args: True,
+            deps_factory=lambda: SyncDeps(source, GraphConnection(AxisDriver(2))),
+        )
+        == 0
+    )
+    report = json.loads(out.getvalue())
+    assert report["graph_check"]["axis_relationships"] == 2 * len(AXES)
+    assert source.writes == []

@@ -72,6 +72,36 @@ class PostgresGraphSyncSource(GraphSyncSource):
             result.append(SyncCreative(properties, properties.pop("updated_at")))
         return result
 
+    def read_sample(self, *, limit: int, run_tag: str) -> list[SyncCreative]:
+        columns = ", ".join(f"c.{column}" for column in SYNC_COLUMNS[:-1])
+        done = "done"
+        query = f"""
+            WITH ranked AS (
+                SELECT {columns},
+                    GREATEST(c.updated_at, COALESCE(
+                        (SELECT max(j.updated_at) FROM analysis_jobs AS j
+                         WHERE j.source = c.source AND j.source_id = c.source_id
+                           AND j.kind = ANY(%s)), c.updated_at)) AS updated_at,
+                    EXISTS (SELECT 1 FROM analysis_jobs AS j
+                            WHERE j.source = c.source AND j.source_id = c.source_id
+                              AND j.kind = ANY(%s) AND j.status = %s) AS has_axis,
+                    EXISTS (SELECT 1 FROM analysis_jobs AS j
+                            WHERE j.source = c.source AND j.source_id = c.source_id
+                              AND j.kind = ANY(%s) AND j.status = %s) AS has_label
+                FROM creatives AS c
+            )
+            SELECT {", ".join(SYNC_COLUMNS)} FROM ranked
+            ORDER BY has_axis DESC, has_label DESC, updated_at, source, source_id
+            LIMIT %s
+        """
+        axis_kinds = [f"{axis}@{run_tag}" for axis in ("hook", "full")]
+        params = (_kinds(run_tag), axis_kinds, done, _kinds(run_tag), done, limit)
+        result = []
+        for row in self._read(query, params):
+            properties = dict(zip(SYNC_COLUMNS, row, strict=True))
+            result.append(SyncCreative(properties, properties.pop("updated_at")))
+        return result
+
     def read_labels(self, key: CreativeKey, *, run_tag: str) -> list[SyncLabel]:
         rows = self._read(
             """SELECT kind, status, labels FROM analysis_jobs
