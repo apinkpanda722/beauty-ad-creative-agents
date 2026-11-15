@@ -548,9 +548,12 @@ rules:
   - kind: efficacy
     value: brightening
     status: advisor_approved
-  en_pending: true
+  en_pending: false
+  terms_en_added:
+  - MFDS whitening ingredient
+  - MFDS-notified whitening ingredient
+  en_origin: advisor_added_en
   exception_refs: []
-  terms_en_added: []
   en_waived: false
 - rule_id: CR-018
   rule_type: prohibited
@@ -939,9 +942,14 @@ rules:
   - kind: efficacy
     value: brightening
     status: advisor_approved
-  en_pending: true
+  en_pending: false
+  terms_en_added:
+  - helps relieve melasma
+  - helps relieve freckles
+  - melasma
+  - freckles
+  en_origin: advisor_added_en
   exception_refs: []
-  terms_en_added: []
   en_waived: false
 - rule_id: CR-033
   rule_type: requires_substantiation
