@@ -11,14 +11,17 @@ from typing import NamedTuple, TextIO
 from urllib.parse import urlsplit
 
 from beautyads.analysis.models import FINAL_RUN_TAG
+from beautyads.domain.claims import ClaimRule
+from beautyads.domain.layer1 import Layer1SyncSource, Layer1Tables
 from beautyads.domain.sync import SYNC_OVERLAP, GraphSyncSource
 from beautyads.graph.connection import GraphConnection, GraphError, connect_graph
+from beautyads.graph.layer1 import load_layer1, load_layer1_tables
 from beautyads.graph.load import (
     count_axis_relationships,
     load_creatives,
     verify_counts,
 )
-from beautyads.graph.schema import apply_schema
+from beautyads.graph.schema import LAYER1_CONSTRAINTS, apply_schema
 from beautyads.settings import (
     DEFAULT_ENV_FILE,
     SettingError,
@@ -26,14 +29,16 @@ from beautyads.settings import (
     neo4j_password,
     neo4j_uri,
 )
+from beautyads.sources.claim_rules import load_claim_rules
 from beautyads.store.connection import StoreConnectError, connect, postgres_dsn
+from beautyads.store.layer1_source import PostgresLayer1Source
 from beautyads.store.sync_source import PostgresGraphSyncSource
 
 from .preflight import docker_running, tcp_reachable
 
 
 class SyncDeps(NamedTuple):
-    source: GraphSyncSource
+    source: GraphSyncSource | Layer1SyncSource
     graph: GraphConnection
 
 
@@ -174,12 +179,59 @@ def run_sync(
     return report
 
 
-def _live_deps(*, environ, env_file, stack: ExitStack) -> SyncDeps:
+def run_layer1_sync(
+    deps: SyncDeps,
+    *,
+    tables: Layer1Tables,
+    rules: Sequence[ClaimRule] = (),
+    limit: int | None = None,
+    full: bool = False,
+    verify: bool = False,
+) -> dict:
+    """Layer-one branch; the original creative synchronization is unchanged."""
+    started = time.monotonic()
+    apply_schema(deps.graph)
+    for statement in LAYER1_CONSTRAINTS:
+        deps.graph.run(statement)
+    watermark = deps.source.get_watermark()
+    since = None if full or watermark is None else watermark - SYNC_OVERLAP
+    entries = deps.source.read_changed(since=since, limit=limit)
+    report = load_layer1(deps.graph, entries, tables=tables, rules=rules)
+    if verify:
+        replay = load_layer1(deps.graph, entries, tables=tables, rules=rules)
+        report["verification"] = {
+            "nodes_created": replay["nodes_created"],
+            "relationships_created": replay["relationships_created"],
+        }
+        if replay["nodes_created"] or replay["relationships_created"]:
+            raise GraphError("GRAPH_VERIFY_FAILED")
+    # Counters are reporting/optional replay checks only. Checkpoint exclusively
+    # uses PostgreSQL times and is persisted after every graph operation succeeds.
+    if entries:
+        latest = max(entry.updated_at for entry in entries)
+        watermark = max(watermark, latest) if watermark is not None else latest
+        deps.source.set_watermark(watermark)
+    return {
+        **report,
+        "event": "summary",
+        "layers": "1",
+        "read": len(entries),
+        "watermark": watermark.isoformat() if watermark is not None else None,
+        "elapsed_s": time.monotonic() - started,
+    }
+
+
+def _live_deps(*, environ, env_file, stack: ExitStack, layers: str = "2") -> SyncDeps:
     connection = connect(postgres_dsn(environ=environ, env_file=env_file))
     stack.callback(connection.close)
     graph = connect_graph(environ=environ, env_file=env_file)
     stack.callback(graph.close)
-    return SyncDeps(PostgresGraphSyncSource(connection), graph)
+    source = (
+        PostgresLayer1Source(connection)
+        if layers == "1"
+        else PostgresGraphSyncSource(connection)
+    )
+    return SyncDeps(source, graph)
 
 
 def _limit(value: str) -> int:
@@ -207,11 +259,15 @@ def main(
     parser.add_argument("--sample", type=_limit)
     parser.add_argument("--full", action="store_true")
     parser.add_argument("--verify", action="store_true")
+    parser.add_argument("--layers", choices=("1", "2"), default="2")
     try:
         args = parser.parse_args(argv)
     except SystemExit as error:
         return int(error.code)
     if args.sample is not None and (args.limit is not None or args.full):
+        print("PREFLIGHT_FAILED SYNC_OPTIONS_CONFLICT", file=out)
+        return 2
+    if args.layers == "1" and args.sample is not None:
         print("PREFLIGHT_FAILED SYNC_OPTIONS_CONFLICT", file=out)
         return 2
     env_file = DEFAULT_ENV_FILE if environ is None else None
@@ -227,18 +283,36 @@ def main(
         return 2
     try:
         with ExitStack() as stack:
+            if args.layers == "1":
+                tables = load_layer1_tables(
+                    Path("config/ingredient_efficacy.yaml"),
+                    Path("config/efficacy_concerns.yaml"),
+                )
+                rules = load_claim_rules(Path("config/claim_rules.yaml"))
             deps = (
                 deps_factory()
                 if deps_factory is not None
-                else _live_deps(environ=environ, env_file=env_file, stack=stack)
+                else _live_deps(
+                    environ=environ, env_file=env_file, stack=stack, layers=args.layers
+                )
             )
-            report = run_sync(
-                deps,
-                limit=args.limit,
-                full=args.full,
-                verify=args.verify,
-                sample=args.sample,
-            )
+            if args.layers == "1":
+                report = run_layer1_sync(
+                    deps,
+                    tables=tables,
+                    rules=rules,
+                    limit=args.limit,
+                    full=args.full,
+                    verify=args.verify,
+                )
+            else:
+                report = run_sync(
+                    deps,
+                    limit=args.limit,
+                    full=args.full,
+                    verify=args.verify,
+                    sample=args.sample,
+                )
     except GraphError as error:
         print(f"PREFLIGHT_FAILED {error}", file=out)
         return 2

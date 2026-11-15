@@ -32,3 +32,40 @@ def test_constraints_are_repeatable_and_composite():
     for label in ("Hook", "Angle", "Format", "Talent", "CtaType"):
         assert any(f":{label}) REQUIRE n.value IS UNIQUE" in q for q, _ in first)
     assert any(":Brand) REQUIRE n.name IS UNIQUE" in q for q, _ in first)
+
+
+def test_layer1_constraints_are_additive_and_repeatable():
+    from beautyads.graph.schema import LAYER1_CONSTRAINTS
+
+    assert len(CONSTRAINTS) == 7
+    assert all("IF NOT EXISTS" in query for query in LAYER1_CONSTRAINTS)
+    assert not set(CONSTRAINTS).intersection(LAYER1_CONSTRAINTS)
+    for label in (
+        "Category",
+        "Form",
+        "Efficacy",
+        "SkinConcern",
+        "SkinType",
+        "FunctionalCert",
+    ):
+        assert any(
+            f":{label}) REQUIRE n.value IS UNIQUE" in q for q in LAYER1_CONSTRAINTS
+        )
+    assert any("(p.brand, p.source_url) IS UNIQUE" in q for q in LAYER1_CONSTRAINTS)
+    assert any(
+        ":Ingredient) REQUIRE n.standard_name IS UNIQUE" in q
+        for q in LAYER1_CONSTRAINTS
+    )
+    assert any(
+        ":IngredientAlias) REQUIRE (n.alias, n.standard_name) IS UNIQUE" in q
+        for q in LAYER1_CONSTRAINTS
+    )
+    assert any(
+        ":ClaimRule) REQUIRE n.rule_id IS UNIQUE" in q for q in LAYER1_CONSTRAINTS
+    )
+    driver = Driver()
+    graph = GraphConnection(driver)
+    for _ in range(2):
+        for statement in LAYER1_CONSTRAINTS:
+            graph.run(statement)
+    assert driver.calls == [(statement, {}) for statement in LAYER1_CONSTRAINTS] * 2

@@ -360,3 +360,161 @@ def test_cli_sample_verify_reports_graph_check():
     report = json.loads(out.getvalue())
     assert report["graph_check"]["axis_relationships"] == 2 * len(AXES)
     assert source.writes == []
+
+
+class Layer1Source:
+    def __init__(self, dates=(), watermark=NOW):
+        from beautyads.domain.layer1 import SyncProduct
+        from beautyads.domain.products import Product
+
+        self.watermark = watermark
+        self.writes = []
+        self.since = []
+        self.rows = [
+            SyncProduct(
+                product=Product(
+                    brand="synthetic",
+                    source_url=f"https://example.test/{i}",
+                    name_ko="합성 세럼",
+                    category="serum_ampoule",
+                ),
+                updated_at=date,
+            )
+            for i, date in enumerate(dates)
+        ]
+
+    def get_watermark(self):
+        return self.watermark
+
+    def set_watermark(self, value):
+        self.watermark = value
+        self.writes.append(value)
+
+    def read_changed(self, *, since, limit):
+        self.since.append(since)
+        rows = [row for row in self.rows if since is None or row.updated_at > since]
+        return rows if limit is None else rows[:limit]
+
+
+def layer1_tables():
+    from beautyads.graph.layer1 import parse_layer1_tables
+
+    return parse_layer1_tables(
+        {"links": [], "unmatched": [], "not_linked_for_now": []}, {"rows": []}
+    )
+
+
+def test_layer1_overlap_and_watermark_depend_only_on_source_times():
+    from beautyads.pipeline.sync import run_layer1_sync
+
+    source = Layer1Source(
+        [
+            NOW - SYNC_OVERLAP - timedelta(seconds=1),
+            NOW - timedelta(minutes=1),
+            NOW + timedelta(minutes=1),
+        ]
+    )
+    report = run_layer1_sync(
+        SyncDeps(source, GraphConnection(Driver())), tables=layer1_tables(), limit=50
+    )
+    assert source.since == [NOW - SYNC_OVERLAP]
+    assert report["read"] == 2 and report["layers"] == "1"
+    assert source.writes == [NOW + timedelta(minutes=1)]
+    assert report["nodes_created"] == report["relationships_created"] == 0
+
+
+def test_layer1_failure_keeps_watermark_and_empty_input_does_not_write():
+    from beautyads.pipeline.sync import run_layer1_sync
+
+    source = Layer1Source([NOW + timedelta(minutes=1)])
+    with pytest.raises(RuntimeError):
+        run_layer1_sync(
+            SyncDeps(source, GraphConnection(Driver(fail=True))), tables=layer1_tables()
+        )
+    assert source.writes == [] and source.watermark == NOW
+    empty = Layer1Source()
+    report = run_layer1_sync(
+        SyncDeps(empty, GraphConnection(Driver())), tables=layer1_tables()
+    )
+    assert empty.writes == [] and report["read"] == 0
+
+
+def test_layer1_full_replay_and_cli_dispatch_are_offline(monkeypatch):
+    source = Layer1Source([NOW - timedelta(days=1)])
+    monkeypatch.setattr(
+        "beautyads.pipeline.sync.load_layer1_tables", lambda *args: layer1_tables()
+    )
+    monkeypatch.setattr("beautyads.pipeline.sync.load_claim_rules", lambda *args: [])
+    out = io.StringIO()
+    driver = Driver()
+    assert (
+        main(
+            ["--layers", "1", "--full", "--verify"],
+            environ=ENV,
+            out=out,
+            docker_check=lambda: True,
+            tcp_check=lambda *args: True,
+            deps_factory=lambda: SyncDeps(source, GraphConnection(driver)),
+        )
+        == 0
+    )
+    report = json.loads(out.getvalue())
+    assert report["layers"] == "1" and report["read"] == 1
+    assert source.since == [None] and source.writes == [NOW]
+    assert report["verification"]["nodes_created"] == 0
+    assert not any(":Creative" in q for q in driver.calls if not q.startswith("CREATE"))
+
+
+@pytest.mark.parametrize(
+    "args", [["--layers", "invalid"], ["--layers", "1", "--sample", "2"]]
+)
+def test_invalid_layer_options_do_not_connect(args):
+    factory = Mock()
+    assert (
+        main(
+            args,
+            environ=ENV,
+            out=io.StringIO(),
+            docker_check=lambda: True,
+            tcp_check=lambda *args: True,
+            deps_factory=factory,
+        )
+        == 2
+    )
+    factory.assert_not_called()
+
+
+def test_layer1_failed_replay_does_not_advance_checkpoint():
+    from beautyads.pipeline.sync import run_layer1_sync
+
+    class NonIdempotentDriver(Driver):
+        def execute_query(self, *args, **kwargs):
+            result = super().execute_query(*args, **kwargs)
+            result.summary.counters.relationships_created = 1
+            return result
+
+    source = Layer1Source([NOW + timedelta(minutes=1)])
+    with pytest.raises(GraphError, match="GRAPH_VERIFY_FAILED"):
+        run_layer1_sync(
+            SyncDeps(source, GraphConnection(NonIdempotentDriver())),
+            tables=layer1_tables(),
+            verify=True,
+        )
+    assert source.writes == [] and source.watermark == NOW
+
+
+def test_layer1_dependency_selection_and_cleanup_use_only_fakes(monkeypatch):
+    from contextlib import ExitStack
+
+    from beautyads.pipeline.sync import _live_deps
+    from beautyads.store.layer1_source import PostgresLayer1Source
+
+    connection, graph = Mock(), Mock()
+    monkeypatch.setattr("beautyads.pipeline.sync.connect", lambda *args: connection)
+    monkeypatch.setattr("beautyads.pipeline.sync.connect_graph", lambda **kwargs: graph)
+    with ExitStack() as stack:
+        deps = _live_deps(environ=ENV, env_file=None, stack=stack, layers="1")
+        assert isinstance(deps.source, PostgresLayer1Source)
+        assert deps.source.conn is connection and deps.graph is graph
+    connection.close.assert_called_once_with()
+    graph.close.assert_called_once_with()

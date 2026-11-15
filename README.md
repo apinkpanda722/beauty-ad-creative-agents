@@ -73,6 +73,55 @@ PostgreSQL도 비밀번호가 첫 볼륨에 적용되므로 기존 원본 볼륨
 | `GRAPH_VERIFY_FAILED` | 반복 적재의 생성 수·Creative 수·닫힌 목록 검증이 실패했다. 워터마크를 갱신하지 않는다. |
 | `SYNC_FAILED` | 원본 스키마·데이터 형식·실행 환경을 확인하고 다시 실행한다. 워터마크 이전에 실패했다면 겹쳐 읽어 재적재한다. |
 
+## sync: 1층 제품 지식 (P4)
+
+사용자가 PostgreSQL의 제품 레코드와 Neo4j를 준비한 뒤 실행한다.
+
+```bash
+make sync ARGS='--layers 1'
+make sync ARGS='--layers 1 --limit 50'
+make sync ARGS='--layers 1 --full --verify'
+```
+
+`--layers 1`은 제품·성분·별칭·인증·표현 규칙과 효능·피부 분류를 MERGE한다.
+옵션을 생략하거나 `--layers 2`를 지정하면 기존 Creative·분류 축 동기화가
+실행된다. `--sample`은 기존 소재 확인 전용이며 1층과 함께 쓰면 거부한다.
+제품 키는 `(brand, source_url)`, 성분 키는 `standard_name`이다. 가격·용량과
+단위, 제품명·영문명·별칭·가격 수집 시각을 보존하고 `unit_list_price`는
+용량당 정가다(`price_basis: sale_price_fallback`이면 판매가로 계산).
+전성분의 핵심 성분 여부는 원본에 없어 `is_key`를 null로 전달한다.
+
+1층 워터마크는 `public_products_layer1_v1`로 기존 소재 워터마크와 분리한다.
+제품·성분·인증의 `updated_at`과 재추출 기록의 `created_at` 중 최대값을
+기준으로 10분 겹쳐 읽는다. 변경된 제품의 성분·인증은 같은 PostgreSQL
+스냅샷에서 **전체 집합**을 읽는다. `CONTAINS`를 MERGE한 뒤 원본에 없는
+순서·표준명 관계를 삭제하므로, 재파싱이 짧아지거나 표준명이 바뀌어도
+이전 관계가 남지 않는다. 미해결 성분은 PostgreSQL에만 남긴다.
+변경 시각이나 재추출 기록 없이 수동으로 행만 삭제했다면 `--full`로 반영한다.
+모든 적재와 선택적 반복 검증이 성공한 뒤에만 원본 시각으로 워터마크를
+갱신하며 그래프 생성 카운터는 변경 판정에 쓰지 않는다.
+
+`config/ingredient_efficacy.yaml`의 `links`만 `HAS_EFFICACY`로 적재하며
+`basis`·`source_ref`·`conditional`을 관계에 기록한다. `unmatched`와
+`not_linked_for_now`는 연결하지 않고 동명 요약 필드에 개수만 출력한다.
+표에 없는 성분은 **근거 연결 없음**이며, `conditional: true`는 고시 함량
+조건과 기능성 심사(보고)가 필요하다는 뜻이다. 성분 함유만으로 효능이나
+제품 인증이 인정되는 것은 아니다.
+
+`config/efficacy_concerns.yaml`의 `confirmed`·`taxonomy_definition`·출처가
+있는 행만 `ADDRESSES`로 올린다. 이는 효능의 실증 주장이 아닌 프로젝트
+분류 체계다. `claim_rules.yaml`의 규칙은 `advisor_approved`·`confirmed`
+범위만 효능·피부 고민·카테고리에 연결한다. 두 대응의 draft 합계는
+`draft_not_loaded`다. 인증은 `certified`만 연결하고 `unknown`은 연결하지
+않는다. 요약 `certification`에는 읽은 제품 수(`products`), 인증 상태별
+행 수(`certified`·`unknown`), 제품 단위 커버리지
+(`certified_products`·`unknown_products`)가 나온다.
+
+표 전체는 적재 전에 검증한다. 형식이나 필수 출처가 잘못되면
+`INGREDIENT_EFFICACY_INVALID`·`EFFICACY_CONCERN_INVALID`로 중단하며,
+`--verify`는 같은 입력을 재적재해 두 번째 생성 수가 0인지 확인한다.
+이 명령은 모델·출처 API 호출이나 이미지 다운로드를 하지 않는다.
+
 - 하네스 사용법: [scripts/README.md](scripts/README.md)
 - 요구사항·설계·결정 기록: [docs/](docs/)
 
