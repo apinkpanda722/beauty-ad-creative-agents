@@ -49,6 +49,7 @@
 | 36 | **P4 착수 결정(2026-11-15)**: 역량 질문 v1 동결, 완성 기준을 1~3홉에서 **1~4홉**으로 변경(CQ-05·13·14·16이 4홉, 홉 정의 추가), 성분→효능 연결 출처 방침(ADR-012 후속), CQ-09는 TikTok 한정으로 한계 명시. `docs/EVAL.md` 동결 기준 숫자는 불변 | 사용자 결정(조언 세션 권고) |
 | 37 | **P4 개정(2026-11-15)**: 구 step 4(`product-records`)를 `llm-image-input`·`store-products`·`product-detail`·`product-records`로 4분할해 P4를 11 step으로 변경(레이어당 한 step). `make live-products`와 `uv add pillow` 추가. `PROMOTES` 규칙 승인(제목·캡션에 같은 브랜드 제품 이름 전체 또는 영문명·줄임말 별칭, 모호하면 안 만듦, dev에서 다듬고 test에서 커버리지 보고, step 9 보고에 무작위 20쌍). `live-products`에 한해 Gemini 상한을 `BEAUTYADS_CAP_GEMINI_USD=14`까지 승인(실행 전 이미지 수·예상 비용 보고 후 멈춤). `SkinType`·`SkinConcern` 목록 확정과 `ADDRESSES` 대응은 출처 없는 초안(ADR-012 후속). 성분→효능 수기 표는 step 7 live 뒤 성분 빈도(성분명·건수만)를 보고받아 조언 세션이 상위 약 20개에 출처를 붙여 만든다. `CLAIMS` "주장 원문" 속성 삭제(v1 라벨은 값만 저장) | 사용자 결정(조언 세션 권고) |
 | 38 | **P4 규칙 초안 확정과 선정 방식 변경(2026-11-15, 조언 세션 검토)**: `claim_rules.yaml`을 원문 9~16쪽과 대조해 확정(쪽을 건너는 예외는 `exception_refs`로 [별표 2]를 참조, 넓은 일반어 제거, 영어 대응어는 `terms_en_added`·`en_origin: advisor_added_en`, 영어는 ASCII 단어 경계로만 비교, `applies_to`는 `advisor_approved`)하고 step 1에 붙였다. 기획안 제목도 검사 대상이고 평가 출력에 면책 문구를 표시한다(P5 `checks`). TikTok은 CQ-09와 분포 용도로만 쓰고 `PROMOTES` 질문은 YouTube·Instagram에서만 답이 나온다. **대표 단품 선정을 임시 후보(공식몰 첫 화면)에서 원래 확정 규칙(M1: 브랜드×카테고리별로 광고 소재 텍스트에 많이 등장하는 단품 최대 2개, 제외 몰 제외)으로 변경**하고 제품 별칭은 `derive_aliases`가 제품명에서 기계적으로 만든다(사용자가 채우지 않는다). 선정은 step 3 전에 끝낸다 | 사용자 결정(조언 세션) |
+| 39 | **P4 후속(2026-11-15, 조언 세션 검토)**: (1) `PROMOTES`가 한 소재의 여러 제품을 모두 잇는다(`multi_product` 속성, 달바 직원 BEST 5 회귀 테스트; 기존 "가장 긴 하나만, 같은 길이면 모호" 규칙 변경), (2) 성분은 식약처 원료성분 전체 목록(DB 카탈로그)과 정확 일치로 대조(영문 INCI는 `eng_name_exact`), (3) 인증 대조 규칙을 브랜드 한글명 접두어 + 정규화한 제품명의 정확 일치로 변경, (4) 제품 성분 저장을 집합 교체로 변경, (5) step 11 `product-identify` 추가(사용자 승인 전 설계 초안, 소량 측정 뒤 멈춤) | 조언 세션 검토 |
 
 ## 1. 전제와 일정
 
@@ -189,6 +190,7 @@ step 본문은 `phases/4-ontology/step*.md`가 원본이다. 구 번호와의 �
 | 8 | `layer1-graph` | graph | 1층 적재. `HAS_EFFICACY` 표는 step 7 live 뒤 성분 빈도 보고를 받아 조언 세션이 만든다 |
 | 9 | `layer2-links` | graph | `PROMOTES`(제목·캡션에 제품 이름 전체 또는 별칭, 모호하면 안 만듦, dev에서 다듬고 test에서 커버리지 보고, **무작위 20쌍 보고**), `CLAIMS`, `MENTIONS` |
 | 10 | `cq-verify` | eval | 역량 질문 1~4홉 검증 실행기와 `make live-cq`. **질문마다 연결된 소재 수(`PROMOTES` 커버리지)를 답과 함께 보고한다.** CQ-12는 합성 데이터로만(P5 피드백 메모리 이후 실데이터), CQ-09는 TikTok 한정 |
+| 11 | `product-identify` | analysis·pipeline·domain | **(2026-11-15 추가, 사용자 승인 전 설계 초안)** 텍스트로 제품을 못 이은 YouTube·Instagram 제품 소재를 영상으로 식별하는 제한 분류 추출. 입력은 영상 + 같은 브랜드 후보 제품 목록(저장된 제품), 출력은 후보 id 목록 또는 없음(목록 밖 이름 불가), 프롬프트 `product-id-v1`·작업 종류 `product-id@v1`(v1 분류 축·E1과 무관), `PROMOTES`는 `basis=video`·`confidence=model`. TikTok 제외(영상 주소 미저장). `make live-product-identify`는 `--sample`(약 50건, 약 $0.15 가정)로 연결 증가와 정밀도(무작위 20쌍)를 먼저 재고 멈춘다. 전체 실행은 사용자 비용 승인 뒤 |
 
 **P4 착수 전 입력(2026-11-15 결정)**: 식약처 안내서 PDF 내려받기와 `claim_rules.yaml` 초안(완료), 공식몰 응답 원본 5쪽+robots.txt(완료), Gemini 이미지 입력 계약 실측 2회 $0.00183(완료), `SkinType`·`SkinConcern` 목록과 `ADDRESSES` 대응 초안(ADR-012 후속), 성분→효능 수기 표(step 7 live 뒤).
 
