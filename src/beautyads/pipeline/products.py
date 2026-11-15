@@ -717,7 +717,8 @@ def run_products(
             ]
             product = product.model_copy(update={"aliases": aliases})
             deps.store.upsert_product(product)
-            deps.store.upsert_ingredients(
+            deps.store.replace_ingredients(
+                item.key,
                 [
                     ProductIngredient(
                         product=item.key,
@@ -728,7 +729,7 @@ def run_products(
                         matched_by=row["matched_by"],
                     )
                     for index, row in enumerate(matches, 1)
-                ]
+                ],
             )
             deps.store.upsert_certs(certs)
             for extraction in extractions:

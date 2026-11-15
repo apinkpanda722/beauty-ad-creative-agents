@@ -88,6 +88,26 @@ class MemoryConnection(FakeConnection):
                     row["updated_at"] = NOW + timedelta(seconds=len(self.calls))
                 rows.append(row)
             return FakeCursor()
+        delete = re.search(
+            r"DELETE FROM (\w+) WHERE brand = %s AND source_url = %s"
+            r" AND ingredient_order > %s",
+            " ".join(query.split()),
+        )
+        if delete:
+            table = delete.group(1)
+            brand, url, keep = params
+            rows = self.tables.get(table, [])
+            kept = [
+                row
+                for row in rows
+                if not (
+                    (row["brand"], row["source_url"]) == (brand, url)
+                    and row["ingredient_order"] > keep
+                )
+            ]
+            removed = len(rows) - len(kept)
+            self.tables[table] = kept
+            return FakeCursor(rowcount=removed)
         select = re.search(r"SELECT (.+?) FROM (\w+)", " ".join(query.split()))
         if select:
             columns, table = select.groups()
@@ -546,3 +566,95 @@ def test_match_source_roundtrips_and_only_resolved_rows_carry_one():
             status="resolved",
             matched_by="fuzzy",
         )
+
+
+def ingredient_rows(key, count, **changes):
+    return [
+        ProductIngredient(
+            product=key, order=i, raw_name=f"원문{i}", status="unresolved", **changes
+        )
+        for i in range(1, count + 1)
+    ]
+
+
+def test_replace_ingredients_drops_surplus_rows_in_the_same_transaction():
+    conn = MemoryConnection()
+    store = PostgresProductStore(conn)
+    item = product()
+    store.upsert_product(item)
+    store.replace_ingredients(item.key, ingredient_rows(item.key, 5))
+    commits = conn.commits
+    store.replace_ingredients(item.key, ingredient_rows(item.key, 3))
+    assert conn.commits == commits + 1  # upserts and the delete are one transaction
+    assert [r.order for r in store.get_ingredients(item.key)] == [1, 2, 3]
+    delete = next(q for q, _ in conn.calls if q.lstrip().startswith("DELETE"))
+    assert "ingredient_order > %s" in delete
+
+
+def test_replace_with_the_same_rows_keeps_updated_at_and_other_products():
+    conn = MemoryConnection()
+    store = PostgresProductStore(conn)
+    item = product()
+    other = product(source_url="https://example.com/other")
+    store.upsert_product(item)
+    store.upsert_product(other)
+    store.replace_ingredients(item.key, ingredient_rows(item.key, 3))
+    store.replace_ingredients(other.key, ingredient_rows(other.key, 4))
+    before = store.get_ingredients(item.key)
+    store.replace_ingredients(item.key, ingredient_rows(item.key, 3))
+    assert store.get_ingredients(item.key) == before
+    assert len(store.get_ingredients(other.key)) == 4
+
+
+def test_replace_with_an_empty_list_removes_the_product_ingredients():
+    conn = MemoryConnection()
+    store = PostgresProductStore(conn)
+    item = product()
+    store.upsert_product(item)
+    store.replace_ingredients(item.key, ingredient_rows(item.key, 2))
+    store.replace_ingredients(item.key, [])
+    assert store.get_ingredients(item.key) == []
+
+
+def test_replace_rejects_rows_of_another_product_and_writes_nothing():
+    conn = MemoryConnection()
+    store = PostgresProductStore(conn)
+    item = product()
+    other = product(source_url="https://example.com/other")
+    with pytest.raises(ValueError):
+        store.replace_ingredients(item.key, ingredient_rows(other.key, 2))
+    assert not conn.calls
+
+
+def test_trim_ingredients_returns_the_number_of_rows_deleted():
+    conn = MemoryConnection()
+    store = PostgresProductStore(conn)
+    item = product()
+    store.upsert_product(item)
+    store.replace_ingredients(item.key, ingredient_rows(item.key, 5))
+    assert store.trim_ingredients(item.key, 3) == 2
+    assert store.trim_ingredients(item.key, 3) == 0
+    assert [r.order for r in store.get_ingredients(item.key)] == [1, 2, 3]
+
+
+def test_replace_and_trim_roll_back_on_sql_failure():
+    conn = FakeConnection(fail_on=lambda query: True)
+    store = PostgresProductStore(conn)
+    key = product().key
+    with pytest.raises(Exception):  # noqa: B017 -- any driver error must propagate
+        store.replace_ingredients(key, ingredient_rows(key, 1))
+    with pytest.raises(Exception):  # noqa: B017
+        store.trim_ingredients(key, 1)
+    assert conn.rollbacks == 2 and conn.commits == 0
+
+
+def test_count_ingredients_counts_only_that_product():
+    conn = MemoryConnection()
+    store = PostgresProductStore(conn)
+    item = product()
+    other = product(source_url="https://example.com/other")
+    store.upsert_product(item)
+    store.upsert_product(other)
+    store.replace_ingredients(item.key, ingredient_rows(item.key, 3))
+    store.replace_ingredients(other.key, ingredient_rows(other.key, 5))
+    assert store.count_ingredients(item.key) == 3

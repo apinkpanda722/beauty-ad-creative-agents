@@ -108,6 +108,10 @@ _INGREDIENT_UPSERT = _upsert_sql(
     _INGREDIENT_COLUMNS,
     ("brand", "source_url", "ingredient_order"),
 )
+_INGREDIENT_TRIM = (
+    "DELETE FROM product_ingredients"
+    " WHERE brand = %s AND source_url = %s AND ingredient_order > %s"
+)
 _CERT_UPSERT = _upsert_sql(
     "product_certs", _CERT_COLUMNS, ("brand", "source_url", "kind")
 )
@@ -247,6 +251,42 @@ class PostgresProductStore(ProductRepository):
                 (_INGREDIENT_UPSERT, _values(item, _INGREDIENT_COLUMNS))
                 for item in ingredients
             )
+
+    def replace_ingredients(
+        self, key: ProductKey, ingredients: Sequence[ProductIngredient]
+    ) -> None:
+        """Make this product's ingredient set exactly `ingredients` (one transaction).
+
+        Rows past the new length are deleted, so a shorter re-parse leaves no stale
+        tail. The incoming rows are upserted first, so unchanged rows keep their
+        change time.
+        """
+        if any(item.product != key for item in ingredients):
+            raise ValueError("ingredients of another product")
+        self._write(
+            [
+                *(
+                    (_INGREDIENT_UPSERT, _values(item, _INGREDIENT_COLUMNS))
+                    for item in ingredients
+                ),
+                (_INGREDIENT_TRIM, (key.brand, key.source_url, len(ingredients))),
+            ]
+        )
+
+    def count_ingredients(self, key: ProductKey) -> int:
+        return len(self.get_ingredients(key))
+
+    def trim_ingredients(self, key: ProductKey, keep: int) -> int:
+        """Delete ingredient rows whose order is greater than `keep`; return the count."""
+        try:
+            removed = self.conn.execute(
+                _INGREDIENT_TRIM, (key.brand, key.source_url, keep)
+            ).rowcount
+            self.conn.commit()
+        except Exception:
+            self.conn.rollback()
+            raise
+        return removed
 
     def get_ingredients(self, key: ProductKey) -> list[ProductIngredient]:
         return self._read(

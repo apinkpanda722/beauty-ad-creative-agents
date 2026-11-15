@@ -33,12 +33,18 @@ class Store:
         self.certs = []
         self.extractions = []
         self.catalog = []
+        self.replaced = []
         self.lookups = {}
 
     def upsert_product(self, product):
         self.products.append(product)
 
     def upsert_ingredients(self, rows):
+        self.ingredients.extend(rows)
+
+    def replace_ingredients(self, key, rows):
+        self.replaced.append((key, len(rows)))
+        self.ingredients = [r for r in self.ingredients if r.product != key]
         self.ingredients.extend(rows)
 
     def upsert_certs(self, rows):
@@ -1124,3 +1130,16 @@ def test_cert_coverage_counts_products_and_each_kind(tmp_path):
 )
 def test_ingredient_text_splits_on_commas_but_not_between_digits(text, expected):
     assert p._split_ingredients(text) == expected
+
+
+def test_product_ingredients_are_saved_as_a_whole_set_replacement(tmp_path):
+    dep, _ = deps()
+    run(tmp_path, dep)
+    key = candidate().key
+    saved = [row for row in dep.store.ingredients if row.product == key]
+    assert dep.store.replaced == [(key, len(saved))]
+    # A second run of the same product replaces the set, never appends to it.
+    run(tmp_path, dep)
+    assert len([row for row in dep.store.ingredients if row.product == key]) == len(
+        saved
+    )
