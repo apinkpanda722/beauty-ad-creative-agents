@@ -62,7 +62,16 @@
     {
       "step": 4,
       "name": "llm-image-input",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-15T16:04:29+0900",
+      "summary": "image_part·usage_by_modality와 실측 픽스처 기반 테스트 추가, 기존 함수·테스트 불변 확인, make verify 2,229개 통과. 추가 패키지 설치 없음.",
+      "completed_at": "2026-11-15T16:08:12+0900",
+      "usage": {
+        "input_tokens": 815991,
+        "cached_input_tokens": 740096,
+        "output_tokens": 5394,
+        "attempts": 1
+      }
     },
     {
       "step": 5,
