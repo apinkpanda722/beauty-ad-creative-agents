@@ -76,7 +76,16 @@
     {
       "step": 5,
       "name": "store-products",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-15T16:08:12+0900",
+      "summary": "제품 도메인·기계적 별칭 생성·마이그레이션 v4·PostgreSQL 저장소 구현. 가격 이력·원문 보존과 변경 시각 기반 조회 검증, make verify 2,330개 통과. 추가 패키지 설치 없음.",
+      "completed_at": "2026-11-15T16:16:36+0900",
+      "usage": {
+        "input_tokens": 1411893,
+        "cached_input_tokens": 1324416,
+        "output_tokens": 19972,
+        "attempts": 1
+      }
     },
     {
       "step": 6,
