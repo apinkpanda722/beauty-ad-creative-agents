@@ -842,3 +842,40 @@ def test_http_status_stop_reports_status_in_detail(tmp_path):
     report, output = run(tmp_path, dep)
     assert report["stopped_detail"] == {"http_status": 402}
     assert "STOPPED MFDS_HTTP_402 http_status=402\n" in output
+
+
+def test_product_with_no_ingredients_is_held_not_done(tmp_path):
+    # An empty ingredient list must not quietly become a product record.
+    from beautyads.analysis.product_detail import ProductDetailOutcome
+    from beautyads.domain.products import ProductDetailResult, ProductExtraction
+
+    dep, _ = deps("image_only")
+    facts = {
+        "ingredients": [],
+        "volume": None,
+        "volume_unit": None,
+        "form": None,
+        "skin_types": [],
+        "efficacy_texts": [],
+        "functional_texts": [],
+    }
+    dep.extract.return_value = ProductDetailOutcome(
+        status=JobStatus.done,
+        result=ProductDetailResult.model_validate(facts),
+        extractions=[
+            ProductExtraction(
+                product=candidate().key, prompt_version="synthetic", raw_output="{}"
+            )
+        ],
+    )
+    report, _ = run(tmp_path, dep)
+    row = report["products"][0]
+    assert row["status"] == "held"
+    assert row["error_code"] == "PRODUCT_INGREDIENTS_EMPTY"
+    assert row["hold_reason"] == "성분 없음"
+    # Every image was read (the list stays empty) and each raw output is kept.
+    urls = dep.mall.fetch_product("cosrx", candidate().url).detail_image_urls
+    assert len(row["extractions"]) == len(urls) >= 1
+    assert not dep.store.products and not dep.store.ingredients
+    assert report["by_status"] == {"held": 1}
+    dep.mfds.search_reports.assert_not_called()  # no certification work for it

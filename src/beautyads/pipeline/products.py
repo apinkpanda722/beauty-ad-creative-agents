@@ -450,6 +450,12 @@ def _product_facts(deps, item, report):
             extractions=extractions,
             issues=issues,
         )
+    if not names:
+        # Reading finished but no ingredient was found: hold it rather than let an
+        # empty product reach the database and the graph.
+        raise ProductsError(
+            "PRODUCT_INGREDIENTS_EMPTY", extractions=extractions, issues=issues
+        )
     return page, names, fields, extractions, issues
 
 
@@ -644,10 +650,13 @@ def run_products(
                     error_code=exc.code,
                 )
         except ProductsError as exc:
+            held_code = exc.code in {"PRODUCT_DETAIL_HELD", "PRODUCT_INGREDIENTS_EMPTY"}
             report.update(
-                status="held" if exc.code == "PRODUCT_DETAIL_HELD" else "failed",
+                status="held" if held_code else "failed",
                 error_code=exc.code,
             )
+            if exc.code == "PRODUCT_INGREDIENTS_EMPTY":
+                report["hold_reason"] = "성분 없음"
             report["extractions"] = [
                 row.model_dump(mode="json") for row in exc.extractions
             ]
