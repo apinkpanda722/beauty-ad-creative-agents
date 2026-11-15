@@ -557,3 +557,29 @@ def test_a_success_resets_the_consecutive_failure_count():
     assert adapter.search_ingredients("성분").stopped is None
     for _ in range(19):
         assert adapter.search_reports("품목").stopped == "MFDS_LOOKUP_FAILED"
+
+
+def test_catalog_page_returns_every_row_unfiltered_with_total():
+    items = body("ingredient_query").get("body").get("items")
+    get = FakeGet(page("ingredient_query", items, 7))
+    result = client(get).fetch_ingredient_page(3, num_of_rows=50)
+    assert result.stopped is None and result.error is None and result.total == 7
+    assert [row.name_ko for row in result.items] == [
+        row.get("INGR_KOR_NAME") for row in items
+    ]
+    _, params = next(iter(get.calls))
+    assert params.get("pageNo") == "3" and params.get("numOfRows") == "50"
+    assert "INGR_KOR_NAME" not in params and "INGR_ENG_NAME" not in params
+
+
+def test_catalog_page_without_items_is_an_empty_page():
+    result = client(FakeGet(page("ingredient_query_no_match"))).fetch_ingredient_page(1)
+    assert result.items == [] and result.stopped is None and result.total == 0
+
+
+def test_catalog_page_failure_is_stopped_not_empty():
+    result = client(
+        FakeGet(page("ingredient_query", [], 5)), max_requests=0
+    ).fetch_ingredient_page(1)
+    assert result.items == [] and result.stopped == "MFDS_REQUEST_CAP"
+    assert result.total is None

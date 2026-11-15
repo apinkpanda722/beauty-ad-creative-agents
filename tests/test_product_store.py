@@ -12,6 +12,7 @@ from test_store import FakeConnection, FakeCursor
 from beautyads.domain.mfds import CertStatus
 from beautyads.domain.products import (
     CachedIngredientStandard,
+    IngredientCatalogEntry,
     IngredientLookup,
     Product,
     ProductCert,
@@ -33,6 +34,7 @@ class MemoryConnection(FakeConnection):
         "product_certs": ("brand", "source_url", "kind"),
         "ingredient_standards": ("name_ko",),
         "ingredient_lookups": ("query_key", "kind"),
+        "mfds_ingredient_catalog": ("page_no", "row_no"),
     }
 
     def __init__(self, *, native_json=True):
@@ -65,7 +67,11 @@ class MemoryConnection(FakeConnection):
                 (old for old in rows if keys and all(old[k] == row[k] for k in keys)),
                 None,
             )
-            if keys and table not in {"ingredient_standards", "ingredient_lookups"}:
+            if keys and table not in {
+                "ingredient_standards",
+                "ingredient_lookups",
+                "mfds_ingredient_catalog",
+            }:
                 assert "updated_at = now()" in query
                 assert "IS DISTINCT FROM" in query
                 for column in columns:
@@ -446,3 +452,97 @@ def test_ingredient_lookup_sql_values_are_bound():
     )
     store.get_ingredient_lookup(sentinel, "kor_exact")
     assert all(sentinel not in query for query, _ in conn.calls)
+
+
+def catalog_entry(page_no, row_no, name_ko, name_en=None, **changes):
+    return IngredientCatalogEntry(
+        page_no=page_no,
+        row_no=row_no,
+        name_ko=name_ko,
+        name_en=name_en,
+        cas_no=None,
+        source_total=250,
+        fetched_at=NOW,
+        **changes,
+    )
+
+
+def test_catalog_pages_are_written_idempotently_and_resume_from_the_last_page():
+    conn = MemoryConnection()
+    store = PostgresProductStore(conn)
+    assert store.catalog_last_page() == 0 and store.list_catalog() == []
+    first = [
+        catalog_entry(1, 0, "합성성분", "Synthetic"),
+        catalog_entry(1, 1, "영문없음"),
+    ]
+    second = [catalog_entry(2, 0, "다른성분", "Other")]
+    store.upsert_catalog_page(second)
+    store.upsert_catalog_page(first)
+    assert store.catalog_last_page() == 2
+    # Writing the same page again replaces rows instead of duplicating them.
+    store.upsert_catalog_page(first)
+    listed = store.list_catalog()
+    # The in-memory fake does not sort, so the ordering is checked on the SQL.
+    assert sorted((e.page_no, e.row_no) for e in listed) == [(1, 0), (1, 1), (2, 0)]
+    assert any(
+        "FROM mfds_ingredient_catalog ORDER BY page_no, row_no" in " ".join(q.split())
+        for q, _ in conn.calls
+    )
+    assert {(e.page_no, e.row_no): e.name_en for e in listed}[(1, 1)] is None
+    assert len(conn.tables["mfds_ingredient_catalog"]) == 3
+
+
+def test_a_catalog_page_is_one_transaction():
+    conn = MemoryConnection()
+    store = PostgresProductStore(conn)
+    store.upsert_catalog_page([catalog_entry(1, i, f"성분{i}") for i in range(3)])
+    assert conn.commits == 1
+
+
+def test_catalog_sql_values_are_bound():
+    conn = MemoryConnection()
+    store = PostgresProductStore(conn)
+    sentinel = "quoted'; sentinel-statement; --"
+    store.upsert_catalog_page([catalog_entry(1, 0, sentinel, sentinel)])
+    assert all(sentinel not in query for query, _ in conn.calls)
+
+
+def test_match_source_roundtrips_and_only_resolved_rows_carry_one():
+    conn = MemoryConnection()
+    store = PostgresProductStore(conn)
+    item = product()
+    store.upsert_product(item)
+    store.upsert_ingredients(
+        [
+            ProductIngredient(
+                product=item.key,
+                order=1,
+                raw_name="Synthetic",
+                standard_name="합성성분",
+                status="resolved",
+                matched_by="eng_name_exact",
+            ),
+            ProductIngredient(
+                product=item.key, order=2, raw_name="미등재", status="unresolved"
+            ),
+        ]
+    )
+    rows = store.get_ingredients(item.key)
+    assert [row.matched_by for row in rows] == ["eng_name_exact", None]
+    with pytest.raises(ValueError):
+        ProductIngredient(
+            product=item.key,
+            order=3,
+            raw_name="x",
+            status="unresolved",
+            matched_by="kor_exact",
+        )
+    with pytest.raises(ValueError):
+        ProductIngredient(
+            product=item.key,
+            order=3,
+            raw_name="x",
+            standard_name="y",
+            status="resolved",
+            matched_by="fuzzy",
+        )

@@ -237,12 +237,15 @@ class ProductIngredient(BaseModel):
     raw_name: str = Field(min_length=1)
     standard_name: str | None = None
     status: Literal["resolved", "unresolved"]
+    matched_by: Literal["kor_exact", "eng_name_exact"] | None = None
     updated_at: AwareDatetime | None = None
 
     @model_validator(mode="after")
     def consistent_status(self) -> "ProductIngredient":
         if (self.standard_name is not None) != (self.status == "resolved"):
             raise ValueError("only resolved ingredients have a standard name")
+        if self.status == "unresolved" and self.matched_by is not None:
+            raise ValueError("an unresolved ingredient has no match source")
         return self
 
 
@@ -325,6 +328,21 @@ class IngredientLookup(BaseModel):
     queried_at: AwareDatetime
 
 
+class IngredientCatalogEntry(BaseModel):
+    """One row of the MFDS ingredient list, keyed by its position in the download."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    page_no: int = Field(ge=1)
+    row_no: int = Field(ge=0)
+    name_ko: str = Field(min_length=1)
+    name_en: str | None = None
+    cas_no: str | None = None
+    # totalCount the API reported with this page; tells whether the copy is whole.
+    source_total: int = Field(ge=1)
+    fetched_at: AwareDatetime
+
+
 class ProductRepository(Protocol):
     def upsert_product(self, product: Product) -> None:
         """Persist one record and append its price observation atomically."""
@@ -359,6 +377,14 @@ class ProductRepository(Protocol):
     ) -> IngredientLookup | None: ...
 
     def upsert_ingredient_lookup(self, lookup: IngredientLookup) -> None: ...
+
+    def upsert_catalog_page(
+        self, entries: Sequence[IngredientCatalogEntry]
+    ) -> None: ...
+
+    def catalog_last_page(self) -> int: ...
+
+    def list_catalog(self) -> list[IngredientCatalogEntry]: ...
 
     def upsert_ingredient_standard(
         self, standard: CachedIngredientStandard

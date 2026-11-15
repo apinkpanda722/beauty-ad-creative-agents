@@ -12,8 +12,8 @@ import pytest
 import yaml
 
 from beautyads.domain import JobStatus
-from beautyads.domain.mfds import FunctionalReport, IngredientStandard
-from beautyads.domain.products import IngredientLookup, Product
+from beautyads.domain.mfds import FunctionalReport
+from beautyads.domain.products import IngredientCatalogEntry, Product
 from beautyads.pipeline import products as p
 from beautyads.sources.mall import MallClient, MallHttpResponse, load_mall_config
 from beautyads.sources.mfds import MFDSError, MFDSResult
@@ -32,7 +32,7 @@ class Store:
         self.ingredients = []
         self.certs = []
         self.extractions = []
-        self.standards = {}
+        self.catalog = []
         self.lookups = {}
 
     def upsert_product(self, product):
@@ -47,11 +47,8 @@ class Store:
     def add_extraction(self, row):
         self.extractions.append(row)
 
-    def get_ingredient_standard(self, name):
-        return self.standards.get(name)
-
-    def upsert_ingredient_standard(self, row):
-        self.standards[row.name_ko] = row
+    def list_catalog(self):
+        return list(self.catalog)
 
     def get_ingredient_lookup(self, query_key, kind):
         return self.lookups.get((query_key, kind))
@@ -92,18 +89,6 @@ def deps(name="text_div"):
     client, calls = mall(name)
     rows = recorded("mfds_ingredient_query.json")
     mfds = SimpleNamespace(
-        search_ingredients=Mock(
-            return_value=MFDSResult(
-                [
-                    IngredientStandard(
-                        name_ko=r.get("INGR_KOR_NAME"),
-                        name_en=r.get("INGR_ENG_NAME"),
-                        cas_no=r.get("CAS_NO"),
-                    )
-                    for r in rows
-                ]
-            )
-        ),
         search_reports=Mock(return_value=MFDSResult([])),
         search_screenings=Mock(return_value=MFDSResult([])),
     )
@@ -113,10 +98,23 @@ def deps(name="text_div"):
         enqueue_analysis=Mock(),
         record_analysis=Mock(),
     )
+    store = Store()
+    store.catalog = [
+        IngredientCatalogEntry(
+            page_no=1,
+            row_no=index,
+            name_ko=r.get("INGR_KOR_NAME"),
+            name_en=r.get("INGR_ENG_NAME"),
+            cas_no=r.get("CAS_NO"),
+            source_total=len(rows),
+            fetched_at=NOW,
+        )
+        for index, r in enumerate(rows)
+    ]
     return p.ProductsDeps(
         client,
         mfds,
-        Store(),
+        store,
         creatives,
         Mock(return_value=b"synthetic image bytes"),
         Mock(),
@@ -141,9 +139,7 @@ def run(tmp_path, dep, items=None, **kwargs):
 
 def test_exact_matching_alias_cache_and_no_discard(tmp_path):
     dep, _ = deps()
-    resolver = p.IngredientResolver(
-        dep.mfds, dep.store, {"합성 통용명": "병풀추출물"}, dep.now
-    )
+    resolver = p.IngredientResolver(dep.store, {"합성 통용명": "병풀추출물"}, dep.now)
     rows = resolver.match(["병풀추출물", "병풀", "합성 통용명", "미등재", "병풀추출물"])
     assert [(r["raw_name"], r["standard_name"], r["status"]) for r in rows] == [
         ("병풀추출물", "병풀추출물", "resolved"),
@@ -153,32 +149,66 @@ def test_exact_matching_alias_cache_and_no_discard(tmp_path):
         ("병풀추출물", "병풀추출물", "resolved"),
     ]
     assert len(rows) == 5
-    assert dep.mfds.search_ingredients.call_count == 3
-    second = p.IngredientResolver(dep.mfds, dep.store, {}, dep.now)
-    second.match(["병풀추출물"])
-    assert dep.mfds.search_ingredients.call_count == 3
-
-
-def test_stopped_lookup_is_retryable_not_unresolved(tmp_path):
-    dep, _ = deps()
-    dep.mfds.search_ingredients.return_value = MFDSResult([], "MFDS_PAGE_CAP")
-    resolver = p.IngredientResolver(dep.mfds, dep.store, {}, dep.now)
-    rows = resolver.match(["미등재"])
-    assert rows[0]["status"] == "pending"
-    assert rows[0]["error_code"] == "MFDS_PAGE_CAP"
-    assert not dep.store.standards
-
-
-def test_ingredient_failure_isolated():
-    dep, _ = deps()
-    dep.mfds.search_ingredients.side_effect = [
-        MFDSResult([], "MFDS_XML_REJECTED"),
-        MFDSResult([]),
+    assert [r["matched_by"] for r in rows] == [
+        "kor_exact",
+        None,
+        "kor_exact",
+        None,
+        "kor_exact",
     ]
-    rows = p.IngredientResolver(dep.mfds, dep.store, {}, dep.now).match(
-        ["합성1", "합성2"]
+    # Three distinct names reach the catalog; the alias and the repeat hit memory.
+    assert dict(resolver.stats) == {"memo_hits": 2, "db_hits": 0, "catalog_lookups": 3}
+
+
+def test_incomplete_catalog_is_a_system_stop_never_unresolved(tmp_path):
+    dep, _ = deps()
+    dep.store.catalog = [
+        e.model_copy(update={"source_total": 500}) for e in dep.store.catalog
+    ]
+    report, output = run(tmp_path, dep, [candidate(index=1), candidate(index=2)])
+    assert report["stopped"] == "INGREDIENT_CATALOG_INCOMPLETE"
+    assert [r["status"] for r in report["products"]] == ["pending", "pending"]
+    assert not dep.store.products and not dep.store.ingredients
+    assert "STOPPED INGREDIENT_CATALOG_INCOMPLETE" in output
+
+
+def test_empty_catalog_is_a_system_stop_never_unresolved(tmp_path):
+    dep, _ = deps()
+    dep.store.catalog = []
+    report, _ = run(tmp_path, dep)
+    assert report["stopped"] == "INGREDIENT_CATALOG_INCOMPLETE"
+    assert report["products"][0]["status"] == "pending"
+
+
+def test_english_ingredient_matches_only_exactly_and_records_the_source():
+    dep, _ = deps()
+    resolver = p.IngredientResolver(dep.store, {}, dep.now)
+    rows = resolver.match(
+        [
+            "Centella Asiatica Extract",
+            " centella  asiatica EXTRACT.",
+            "Centella Asiatica",
+        ]
     )
-    assert [r["status"] for r in rows] == ["pending", "unresolved"]
+    assert [(r["standard_name"], r["matched_by"], r["status"]) for r in rows] == [
+        ("병풀추출물", "eng_name_exact", "resolved"),
+        ("병풀추출물", "eng_name_exact", "resolved"),
+        (None, None, "unresolved"),
+    ]
+    assert dep.store.lookups[("Centella Asiatica Extract", "eng_exact")].standard_name
+
+
+def test_ambiguous_english_name_stays_unresolved_and_is_counted():
+    dep, _ = deps()
+    first = dep.store.catalog[0]
+    dep.store.catalog.append(
+        first.model_copy(update={"row_no": 99, "name_ko": "다른표준명"})
+    )
+    resolver = p.IngredientResolver(dep.store, {}, dep.now)
+    rows = resolver.match([first.name_en])
+    assert rows[0]["status"] == "unresolved" and rows[0]["matched_by"] is None
+    assert resolver.ambiguous == {first.name_en}
+    assert not dep.store.lookups
 
 
 def test_alias_loaders_empty_missing_and_source_required(tmp_path):
@@ -333,7 +363,7 @@ def test_product_failure_does_not_block_next(tmp_path):
 
 def test_system_error_leaves_current_and_remaining_pending(tmp_path):
     dep, _ = deps()
-    dep.mfds.search_ingredients.return_value = MFDSResult(
+    dep.mfds.search_reports.return_value = MFDSResult(
         [], "MFDS_HTTP_402", MFDSError("MFDS_HTTP_402", http_status=402)
     )
     report, _ = run(tmp_path, dep, [candidate(index=1), candidate(index=2)])
@@ -724,7 +754,7 @@ def test_product_alias_loader_valid_and_malformed(tmp_path):
 
 def test_ingredient_parentheses_only_amount_is_removed():
     dep, _ = deps()
-    resolver = p.IngredientResolver(dep.mfds, dep.store, {}, dep.now)
+    resolver = p.IngredientResolver(dep.store, {}, dep.now)
     rows = resolver.match(["병풀추출물(1,000 ppm)", "병풀추출물(다른 성분)"])
     assert [row["status"] for row in rows] == ["resolved", "unresolved"]
 
@@ -804,53 +834,6 @@ def test_held_product_records_chunk_issue_codes(tmp_path):
     assert "INVALID_OUTPUT" in row["issues"]
 
 
-def test_mfds_stop_prints_provider_code_and_message(tmp_path):
-    dep, _ = deps()
-    dep.mfds.search_ingredients.return_value = MFDSResult(
-        [],
-        "MFDS_API_ERROR",
-        MFDSError(
-            "MFDS_API_ERROR",
-            provider_code="22",
-            provider_message="LIMITED\nNUMBER " + "x" * 400,
-            http_status=200,
-        ),
-    )
-    report, output = run(tmp_path, dep, [candidate(index=1), candidate(index=2)])
-    assert report["stopped"] == "MFDS_API_ERROR"
-    detail = report["stopped_detail"]
-    assert detail["provider_code"] == "22" and detail["http_status"] == 200
-    # One line, bounded length, no raw newline from the provider.
-    assert "\n" not in detail["provider_message"]
-    assert len(detail["provider_message"]) <= 200
-    stopped_line = next(
-        line for line in output.splitlines() if line.startswith("STOPPED ")
-    )
-    assert stopped_line.startswith("STOPPED MFDS_API_ERROR provider_code=22 ")
-    assert "provider_message=LIMITED NUMBER" in stopped_line
-    saved = json.loads((tmp_path / "state.json").read_text())
-    assert saved["stopped_detail"] == detail
-
-
-def test_stop_without_provider_error_prints_only_the_code(tmp_path):
-    dep, _ = deps()
-    dep.mfds.search_ingredients.return_value = MFDSResult([], "MFDS_REQUEST_CAP")
-    report, output = run(tmp_path, dep)
-    assert report["stopped"] == "MFDS_REQUEST_CAP"
-    assert report["stopped_detail"] is None
-    assert "STOPPED MFDS_REQUEST_CAP\n" in output
-
-
-def test_http_status_stop_reports_status_in_detail(tmp_path):
-    dep, _ = deps()
-    dep.mfds.search_ingredients.return_value = MFDSResult(
-        [], "MFDS_HTTP_402", MFDSError("MFDS_HTTP_402", http_status=402)
-    )
-    report, output = run(tmp_path, dep)
-    assert report["stopped_detail"] == {"http_status": 402}
-    assert "STOPPED MFDS_HTTP_402 http_status=402\n" in output
-
-
 def test_product_with_no_ingredients_is_held_not_done(tmp_path):
     # An empty ingredient list must not quietly become a product record.
     from beautyads.analysis.product_detail import ProductDetailOutcome
@@ -888,85 +871,65 @@ def test_product_with_no_ingredients_is_held_not_done(tmp_path):
     dep.mfds.search_reports.assert_not_called()  # no certification work for it
 
 
-def test_lookup_failed_ingredients_stay_pending_and_the_batch_continues(tmp_path):
-    # A transient provider error for one item is retryable work, never a stop.
-    dep, _ = deps()
-    dep.mfds.search_ingredients.return_value = MFDSResult(
-        [],
-        "MFDS_LOOKUP_FAILED",
-        MFDSError(
-            "MFDS_LOOKUP_FAILED",
-            provider_code="01",
-            provider_message="System Error!!",
-            http_status=200,
-        ),
-    )
-    report, _ = run(tmp_path, dep, [candidate(index=1), candidate(index=2)])
-    assert report["stopped"] is None
-    assert [r["status"] for r in report["products"]] == ["pending", "pending"]
-    assert all(
-        r["error_code"] == "INGREDIENT_RETRY_REQUIRED" for r in report["products"]
-    )
-    assert dep.mfds.search_ingredients.call_count > 2  # both products were tried
-    assert not dep.store.products  # nothing is recorded as a permanent failure
-
-
-def test_consecutive_failures_are_a_system_stop(tmp_path):
-    dep, _ = deps()
-    dep.mfds.search_ingredients.return_value = MFDSResult(
-        [],
-        "MFDS_CONSECUTIVE_FAILURES",
-        MFDSError("MFDS_CONSECUTIVE_FAILURES", provider_code="01", http_status=200),
-    )
-    report, output = run(tmp_path, dep, [candidate(index=1), candidate(index=2)])
-    assert report["stopped"] == "MFDS_CONSECUTIVE_FAILURES"
-    assert [r["status"] for r in report["products"]] == ["pending", "pending"]
-    assert "STOPPED MFDS_CONSECUTIVE_FAILURES provider_code=01" in output
-
-
-def test_resolved_and_unresolved_lookups_are_cached_across_runs():
-    dep, _ = deps()
-    first = p.IngredientResolver(dep.mfds, dep.store, {}, dep.now)
-    first.match(["병풀추출물", "미등재", "미등재"])
-    assert dep.mfds.search_ingredients.call_count == 2
-    assert dict(first.stats) == {"api_lookups": 2, "memo_hits": 1, "db_hits": 0}
-    # A new resolver (a later run) starts with an empty memo but a persisted cache.
-    second = p.IngredientResolver(dep.mfds, dep.store, {}, dep.now)
-    rows = second.match(["병풀추출물", "미등재"])
-    assert [r["status"] for r in rows] == ["resolved", "unresolved"]
-    assert dep.mfds.search_ingredients.call_count == 2  # no new request
-    assert dict(second.stats) == {"api_lookups": 0, "memo_hits": 0, "db_hits": 2}
-    assert dep.store.lookups[("미등재", "kor_exact")].standard_name is None
-
-
-def test_pending_lookups_are_never_cached():
-    dep, _ = deps()
-    dep.mfds.search_ingredients.return_value = MFDSResult(
-        [], "MFDS_LOOKUP_FAILED", MFDSError("MFDS_LOOKUP_FAILED", provider_code="01")
-    )
-    rows = p.IngredientResolver(dep.mfds, dep.store, {}, dep.now).match(["미등재"])
-    assert rows[0]["status"] == "pending" and not dep.store.lookups
-    dep.mfds.search_ingredients.return_value = MFDSResult([])
-    rows = p.IngredientResolver(dep.mfds, dep.store, {}, dep.now).match(["미등재"])
-    assert rows[0]["status"] == "unresolved"
-    assert dep.mfds.search_ingredients.call_count == 2  # asked again, then cached
-    assert ("미등재", "kor_exact") in dep.store.lookups
-
-
-def test_lookup_cache_is_keyed_by_kind_so_another_kind_never_answers():
-    dep, _ = deps()
-    dep.store.lookups[("병풀추출물", "eng_exact")] = IngredientLookup(
-        query_key="병풀추출물", kind="eng_exact", standard_name=None, queried_at=NOW
-    )
-    rows = p.IngredientResolver(dep.mfds, dep.store, {}, dep.now).match(["병풀추출물"])
-    assert rows[0]["status"] == "resolved"
-    assert dep.mfds.search_ingredients.call_count == 1
-
-
 def test_summary_counts_every_ingredient_lookup_by_source(tmp_path):
     dep, _ = deps()
     report, _ = run(tmp_path, dep, [candidate(index=1), candidate(index=2)])
     cache = report["ingredient_cache"]
-    assert set(cache) == {"api_lookups", "memo_hits", "db_hits"}
-    assert cache["api_lookups"] > 0 and cache["memo_hits"] > 0
+    assert set(cache) == {"catalog_lookups", "memo_hits", "db_hits"}
+    assert cache["catalog_lookups"] > 0 and cache["memo_hits"] > 0
     assert sum(cache.values()) == report["ingredient_count"]
+    assert report["ingredient_catalog"]["rows"] == len(dep.store.catalog)
+    assert report["ingredient_ambiguous"] == []
+
+
+def test_resolved_lookups_are_cached_across_runs_and_unresolved_are_not():
+    dep, _ = deps()
+    first = p.IngredientResolver(dep.store, {}, dep.now)
+    first.match(["병풀추출물", "미등재"])
+    assert set(dep.store.lookups) == {("병풀추출물", "kor_exact")}
+    dep.store.catalog = []  # the next resolver must not need the catalog for a hit
+    second = p.IngredientResolver(dep.store, {}, dep.now)
+    rows = second.match(["병풀추출물"])
+    assert rows[0]["status"] == "resolved" and rows[0]["matched_by"] == "kor_exact"
+    assert dict(second.stats) == {"memo_hits": 0, "db_hits": 1, "catalog_lookups": 0}
+
+
+def test_the_catalog_is_only_loaded_when_a_name_misses_every_cache():
+    dep, _ = deps()
+    resolver = p.IngredientResolver(dep.store, {}, dep.now)
+    assert resolver.catalog_stats is None
+    resolver.match(["병풀추출물"])
+    assert resolver.catalog_stats["rows"] == len(dep.store.catalog)
+
+
+def test_certification_stop_still_reports_provider_code_and_message(tmp_path):
+    dep, _ = deps()
+    dep.mfds.search_reports.return_value = MFDSResult(
+        [],
+        "MFDS_API_ERROR",
+        MFDSError(
+            "MFDS_API_ERROR",
+            provider_code="22",
+            provider_message="LIMITED\nNUMBER " + "x" * 400,
+            http_status=200,
+        ),
+    )
+    report, output = run(tmp_path, dep, [candidate(index=1), candidate(index=2)])
+    assert report["stopped"] == "MFDS_API_ERROR"
+    detail = report["stopped_detail"]
+    assert detail["provider_code"] == "22" and detail["http_status"] == 200
+    assert "\n" not in detail["provider_message"]
+    assert len(detail["provider_message"]) <= 200
+    stopped_line = next(
+        line for line in output.splitlines() if line.startswith("STOPPED ")
+    )
+    assert stopped_line.startswith("STOPPED MFDS_API_ERROR provider_code=22 ")
+
+
+def test_matched_by_is_saved_with_each_product_ingredient(tmp_path):
+    dep, _ = deps()
+    run(tmp_path, dep)
+    saved = dep.store.ingredients
+    assert saved and all(
+        (row.status == "resolved") == (row.matched_by is not None) for row in saved
+    )

@@ -27,7 +27,6 @@ from beautyads.domain import JobStatus
 from beautyads.domain.labels import Category
 from beautyads.domain.mfds import CertStatus, FunctionalKind, functional_kinds
 from beautyads.domain.products import (
-    CachedIngredientStandard,
     IngredientLookup,
     Product,
     ProductCert,
@@ -56,6 +55,7 @@ from beautyads.store import (
 )
 from beautyads.store.product_repository import PostgresProductStore
 
+from .ingredient_catalog import CatalogIndex, catalog_complete
 from .preflight import docker_running, tcp_reachable
 
 CANDIDATES_PATH = Path("config/product_candidates.yaml")
@@ -272,15 +272,43 @@ def _mfds_system(result) -> None:
 
 
 class IngredientResolver:
-    def __init__(self, mfds, store, aliases, now):
-        self.mfds = mfds
+    """Match ingredient names against the stored MFDS catalog; no API request."""
+
+    def __init__(self, store, aliases, now):
         self.store = store
         self.aliases = aliases
         self.now = now
-        self.memo: dict[str, str | None] = {}
+        # name -> (match source, standard name); (None, None) when unresolved.
+        self.memo: dict[str, tuple[str | None, str | None]] = {}
+        self._index: CatalogIndex | None = None
+        self.ambiguous: set[str] = set()
         # Where each ingredient's answer came from: this run's memory, the persisted
-        # lookup cache, or a request to the API.
-        self.stats = Counter({"memo_hits": 0, "db_hits": 0, "api_lookups": 0})
+        # lookup cache, or the catalog.
+        self.stats = Counter({"memo_hits": 0, "db_hits": 0, "catalog_lookups": 0})
+
+    @property
+    def catalog_stats(self) -> dict | None:
+        return None if self._index is None else self._index.stats
+
+    def _catalog(self) -> CatalogIndex:
+        if self._index is None:
+            entries = self.store.list_catalog()
+            # A partial copy would turn unread names into false "not registered".
+            if not catalog_complete(entries):
+                raise _Stop("INGREDIENT_CATALOG_INCOMPLETE")
+            self._index = CatalogIndex(entries)
+        return self._index
+
+    def _cached(self, name: str) -> tuple[str, str] | None:
+        # Only resolved answers are cached; "not found" is recomputed from the catalog.
+        for kind, source in (
+            ("kor_exact", "kor_exact"),
+            ("eng_exact", "eng_name_exact"),
+        ):
+            lookup = self.store.get_ingredient_lookup(name, kind)
+            if lookup is not None and lookup.standard_name:
+                return source, lookup.standard_name
+        return None
 
     def match(self, names: Sequence[str]) -> list[dict]:
         rows = []
@@ -289,6 +317,7 @@ class IngredientResolver:
                 "raw_name": raw,
                 "standard_name": None,
                 "status": "pending",
+                "matched_by": None,
                 "error_code": None,
             }
             # Strip printed amount annotations only; retain the untouched raw name.
@@ -302,52 +331,39 @@ class IngredientResolver:
             try:
                 if name in self.memo:
                     self.stats["memo_hits"] += 1
+                elif not name:
+                    self.memo[name] = (None, None)
                 else:
-                    lookup = (
-                        self.store.get_ingredient_lookup(name, "kor_exact")
-                        if name
-                        else None
-                    )
-                    cached = self.store.get_ingredient_standard(name)
-                    if lookup is not None:
-                        self.memo[name] = lookup.standard_name
+                    cached = self._cached(name)
+                    if cached is not None:
+                        self.memo[name] = cached
                         self.stats["db_hits"] += 1
-                    elif cached is not None and cached.name_ko == name:
-                        self.memo[name] = name
-                        self.stats["db_hits"] += 1
-                    elif not name:
-                        self.memo[name] = None
                     else:
-                        result = self.mfds.search_ingredients(name)
-                        self.stats["api_lookups"] += 1
-                        _mfds_system(result)
-                        if result.stopped:
-                            # An incomplete answer is never cached.
-                            row["error_code"] = result.stopped
-                            rows.append(row)
-                            continue
-                        # Never trust a fake or a future adapter to filter partial matches.
-                        standard = next(
-                            (item for item in result.items if item.name_ko == name),
-                            None,
-                        )
-                        self.memo[name] = standard.name_ko if standard else None
-                        self.store.upsert_ingredient_lookup(
-                            IngredientLookup(
-                                query_key=name,
-                                kind="kor_exact",
-                                standard_name=self.memo[name],
-                                queried_at=self.now(),
-                            )
-                        )
-                        if standard:
-                            self.store.upsert_ingredient_standard(
-                                CachedIngredientStandard(
-                                    **standard.model_dump(), queried_at=self.now()
+                        found = self._catalog().match(name)
+                        self.stats["catalog_lookups"] += 1
+                        if found is None:
+                            self.memo[name] = (None, None)
+                        elif found[0] == "ambiguous":
+                            # An English or Korean name that points to several standard
+                            # names is never resolved by picking one.
+                            self.ambiguous.add(name)
+                            self.memo[name] = (None, None)
+                        else:
+                            self.memo[name] = found  # type: ignore[assignment]
+                            self.store.upsert_ingredient_lookup(
+                                IngredientLookup(
+                                    query_key=name,
+                                    kind="kor_exact"
+                                    if found[0] == "kor_exact"
+                                    else "eng_exact",
+                                    standard_name=found[1],
+                                    queried_at=self.now(),
                                 )
                             )
-                row["standard_name"] = self.memo[name]
-                row["status"] = "resolved" if self.memo[name] else "unresolved"
+                source, standard = self.memo[name]
+                row["standard_name"] = standard
+                row["matched_by"] = source
+                row["status"] = "resolved" if standard else "unresolved"
             except _Stop:
                 raise
             except Exception:  # noqa: BLE001 -- one ingredient cannot discard later facts
@@ -575,7 +591,7 @@ def run_products(
     reports = [
         {"index": item.index, "status": "pending", "error_code": None} for item in items
     ]
-    resolver = IngredientResolver(deps.mfds, deps.store, ingredient_aliases, deps.now)
+    resolver = IngredientResolver(deps.store, ingredient_aliases, deps.now)
     ingredients = []
     cert_products = Counter()
     cert_by_kind = {kind.value: Counter() for kind in FunctionalKind}
@@ -634,6 +650,7 @@ def run_products(
                         raw_name=row["raw_name"],
                         standard_name=row["standard_name"],
                         status=row["status"],
+                        matched_by=row["matched_by"],
                     )
                     for index, row in enumerate(matches, 1)
                 ]
@@ -723,6 +740,11 @@ def run_products(
         "by_status": dict(Counter(row["status"] for row in reports)),
         "ingredient_count": len(all_rows),
         "ingredient_cache": dict(resolver.stats),
+        "ingredient_catalog": resolver.catalog_stats,
+        "ingredient_ambiguous": sorted(resolver.ambiguous)[:50],
+        "mfds_requests": getattr(deps.mfds, "requests_made", None)
+        if isinstance(getattr(deps.mfds, "requests_made", None), int)
+        else None,
         "resolved_ratio": resolved / len(all_rows) if all_rows else None,
         "unresolved": sum(row["status"] == "unresolved" for row in all_rows),
         "ingredient_pending": sum(row["status"] == "pending" for row in all_rows),

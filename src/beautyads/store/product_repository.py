@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from beautyads.domain.products import (
     CachedIngredientStandard,
+    IngredientCatalogEntry,
     IngredientLookup,
     Product,
     ProductCert,
@@ -45,6 +46,7 @@ _INGREDIENT_COLUMNS = (
     "raw_name",
     "standard_name",
     "status",
+    "matched_by",
 )
 _CERT_COLUMNS = (
     "brand",
@@ -64,6 +66,15 @@ _PRICE_COLUMNS = (
 )
 _EXTRACTION_COLUMNS = ("brand", "source_url", "prompt_version", "raw_output")
 _STANDARD_COLUMNS = ("name_ko", "name_en", "cas_no", "queried_at")
+_CATALOG_COLUMNS = (
+    "page_no",
+    "row_no",
+    "name_ko",
+    "name_en",
+    "cas_no",
+    "source_total",
+    "fetched_at",
+)
 _LOOKUP_COLUMNS = ("query_key", "kind", "standard_name", "queried_at")
 _JSON_COLUMNS = frozenset(
     {"aliases", "skin_types", "efficacy_texts", "functional_texts"}
@@ -111,6 +122,12 @@ _LOOKUP_UPSERT = (
     _insert_sql("ingredient_lookups", _LOOKUP_COLUMNS)
     + " ON CONFLICT (query_key, kind) DO UPDATE SET"
     + " standard_name = EXCLUDED.standard_name, queried_at = EXCLUDED.queried_at"
+)
+_CATALOG_UPSERT = (
+    _insert_sql("mfds_ingredient_catalog", _CATALOG_COLUMNS)
+    + " ON CONFLICT (page_no, row_no) DO UPDATE SET name_ko = EXCLUDED.name_ko,"
+    + " name_en = EXCLUDED.name_en, cas_no = EXCLUDED.cas_no,"
+    + " source_total = EXCLUDED.source_total, fetched_at = EXCLUDED.fetched_at"
 )
 
 
@@ -281,6 +298,32 @@ class PostgresProductStore(ProductRepository):
 
     def upsert_ingredient_standard(self, standard: CachedIngredientStandard) -> None:
         self._write([(_STANDARD_UPSERT, _values(standard, _STANDARD_COLUMNS))])
+
+    def upsert_catalog_page(self, entries: Sequence[IngredientCatalogEntry]) -> None:
+        if entries:
+            self._write(
+                (_CATALOG_UPSERT, _values(entry, _CATALOG_COLUMNS)) for entry in entries
+            )
+
+    def catalog_last_page(self) -> int:
+        try:
+            rows = self.conn.execute(
+                "SELECT page_no FROM mfds_ingredient_catalog"
+                " ORDER BY page_no DESC LIMIT 1"
+            ).fetchall()
+        except Exception:
+            self.conn.rollback()
+            raise
+        self.conn.rollback()
+        return max((row[0] for row in rows), default=0)
+
+    def list_catalog(self) -> list[IngredientCatalogEntry]:
+        return self._read(
+            IngredientCatalogEntry,
+            "mfds_ingredient_catalog",
+            _CATALOG_COLUMNS,
+            order="page_no, row_no",
+        )
 
     def get_ingredient_lookup(
         self, query_key: str, kind: str

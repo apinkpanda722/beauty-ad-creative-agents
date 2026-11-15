@@ -200,6 +200,24 @@ MIGRATIONS: list[tuple[int, str, str]] = [
         );
         """,
     ),
+    (
+        6,
+        "ingredient_catalog_and_match_source",
+        """
+        CREATE TABLE IF NOT EXISTS mfds_ingredient_catalog (
+            page_no int NOT NULL CHECK (page_no >= 1),
+            row_no int NOT NULL CHECK (row_no >= 0),
+            name_ko text NOT NULL,
+            name_en text,
+            cas_no text,
+            source_total int NOT NULL CHECK (source_total >= 1),
+            fetched_at timestamptz NOT NULL,
+            PRIMARY KEY (page_no, row_no)
+        );
+        ALTER TABLE product_ingredients ADD COLUMN IF NOT EXISTS matched_by text
+            CHECK (matched_by IN ('kor_exact', 'eng_name_exact'));
+        """,
+    ),
 ]
 
 # Fixed identifiers and SQL types, never caller input. Explicit casts preserve

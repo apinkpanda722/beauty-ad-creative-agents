@@ -236,11 +236,13 @@ def test_product_migration_v4_is_additive_repeatable_and_preserves_prior_version
     executed = []
     for _ in range(2):
         conn = FakeConnection([FakeCursor(), FakeCursor([(1,), (2,), (3,)])])
-        assert apply_migrations(conn) == [4, 5]
+        assert apply_migrations(conn) == [4, 5, 6]
         executed.append([query for query, _ in conn.calls if query == sql])
-        assert conn.commits == 2 and conn.rollbacks == 0
+        assert conn.commits == 3 and conn.rollbacks == 0
     assert executed == [[sql], [sql]]
-    conn = FakeConnection([FakeCursor(), FakeCursor([(1,), (2,), (3,), (4,), (5,)])])
+    conn = FakeConnection(
+        [FakeCursor(), FakeCursor([(1,), (2,), (3,), (4,), (5,), (6,)])]
+    )
     assert apply_migrations(conn) == []
     assert not calls_for(conn, "CREATE TABLE IF NOT EXISTS products")
 
@@ -1096,3 +1098,20 @@ def test_migration_5_only_adds_the_ingredient_lookup_cache():
     # Additive: nothing is removed or altered, and no other table is touched.
     assert "DR" + "OP " not in normalized and "ALT" + "ER " not in normalized
     assert normalized.count("CREATE TABLE") == 1
+
+
+def test_migration_6_adds_the_catalog_and_match_source_without_removing_anything():
+    [(version, name, sql)] = [item for item in MIGRATIONS if item[0] == 6]
+    assert version == 6 and name == "ingredient_catalog_and_match_source"
+    normalized = " ".join(sql.split()).upper()
+    assert "CREATE TABLE IF NOT EXISTS MFDS_INGREDIENT_CATALOG" in normalized
+    assert "PRIMARY KEY (PAGE_NO, ROW_NO)" in normalized
+    assert (
+        "ALTER TABLE PRODUCT_INGREDIENTS ADD COLUMN IF NOT EXISTS MATCHED_BY"
+        in normalized
+    )
+    assert "'KOR_EXACT'" in normalized and "'ENG_NAME_EXACT'" in normalized
+    assert "DR" + "OP " not in normalized and "TRUNCATE" not in normalized
+    assert (
+        normalized.count("CREATE TABLE") == 1 and normalized.count("ALTER TABLE") == 1
+    )

@@ -65,6 +65,15 @@ class MFDSResult[T](NamedTuple):
     error: MFDSError | None = None
 
 
+class MFDSPage[T](NamedTuple):
+    """One unfiltered page; total is None when the page could not be read."""
+
+    items: list[T]
+    total: int | None = None
+    stopped: str | None = None
+    error: MFDSError | None = None
+
+
 def mfds_httpx_get(
     url: str, params: Mapping[str, str], timeout_s: float
 ) -> MFDSHttpResponse:
@@ -245,6 +254,11 @@ class MFDSClient:
         self._last_request: float | None = None
         self._consecutive_failures = 0
 
+    @property
+    def requests_made(self) -> int:
+        """Requests actually sent so far (retries included)."""
+        return self._requests
+
     def _request(self, endpoint: str, params: Mapping[str, str]) -> Mapping[str, Any]:
         """One request with provider-code retries (backoff), within the shared cap."""
         for retry in range(len(_PROVIDER_RETRY_BACKOFF_S) + 1):
@@ -424,6 +438,47 @@ class MFDSClient:
             num_of_rows=num_of_rows,
             exact=True,
         )
+
+    def fetch_ingredient_page(
+        self, page_no: int, *, num_of_rows: int = 100
+    ) -> MFDSPage[IngredientStandard]:
+        """Read one page of the whole ingredient list (the API has no English search)."""
+        if type(page_no) is not int or page_no < 1:
+            raise ValueError("MFDS_INVALID_PAGE")
+        if type(num_of_rows) is not int or num_of_rows < 1:
+            raise ValueError("MFDS_INVALID_PAGE_SIZE")
+        try:
+            content = self._request(
+                _INGREDIENT,
+                {
+                    "type": "json",
+                    "pageNo": str(page_no),
+                    "numOfRows": str(num_of_rows),
+                },
+            )
+            total = content.get("totalCount")
+            if total == 0 or "items" not in content:
+                return MFDSPage([], 0)
+            rows = content.get("items")
+            if (
+                type(total) is not int
+                or total < 0
+                or not isinstance(rows, list)
+                or any(not isinstance(row, Mapping) for row in rows)
+            ):
+                raise MFDSError("MFDS_INVALID_RESPONSE")
+            return MFDSPage([_ingredient(row) for row in rows], total)
+        except ValidationError:
+            error = MFDSError("MFDS_INVALID_RESPONSE")
+            return MFDSPage([], None, error.code, error)
+        except MFDSError as error:
+            diagnostic = MFDSError(
+                error.code,
+                provider_code=error.provider_code,
+                provider_message=error.provider_message,
+                http_status=error.http_status,
+            )
+            return MFDSPage([], None, diagnostic.code, diagnostic)
 
     def search_reports(
         self, item_name: str, *, max_pages: int = 10, num_of_rows: int = 100
