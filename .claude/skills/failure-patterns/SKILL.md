@@ -84,6 +84,13 @@ description: 이 프로젝트(beauty-ad-creative-agents)와 앞선 프로젝트 
 - **강제 수단**: `tests/test_mall.py`의 몰 구조별 테스트(`test_detail_images_in_a_tab_container_use_plain_src_and_skip_icons`, `test_detail_images_after_an_empty_anchor_extend_past_the_review_anchor`, `test_detail_images_in_a_content_block_use_plain_src`, `test_godomall_detail_section_images_are_read`)가 실제 원본에서 만든 픽스처(`mall_cafe24_tab_src`·`empty_anchor`·`tab_cont`, `mall_godomall_detail`)를 읽는다. /review 체크(몰·출처별 원본 픽스처가 있는가, 픽스처가 어댑터가 읽는 요소만 남기고 잘렸는가).
 - **출처**: 2026-11-15 P4 `make live-products --scan`, `docs/TROUBLESHOOTING_LOG.md`
 
+### FP-C09 추출 실패를 데이터 부재로 단정한다 / 재저장이 이전 행을 지우지 않는다
+- **증상**: P4에서 바이오던스 제품 5개가 "상세 이미지에 전성분이 없다"며 보류됐고 교체까지 논의됐는데, 저장해 둔 페이지의 본문에 `[전성분] 정제수, …`가 인라인 텍스트로 있었다. 어댑터가 라벨·값 구조만 읽었다. 같은 시기에 성분 쉼표 파싱을 고쳐 재실행하자 짧아진 결과의 끝쪽 이전 행이 DB에 그대로 남아(제품당 1~2행, 22개 제품), 해결률의 분모와 빈도표가 오염됐다.
+- **원인**: "못 찾았다"를 "없다"로 단정하고 이미지 읽기로 넘어갔다(FP-C05의 변형). 저장 방식이 (제품, 순서) 키 덮어쓰기뿐이라 집합이 줄어드는 재처리를 고려하지 않았다.
+- **규칙**: (1) 추출이 비면 데이터 부재로 보고하기 전에 **저장된 페이지의 본문 텍스트에서 '전성분' 문자열을 먼저 검색**한다. 마크업 구조(th/td, 아코디언, 팝업, 인라인 문단)를 하나씩 확인하고, 이미지로 넘어가거나 후보를 교체하는 것은 그다음이다. (2) 한 제품의 하위 행 집합은 **집합 교체**(같은 트랜잭션에서 새 행 upsert + 초과 행 삭제)로 저장하고, 재처리 결과가 짧아지는 경우를 테스트한다. 파생물(그래프)에도 삭제를 반영한다.
+- **강제 수단**: `tests/test_product_store.py`의 `test_replace_ingredients_drops_surplus_rows_in_the_same_transaction`·`test_replace_with_an_empty_list_removes_the_product_ingredients`, `tests/test_ingredient_cleanup.py`, `tests/test_products_pipeline.py::test_product_ingredients_are_saved_as_a_whole_set_replacement`. 바이오던스 인라인 텍스트 파서 테스트는 (b) 구현 때 여기에 적는다. /review 체크(보류·실패 사유가 "데이터 없음"이면 본문 텍스트 검색 기록이 있는가, 하위 행 저장이 집합 교체인가).
+- **출처**: 2026-11-15 P4 바이오던스 보류, 성분 재파싱 잔여 행, `docs/TROUBLESHOOTING_LOG.md`
+
 ---
 
 ## B에서 이식한 항목 (프로젝트 B `failure-patterns`의 번호)

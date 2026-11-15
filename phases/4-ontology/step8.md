@@ -28,7 +28,7 @@
 **선행 조건**: `config/ingredient_efficacy.yaml`(성분→효능 수기 표)이 아래 "확정된 표" 절에 승인본으로 붙어 있어야 한다. 이 표는 step 7 live 뒤 성분 빈도 보고를 받아 조언 세션이 상위 약 20개에 출처를 붙여 만든다. 절이 비어 있으면 `blocked`(reason에 "성분→효능 수기 표가 없다").
 
 - **노드**: `Brand`, `Product`(이름, 영문명, 별칭, 용량·단위, 정가·판매가·`price_basis`, 단위당 정가, 가격 수집 시각, 출처 주소), `Category`(`mask_pack`·`serum_ampoule`·`sun_care`, 고정 목록), `Form`, `Ingredient`(표준명, 영문명, CAS), `IngredientAlias`, `Efficacy`(`domain.labels.Claim`의 값, `other` 제외 — 분류의 소구점 값과 같은 목록), `SkinConcern`·`SkinType`(`domain/skin.py`의 목록), `FunctionalCert`, `ClaimRule`(step 1 규칙).
-- **관계**: `OWNS`, `IN_CATEGORY`, `HAS_FORM`, `CONTAINS`(표기 순서, 핵심 성분 여부, 출처), `ALIAS_OF`, `HAS_EFFICACY`, `ADDRESSES`, `SUITS`, `CERTIFIED_AS`, `APPLIES_TO`. **`미해결` 성분은 `Ingredient` 노드로 올리지 않는다**(`CONTAINS`는 표준명에 묶인 성분만, 미해결은 PostgreSQL에만 남는다).
+- **관계**: `OWNS`, `IN_CATEGORY`, `HAS_FORM`, `CONTAINS`(표기 순서, 핵심 성분 여부, 출처), `ALIAS_OF`, `HAS_EFFICACY`, `ADDRESSES`, `SUITS`, `CERTIFIED_AS`, `APPLIES_TO`. **`미해결` 성분은 `Ingredient` 노드로 올리지 않는다**(`CONTAINS`는 표준명에 묶인 성분만, 미해결은 PostgreSQL에만 남는다). **제품의 성분 관계(`CONTAINS`)는 집합 교체(삭제 반영)로 적재한다**: 한 제품의 `CONTAINS`는 PostgreSQL의 그 제품 성분 집합과 정확히 같아야 하므로, 적재할 때 PostgreSQL에 더 이상 없는 관계(순서가 줄어 사라진 행, 표준명이 바뀐 행)를 그래프에서 삭제한다. 삭제된 행은 변경 시각으로 보이지 않으므로, 변경이 감지된 제품은 그 제품의 `CONTAINS` 전체를 다시 계산해 교체한다(MERGE 후 집합에 없는 관계 삭제). 이유: 재파싱이 짧아져 이전 행이 남는 결함이 P4에서 실제로 있었다(FP-C09).
 - **`HAS_EFFICACY`의 출처(ADR-012 후속 결정)**: (a) 식약처 기능성 고시 성분(미백·주름 개선·자외선 차단), (b) 그 밖의 효능(진정·보습 등)은 `config/ingredient_efficacy.yaml`의 소규모 수기 표(**각 행에 출처 문헌·데이터베이스 필수**). 출처가 없는 행은 로더가 `INGREDIENT_EFFICACY_INVALID`로 거부하고 **관계를 만들지 않는다**. 관계 속성에 `source`를 둔다.
 - **`ADDRESSES`(Efficacy→SkinConcern)**: `config/efficacy_concerns.yaml`에 ADR-012 후속 결정 6의 대응 초안이 들어 있다. **출처가 없는 초안이므로 행마다 `status`(`draft`·`confirmed`)와 `source`를 둔다. `status == confirmed`이고 `source`가 비어 있지 않은 행만 관계로 올리고, `draft` 행은 올리지 않으며 건수를 `draft_not_loaded`로 요약에 출력한다**(사용자 확인 또는 출처 부여 전에는 그래프에 없다). `SkinConcern`·`SkinType` 노드는 올린다.
 - **`CERTIFIED_AS`**: `product_certs.status == certified`인 것만 만든다. **`unknown`(보고품목 `SPF`·`PA` null 등)은 관계를 만들지 않고** 커버리지 수(`certified`·`unknown`·제품 수)를 요약에 출력한다("인증 없음"으로 만들지 않는다).
@@ -44,6 +44,7 @@
 - 적재 문장: `CREATE` 없음·`MERGE`·파라미터만, 같은 입력을 두 번 넣으면 문장·파라미터가 같다, 제약이 `IF NOT EXISTS`이고 기존 제약이 불변이다.
 - `HAS_EFFICACY`: 출처가 없는 합성 행은 거부되고 관계가 만들어지지 않는다, 출처가 있는 행은 `source` 속성을 가진다, 표에 없는 성분·효능은 관계가 없다("근거 연결 없음"을 다른 값으로 채우지 않는다), `Efficacy` 값이 `Claim`의 닫힌 목록 밖이면 거부된다.
 - `ADDRESSES`: `draft` 행은 올라가지 않고 `draft_not_loaded`로 센다, `confirmed`이면서 출처가 있는 행만 올라간다, `confirmed`인데 출처가 비어 있으면 `EFFICACY_CONCERN_INVALID`, 값이 `Claim`·`SkinConcern` 밖이면 거부된다.
+- 한 제품의 성분 행 수가 줄어든 뒤 다시 적재하면 사라진 순서의 `CONTAINS`가 그래프에서도 삭제된다(제품당 `CONTAINS` 수가 PostgreSQL의 성분 수와 같다)
 - `미해결` 성분이 `Ingredient` 노드·`CONTAINS`로 올라가지 않는다, 별칭이 표준명에 `ALIAS_OF`로 이어진다.
 - `CERTIFIED_AS`: `unknown`은 관계가 없고 커버리지 수에 센다, `certified`만 관계가 된다.
 - 증분: 워터마크보다 오래된 제품은 읽지 않는다, 적재 실패 시 워터마크가 오르지 않는다, 그래프 카운터를 판정에 쓰지 않는다.

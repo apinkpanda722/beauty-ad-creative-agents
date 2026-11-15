@@ -248,18 +248,39 @@ def _ingredients(root: _Node) -> str | None:
 _INLINE_LABEL = "[전성분]"
 
 
+def _text_runs(node: _Node) -> Iterator[str]:
+    """Text runs in document order; script and style text is never content."""
+    for child in node.children:
+        if isinstance(child, str):
+            yield child
+        elif child.tag not in {"script", "style"}:
+            yield from _text_runs(child)
+
+
+def _bracket_value(text: str) -> str:
+    # Another bracket label on a later line starts a different item.
+    text = re.split(r"\n\s*\[", text, maxsplit=1)[0]
+    return " ".join(text.split())
+
+
 def _inline_ingredients(root: _Node) -> str | None:
-    """A text run "[전성분] a, b, c" inside a paragraph, with no label/value element."""
-    for node in root.walk():
-        for child in node.children:
-            if not isinstance(child, str) or _INLINE_LABEL not in child:
-                continue
-            value = child.split(_INLINE_LABEL, 1)[1]
-            # Another bracket label on a later line starts a different item.
-            value = re.split(r"\n\s*\[", value, maxsplit=1)[0]
-            value = " ".join(value.split())
-            if value:
-                return value
+    """ "[전성분] a, b, c" in a paragraph, with no label/value element.
+
+    The list follows the label in the same text run, or, when the label run ends
+    there, is the next non-blank text run (it must look like a list: two commas).
+    """
+    runs = list(_text_runs(root))
+    for index, run in enumerate(runs):
+        if _INLINE_LABEL not in run:
+            continue
+        value = _bracket_value(run.split(_INLINE_LABEL, 1)[1])
+        if value:
+            return value
+        following = next(
+            (_bracket_value(text) for text in runs[index + 1 :] if text.strip()), ""
+        )
+        if following.count(",") >= 2:
+            return following
     return None
 
 

@@ -1052,3 +1052,42 @@ def test_an_empty_inline_ingredient_label_is_not_text():
         None, "biodance", "https://biodance.co.kr/product/x/132/", body=body
     )
     assert product.ingredients_text is None
+
+
+@pytest.mark.parametrize(
+    "fixture,first",
+    [
+        ("inline_ingredients_paragraph", "캐비어수(678,243ppm), 글리세린"),
+        ("inline_ingredients_next_run", "정제수, 프로판다이올, 글리세린"),
+        (
+            "inline_ingredients_style",
+            "콜라겐수(622,119ppm), 네오펜틸글라이콜다이헵타노에이트",
+        ),
+    ],
+)
+def test_inline_label_with_the_list_in_a_following_text_run(fixture, first):
+    # Real biodance variants: the "[전성분]" run ends at the label and the list is the
+    # next text run (sometimes after an inline <style>, whose text is never a value).
+    product = _product(
+        f"cafe24_{fixture}.html", "biodance", "https://biodance.co.kr/product/x/1/"
+    )
+    assert product.ingredients_text and product.ingredients_text.startswith(first)
+    assert (
+        "<style" not in product.ingredients_text
+        and "border:" not in product.ingredients_text
+    )
+    assert "주식회사" not in product.ingredients_text  # stops before the business info
+    assert "1,2-헥산다이올" in product.ingredients_text
+    assert product.detail_image_urls == ()
+
+
+def test_a_label_followed_only_by_unrelated_short_text_is_not_an_ingredient_list():
+    body = (
+        '<html><head><meta property="product:price:amount" content="1000" />'
+        '<meta property="product:sale_price:amount" content="1000" /></head><body>'
+        "<p><span>[전성분] </span></p><p><span>상세 이미지를 참고하세요</span></p></body></html>"
+    ).encode()
+    product = _product(
+        None, "biodance", "https://biodance.co.kr/product/x/1/", body=body
+    )
+    assert product.ingredients_text is None
