@@ -130,6 +130,9 @@ def run(tmp_path, dep, items=None, **kwargs):
         brand_pool={"cosrx": ["합성 세럼"], "anua": ["다른 제품"]},
         ingredient_aliases={},
         product_aliases={},
+        brand_korean_names=kwargs.pop(
+            "brand_korean_names", {"cosrx": "합성", "anua": "합성"}
+        ),
         out=out,
         report_path=tmp_path / "state.json",
         **kwargs,
@@ -252,49 +255,6 @@ def test_brand_pool_fail_closed(tmp_path, content):
 def test_pool_missing(tmp_path):
     with pytest.raises(p.ProductsError, match="BRAND_POOL_UNREADABLE"):
         p.load_brand_pool(tmp_path / "missing")
-
-
-def test_certs_null_cancelled_exact_name_no_company_inference():
-    dep, _ = deps()
-    r = recorded("mfds_functional_report_query.json")[0]
-    report = FunctionalReport(
-        item_name=r.get("ITEM_NAME"),
-        entp_name=r.get("ENTP_NAME"),
-        effect_text=r.get("EE_NAME"),
-        spf=r.get("SPF"),
-        pa=r.get("PA"),
-        source="report",
-    )
-    item = candidate(title=" ".join(report.item_name))
-    dep.mfds.search_reports.return_value = MFDSResult(
-        [
-            report,
-            report.model_copy(update={"cancelled": True, "spf": "50+"}),
-            report.model_copy(
-                update={"item_name": report.item_name + "추가", "spf": "50+"}
-            ),
-            report.model_copy(
-                update={"item_name": "다른 제품", "entp_name": item.title, "spf": "50+"}
-            ),
-        ]
-    )
-    certs = p.match_certs(item, dep.mfds)
-    assert {c.status.value for c in certs} == {"unknown"}
-    assert {c.kind.value for c in certs} == {
-        "brightening",
-        "anti_aging",
-        "sun_protection",
-    }
-    dep.mfds.search_reports.return_value = MFDSResult(
-        [report.model_copy(update={"spf": "50+", "entp_name": "다른 회사"})]
-    )
-    assert (
-        next(
-            c for c in p.match_certs(item, dep.mfds) if c.kind.value == "sun_protection"
-        ).status.value
-        == "certified"
-    )
-    dep.mfds.search_screenings.assert_called()
 
 
 def test_text_bypasses_model_and_preserves_all_ingredients(tmp_path):
@@ -778,30 +738,6 @@ def test_scan_preflight_missing_credentials_never_constructs_mall(cli):
     assert "ENV_MISSING:GEMINI_API_KEY" in out.getvalue()
 
 
-def test_cert_coverage_counts_products_and_each_kind(tmp_path):
-    dep, _ = deps()
-    dep.mfds.search_reports.side_effect = lambda name: (
-        MFDSResult(
-            [
-                FunctionalReport(
-                    item_name=name,
-                    source="report",
-                    effect_text="피부의 미백에 도움을 준다.",
-                )
-            ]
-        )
-        if name == "합성세럼"
-        else MFDSResult([])
-    )
-    report, _ = run(
-        tmp_path, dep, [candidate(index=1), candidate(title="다른 세럼", index=2)]
-    )
-    assert report["certification"]["certified"] == 1
-    assert report["certification"]["unknown"] == 1
-    assert report["certification"]["coverage"] == 0.5
-    assert report["certification"]["by_kind"]["sun_protection"]["unknown"] == 2
-
-
 def test_failed_product_records_each_image_error_code(tmp_path):
     # PRODUCT_DETAIL_FAILED used to drop the per-image causes, so a live failure
     # could not be diagnosed afterwards.
@@ -998,3 +934,165 @@ def test_ingredients_found_before_the_cap_are_not_held(tmp_path, monkeypatch):
     )
     report, _ = run(tmp_path, dep)
     assert report["products"][0]["status"] == "done"
+
+
+def _report(name, *, spf="50+", entp="다른 회사", **changes):
+    return FunctionalReport(
+        item_name=name,
+        entp_name=entp,
+        spf=spf,
+        effect_text="피부의 미백에 도움을 준다.",
+        source="report",
+        **changes,
+    )
+
+
+def _cert(items, title="콩 선세럼 50ml", brand_name="믹순", screenings=()):
+    dep, _ = deps()
+    dep.mfds.search_reports.return_value = MFDSResult(list(items))
+    dep.mfds.search_screenings.return_value = MFDSResult(list(screenings))
+    certs = p.match_certs(candidate(title=title), dep.mfds, brand_name)
+    return {c.kind.value: c for c in certs}, dep
+
+
+def test_cert_matches_only_brand_prefixed_name_equal_after_normalizing_the_mall_name():
+    certs, dep = _cert([_report("믹순콩선세럼")])
+    assert certs["sun_protection"].status.value == "certified"
+    assert certs["sun_protection"].evidence_item_name == "믹순콩선세럼"
+    # The query is the mall name without SPF/PA, volume and symbols, spaces removed.
+    assert dep.mfds.search_reports.call_args.args == ("콩선세럼",)
+
+
+def test_cert_name_with_spf_suffix_is_not_the_normalized_name():
+    # Real MFDS data has "믹순콩선세럼" and "믹순콩선세럼SPF50+PA++++" side by side;
+    # only the first equals brand + normalized name, so it is a single candidate.
+    certs, _ = _cert([_report("믹순콩선세럼SPF50+PA++++"), _report("믹순콩선세럼")])
+    assert certs["sun_protection"].evidence_item_name == "믹순콩선세럼"
+
+
+def test_two_different_matching_item_names_are_ambiguous_and_stay_unknown():
+    certs, _ = _cert([_report("믹순콩선세럼"), _report("믹순 콩 선세럼")])
+    assert {c.status.value for c in certs.values()} == {"unknown"}
+    assert all(c.evidence_item_name is None for c in certs.values())
+
+
+def test_the_same_item_name_in_both_apis_is_one_candidate():
+    certs, _ = _cert(
+        [_report("믹순콩선세럼")],
+        screenings=[
+            FunctionalReport(
+                item_name="믹순콩선세럼",
+                source="screening",
+                effect_text="피부의 미백에 도움을 준다.",
+            )
+        ],
+    )
+    assert certs["sun_protection"].status.value == "certified"
+    assert certs["brightening"].status.value == "certified"
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "단하나콩선세럼",  # another brand's prefix
+        "콩선세럼",  # no brand prefix at all
+        "믹순콩선세럼추가",  # longer than the normalized name
+        "콩선세럼믹순",  # brand is not a prefix
+    ],
+)
+def test_names_without_the_exact_brand_prefix_are_never_accepted(name):
+    certs, _ = _cert([_report(name)])
+    assert {c.status.value for c in certs.values()} == {"unknown"}
+
+
+def test_company_name_never_decides_the_brand_or_the_match():
+    certs, _ = _cert([_report("다른제품", entp="믹순콩선세럼")])
+    assert {c.status.value for c in certs.values()} == {"unknown"}
+    certs, _ = _cert([_report("콩선세럼", entp="믹순")])
+    assert {c.status.value for c in certs.values()} == {"unknown"}
+
+
+def test_cancelled_reports_are_ignored():
+    certs, _ = _cert(
+        [
+            _report("믹순콩선세럼", cancelled=True),
+            _report("믹순콩선세럼", cancelled_raw="Y"),
+        ]
+    )
+    assert {c.status.value for c in certs.values()} == {"unknown"}
+
+
+def test_a_brand_without_a_korean_name_is_unknown_without_any_request():
+    certs, dep = _cert([_report("믹순콩선세럼")], brand_name=None)
+    assert {c.status.value for c in certs.values()} == {"unknown"}
+    dep.mfds.search_reports.assert_not_called()
+    dep.mfds.search_screenings.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "title,core",
+    [
+        (
+            "어성초 마일드 선크림 릴리프 튜브 SPF50+ PA++++",
+            "어성초마일드선크림릴리프튜브",
+        ),
+        ("인삼선세럼 (SPF 50+ PA++++)", "인삼선세럼"),
+        (
+            "맑은쌀선크림 : 쌀추출물+나이아신아마이드 (SPF 50+ PA++++)",
+            "맑은쌀선크림쌀추출물나이아신아마이드",
+        ),
+        ("워터풀 에센스 선크림 50ml", "워터풀에센스선크림"),
+        ("PANTHENOL PA 크림 20g", "PANTHENOL크림"),
+        ("PDRN 실키 선 스틱", "PDRN실키선스틱"),
+    ],
+)
+def test_mall_name_normalization(title, core):
+    assert p._cert_core(title) == core.casefold()
+
+
+def test_brand_korean_names_loader_requires_nonblank_text(tmp_path):
+    path = tmp_path / "names.yaml"
+    path.write_text(
+        yaml.safe_dump({"brands": {"cosrx": "코스알엑스"}}), encoding="utf-8"
+    )
+    assert p.load_brand_korean_names(path) == {"cosrx": "코스알엑스"}
+    for bad in [{"brands": {"cosrx": " "}}, {"brands": []}, {"other": {}}, {}]:
+        path.write_text(yaml.safe_dump(bad), encoding="utf-8")
+        with pytest.raises(p.ProductsError, match="BRAND_NAMES_INVALID"):
+            p.load_brand_korean_names(path)
+    with pytest.raises(p.ProductsError, match="BRAND_NAMES_INVALID"):
+        p.load_brand_korean_names(tmp_path / "missing.yaml")
+
+
+def test_the_real_brand_name_table_covers_every_candidate_brand():
+    names = p.load_brand_korean_names(p.BRAND_NAMES_PATH)
+    brands = {item.brand for item in p.load_candidates(p.CANDIDATES_PATH)}
+    assert brands <= set(names)
+
+
+def test_cert_coverage_counts_products_and_each_kind(tmp_path):
+    dep, _ = deps()
+    dep.mfds.search_reports.side_effect = lambda name: (
+        MFDSResult(
+            [
+                FunctionalReport(
+                    item_name="합성" + name,
+                    source="report",
+                    effect_text="피부의 미백에 도움을 준다.",
+                )
+            ]
+        )
+        if name == "합성세럼"
+        else MFDSResult([])
+    )
+    report, _ = run(
+        tmp_path,
+        dep,
+        [candidate(index=1, title="합성 세럼"), candidate(index=2, title="다른 제품")],
+        brand_korean_names={"cosrx": "합성", "anua": "합성"},
+    )
+    cert = report["certification"]
+    assert cert["certified"] == 1 and cert["unknown"] == 1
+    assert cert["by_kind"]["brightening"] == {"certified": 1, "unknown": 1}
+    assert cert["by_kind"]["sun_protection"] == {"certified": 0, "unknown": 2}
+    assert cert["coverage"] == 0.5

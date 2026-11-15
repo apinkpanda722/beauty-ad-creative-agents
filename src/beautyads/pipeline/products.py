@@ -10,6 +10,7 @@ import json
 import re
 import sys
 import time
+import unicodedata
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from contextlib import ExitStack
@@ -60,6 +61,7 @@ from .preflight import docker_running, tcp_reachable
 
 CANDIDATES_PATH = Path("config/product_candidates.yaml")
 BRAND_POOL_PATH = Path("config/brand_product_pool.yaml")
+BRAND_NAMES_PATH = Path("config/brand_korean_names.yaml")
 INGREDIENT_ALIASES_PATH = Path("config/ingredient_aliases.yaml")
 PRODUCT_ALIASES_PATH = Path("config/product_aliases.yaml")
 REPORT_PATH = Path("data/interim/products/records.json")
@@ -200,6 +202,18 @@ def load_brand_pool(path: Path) -> dict[str, list[str]]:
     ):
         raise ProductsError("BRAND_POOL_UNREADABLE")
     return brands
+
+
+def load_brand_korean_names(path: Path) -> dict[str, str]:
+    doc = _yaml(path, "BRAND_NAMES_INVALID")
+    names = (
+        doc.get("brands") if isinstance(doc, dict) and set(doc) == {"brands"} else None
+    )
+    if not isinstance(names, dict) or any(
+        not _nonblank(brand) or not _nonblank(name) for brand, name in names.items()
+    ):
+        raise ProductsError("BRAND_NAMES_INVALID")
+    return dict(names)
 
 
 def _alias_rows(path: Path) -> list[dict]:
@@ -374,21 +388,51 @@ class IngredientResolver:
         return rows
 
 
-def match_certs(item: Candidate, mfds) -> list[ProductCert]:
+_CERT_NOISE = (
+    re.compile(r"\bSPF\s*\d*\+*", re.IGNORECASE),
+    re.compile(r"\bPA\b\s*\+*", re.IGNORECASE),
+    re.compile(r"\d+(?:\.\d+)?\s*(?:ml|g)(?![a-z])|\d+\s*(?:매|입)", re.IGNORECASE),
+)
+
+
+def _cert_core(title: str) -> str:
+    """Mall product name without SPF/PA, volume and symbols, spaces removed."""
+    text = unicodedata.normalize("NFKC", title)
+    for pattern in _CERT_NOISE:
+        text = pattern.sub(" ", text)
+    return re.sub(r"[^0-9A-Za-z가-힣]", "", text).casefold()
+
+
+def match_certs(
+    item: Candidate, mfds, brand_name: str | None = None
+) -> list[ProductCert]:
+    """Certify only when brand name + normalized mall name equals one report item.
+
+    The report item name must start with the mall's Korean brand name and the rest,
+    spaces removed, must equal the normalized mall name. Two different matching item
+    names, a missing brand prefix, another brand's prefix or an unknown brand name
+    leave every kind unknown. A company name never decides a match.
+    """
+    core = _cert_core(item.title)
+    prefix = "".join((brand_name or "").split()).casefold()
     matched = []
-    query = "".join(item.title.split())
-    for search in (mfds.search_reports, mfds.search_screenings):
-        result = search(query)
-        _mfds_system(result)
-        if result.stopped:
-            raise _Retry(result.stopped)
-        matched.extend(
-            row
-            for row in result.items
-            if row.cancelled is not True
-            and row.cancelled_raw != "Y"
-            and "".join((row.item_name or "").split()) == query
-        )
+    if core and prefix:
+        for search in (mfds.search_reports, mfds.search_screenings):
+            result = search(core)
+            _mfds_system(result)
+            if result.stopped:
+                raise _Retry(result.stopped)
+            for row in result.items:
+                name = "".join((row.item_name or "").split())
+                if (
+                    row.cancelled is not True
+                    and row.cancelled_raw != "Y"
+                    and name.casefold().startswith(prefix)
+                    and name[len(prefix) :].casefold() == core
+                ):
+                    matched.append(row)
+    if len({row.item_name for row in matched}) > 1:
+        matched = []
     certs = []
     for kind in FunctionalKind:
         evidence = next(
@@ -594,6 +638,7 @@ def run_products(
     brand_pool,
     ingredient_aliases,
     product_aliases,
+    brand_korean_names: Mapping[str, str] | None = None,
     report_path: Path,
     out: TextIO,
     ledger_path: Path | None = None,
@@ -626,7 +671,9 @@ def run_products(
             if any(row["status"] == "pending" for row in matches):
                 report["error_code"] = "INGREDIENT_RETRY_REQUIRED"
                 continue
-            certs = match_certs(item, deps.mfds)
+            certs = match_certs(
+                item, deps.mfds, (brand_korean_names or {}).get(item.brand)
+            )
             product = Product.model_validate(
                 dict(
                     brand=item.brand,
@@ -983,6 +1030,7 @@ def main(
         pool = load_brand_pool(BRAND_POOL_PATH)
         ingredient_aliases = load_ingredient_aliases(INGREDIENT_ALIASES_PATH)
         product_aliases = load_product_aliases(PRODUCT_ALIASES_PATH)
+        brand_names = load_brand_korean_names(BRAND_NAMES_PATH)
         if args.products is not None:
             wanted = {part.strip() for part in args.products.split(",")}
             selected = [
@@ -1070,6 +1118,7 @@ def main(
                 brand_pool=pool,
                 ingredient_aliases=ingredient_aliases,
                 product_aliases=product_aliases,
+                brand_korean_names=brand_names,
                 report_path=REPORT_PATH,
                 out=out,
                 ledger_path=settings.ledger_path,
