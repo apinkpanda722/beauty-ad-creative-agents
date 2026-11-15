@@ -31,6 +31,7 @@ _ROBOTS_MAX_BYTES = 1024 * 1024
 _ROBOTS_ABSENT_STATUSES = frozenset({404, 410})
 # robots.txt may redirect (RFC 9309 asks crawlers to follow at least five hops).
 _ROBOTS_MAX_REDIRECTS = 5
+_ERROR_BODY_BYTES = 4096
 _REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
 _VOID_TAGS = frozenset(
     {
@@ -116,9 +117,16 @@ def httpx_mall_get(
         ) as response:
             content_type = response.headers.get("content-type")
             if response.status_code != 200:
+                # Only a 403 keeps a bounded body: robots.txt classification needs to
+                # tell an S3-style XML AccessDenied from other refusals.
+                body = b""
+                if response.status_code == 403:
+                    for chunk in response.iter_bytes(chunk_size=4096):
+                        body = chunk[:_ERROR_BODY_BYTES]
+                        break
                 return MallHttpResponse(
                     response.status_code,
-                    b"",
+                    body,
                     location=response.headers.get("location"),
                     content_type=content_type,
                 )
@@ -400,6 +408,10 @@ class MallClient:
         self._last_request: dict[str, float] = {}
         self._robots: dict[str, RobotFileParser] = {}
         self._intervals: dict[str, float] = {}
+        # brand -> (host, origin) of its product pages; origins whose robots.txt was a
+        # real rules file (HTTP 200, not an HTML error page).
+        self._site: dict[str, tuple[str, str]] = {}
+        self._real_robots: set[str] = set()
 
     def _request(
         self, url: str, *, max_bytes: int, timeout_s: float
@@ -450,7 +462,27 @@ class MallClient:
             url = target
         raise MallError("MALL_ROBOTS_UNREADABLE")
 
-    def _allowed_url(self, brand: str, url: str) -> str:
+    def _image_cdn_without_robots(
+        self, brand: str, host: str, response: MallHttpResponse
+    ) -> bool:
+        """An image-only CDN whose robots.txt is an S3-style XML AccessDenied (403).
+
+        The file does not exist there. Counts only when the brand's own site
+        robots.txt was a real 200 file, the host is not the site itself, and the body
+        is that XML error. Every other 401/403 stays fail-closed.
+        """
+        site = self._site.get(brand)
+        if site is None or host == site[0] or site[1] not in self._real_robots:
+            return False
+        content_type = (response.content_type or "").lower()
+        if response.status != 403 or not content_type.startswith(
+            ("application/xml", "text/xml")
+        ):
+            return False
+        body = response.body[:_ERROR_BODY_BYTES].decode("utf-8", errors="replace")
+        return "<Error>" in body and "<Code>AccessDenied</Code>" in body
+
+    def _allowed_url(self, brand: str, url: str, *, image: bool = False) -> str:
         definition = self.config.malls.get(brand)
         if definition is None:
             raise MallError("MALL_UNKNOWN")
@@ -482,12 +514,15 @@ class MallClient:
                 # file. That body is never read as rules. The request interval still
                 # applies to this host.
                 parser.parse([])
+            elif image and self._image_cdn_without_robots(brand, host, response):
+                parser.parse([])
             elif response.status != 200 or len(response.body) > _ROBOTS_MAX_BYTES:
                 # 401/403, server errors and oversized files stay fail-closed.
                 raise MallError(
                     "MALL_ROBOTS_UNREADABLE", retryable=500 <= response.status < 600
                 )
             else:
+                self._real_robots.add(origin)
                 parser.parse(
                     response.body.decode("utf-8-sig", errors="replace").splitlines()
                 )
@@ -507,6 +542,8 @@ class MallClient:
 
     def fetch_product(self, brand: str, url: str) -> MallProduct:
         url = self._allowed_url(brand, url)
+        parts = urlsplit(url)
+        self._site[brand] = (parts.netloc.lower(), f"{parts.scheme}://{parts.netloc}")
         response = self._request(url, max_bytes=_HTML_MAX_BYTES, timeout_s=_TIMEOUT_S)
         _check_status(response.status, product=True)
         if len(response.body) > _HTML_MAX_BYTES:
@@ -534,7 +571,7 @@ def download_detail_image(
         raise MallError("MALL_INVALID_MAX_BYTES")
     if timeout_s <= 0 or not Decimal(str(timeout_s)).is_finite():
         raise MallError("MALL_INVALID_TIMEOUT")
-    url = client._allowed_url(brand, url)
+    url = client._allowed_url(brand, url, image=True)
     try:
         response = client._request(url, max_bytes=max_bytes, timeout_s=timeout_s)
     except MallError as error:

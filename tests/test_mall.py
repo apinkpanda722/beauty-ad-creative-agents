@@ -915,3 +915,100 @@ def test_an_empty_popup_ingredient_list_is_not_text():
         body=body,
     )
     assert product.ingredients_text is None
+
+
+CDN_IMAGE = "https://cdn.example.net/a.jpg"
+SITE_PAGE = "https://www.cosrx.co.kr/product/732/"
+
+
+def access_denied(status=403, content_type="application/xml", body=None):
+    return MallHttpResponse(
+        status,
+        recorded("robots_s3_access_denied.xml") if body is None else body,
+        content_type=content_type,
+    )
+
+
+def fetch_then_download(responses, image=CDN_IMAGE):
+    get = FakeGet(*responses)
+    mall = client(get)
+    mall.fetch_product("cosrx", SITE_PAGE)
+    return get, lambda: download_detail_image(
+        image, client=mall, brand="cosrx", max_bytes=9
+    )
+
+
+def test_image_cdn_with_an_xml_access_denied_robots_has_no_rules_when_the_site_allows():
+    # Real biodance CDN (S3 behind CloudFront): a missing robots.txt answers 403 with
+    # an XML AccessDenied error. The brand's own site robots.txt is a real 200 file.
+    get, download = fetch_then_download(
+        [robots(), page(), access_denied(), MallHttpResponse(200, b"x")]
+    )
+    assert download() == b"x"
+    assert [urlsplit(url).path for url, _ in get.calls] == [
+        "/robots.txt",
+        "/product/732/",
+        "/robots.txt",
+        "/a.jpg",
+    ]
+
+
+@pytest.mark.parametrize(
+    "denied",
+    [
+        access_denied(content_type="text/html; charset=utf-8"),
+        access_denied(body=b"<Error><Code>SignatureDoesNotMatch</Code></Error>"),
+        access_denied(body=b"<html>AccessDenied</html>"),
+        access_denied(status=401),
+        access_denied(status=500),
+        access_denied(content_type=None),
+    ],
+)
+def test_other_cdn_robots_errors_still_fail_closed(denied):
+    _get, download = fetch_then_download([robots(), page(), denied])
+    with pytest.raises(MallError, match="MALL_ROBOTS_UNREADABLE"):
+        download()
+
+
+def test_the_exception_needs_the_site_robots_to_be_a_real_file():
+    # A site with no robots.txt (404) proves nothing about the brand's rules.
+    _get, download = fetch_then_download(
+        [MallHttpResponse(404, b""), page(), access_denied()]
+    )
+    with pytest.raises(MallError, match="MALL_ROBOTS_UNREADABLE"):
+        download()
+
+
+def test_the_exception_never_covers_the_sites_own_host_or_an_unknown_site():
+    mall = client(FakeGet(access_denied()))
+    with pytest.raises(MallError, match="MALL_ROBOTS_UNREADABLE"):
+        mall.fetch_product("cosrx", SITE_PAGE)
+    # Nothing was fetched for the brand yet, so no site robots was ever read.
+    mall = client(FakeGet(access_denied()))
+    with pytest.raises(MallError, match="MALL_ROBOTS_UNREADABLE"):
+        download_detail_image(CDN_IMAGE, client=mall, brand="cosrx", max_bytes=9)
+
+
+def test_a_403_body_is_read_but_bounded(monkeypatch):
+    from contextlib import contextmanager
+
+    from beautyads.sources import mall as module
+
+    class Response:
+        status_code = 403
+
+        def __init__(self):
+            self.headers = {"content-type": "application/xml"}
+
+        def iter_bytes(self, chunk_size=0):
+            yield b"<Error><Code>AccessDenied</Code>" + b"x" * 100_000
+
+    @contextmanager
+    def stream(method, url, **kwargs):
+        yield Response()
+
+    monkeypatch.setattr(module.httpx, "stream", stream)
+    result = httpx_mall_get("https://cdn.example.net/robots.txt", {}, 1.0, 10)
+    assert result.status == 403 and result.content_type == "application/xml"
+    assert result.body.startswith(b"<Error><Code>AccessDenied</Code>")
+    assert len(result.body) <= 4096
