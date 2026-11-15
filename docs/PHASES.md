@@ -48,6 +48,7 @@
 | 35 | **P3 step 실행 순서 변경(2026-11-13)**: 부분 동결(11-18 예정)이 시범 비교 결과를 보고 정해야 해서 `pilot-compare`(3)와 `cost-recalc`(4)를 먼저 실행하고 이어 1·2·5·6·7 순으로 진행했다. 방법은 `phases/3-collect-freeze/index.json`의 step 배열 순서만 3, 4, 1, 2, 5, 6, 7, 8, 9, 10으로 바꾼 것이며 step 번호와 파일 이름은 그대로다(PHASES.md·사전 등록의 번호 불변). 실행기는 배열의 첫 `pending`을 고르므로 진행 표시는 `Step N/9` 꼴로 보인다 | 사용자 결정 |
 | 36 | **P4 착수 결정(2026-11-15)**: 역량 질문 v1 동결, 완성 기준을 1~3홉에서 **1~4홉**으로 변경(CQ-05·13·14·16이 4홉, 홉 정의 추가), 성분→효능 연결 출처 방침(ADR-012 후속), CQ-09는 TikTok 한정으로 한계 명시. `docs/EVAL.md` 동결 기준 숫자는 불변 | 사용자 결정(조언 세션 권고) |
 | 37 | **P4 개정(2026-11-15)**: 구 step 4(`product-records`)를 `llm-image-input`·`store-products`·`product-detail`·`product-records`로 4분할해 P4를 11 step으로 변경(레이어당 한 step). `make live-products`와 `uv add pillow` 추가. `PROMOTES` 규칙 승인(제목·캡션에 같은 브랜드 제품 이름 전체 또는 영문명·줄임말 별칭, 모호하면 안 만듦, dev에서 다듬고 test에서 커버리지 보고, step 9 보고에 무작위 20쌍). `live-products`에 한해 Gemini 상한을 `BEAUTYADS_CAP_GEMINI_USD=14`까지 승인(실행 전 이미지 수·예상 비용 보고 후 멈춤). `SkinType`·`SkinConcern` 목록 확정과 `ADDRESSES` 대응은 출처 없는 초안(ADR-012 후속). 성분→효능 수기 표는 step 7 live 뒤 성분 빈도(성분명·건수만)를 보고받아 조언 세션이 상위 약 20개에 출처를 붙여 만든다. `CLAIMS` "주장 원문" 속성 삭제(v1 라벨은 값만 저장) | 사용자 결정(조언 세션 권고) |
+| 38 | **P4 규칙 초안 확정과 선정 방식 변경(2026-11-15, 조언 세션 검토)**: `claim_rules.yaml`을 원문 9~16쪽과 대조해 확정(쪽을 건너는 예외는 `exception_refs`로 [별표 2]를 참조, 넓은 일반어 제거, 영어 대응어는 `terms_en_added`·`en_origin: advisor_added_en`, 영어는 ASCII 단어 경계로만 비교, `applies_to`는 `advisor_approved`)하고 step 1에 붙였다. 기획안 제목도 검사 대상이고 평가 출력에 면책 문구를 표시한다(P5 `checks`). TikTok은 CQ-09와 분포 용도로만 쓰고 `PROMOTES` 질문은 YouTube·Instagram에서만 답이 나온다. **대표 단품 선정을 임시 후보(공식몰 첫 화면)에서 원래 확정 규칙(M1: 브랜드×카테고리별로 광고 소재 텍스트에 많이 등장하는 단품 최대 2개, 제외 몰 제외)으로 변경**하고 제품 별칭은 `derive_aliases`가 제품명에서 기계적으로 만든다(사용자가 채우지 않는다). 선정은 step 3 전에 끝낸다 | 사용자 결정(조언 세션) |
 
 ## 1. 전제와 일정
 
@@ -198,7 +199,7 @@ step 본문은 `phases/4-ontology/step*.md`가 원본이다. 구 번호와의 �
 | 0 | `llm-chat-models` | `llm/`에 OpenAI·Anthropic 경로 추가: **`reasoning_effort` 필수 인자**, `temperature` 기본 미지정(luna·terra `none`만 예외), 스트리밍 비용(`stream_chunk_builder`+`completion_cost`), 도구 호출 인자 JSON 문자열 파싱 실패 처리, Anthropic `cache_control`. 원본은 `litellm_*.json` |
 | 1 | `agent-api-skeleton` | (P1에서 이동) 도구 1개, 노드 1개(luna, `reasoning_effort="none"`), 체크포인터 풀(`autocommit`·`dict_row`·`prepare_threshold=0`)은 api가 조립, FastAPI `/chat` SSE, **짧은 live 확인 타깃 `make live-agent`**(step 뒤에 끊어 사용자가 돌림), **서버 진입점 경유 테스트**, 테넌트 컨텍스트 fail-closed |
 | 2 | `tool-registry` | 조회·집계·비교·표시 4종, 도구 등록 목록, 구조화 실패, 테넌트 범위 |
-| 3 | `checks` | 근거 ID 존재, 분류 값 유효성, 금지 표현, 효능 근거 경로 |
+| 3 | `checks` | 근거 ID 존재, 분류 값 유효성, 금지 표현(**기획안의 제목도 검사 대상 — 안내서 III.7**, `domain.claims.check_plan_fields`), 효능 근거 경로. **평가 출력에 "식약처 안내서 기준 점검이며 법적 판단이 아님"(`CLAIM_CHECK_DISCLAIMER`)을 표시한다** |
 | 4 | `tenant-memory` | 테넌트 전용 저장, 피드백 메모리, thread 소유 테넌트 검증 |
 | 5 | `research-agent` | 하위 그래프(전용 상태), 지시서·구조화 핸드오프, 근거 미달이면 "근거 없음" |
 | 6 | `planning-evaluation` | 기획(terra)·평가(Sonnet), 코드 검사 + LLM 채점, 되돌림 상태 카운터 최대 2회 |
