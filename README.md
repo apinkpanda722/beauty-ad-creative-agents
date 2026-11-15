@@ -1075,3 +1075,33 @@ BEAUTYADS_CAP_GEMINI_USD=14 make live-products ARGS='--products 1,2 --max-mfds-r
 `ALIAS_INVALID` 등이다. 키 누락·비용 상한·Docker 실패 뒤에는 다음 접속 점검도
 진행하지 않는다. 성공/계획/스캔 완료는 0, 시스템 중단 또는 제품 오류·보류·대기가
 있으면 3이다. `live-products`는 `make verify`에 포함하지 않는다.
+
+
+## 역량 질문 확인 (`live-cq`)
+
+사용자가 `make sync`로 그래프를 준비한 뒤 `make live-cq`를 실행한다.
+모델 호출 없이 Neo4j를 읽기만 하며 비용은 0이다. `make verify`에는 포함하지 않는다.
+CQ-07을 제외한 동결 v1 질문을 고정 Cypher로 실행하고 질문별 JSON 한 줄과 요약을 출력한다.
+각 줄에는 홉 수, 성공/오류 코드, 결과 행 수, 답에 사용된 Creative 중 제품에 연결된 수 /
+질문 범위의 제품 소재 수(`PROMOTES` 커버리지), 문서의 한계 원문과 답을 표시한다.
+0행은 데이터 부족으로 따로 집계하며 홉 설계 실패와 합치지 않는다.
+
+CQ-09는 `config/advertiser_classes.yaml`을 정규화해 TikTok 광고주를 분류한다.
+분류 파일 오류는 CQ-09만 막으며 다른 질문은 계속한다. 두 비교 집단 중 하나라도
+30건 미만이면 “표본 부족으로 방향만 제시”라고 표시한다. 광고주 이름을 반영하려면
+기존 일반 소재 동기화를 `make sync ARGS='--full'`로 다시 실행한다.
+CQ-03·10·11은 제품 인증 연결의 certified/unknown/제품 수를 함께 출력한다.
+CQ-06은 조회수 없는 소재 수를 별도로 출력하고 출처/브랜드별 14일 이상 소재의
+백분위를 사용한다. 현재 그래프에는 원 채널 ID가 없어 브랜드를 대용하므로
+엄밀한 채널 내 비교는 P5 이후 보완해야 한다.
+CQ-12는 Feedback이 없으면 `SKIPPED_SYNTHETIC_ONLY`이고 임시 데이터를 쓰지 않는다.
+Feedback이 있어도 세션 테넌트가 없는 CLI는 `CQ_CONTEXT_MISSING`으로 거부한다.
+CQ-13·14·16은 공개 제품 각각을 기준 제품으로 표시한 쌍을 출력한다. 특정 작업 공간의
+“우리 제품” 해석에는 P5 브랜드 프로필이 필요하다. 핵심 성분 unknown은 추정하지 않는다.
+CQ-16은 서버 컨텍스트의 가격 범위로 조회하고, 범위가 없으면 기준 제품과 정확히 같은
+단위당 정가만 조회한다. 임의의 가격대 허용 폭을 판정 기준으로 만들지 않는다.
+
+점검 실패는 `PREFLIGHT_FAILED`와 종료 코드 2다. 이유는
+`ENV_MISSING:NEO4J_PASSWORD`, `DOCKER_DOWN`, `NEO4J_UNREACHABLE`, `GRAPH_EMPTY`이며,
+빈 그래프는 먼저 `make sync`로 준비한다. 질문 오류는 다음 질문을 막지 않고 종료 코드 3으로
+보고한다. 성공(0행 및 합성 전용 건너뜀 포함)은 종료 코드 0이다.

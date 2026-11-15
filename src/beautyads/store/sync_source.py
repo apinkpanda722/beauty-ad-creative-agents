@@ -23,6 +23,26 @@ SYNC_COLUMNS = (
     "metrics_collected_at",
     "updated_at",
 )
+# Keep the shared legacy columns unchanged: layer-two SQL reuses them.
+ADVERTISER_SYNC_COLUMNS = (*SYNC_COLUMNS, "advertiser_name")
+_ADVERTISER_COLUMN = (
+    "CASE WHEN c.source = 'tiktok' THEN "
+    "c.attributes->>'advertiser_business_name' ELSE NULL END AS advertiser_name"
+)
+
+
+def _creative_properties(row):
+    # The optional new column also accepts legacy source rows without it.
+    names = (
+        ADVERTISER_SYNC_COLUMNS
+        if len(row) == len(ADVERTISER_SYNC_COLUMNS)
+        else SYNC_COLUMNS
+    )
+    properties = dict(zip(names, row, strict=True))
+    properties.setdefault("advertiser_name", None)
+    return properties
+
+
 SYNC_NAME = "public_creatives_v1"
 
 
@@ -49,14 +69,14 @@ class PostgresGraphSyncSource(GraphSyncSource):
         columns = ", ".join(f"c.{column}" for column in SYNC_COLUMNS[:-1])
         query = f"""
             WITH changed AS (
-                SELECT {columns},
+                SELECT {columns}, {_ADVERTISER_COLUMN},
                     GREATEST(c.updated_at, COALESCE(
                         (SELECT max(j.updated_at) FROM analysis_jobs AS j
                          WHERE j.source = c.source AND j.source_id = c.source_id
                            AND j.kind = ANY(%s)), c.updated_at)) AS updated_at
                 FROM creatives AS c
             )
-            SELECT {", ".join(SYNC_COLUMNS)} FROM changed
+            SELECT {", ".join(ADVERTISER_SYNC_COLUMNS)} FROM changed
         """
         params: list[Any] = [_kinds(run_tag)]
         if since is not None:
@@ -68,7 +88,7 @@ class PostgresGraphSyncSource(GraphSyncSource):
             params.append(limit)
         result = []
         for row in self._read(query, tuple(params)):
-            properties = dict(zip(SYNC_COLUMNS, row, strict=True))
+            properties = _creative_properties(row)
             result.append(SyncCreative(properties, properties.pop("updated_at")))
         return result
 
@@ -77,7 +97,7 @@ class PostgresGraphSyncSource(GraphSyncSource):
         done = "done"
         query = f"""
             WITH ranked AS (
-                SELECT {columns},
+                SELECT {columns}, {_ADVERTISER_COLUMN},
                     GREATEST(c.updated_at, COALESCE(
                         (SELECT max(j.updated_at) FROM analysis_jobs AS j
                          WHERE j.source = c.source AND j.source_id = c.source_id
@@ -90,7 +110,7 @@ class PostgresGraphSyncSource(GraphSyncSource):
                               AND j.kind = ANY(%s) AND j.status = %s) AS has_label
                 FROM creatives AS c
             )
-            SELECT {", ".join(SYNC_COLUMNS)} FROM ranked
+            SELECT {", ".join(ADVERTISER_SYNC_COLUMNS)} FROM ranked
             ORDER BY has_axis DESC, has_label DESC, updated_at, source, source_id
             LIMIT %s
         """
@@ -98,7 +118,7 @@ class PostgresGraphSyncSource(GraphSyncSource):
         params = (_kinds(run_tag), axis_kinds, done, _kinds(run_tag), done, limit)
         result = []
         for row in self._read(query, params):
-            properties = dict(zip(SYNC_COLUMNS, row, strict=True))
+            properties = _creative_properties(row)
             result.append(SyncCreative(properties, properties.pop("updated_at")))
         return result
 

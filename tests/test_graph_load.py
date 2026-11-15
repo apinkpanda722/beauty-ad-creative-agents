@@ -267,3 +267,40 @@ def test_empty_input_issues_no_queries():
         == 0
     )
     assert driver.calls == []
+
+
+def test_advertiser_name_is_added_without_changing_existing_property_allowlist():
+    from beautyads.graph.load import CREATIVE_PROPERTIES
+
+    assert set(CREATIVE_PROPERTIES) == {
+        "source",
+        "source_id",
+        "url",
+        "published_at",
+        "duration_s",
+        "language",
+        "brand",
+        "latest_view_count",
+        "latest_like_count",
+        "latest_comment_count",
+        "metrics_collected_at",
+        "advertiser_name",
+    }
+    driver = Driver()
+    load_creatives(
+        GraphConnection(driver),
+        [(creative(source="tiktok", advertiser_name="Synthetic Name"), labels())],
+        run_tag="v1",
+    )
+    assert (
+        driver.calls[0][1]["rows"][0]["properties"]["advertiser_name"]
+        == "Synthetic Name"
+    )
+
+
+def test_legacy_layer2_snapshot_does_not_erase_advertiser_name():
+    driver = Driver()
+    load_creatives(
+        GraphConnection(driver), [(creative(source="tiktok"), labels())], run_tag="v1"
+    )
+    assert "advertiser_name" not in driver.calls[0][1]["rows"][0]["properties"]

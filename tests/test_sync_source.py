@@ -153,3 +153,30 @@ def test_sample_read_failure_rolls_back():
     with pytest.raises(RuntimeError):
         PostgresGraphSyncSource(conn).read_sample(limit=1, run_tag="v1")
     assert conn.rollbacks == 1
+
+
+@pytest.mark.parametrize("method", ["read_changed", "read_sample"])
+@pytest.mark.parametrize(
+    "origin,name",
+    [("tiktok", "Synthetic Advertiser"), ("youtube", None), ("instagram", None)],
+)
+def test_advertiser_name_column_is_tiktok_only(method, origin, name):
+    from beautyads.store.sync_source import ADVERTISER_SYNC_COLUMNS
+
+    values = {
+        "source": origin,
+        "source_id": "synthetic",
+        "updated_at": NOW,
+        "advertiser_name": name,
+    }
+    conn = Connection([tuple(values.get(c) for c in ADVERTISER_SYNC_COLUMNS)])
+    source = PostgresGraphSyncSource(conn)
+    options = {"limit": 1, "run_tag": "v1"}
+    if method == "read_changed":
+        options["since"] = None
+    rows = getattr(source, method)(**options)
+    query = conn.calls[0][0]
+    assert "CASE WHEN c.source = 'tiktok'" in query
+    assert "c.attributes->>'advertiser_business_name'" in query
+    assert "ELSE NULL END AS advertiser_name" in query
+    assert rows[0].properties["advertiser_name"] == name

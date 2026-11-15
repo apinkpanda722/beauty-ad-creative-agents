@@ -36,6 +36,7 @@ CREATIVE_PROPERTIES = (
     "latest_like_count",
     "latest_comment_count",
     "metrics_collected_at",
+    "advertiser_name",
 )
 MERGE_CREATIVE = """
     UNWIND $rows AS row
@@ -94,6 +95,9 @@ def _prepare(creative, jobs, run_tag, report):
         return None
 
     properties = {name: creative.properties.get(name) for name in CREATIVE_PROPERTIES}
+    if "advertiser_name" not in creative.properties:
+        # Layer-two legacy snapshots must not erase names added by base sync.
+        properties.pop("advertiser_name", None)
     for name in ("latest_view_count", "latest_like_count", "latest_comment_count"):
         value = properties.get(name)
         properties[name] = int(value) if value is not None else None
