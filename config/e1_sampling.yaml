@@ -1,0 +1,16 @@
+seed: 20261112
+stage1:
+  min_labeled: 100
+  max_labeled: 200
+  target_product: 50
+  use_all_labeled: true
+stage2:
+  size: 50
+  categories: [mask_pack, serum_ampoule, sun_care]
+accepted_stage1_provenance:
+  preregistration_sha256: ["83d8ad1f9102eb4c47e9130ef5e0bc386aec4306c002d855ca5fcf26a2dbd220"]
+  config_sha256: ["aabfc76029f184cf40305b3b069a4502b560dad22fee0c9d540060df29d7c7bf"]
+sources: [youtube, instagram]
+dedupe:
+  youtube: [source, account, title, caption]
+  instagram: [source, account, caption]

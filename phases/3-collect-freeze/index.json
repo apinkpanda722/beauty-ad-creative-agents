@@ -4,54 +4,145 @@
   "created_at": "2026-11-13T00:00:00+0900",
   "steps": [
     {
-      "step": 1,
-      "name": "taxonomy-partial",
-      "status": "pending"
-    },
-    {
-      "step": 2,
-      "name": "e1-sampling",
-      "status": "pending"
-    },
-    {
       "step": 3,
       "name": "pilot-compare",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-13T15:10:28+0900",
+      "usage": {
+        "input_tokens": 1273878,
+        "cached_input_tokens": 1201792,
+        "output_tokens": 14430,
+        "attempts": 1
+      },
+      "summary": "pilot-compare CLI·재사용 agreement 함수·합성 데이터 테스트·Makefile 타깃·README 사용법 구현, make verify 통과(1469 tests).",
+      "completed_at": "2026-11-13T15:18:05+0900"
     },
     {
       "step": 4,
       "name": "cost-recalc",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-13T15:18:05+0900",
+      "summary": "읽기 전용 cost-recalc CLI, 태그별 통계·가정별 견적·상한 비교·종류별 집계, 합성 테스트와 Makefile·README 구현; make verify 통과(1503 tests).",
+      "completed_at": "2026-11-13T15:27:17+0900",
+      "usage": {
+        "input_tokens": 1281348,
+        "cached_input_tokens": 1203584,
+        "output_tokens": 18927,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 1,
+      "name": "taxonomy-partial",
+      "status": "completed",
+      "started_at": "2026-11-13T16:44:09+0900",
+      "summary": "content_type·category 승인 정의 부분 동결, category 표 전환, ADR-017 및 문서·enum 일치와 누락·빈 정의 검증 테스트 추가; make verify 통과(1518 tests).",
+      "completed_at": "2026-11-13T16:46:58+0900",
+      "usage": {
+        "input_tokens": 884397,
+        "cached_input_tokens": 805632,
+        "output_tokens": 5391,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 2,
+      "name": "e1-sampling",
+      "status": "completed",
+      "started_at": "2026-11-13T16:50:04+0900",
+      "usage": {
+        "input_tokens": 1817871,
+        "cached_input_tokens": 1720192,
+        "output_tokens": 26410,
+        "attempts": 1
+      },
+      "summary": "E1 1·2단계 표본 추출 CLI, 블라인드 시트·코드북, SHA256 기록, 라벨·정지점 검증, 합성 테스트와 Makefile·README 구현; make verify 통과(1585 tests), 의존성 추가 없음.",
+      "completed_at": "2026-11-13T17:01:41+0900"
     },
     {
       "step": 5,
       "name": "taxonomy-v1",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-13T22:51:06+0900",
+      "usage": {
+        "input_tokens": 1566355,
+        "cached_input_tokens": 1454976,
+        "output_tokens": 12315,
+        "attempts": 1
+      },
+      "summary": "2026-11-13 TAXONOMY v1·ADR-018 동결, 훅 구간 축 제거·CTA 동치 검증·프롬프트 3종 v1·코드북 반영; make verify 통과(1641 tests), 의존성 추가 없음. 사전 등록 기록은 별도 진행 필요.",
+      "completed_at": "2026-11-13T23:00:38+0900"
     },
     {
       "step": 6,
       "name": "analyze-target",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-13T23:07:57+0900",
+      "summary": "analyze-target CLI·@v1 배치 재개·E1 키 우선 분석·사전 점검·중단 처리·종류별 비용 집계와 Makefile·README·합성 테스트 구현; make verify 통과(1709 tests), 의존성 추가 없음.",
+      "completed_at": "2026-11-13T23:17:09+0900",
+      "usage": {
+        "input_tokens": 2074920,
+        "cached_input_tokens": 1964032,
+        "output_tokens": 21000,
+        "attempts": 1
+      }
     },
     {
       "step": 7,
       "name": "metrics-normalize",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-14T22:02:39+0900",
+      "summary": "채널별 조회수 평균순위 백분위·상하위 구분·미계산 사유를 반환하는 순수 함수와 합성 테스트 구현; make verify 통과(1749 tests), 의존성 추가 없음.",
+      "completed_at": "2026-11-14T22:05:40+0900",
+      "usage": {
+        "input_tokens": 445566,
+        "cached_input_tokens": 387456,
+        "output_tokens": 6949,
+        "attempts": 1
+      }
     },
     {
       "step": 8,
       "name": "e1-scorer",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-14T22:12:08+0900",
+      "summary": "e1-score CLI·교집합 κ/커버리지·재현율·재검사·claims 채점과 준비 점검, 합성 테스트·Makefile·README 구현; make verify 통과(1824 tests), 의존성 추가 없음.",
+      "completed_at": "2026-11-14T22:21:06+0900",
+      "usage": {
+        "input_tokens": 1403959,
+        "cached_input_tokens": 1310336,
+        "output_tokens": 20819,
+        "attempts": 1
+      }
     },
     {
       "step": 9,
       "name": "tiktok-collect",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-14T22:24:12+0900",
+      "summary": "TikTok 브랜드별 수집 CLI·점검·부분 결과 폐기·중단 처리·JSON 보고·합성 테스트와 live-tiktok 타깃·README 구현; make verify 통과(1860 tests), 의존성 추가 없음.",
+      "completed_at": "2026-11-14T22:30:29+0900",
+      "usage": {
+        "input_tokens": 1071359,
+        "cached_input_tokens": 980352,
+        "output_tokens": 13901,
+        "attempts": 1
+      }
     },
     {
       "step": 10,
       "name": "tiktok-plans",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-14T22:59:57+0900",
+      "summary": "TikTok 브랜드별 재조회 플랜·분석 연결, 기본 20쪽 옵션, 고정 시드 브랜드별 표본 선택·재개와 README·합성 테스트 구현; make verify 통과(1883 tests), 의존성 추가 없음.",
+      "completed_at": "2026-11-14T23:05:58+0900",
+      "usage": {
+        "input_tokens": 1579444,
+        "cached_input_tokens": 1489920,
+        "output_tokens": 13052,
+        "attempts": 1
+      }
     }
-  ]
+  ],
+  "completed_at": "2026-11-14T23:05:58+0900"
 }

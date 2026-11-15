@@ -12,6 +12,8 @@ class ErrorKind(StrEnum):
     RETRYABLE = "RETRYABLE"
     DAILY_LIMIT = "DAILY_LIMIT"
     RATE_LIMIT = "RATE_LIMIT"
+    # 선불 크레딧 소진(402). 요청이 틀린 것이 아니라 계정 상태라 배치를 멈추고 소재는 그대로 둔다.
+    CREDITS_DEPLETED = "CREDITS_DEPLETED"
     FATAL = "FATAL"
 
 
@@ -94,6 +96,13 @@ def classify_error(exc: BaseException) -> ErrorKind:
         ):
             return ErrorKind.DAILY_LIMIT
         return ErrorKind.RATE_LIMIT
+    message = str(exc)
+    if (
+        status == 402
+        or "prepayment credits" in message.lower()
+        or ('"code": 402' in message and "RESOURCE_EXHAUSTED" in message)
+    ):
+        return ErrorKind.CREDITS_DEPLETED
     if status in {400, 401, 403, 404}:
         return ErrorKind.FATAL
     if status == 503 or isinstance(

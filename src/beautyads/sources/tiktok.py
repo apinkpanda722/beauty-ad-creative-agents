@@ -1,5 +1,6 @@
 """TikTok EU ad collection; signed media URLs exist only during explicit refresh."""
 
+import time
 from collections.abc import Callable, Collection, Iterator, Mapping
 from datetime import UTC, date, datetime, timedelta
 from typing import Any, NamedTuple
@@ -17,6 +18,11 @@ QUERY_FIELDS = (
 )
 _TIMEOUT_S = 30.0
 _STOP_ERRORS = {"TIKTOK_TOKEN_INVALID", "TIKTOK_INVALID_PARAMS"}
+# 500·502·503·504는 간헐적이라 대기 후 재시도한다(계약: 서버 오류가 간헐적으로 난다).
+_RETRY_STATUSES = frozenset({500, 502, 503, 504})
+_BACKOFF_S = (2.0, 5.0, 15.0)
+# 쪽 상한에서 끊긴 조회는 "없음"을 증명하지 못한다. 브랜드 하나의 일시 실패일 뿐이다.
+PAGES_INCOMPLETE = "TIKTOK_PAGES_INCOMPLETE"
 
 
 class TikTokHttpResponse(NamedTuple):
@@ -261,9 +267,16 @@ def ad_to_creative(
 
 
 def _query(
-    post: TikTokPost, token: TokenProvider, body: Mapping[str, Any], *, base_url: str
+    post: TikTokPost,
+    token: TokenProvider,
+    body: Mapping[str, Any],
+    *,
+    base_url: str,
+    sleep: Callable[[float], None] = time.sleep,
 ) -> Mapping[str, Any]:
-    for attempt in range(2):
+    token_retried = False
+    server_retries = 0
+    while True:
         response = post(
             f"{base_url.rstrip('/')}/v2/research/adlib/ad/query/",
             {"fields": QUERY_FIELDS, "Authorization": f"Bearer {token.token()}"},
@@ -273,10 +286,18 @@ def _query(
         )
         if response.status != 200:
             code = _mapping(_mapping(response.body).get("error")).get("code")
-            if response.status == 401 and code == "access_token_invalid":
+            if (
+                response.status == 401
+                and code == "access_token_invalid"
+                and not token_retried
+            ):
                 token.invalidate()
-                if attempt == 0:
-                    continue
+                token_retried = True
+                continue
+            if response.status in _RETRY_STATUSES and server_retries < len(_BACKOFF_S):
+                sleep(_BACKOFF_S[server_retries])
+                server_retries += 1
+                continue
             raise _http_error(response.status)
         if _mapping(_mapping(response.body).get("error")).get("code") != "ok":
             raise TikTokError("TIKTOK_INVALID_RESPONSE")
@@ -284,7 +305,42 @@ def _query(
         if not isinstance(data, Mapping):
             raise TikTokError("TIKTOK_INVALID_RESPONSE")
         return data
-    raise TikTokError("TIKTOK_TOKEN_INVALID")  # Defensive: both attempts failed.
+
+
+def _pages_flagged(
+    post: TikTokPost,
+    token: TokenProvider,
+    config: TikTokConfig,
+    brand: TikTokBrand,
+    *,
+    base_url: str,
+    today: date,
+    max_pages: int,
+    sleep: Callable[[float], None] = time.sleep,
+) -> Iterator[tuple[list[Mapping[str, Any]], bool]]:
+    search_id = None
+    for _ in range(max_pages):
+        data = _query(
+            post,
+            token,
+            build_query_body(brand, config, today=today, search_id=search_id),
+            base_url=base_url,
+            sleep=sleep,
+        )
+        ads = data.get("ads")
+        has_more = data.get("has_more")
+        if (
+            not isinstance(ads, list)
+            or any(not isinstance(ad, Mapping) for ad in ads)
+            or type(has_more) is not bool
+        ):
+            raise TikTokError("TIKTOK_INVALID_RESPONSE")
+        yield ads, has_more
+        if has_more is False:
+            break
+        search_id = data.get("search_id")
+        if not isinstance(search_id, str) or not search_id:
+            raise TikTokError("TIKTOK_INVALID_RESPONSE")
 
 
 def _pages(
@@ -296,29 +352,19 @@ def _pages(
     base_url: str,
     today: date,
     max_pages: int,
+    sleep: Callable[[float], None] = time.sleep,
 ) -> Iterator[list[Mapping[str, Any]]]:
-    search_id = None
-    for _ in range(max_pages):
-        data = _query(
-            post,
-            token,
-            build_query_body(brand, config, today=today, search_id=search_id),
-            base_url=base_url,
-        )
-        ads = data.get("ads")
-        has_more = data.get("has_more")
-        if (
-            not isinstance(ads, list)
-            or any(not isinstance(ad, Mapping) for ad in ads)
-            or type(has_more) is not bool
-        ):
-            raise TikTokError("TIKTOK_INVALID_RESPONSE")
+    for ads, _has_more in _pages_flagged(
+        post,
+        token,
+        config,
+        brand,
+        base_url=base_url,
+        today=today,
+        max_pages=max_pages,
+        sleep=sleep,
+    ):
         yield ads
-        if has_more is False:
-            break
-        search_id = data.get("search_id")
-        if not isinstance(search_id, str) or not search_id:
-            raise TikTokError("TIKTOK_INVALID_RESPONSE")
 
 
 def collect_tiktok(
@@ -331,6 +377,7 @@ def collect_tiktok(
     max_pages: int,
     collected_at: datetime,
     brands: Collection[str] | None = None,
+    sleep: Callable[[float], None] = time.sleep,
 ) -> CollectResult:
     creatives: list[Creative] = []
     errors: dict[str, str] = {}
@@ -347,6 +394,7 @@ def collect_tiktok(
                 base_url=base_url,
                 today=collected_at.date(),
                 max_pages=max_pages,
+                sleep=sleep,
             ):
                 for item in ads:
                     source_id = _ad_id(item)
@@ -373,6 +421,86 @@ def collect_tiktok(
     return CollectResult(creatives, errors, None)
 
 
+class BrandCollection(NamedTuple):
+    creatives: list[Creative]
+    # 광고 id -> 서명된 영상 주소. 이번 실행의 메모리에서만 쓰고 절대 저장하지 않는다.
+    urls: dict[str, str]
+    error: str | None
+
+
+# 브랜드 하나의 실패가 아니라 계정 수준 실패라서 실행 전체를 멈춰야 하는 코드.
+STOP_ERROR_CODES = frozenset(_STOP_ERRORS)
+
+
+def _video_url(item: Mapping[str, Any]) -> str | None:
+    return next(
+        (
+            v.get("url")
+            for v in _videos(_mapping(item.get("ad")))
+            if isinstance(v.get("url"), str) and v.get("url")
+        ),
+        None,
+    )
+
+
+def collect_tiktok_brand(
+    post: TikTokPost,
+    token: TokenProvider,
+    config: TikTokConfig,
+    retailers: Retailers,
+    brand: TikTokBrand,
+    *,
+    base_url: str = TIKTOK_BASE_URL,
+    max_pages: int,
+    collected_at: datetime,
+    sleep: Callable[[float], None] = time.sleep,
+) -> BrandCollection:
+    """One brand's ads plus their video URLs for same-run analysis.
+
+    The search result set differs between runs, so an ad can only be analyzed with
+    the URL from the response that returned it. A brand that fails midway returns
+    nothing (its partial pages are not used), like the batch collection.
+    """
+    creatives: list[Creative] = []
+    urls: dict[str, str] = {}
+    seen: set[str] = set()
+    try:
+        for ads in _pages(
+            post,
+            token,
+            config,
+            brand,
+            base_url=base_url,
+            today=collected_at.date(),
+            max_pages=max_pages,
+            sleep=sleep,
+        ):
+            for item in ads:
+                source_id = _ad_id(item)
+                if source_id in seen:
+                    continue
+                executor = classify_executor(
+                    _mapping(item.get("advertiser")),
+                    brand_names=(brand.brand, brand.search_term),
+                    retailers=retailers,
+                )
+                creatives.append(
+                    ad_to_creative(
+                        item,
+                        brand=brand.brand,
+                        collected_at=collected_at,
+                        executor=executor,
+                    )
+                )
+                url = _video_url(item)
+                if url is not None:
+                    urls[source_id] = url
+                seen.add(source_id)
+    except TikTokError as error:
+        return BrandCollection([], {}, error.code)
+    return BrandCollection(creatives, urls, None)
+
+
 def refresh_tiktok_video_urls(
     post: TikTokPost,
     token: TokenProvider,
@@ -383,15 +511,21 @@ def refresh_tiktok_video_urls(
     base_url: str = TIKTOK_BASE_URL,
     today: date,
     max_pages: int,
+    sleep: Callable[[float], None] = time.sleep,
 ) -> RefreshResult:
-    """Use at least the collection's max_pages; signed URLs must never be persisted."""
+    """Use at least the collection's max_pages; signed URLs must never be persisted.
+
+    `stopped` is None only when the scan ended with `has_more` false (or every wanted
+    id was found). A scan cut by `max_pages` or by an error never proves absence.
+    """
     urls: dict[str, str] = {}
     gone: set[str] = set()
     missing = set(wanted_ids)
     if not missing:
         return RefreshResult(urls, gone, missing, None)
+    complete = False
     try:
-        for ads in _pages(
+        for ads, has_more in _pages_flagged(
             post,
             token,
             config,
@@ -399,7 +533,9 @@ def refresh_tiktok_video_urls(
             base_url=base_url,
             today=today,
             max_pages=max_pages,
+            sleep=sleep,
         ):
+            complete = has_more is False
             for item in ads:
                 source_id = _ad_id(item)
                 if source_id not in missing:
@@ -418,7 +554,7 @@ def refresh_tiktok_video_urls(
                 else:
                     urls[source_id] = url
             if not missing:
-                break
+                return RefreshResult(urls, gone, missing, None)
     except TikTokError as error:
         return RefreshResult(urls, gone, missing, error.code)
-    return RefreshResult(urls, gone, missing, None)
+    return RefreshResult(urls, gone, missing, None if complete else PAGES_INCOMPLETE)

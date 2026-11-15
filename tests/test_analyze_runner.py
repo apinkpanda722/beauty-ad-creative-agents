@@ -280,6 +280,10 @@ def daily():
     return DailyLimitReached(kind=ErrorKind.DAILY_LIMIT, code="DAILY_LIMIT")
 
 
+def credits():
+    return DailyLimitReached(kind=ErrorKind.CREDITS_DEPLETED, code="CREDITS_DEPLETED")
+
+
 def rate(wait=None):
     return LlmCallError(
         kind=ErrorKind.RATE_LIMIT, code="RATE_LIMIT", retry_after_s=wait
@@ -290,6 +294,7 @@ def rate(wait=None):
     ("error", "stop"),
     [
         (daily(), "DAILY_LIMIT"),
+        (credits(), "CREDITS_DEPLETED"),
         (CostCapExceeded("gemini", 12, 12), "COST_CAP:gemini"),
         (rate(), "RATE_LIMITED"),
     ],
@@ -602,3 +607,66 @@ def test_rate_retry_does_not_pay_twice_for_completed_content(rig, monkeypatch):
 def test_empty_or_zero_limit_does_not_plan_media(rig):
     assert execute(rig, limit=0).processed == 0
     rig.deps.plans.assert_not_called()
+
+
+def test_repeated_llm_fatal_becomes_a_permanent_exclusion_reason(rig):
+    # A first LLM_FATAL stays retryable; failing the same way again after a retry is
+    # recorded as a permanent exclusion so --retry-failed never requeues it again.
+    repeated, first = rig.items[0], rig.items[1]
+    job = set_job(rig, repeated, code="LLM_FATAL")
+    job.attempts = 1
+
+    def analyze(item, **kwargs):
+        return outcome(item, rig.run, JobStatus.failed, "LLM_FATAL")
+
+    rig.fake.side_effect = analyze
+    report = execute(rig, retry_failed=True, only_keys={repeated.key, first.key})
+    codes = {
+        key.source_id: rig.store.jobs["content_type@test", key].error_code
+        for key in (repeated.key, first.key)
+    }
+    assert codes[repeated.source_id] == "LLM_FATAL_REPEATED"
+    assert codes[first.source_id] == "LLM_FATAL"
+    assert "LLM_FATAL_REPEATED" not in RETRYABLE_ERROR_CODES
+    assert report.error_codes["LLM_FATAL_REPEATED"] == 1
+    # the permanent one is not requeued by another retry
+    rig.store.jobs["content_type@test", first.key].status = JobStatus.done
+    assert rig.store.requeue_jobs("content_type@test", RETRYABLE_ERROR_CODES) == 0
+
+
+def _absence_run(rig, item, attempts, prior_code=None):
+    # a requeued job keeps the error code of its previous attempt
+    job = set_job(rig, item, code=prior_code, status=JobStatus.pending)
+    job.attempts = attempts
+    rig.store.creatives[item.key] = item
+    rig.fake.side_effect = lambda it, **kw: outcome(
+        it, rig.run, JobStatus.failed, "MEDIA_URL_MISSING"
+    )
+    rig.deps.now.side_effect = [NOW, NOW + timedelta(seconds=9)]
+    execute(rig, only_keys={item.key})
+    return rig.store.jobs["content_type@test", item.key].error_code
+
+
+def test_tiktok_absence_needs_a_second_scan_before_it_is_permanent(rig):
+    def tiktok(index, source_id):
+        return rig.items[index].model_copy(
+            update={"source": Source.tiktok, "source_id": source_id}
+        )
+
+    # first absence: retryable
+    assert _absence_run(rig, tiktok(0, "t1"), 0) == "MEDIA_URL_MISSING_UNCONFIRMED"
+    # missing again after that unconfirmed absence: confirmed
+    assert (
+        _absence_run(rig, tiktok(1, "t2"), 1, "MEDIA_URL_MISSING_UNCONFIRMED")
+        == "MEDIA_URL_MISSING"
+    )
+    # a retry after an unfinished scan or other failure is still the first absence
+    for index, prior in ((3, "MEDIA_REFRESH_STOPPED"), (4, "LLM_FATAL")):
+        found = _absence_run(rig, tiktok(index, f"t{index}"), 1, prior)
+        assert found == "MEDIA_URL_MISSING_UNCONFIRMED"
+    assert "MEDIA_URL_MISSING_UNCONFIRMED" in RETRYABLE_ERROR_CODES
+    assert "MEDIA_URL_MISSING" not in RETRYABLE_ERROR_CODES
+
+
+def test_other_sources_keep_the_single_scan_absence_rule(rig):
+    assert _absence_run(rig, rig.items[2], attempts=0) == "MEDIA_URL_MISSING"

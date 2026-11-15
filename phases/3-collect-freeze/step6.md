@@ -47,6 +47,14 @@
 
 `--sources`(기본 `youtube,instagram`; TikTok은 `tiktok-plans` step 뒤에 추가), `--brands`(기본 전체), `--limit`(기본 전체, 시험용), `--batch-size`(기본 100, 1~500), `--concurrency`(기본 1, 1~`MAX_CONCURRENCY`), `--thinking-level`(기본 `minimal`, 사용자가 비용 결정 뒤 바꾼다), `--content-type-window-s`·`--full-window-s`(기본 60), `--retry-failed`(재시도 대상 오류 코드의 작업만 `pending`으로 되돌려 다시 돈다. `RETRYABLE_ERROR_CODES` 재사용), `--dry-run`, `--items N`(`--dry-run`에서 계획 호출 수를 계산할 때만).
 
+**`--only-keys-file PATH`(여러 번 지정 가능)**: E1 표본 소재를 먼저 분석하기 위한 옵션이다. 인자는 `e1-sampling`이 만든 키 파일(`e1_stage1_key.json`, `e1_stage2_key.json`)이고, JSON의 `items`(항목 번호 → `{source, source_id, ...}`)에서 **`source`와 `source_id`만** 읽는다(`brand`·`url`·사람 라벨 등 다른 필드는 읽거나 출력하지 않는다). 이 옵션이 있으면:
+- 그 키에 해당하는 소재(DB에서 `get_creative`로 조회, 분석 가능한 것만)만 대기열에 넣고(`enqueue_analysis`) `run_analysis(..., only_keys=…)`로 그 소재만 처리한다. 나머지 소재는 대기열에 넣지 않는다. 키 목록에 있는데 DB에 없거나 분석 가능하지 않은 소재는 건너뛰고 건수를 `KEY_NOT_ANALYZABLE <건수>`로 요약에 보고한다(키 값은 출력하지 않는다).
+- 그 소재의 작업이 모두 끝나면(대기열이 비면) 종료한다. **이어서 옵션 없이 다시 실행하면 전체가 대기열에 들어가고 이미 `done`인 작업은 다시 호출되지 않는다**(재개). 순서는 "E1 표본 → 나머지"다.
+- `--sources`는 함께 쓸 수 있고(교집합), `--brands`·`--limit`와는 함께 쓸 수 없다(`ONLY_KEYS_CONFLICT`, 종료 코드 2).
+- 키 파일이 없으면 `ONLY_KEYS_FILE_MISSING`, JSON이 아니거나 `items`가 없거나 `source`가 알려진 출처가 아니거나 `source_id`가 비었으면 `ONLY_KEYS_FILE_INVALID`이고 **환경 점검 단계에서 종료 코드 2**로 끝난다(DB 접속·모델 호출 전).
+- `--dry-run`은 파일을 읽어 키 수만 `ESTIMATE`에 함께 출력한다(키 값은 출력하지 않는다).
+- README에 "E1 시트를 만든 뒤 `--only-keys-file`로 표본을 먼저 분석하고, 이어서 옵션 없이 전체를 돌린다"와 이유 코드를 쓴다.
+
 ### 환경 점검(하나라도 있으면 `PREFLIGHT_FAILED <코드>`를 출력하고 종료 코드 2, 그 전에는 어떤 호출도 접속도 하지 않는다)
 
 `ENV_MISSING:GEMINI_API_KEY`, `ENV_MISSING:POSTGRES_PASSWORD`, `ENV_MISSING:INSTAGRAM_ACCESS_TOKEN`·`ENV_MISSING:INSTAGRAM_USER_ID`(Instagram을 대상에 포함할 때), `DOCKER_DOWN`, `POSTGRES_UNREACHABLE`, `COST_CAP:gemini`(누적이 상한에 이미 닿음), `LEDGER_NOT_WRITABLE`, **`PREREGISTRATION_NOT_UPDATED`**(`docs/results/e1_preregistration.md`가 없거나, 거기에 현재 `ANALYSIS_MODEL_ID`, `PROMPT_VERSIONS`의 세 값 문자열, `전체 v1 동결: YYYY-MM-DD` 형식(날짜가 있는) 줄 중 하나라도 없다. "미기록" 같은 자리표시는 날짜가 아니다 — 사전 등록이 분류 v1 동결을 기록하기 전에 일괄 분석이 시작되는 것을 막는다). `StoreConnectError`는 코드를 출력한다(DSN·비밀번호 미출력).
@@ -72,6 +80,7 @@
 - Instagram 사용량 중단 시 `MEDIA_REFRESH_STOPPED`로 기록된 소재 수와 마지막 사용량이 요약에 나오고 자동 반복이 없다(모델·재조회 호출 횟수로 확인).
 - 일일 한도(`DAILY_LIMIT`)와 `COST_CAP`에서 남은 소재가 `pending`으로 남는다.
 - 진행 보고: 합성 `done` 결과에서 출처·`category`별 건수, 실패율, 축별 `other` 비율이 손계산 값과 같다.
+- **`--only-keys-file`**(합성 키 JSON, tmp 경로): 키 파일의 `items`에 든 소재만 대기열에 들어가고 처리된다(가짜 저장소가 받은 `enqueue_analysis`·`run_analysis`의 `only_keys`로 확인), 키 파일에 없는 소재는 대기열에 들어가지 않는다, 키 파일 안의 다른 필드(브랜드·URL·감시 문자열)가 출력에 없다, DB에 없거나 분석 가능하지 않은 키는 건너뛰고 `KEY_NOT_ANALYZABLE` 건수가 나온다, 여러 파일을 지정하면 합집합이다, 이어서 옵션 없이 다시 실행하면 이미 `done`인 소재는 다시 호출되지 않고 나머지만 처리된다(모델 호출 횟수로 확인), `--brands`·`--limit`와 함께 쓰면 `ONLY_KEYS_CONFLICT`(종료 코드 2), 파일이 없으면 `ONLY_KEYS_FILE_MISSING`, 형식 오류(JSON 아님·`items` 없음·알 수 없는 `source`·빈 `source_id`)는 `ONLY_KEYS_FILE_INVALID`이고 둘 다 `deps_factory`·모델 호출이 **한 번도** 불리지 않는다, `--dry-run`이 키 수를 출력하되 키 값을 출력하지 않는다. 이 옵션 없이 부른 기존 동작(전체 대기열)은 바뀌지 않는다.
 - **`purpose`**: `analyze_target`이 만든 모든 호출의 `purpose`가 세 값(`analyze-target-content_type`·`-hook`·`-full`) 중 하나이고 호출 종류와 맞는다(가짜 모델이 받은 인자로 확인). `AnalysisRun`을 `purpose_by_axis` 없이 만든 기존 경로(시범)는 호출 `purpose`가 그대로 `run.purpose`다(`tests/test_media_flow.py`의 새 테스트로 두 경우 모두). 요약의 종류별 비용·호출 수가 합성 원장의 손계산 값과 같고 이번 실행 전 항목은 세지 않는다.
 - `--dry-run`이 의존성 생성 함수·모델·네트워크를 부르지 않고 `ESTIMATE`를 출력한다(기대값은 작은 입력의 손계산 값), `--batch-size 0`·`501`, `--concurrency`가 범위 밖이면 오류 종료.
 - `Makefile`: `verify` 레시피에 `live-`가 없고 `live-analyze` 타깃과 `.PHONY` 항목이 있다.
@@ -113,6 +122,7 @@ make verify   # lint + test 통과
 - 사용량 중단·429·`COST_CAP` 뒤에 자동으로 계속 재시도하지 마라. 이유: 회복 전의 반복은 한도만 깎고 일일 한도 429는 재시도하지 않는다(AGENTS.md). 남은 소재는 대기 상태로 둔다.
 - 중단을 "없음"으로 확정하지 마라(`MEDIA_URL_MISSING`은 재조회가 끝까지 돈 뒤에만). 이유: FP-C05 — 중단과 부재는 다른 상태다.
 - `eval/`을 import하거나 시범 실행기 코드를 복사해서 수정하지 마라. 이유: 계층 가드(`pipeline`은 `eval`을 import할 수 없다). 필요한 경계 함수는 각 계층에서 직접 부른다.
+- `--only-keys-file`로 키 목록 밖의 소재를 대기열에 넣거나 키 파일의 `source`·`source_id` 외 필드를 읽거나 출력하지 마라. 이유: E1 키 파일에는 브랜드·URL·사람 라벨이 있어 읽는 범위를 최소로 한다.
 - 환경 점검이 통과하기 전에 네트워크 호출·DB 접속·모델 호출을 하지 마라. `--dry-run`도 하지 않는다. 이유: 첫 live에서 Docker 꺼짐·키 누락·상한 초과가 호출 도중에 터지는 것을 막는다(B-FP-051).
 - 비용 상한(공급사별 누적)을 우회하거나 `thinking_level` 기본값을 사용자 결정 없이 바꾸지 마라. 이유: 상한과 `thinking_level`은 `cost-recalc` 뒤 사용자가 정한다.
 - 영상·이미지 파일을 디스크에 남기지 마라(메모리 바이트만, 분석 뒤 삭제). 이유: AGENTS.md 영상 저장 금지 규칙.

@@ -1,8 +1,8 @@
-"""Closed classification values from the draft v0 taxonomy."""
+"""Closed classification values from the frozen v1 taxonomy."""
 
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 
 class HookType(StrEnum):
@@ -89,7 +89,6 @@ class Category(StrEnum):
 class StructureFlags(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    has_hook_segment: bool
     has_demo_segment: bool
     has_proof_segment: bool
     has_cta: bool
@@ -123,3 +122,9 @@ class FullResult(BaseModel):
     cta_type: CtaType
     claims: list[Claim]
     ingredients: list[str]
+
+    @model_validator(mode="after")
+    def validate_cta_consistency(self) -> "FullResult":
+        if self.structure.has_cta != (self.cta_type != CtaType.none):
+            raise ValueError("structure.has_cta must equal (cta_type != none)")
+        return self

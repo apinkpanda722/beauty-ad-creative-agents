@@ -24,9 +24,10 @@ from beautyads.domain import (
     Source,
 )
 from beautyads.llm import FileError, InteractionResult, ThinkingLevel, UploadedFile
-from beautyads.sources.config import InstagramAccount
+from beautyads.sources.config import InstagramAccount, TikTokBrand
 from beautyads.sources.instagram import RefreshResult
 from beautyads.sources.media import DownloadedMedia, MediaError
+from beautyads.sources.tiktok import RefreshResult as TikTokRefreshResult
 
 RETRYABLE_ERROR_CODES = frozenset(
     {
@@ -36,10 +37,19 @@ RETRYABLE_ERROR_CODES = frozenset(
         "FILE_PROCESS_TIMEOUT",
         "FILE_RETRIEVE_FAILED",
         "LLM_RETRYABLE",
+        # 분류되지 않은 호출 실패. 2026-11-14 YouTube 실행 끝에서 118건이 몰려 실패했고
+        # 다시 호출하자 성공했다(시간 의존 일시 오류). 영구 사유면 재시도해도 같은 코드로 다시 실패한다.
+        "LLM_FATAL",
+        # TikTok은 조회 결과 집합이 실행마다 달라질 수 있어 첫 "못 찾음"은 확정하지 않는다.
+        "MEDIA_URL_MISSING_UNCONFIRMED",
         # 사용량 등으로 재조회가 중간에 멈춰 못 찾은 것이라 소재 문제가 아니다.
         "MEDIA_REFRESH_STOPPED",
     }
 )
+# 재시도 뒤에도 같은 LLM_FATAL로 다시 실패한 작업의 제외 사유. RETRYABLE_ERROR_CODES에 없으므로
+# --retry-failed가 다시 집지 않는다.
+LLM_FATAL_REPEATED = "LLM_FATAL_REPEATED"
+MEDIA_URL_MISSING_UNCONFIRMED = "MEDIA_URL_MISSING_UNCONFIRMED"
 _HELD_CODES = frozenset(
     {
         "MEDIA_NOT_VIDEO",
@@ -68,6 +78,7 @@ class AnalysisRun(NamedTuple):
     full_window_s: float
     hook_window_max_s: float
     interact: Callable[..., InteractionResult]
+    purpose_by_axis: bool = False
 
 
 class MediaDeps(NamedTuple):
@@ -127,6 +138,34 @@ def prepare_instagram_plans(
     return plans
 
 
+def prepare_tiktok_plans(
+    creatives: Sequence[Creative],
+    brands: Mapping[str, TikTokBrand],
+    *,
+    refresh: Callable[[TikTokBrand, set[str]], TikTokRefreshResult],
+) -> dict[CreativeKey, UrlPlan]:
+    """Refresh each configured brand once; an unfinished scan is not absence."""
+    plans = {}
+    grouped: dict[str, list[Creative]] = defaultdict(list)
+    for creative in creatives:
+        if creative.source != Source.tiktok:
+            continue
+        plans[creative.key] = UrlPlan(None, "missing")
+        if creative.brand in brands:
+            grouped[creative.brand].append(creative)
+    for brand, items in grouped.items():
+        result = refresh(brands[brand], {item.source_id for item in items})
+        for item in items:
+            url = result.urls.get(item.source_id)
+            if url:
+                plans[item.key] = UrlPlan(url, "ok")
+            elif item.source_id in result.gone:
+                plans[item.key] = UrlPlan(None, "gone")
+            elif result.stopped is not None:
+                plans[item.key] = UrlPlan(None, "refresh_stopped")
+    return plans
+
+
 def _error_record(run: AnalysisRun, code: str) -> AxisRecord:
     return AxisRecord(
         kind=f"content_type@{run.run_tag}",
@@ -163,6 +202,8 @@ def _analyze(
         "caps": run.caps,
         "interact": run.interact,
     }
+    if run.purpose_by_axis:
+        kwargs["purpose"] = f"{run.purpose}-content_type"
     content = analyze_content_type(
         creative, video, window_max_s=run.content_type_window_s, **kwargs
     )
@@ -172,6 +213,8 @@ def _analyze(
     if not is_product_target(ContentTypeResult.model_validate(content.labels)):
         return
 
+    if run.purpose_by_axis:
+        kwargs["purpose"] = f"{run.purpose}-hook"
     hook = analyze_hook(
         creative, video=video, window_max_s=run.hook_window_max_s, **kwargs
     )
@@ -189,6 +232,8 @@ def _analyze(
     )
     if hook.status != JobStatus.done:
         return
+    if run.purpose_by_axis:
+        kwargs["purpose"] = f"{run.purpose}-full"
     full = analyze_full(creative, video, window_max_s=run.full_window_s, **kwargs)
     outcome.records.append(_axis_record(full, run))
 

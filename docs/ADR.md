@@ -87,3 +87,14 @@
 **결정**: 기본 trace는 로컬 JSONL이다. Langfuse는 프로젝트 B와 같은 셀프호스팅 구성(langfuse-web, langfuse-worker, ClickHouse, Redis, MinIO, 이미지 태그 고정)을 docker compose의 선택 profile `obs`로 두고 기본은 꺼 둔다. Cloud와 B 인스턴스 참조는 쓰지 않는다(이 저장소만으로 실행되는 단일 구성). 호스트 포트는 B 스택과 동시에 켜도 충돌하지 않게 Postgres 5433, Langfuse 3001로 바꾸고 `NEXTAUTH_URL`도 맞춘다. 연동·trace 코드는 이 저장소에서 새로 쓰고 B의 코드는 가져오지 않는다. trace에 `tenant_id`를 남긴다. Langfuse는 M2 관측 phase에서 추가한다(phase 1 compose는 Postgres와 Neo4j만).
 **이유**: B에서 로컬 구성 실측이 끝났고 이미지가 이 맥에 있다. 로컬 실행 원칙(ADR-007)과 맞고, "명령 한 줄로 전체를 띄운다"는 요구가 결국 로컬 구성을 필요로 한다. Cloud는 새 계정과 외부 계약을 하나 더 만든다. PRD 미결 2를 해결한다.
 **트레이드오프**: Langfuse v3는 ClickHouse·Redis·MinIO까지 필요해 노트북에 무겁다. 그래서 기본을 꺼 두고 JSONL을 기본으로 한다. Langfuse 연동의 환경 변수와 trace 필드는 이 저장소에서 아직 실측하지 않았다(`docs/CONTRACTS.md`의 미확인).
+
+### ADR-017: 콘텐츠 유형·제품 카테고리 부분 동결 (2026-11-13)
+**결정**: `content_type`·`category` 두 축의 값과 정의를 2026-11-13에 부분 동결한다.
+**이유**: E1 1단계 라벨링(사람이 두 축을 함께 라벨링) 중에 정의가 바뀌면 사람 라벨의 기준이 달라진다.
+**근거**: 시범 20건 사람 라벨링과 라벨 점검(2026-11-13). `content_type`의 `product_creative`와 `brand_campaign` 경계 규칙은 라벨링 중 정했고, 시범 비교 결과 일부를 본 뒤 라벨 점검에 반영했다(결과 문서에 한계로 기록).
+**트레이드오프**: 나머지 축(`hook_type`·`angle`·`format`·`talent`·구조·플랫폼 적합성·`cta_type`·`claims`)은 전체 v1(2026-11-19)까지 바뀔 수 있다.
+
+### ADR-018: 소재 분류 전체 v1 동결 (2026-11-13)
+**결정**: 사용자 승인에 따라 소재 분류의 모든 축과 정의를 2026-11-13에 v1로 동결한다. `has_hook_segment` 축을 제거하고 `hook_type`은 유지한다. `has_cta` ⇔ `cta_type != none`을 스키마 검증으로 강제하며 불일치는 기존 1회 재요청 뒤 `INVALID_OUTPUT` 경로로 처리한다. `claims`는 영상 자막·음성과 캡션 본문 문장에 명시된 효능을 인정하되 해시태그만 있는 경우는 제외한다. 다중 CTA는 `shop_now` > `event` > `learn_more` > `store_mention` > `follow_engage` 순으로 고른다. 프롬프트 버전은 본문 변경 여부와 관계없이 `content-type-v1`·`hook-v1`·`full-v1`로 모두 올리고 `ANALYSIS_MODEL_ID`와 `FINAL_RUN_TAG`는 유지한다. 값 목록은 축 제거 외에 바꾸지 않는다. format 우선순위는 `static_image` > `text_motion` > `ugc_style` > `demo` > `studio_film` > `other`로 명시하고, `how_to`(메시지 전략)와 `demo`(제작 형식)는 함께 붙을 수 있다. `ordinary_person`은 이름·소속이 표시되지 않은 출연자(전문 광고 모델 포함)로 정의한다. 타이틀·로고로 시작하는 영상은 `other`로 두며 `title_card` 값은 추가하지 않는다. 동결 뒤 변경은 ADR에 남긴다.
+**이유**: E1 2단계 라벨링과 일괄 분석이 같은 기준을 써야 한다. E1 1단계가 2026-11-13에 끝나 2단계 라벨링·7일 재라벨 일정에 여유를 만들기 위해 전체 동결을 예정일 11-19보다 앞당겼다. 2단계 라벨링과 일괄 분석 전의 승인으로 사전 등록 위반이 아니다.
+**트레이드오프**: 시범 `@minimal`·`@default`의 v0 결과와 `@v1` 결과는 규칙이 달라 직접 비교하거나 섞지 않는다. 시범 20건의 사람 라벨은 옛 규칙(마지막 CTA 등)으로 달았으므로 v1 결과와 직접 비교하지 않고, E1 판정에는 시범을 쓰지 않는다.

@@ -63,6 +63,8 @@ def test_new_label_models_accept_all_enum_members_and_reject_outside_values(
         for member in enum:
             data = axis_data(model)
             data[name] = [member.value] if name == "claims" else member.value
+            if name == "cta_type":
+                data["structure"]["has_cta"] = member is not CtaType.none
             assert model.model_validate(data).model_dump(mode="json") == data
         data = axis_data(model)
         data[name] = ["outside-taxonomy"] if name == "claims" else "outside-taxonomy"

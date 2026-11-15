@@ -29,7 +29,7 @@ from beautyads.llm import (
     video_part,
 )
 
-from .models import ANALYSIS_MODEL_ID, VideoInput
+from .models import ANALYSIS_MODEL_ID, VideoInput, log_llm_failure
 from .prompts import HOOK_PROMPT_VERSION, build_hook_prompt
 
 HOOK_WINDOW_S = 3.0
@@ -153,6 +153,7 @@ def analyze_hook(
         except LlmCallError as exc:
             if exc.kind == ErrorKind.RATE_LIMIT:
                 raise
+            log_llm_failure("hook", exc)
             outcome.error_code = f"LLM_{exc.kind}"
             return outcome
         except LlmResponseError as exc:

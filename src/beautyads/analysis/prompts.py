@@ -1,4 +1,4 @@
-"""Draft v0 hook criteria in taxonomy priority order."""
+"""Frozen v1 classification criteria and priority rules."""
 
 from collections.abc import Mapping
 from enum import StrEnum
@@ -19,7 +19,7 @@ from beautyads.domain import (
     Talent,
 )
 
-HOOK_PROMPT_VERSION = "hook-v0"
+HOOK_PROMPT_VERSION = "hook-v1"
 
 _HOOK_CRITERIA = {
     HookType.question: "화면 자막이나 음성이 의문문으로 시작한다",
@@ -42,6 +42,7 @@ def build_hook_prompt(creative: Creative) -> str:
         "제공된 구간이 더 짧으면 그 구간만 본다.\n"
         f"{criteria}\n"
         "둘 이상 해당하면 위쪽 값을 우선한다.\n"
+        "타이틀·로고로 시작하는 영상은 other로 둔다(title_card 값은 추가하지 않는다).\n"
         "제목·캡션은 참고 정보이며 구간 밖의 내용을 추정하지 않는다.\n"
         f"참고 제목: {creative.title or ''}\n"
         f"참고 캡션: {creative.caption or ''}\n"
@@ -80,7 +81,7 @@ _FORMAT_CRITERIA = {
 }
 _TALENT_CRITERIA = {
     Talent.none: "출연자 없음",
-    Talent.ordinary_person: "일반인",
+    Talent.ordinary_person: "이름·소속이 표시되지 않은 출연자(전문 광고 모델 포함)",
     Talent.creator: "크리에이터",
     Talent.celebrity: "유명인",
     Talent.expert: "전문가",
@@ -139,26 +140,34 @@ def build_full_prompt(creative: Creative) -> str:
         "각 단일 선택 축은 하나, claims와 ingredients는 여럿을 선택한다.\n"
         f"angle:\n{_criteria(Angle, _ANGLE_CRITERIA)}\n"
         f"format:\n{_criteria(Format, _FORMAT_CRITERIA)}\n"
+        "둘 이상 해당하면 format 우선순위: "
+        "static_image > text_motion > ugc_style > demo > studio_film > other "
+        "순으로 가장 앞선 것을 고른다.\n"
         f"talent:\n{_criteria(Talent, _TALENT_CRITERIA)}\n"
         f"{Talent.celebrity.value}와 {Talent.creator.value}는 캡션·제목의 "
         "이름 표기나 협업 표기가 있을 때만 붙이고, "
-        f"없으면 {Talent.ordinary_person.value}으로 둔다. "
+        f"이름·소속이 표시되지 않은 출연자는 {Talent.ordinary_person.value}으로 둔다. "
         "손만 보이는데 성별을 적는 등 보이지 않는 특성은 추정하지 않는다.\n"
         f"structure: {', '.join(StructureFlags.model_fields)} 각각을 예/아니오(bool)로 판정한다. "
-        "훅 구간·사용 시연 구간·근거 제시 구간·행동 유도가 있는지 전체 구간에서 관찰한다.\n"
+        "사용 시연 구간·근거 제시 구간·행동 유도가 있는지 전체 구간에서 관찰한다.\n"
         f"platform_fit: {', '.join(PlatformFitFlags.model_fields)} 각각을 예/아니오(bool)로 판정한다. "
         "세로 비율·텍스트 오버레이·음성·음악만 있음·자막 여부를 관찰한다.\n"
         f"cta_type:\n{_criteria(CtaType, _CTA_CRITERIA)}\n"
+        "has_cta는 cta_type이 none이 아닐 때만 true이고, none이면 false다. "
+        "영상·제목·캡션의 판매처·할인·행사 표기도 CTA로 센다. "
+        "여러 CTA가 나오면 고정 우선순위 "
+        "shop_now > event > learn_more > store_mention > follow_engage "
+        "순으로 가장 앞선 것을 고른다.\n"
         f"claims:\n{_criteria(Claim, _CLAIM_CRITERIA)}\n"
-        "소구점은 자막이나 음성으로 명시된 효능만 붙인다. "
-        "화면 분위기에서 효능이나 성분을 추정하지 않는다. "
+        "영상 자막·음성 또는 캡션 본문 문장에 명시된 효능만 붙인다. "
+        "해시태그만 있는 경우는 제외한다. 화면 분위기에서 추정하지 않는다. "
         "명시된 효능이 없으면 claims는 빈 목록이다.\n"
         "ingredients는 자막·음성·제품 표기에 나온 성분명만 원문 그대로 추출한다. "
         "공백·대소문자·한글을 바꾸지 않으며 정규화·번역·사전 대조·폐기를 하지 않는다. "
         "명시된 성분이 없으면 빈 목록이다.\n"
         "닫힌 목록 어디에도 안 맞는 축은 해당 없음이나 기타 값으로 빠질 수 있다.\n"
         f"참고 제목: {creative.title or ''}\n"
-        f"참고 캡션: {creative.caption or ''}\n"
+        f"캡션(본문 문장의 명시된 효능은 claims 근거): {creative.caption or ''}\n"
         f"출력은 {', '.join(FullResult.model_fields)} 필드를 모두 담은 JSON 하나다. "
         "원문은 번역하지 않는다."
     )
