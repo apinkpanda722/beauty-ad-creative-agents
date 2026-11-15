@@ -34,7 +34,16 @@
     {
       "step": 2,
       "name": "mfds-source",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-15T15:25:21+0900",
+      "summary": "식약처 3종 어댑터·도메인 타입·테스트 구현: 정확 일치, unknown 판정, XML 방어, 호출 상한·간격·재시도·비밀 보호 적용. make verify 2,143개 통과, 추가 패키지 설치 없음.",
+      "completed_at": "2026-11-15T15:32:40+0900",
+      "usage": {
+        "input_tokens": 1279643,
+        "cached_input_tokens": 1205248,
+        "output_tokens": 15327,
+        "attempts": 1
+      }
     },
     {
       "step": 3,
