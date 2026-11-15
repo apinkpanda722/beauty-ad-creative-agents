@@ -518,3 +518,166 @@ def test_layer1_dependency_selection_and_cleanup_use_only_fakes(monkeypatch):
         assert deps.source.conn is connection and deps.graph is graph
     connection.close.assert_called_once_with()
     graph.close.assert_called_once_with()
+
+
+class LinksSource:
+    def __init__(self, entries=(), products=(), watermark=NOW):
+        self.entries, self.products = list(entries), list(products)
+        self.watermark = watermark
+        self.since, self.writes = [], []
+
+    def read_snapshot(self, *, since, limit):
+        from beautyads.domain.links import LinksSnapshot
+
+        self.since.append(since)
+        changed = [
+            e for e in self.entries if since is None or e.creative.updated_at > since
+        ]
+        return LinksSnapshot(
+            changed if limit is None else changed[:limit], self.products
+        )
+
+    def get_watermark(self):
+        return self.watermark
+
+    def set_watermark(self, value):
+        self.writes.append(value)
+        self.watermark = value
+
+
+def test_layer2_cli_dispatch_split_seed_and_full_summary_are_offline():
+    from test_graph_layer2 import Graph
+    from test_links_domain import creative, product
+
+    p = product(brand="cosrx")
+    source = LinksSource([creative(p.name_ko, brand="cosrx")], [p])
+    out = io.StringIO()
+    assert (
+        main(
+            [
+                "--layers",
+                "2",
+                "--full",
+                "--sample-pairs",
+                "1",
+                "--seed",
+                "17",
+                "--verify",
+            ],
+            environ=ENV,
+            out=out,
+            docker_check=lambda: True,
+            tcp_check=lambda *args: True,
+            deps_factory=lambda: SyncDeps(source, Graph()),
+        )
+        == 0
+    )
+    report = json.loads(out.getvalue())
+    assert (
+        report["layers"] == "2" and report["promotes"] == report["dev"]["promotes"] == 1
+    )
+    assert report["test"]["promotes"] == 0 and len(report["sample_pairs"]) == 1
+    assert report["coverage_scope"] == "applied_batch"
+    assert list(report)[-1] == "recommendation"
+    assert "torriden" in report["no_product_info_brands"]
+    assert source.since == [None] and source.writes == [NOW]
+    assert report["verification"]["same_relationships"] is True
+
+
+def test_layer2_overlap_checkpoint_empty_and_failed_transaction():
+    from test_graph_layer2 import Graph
+    from test_links_domain import creative, product
+
+    from beautyads.pipeline.sync import run_layer2_sync
+
+    p = product()
+    source = LinksSource([creative(p.name_ko)], [p])
+    report = run_layer2_sync(
+        SyncDeps(source, Graph()), dev_brands=["dev"], test_brands=[]
+    )
+    assert source.since == [NOW - SYNC_OVERLAP] and source.writes == [NOW]
+    assert report["promotes"] == 1
+    empty = LinksSource()
+    report = run_layer2_sync(SyncDeps(empty, Graph()), dev_brands=[], test_brands=[])
+    assert report["read"] == 0 and empty.writes == []
+    source.writes.clear()
+    graph = Graph()
+    graph.fail = True
+    with pytest.raises(RuntimeError):
+        run_layer2_sync(SyncDeps(source, graph), dev_brands=["dev"], test_brands=[])
+    assert source.writes == []
+
+
+def test_layer2_failed_semantic_replay_does_not_checkpoint():
+    from test_graph_layer2 import Graph
+    from test_links_domain import creative, product
+
+    from beautyads.pipeline.sync import run_layer2_sync
+
+    class BadReplay(Graph):
+        def run(self, query, params=None):
+            from beautyads.graph.layer2 import LINK_STATE
+
+            result = super().run(query, params)
+            if query == LINK_STATE:
+                result.records.append({"unstable": len(self.calls)})
+            return result
+
+    p = product()
+    source = LinksSource([creative(p.name_ko)], [p])
+    with pytest.raises(GraphError, match="GRAPH_VERIFY_FAILED"):
+        run_layer2_sync(
+            SyncDeps(source, BadReplay()),
+            dev_brands=["dev"],
+            test_brands=[],
+            verify=True,
+        )
+    assert source.writes == []
+
+
+def test_layer2_dependency_selection_and_cleanup_use_only_fakes(monkeypatch):
+    from contextlib import ExitStack
+
+    from beautyads.pipeline.sync import _live_deps
+    from beautyads.store.links_source import PostgresLinksSource
+
+    connection, graph = Mock(), Mock()
+    monkeypatch.setattr("beautyads.pipeline.sync.connect", lambda *args: connection)
+    monkeypatch.setattr("beautyads.pipeline.sync.connect_graph", lambda **kwargs: graph)
+    with ExitStack() as stack:
+        deps = _live_deps(environ=ENV, env_file=None, stack=stack, layers="2")
+        assert isinstance(deps.source, PostgresLinksSource)
+    connection.close.assert_called_once_with()
+    graph.close.assert_called_once_with()
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        ["--layers", "2", "--sample-pairs", "-1"],
+        ["--layers", "2", "--sample-pairs", "invalid"],
+    ],
+)
+def test_layer2_invalid_options_never_connect(options):
+    factory = Mock()
+    assert main(options, environ=ENV, out=io.StringIO(), deps_factory=factory) == 2
+    factory.assert_not_called()
+
+
+def test_explicit_layer2_preserves_existing_sample_mode():
+    source = SampleSource()
+    out = io.StringIO()
+    assert (
+        main(
+            ["--layers", "2", "--sample", "50", "--verify"],
+            environ=ENV,
+            out=out,
+            docker_check=lambda: True,
+            tcp_check=lambda *args: True,
+            deps_factory=lambda: SyncDeps(source, GraphConnection(AxisDriver(2))),
+        )
+        == 0
+    )
+    report = json.loads(out.getvalue())
+    assert report["sample"] == 50 and report["graph_check"]["labeled_in_sample"] == 1
+    assert source.sampled == [50] and source.writes == []

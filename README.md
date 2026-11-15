@@ -122,6 +122,68 @@ make sync ARGS='--layers 1 --full --verify'
 `--verify`는 같은 입력을 재적재해 두 번째 생성 수가 0인지 확인한다.
 이 명령은 모델·출처 API 호출이나 이미지 다운로드를 하지 않는다.
 
+## sync: 2층 소재와 제품 연결 (P4)
+
+Step 9부터 명시적인 `--layers 2`는 기존 Creative·분류 축 동기화에
+`PROMOTES`·`CLAIMS`·`MENTIONS`를 추가한다. 사용자가 1층 제품 적재와
+step 7의 `ingredient-matches@v1` 대조를 마친 뒤 실행한다.
+
+```bash
+make sync ARGS='--layers 2 --full --verify'
+make sync ARGS='--layers 2'
+make sync ARGS='--layers 2 --sample-pairs 20 --seed 20261115'
+```
+
+`--layers` 생략 및 `--sample 50 --verify`는 기존 소재·분류 축 확인 동작을
+유지한다. `--sample-pairs`(기본 20, 0이면 생략)와 `--seed`(기본 20261115)는
+제품 연결 정밀도를 사람이 확인할 표본을 정한다. 제목·캡션은 각각 앞
+120자, 제품 이름·제품 URL·일치 문자열·`basis`·`confidence`와 함께 요약의
+`sample_pairs`에 나온다. 같은 입력·시드는 입력 순서와 무관하게 같은 쌍을
+고른다. `matched_text`는 정규화 비교에서 일치한 제품명·별칭의 저장 표기다.
+
+`PROMOTES`는 `content_type@v1`이 `done`인 제품 소재에만 만든다.
+NFKC·대소문자 무시·공백 제거 뒤 같은 브랜드의 한글 제품명 전체 또는
+영문명·별칭이 제목·캡션에 포함되어야 한다. 영문명·별칭은 정규화 길이
+3자 이상만 쓴다. 최장 일치 제품이 둘이면 `ambiguous`로 보류한다.
+제품명 일부만으로는 연결하지 않는다. `basis`는 `title`·`caption`,
+`confidence`는 한글 제품명 전체면 `name_full`, 영문명·별칭이면 `alias`다.
+동일 제품 안에서 길이가 같으면 전체 이름, 제목 순으로 근거를 고른다.
+
+`CLAIMS`는 `done`인 `full@v1`의 유효한 `claims` 값에서 `other`를 제외한다.
+주장 원문 속성은 없다. `MENTIONS`는 같은 `full@v1`의 성분 원문과
+`done`인 `ingredient-matches@v1`의 `raw_name`이 정확히 같고 표준명이 하나로
+묶인 경우에만 `IngredientAlias`로 잇고 `ALIAS_OF`로 `Ingredient`에 잇는다.
+`raw_name` 관계 속성에 원문을 보존하며 나머지는 `unresolved`로 센다.
+시범 `@minimal`·`@default`·v0 라벨은 읽지 않는다. 모델 재분석은 하지 않는다.
+
+2층 워터마크는 `public_links_layer2_v1`이다. 소재·v1 분석 작업과 같은
+브랜드 제품의 PostgreSQL 변경 시각 중 최대값을 10분 겹쳐 읽는다.
+제품명·별칭이 바뀌거나 새 제품이 생겨도 그 브랜드 소재를 재계산한다.
+해당 소재 키의 이전 `PROMOTES` 삭제와 새 관계의 MERGE는 한 트랜잭션이다.
+`CLAIMS`·`MENTIONS`도 해당 소재에서 사라진 할당을 제거한다. 변경 시각 없이
+수동 삭제한 원본은 `--full`로 반영한다. 모든 적재와 반복 검증이 성공한
+뒤에만 워터마크를 저장한다. `--verify`는 재생성 카운터 대신 관계·속성·대상
+집합의 동일성을 검사한다(`PROMOTES`는 반복 시에도 삭제 후 다시 만들어진다).
+
+요약의 `promotes`, `product_creatives`, `coverage`, `ambiguous`, `claims`,
+`mentions`, `unresolved`는 이번에 실제 적재한 소재 집합을 기준으로 집계하며
+`coverage_scope: applied_batch`으로 표시한다. `read`와 생성 카운터도
+이번 변경분 적재 수다. 표본 쌍은 이 집합에서 실제 연결한 소재만 대상으로
+고른다. 전체 커버리지와 전 소재의 정밀도 표본을 확인하려면 `--limit` 없이
+`--full --verify`를 사용한다. `config/brand_split.yaml`에 따라 `dev`·`test`와
+출처별로 같은 수를 보고하며 규칙 선택에는 dev 입력만 전달한다.
+test 결과로 별칭 길이나 후보 선택 규칙을 바꾸지 않는다.
+
+제품이 없는 브랜드는 `no_product_info_brands`(제품 정보 없음)에 나열하고
+`product_creatives` 분모에서 제외한다. `all_product_creatives`는 제외 전
+제품 소재 수다. 토리든·넘버즈인은 공식몰 제품 정보가 없어 이 한계에 해당한다.
+`candidates_by_source`는 제목·캡션이 비어 있지 않은 제품 소재 수다.
+TikTok은 두 필드가 비어 있어 후보에 포함되지 않으며 제품에 억지로 잇지
+않는다. TikTok은 CQ-09와 분포 용도이고 제품 연결 질문의 답은
+YouTube·Instagram에 한정된다. YouTube·Instagram의 test 대상 중 미연결이
+있으면 요약 마지막 `recommendation`에서 영상 제품 식별의 별도 추출을
+제안한다. 이 제안은 유료 모델 비용이 드는 후속 작업이며 실행하지 않는다.
+
 - 하네스 사용법: [scripts/README.md](scripts/README.md)
 - 요구사항·설계·결정 기록: [docs/](docs/)
 

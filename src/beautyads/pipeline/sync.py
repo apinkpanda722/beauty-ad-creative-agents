@@ -13,9 +13,11 @@ from urllib.parse import urlsplit
 from beautyads.analysis.models import FINAL_RUN_TAG
 from beautyads.domain.claims import ClaimRule
 from beautyads.domain.layer1 import Layer1SyncSource, Layer1Tables
+from beautyads.domain.links import DEFAULT_SAMPLE_PAIRS, DEFAULT_SEED, LinksSource
 from beautyads.domain.sync import SYNC_OVERLAP, GraphSyncSource
 from beautyads.graph.connection import GraphConnection, GraphError, connect_graph
 from beautyads.graph.layer1 import load_layer1, load_layer1_tables
+from beautyads.graph.layer2 import load_layer2, read_link_state
 from beautyads.graph.load import (
     count_axis_relationships,
     load_creatives,
@@ -30,15 +32,17 @@ from beautyads.settings import (
     neo4j_uri,
 )
 from beautyads.sources.claim_rules import load_claim_rules
+from beautyads.sources.split import load_brand_split
 from beautyads.store.connection import StoreConnectError, connect, postgres_dsn
 from beautyads.store.layer1_source import PostgresLayer1Source
+from beautyads.store.links_source import PostgresLinksSource
 from beautyads.store.sync_source import PostgresGraphSyncSource
 
 from .preflight import docker_running, tcp_reachable
 
 
 class SyncDeps(NamedTuple):
-    source: GraphSyncSource | Layer1SyncSource
+    source: GraphSyncSource | Layer1SyncSource | LinksSource
     graph: GraphConnection
 
 
@@ -221,16 +225,86 @@ def run_layer1_sync(
     }
 
 
-def _live_deps(*, environ, env_file, stack: ExitStack, layers: str = "2") -> SyncDeps:
+def run_layer2_sync(
+    deps: SyncDeps,
+    *,
+    dev_brands: Sequence[str],
+    test_brands: Sequence[str],
+    limit: int | None = None,
+    full: bool = False,
+    verify: bool = False,
+    sample_pairs: int = DEFAULT_SAMPLE_PAIRS,
+    seed: int = DEFAULT_SEED,
+) -> dict:
+    """Extend the creative skeleton with frozen-v1 links, without reanalysis."""
+    if sample_pairs < 0:
+        raise ValueError("sample_pairs must be nonnegative")
+    started = time.monotonic()
+    apply_schema(deps.graph)
+    for statement in LAYER1_CONSTRAINTS:
+        deps.graph.run(statement)
+    watermark = deps.source.get_watermark()
+    since = None if full or watermark is None else watermark - SYNC_OVERLAP
+    snapshot = deps.source.read_snapshot(since=since, limit=limit)
+    entries = [(entry.creative, entry.labels) for entry in snapshot.changed]
+    skeleton = load_creatives(deps.graph, entries, run_tag=FINAL_RUN_TAG)
+    options = {
+        "products": snapshot.products,
+        "dev_brands": dev_brands,
+        "test_brands": test_brands,
+        "sample_pairs": sample_pairs,
+        "seed": seed,
+    }
+    report = load_layer2(deps.graph, snapshot.changed, **options)
+    report["nodes_created"] += skeleton.nodes_created
+    report["relationships_created"] += skeleton.relationships_created
+    report["skipped_invalid"] = skeleton.skipped_invalid
+    if verify:
+        before = read_link_state(deps.graph, snapshot.changed)
+        replay_skeleton = load_creatives(deps.graph, entries, run_tag=FINAL_RUN_TAG)
+        replay = load_layer2(deps.graph, snapshot.changed, **options)
+        after = read_link_state(deps.graph, snapshot.changed)
+        same = before == after
+        report["verification"] = {
+            "same_relationships": same,
+            "nodes_created": replay_skeleton.nodes_created + replay["nodes_created"],
+            "relationships_created": replay_skeleton.relationships_created
+            + replay["relationships_created"],
+        }
+        # PROMOTES is deleted and rebuilt atomically; compare its semantic set,
+        # not the number of replacement relationships allocated on replay.
+        if not same or report["verification"]["nodes_created"]:
+            raise GraphError("GRAPH_VERIFY_FAILED")
+    if snapshot.changed:
+        latest = max(entry.creative.updated_at for entry in snapshot.changed)
+        watermark = max(watermark, latest) if watermark is not None else latest
+        deps.source.set_watermark(watermark)
+    recommendation = report.pop("recommendation")
+    return {
+        **report,
+        "event": "summary",
+        "layers": "2",
+        "read": len(snapshot.changed),
+        "coverage_scope": "applied_batch",
+        "watermark": watermark.isoformat() if watermark is not None else None,
+        "elapsed_s": time.monotonic() - started,
+        "recommendation": recommendation,
+    }
+
+
+def _live_deps(
+    *, environ, env_file, stack: ExitStack, layers: str | None = None
+) -> SyncDeps:
     connection = connect(postgres_dsn(environ=environ, env_file=env_file))
     stack.callback(connection.close)
     graph = connect_graph(environ=environ, env_file=env_file)
     stack.callback(graph.close)
-    source = (
-        PostgresLayer1Source(connection)
-        if layers == "1"
-        else PostgresGraphSyncSource(connection)
-    )
+    if layers == "1":
+        source = PostgresLayer1Source(connection)
+    elif layers == "2":
+        source = PostgresLinksSource(connection)
+    else:
+        source = PostgresGraphSyncSource(connection)
     return SyncDeps(source, graph)
 
 
@@ -242,6 +316,16 @@ def _limit(value: str) -> int:
     if limit < 1:
         raise argparse.ArgumentTypeError("limit must be positive")
     return limit
+
+
+def _sample_pairs(value: str) -> int:
+    try:
+        count = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError("sample-pairs must be nonnegative") from None
+    if count < 0:
+        raise argparse.ArgumentTypeError("sample-pairs must be nonnegative")
+    return count
 
 
 def main(
@@ -259,7 +343,13 @@ def main(
     parser.add_argument("--sample", type=_limit)
     parser.add_argument("--full", action="store_true")
     parser.add_argument("--verify", action="store_true")
-    parser.add_argument("--layers", choices=("1", "2"), default="2")
+    # Omitted --layers retains step-zero/live-graph behavior. Explicit layer 2
+    # adds links and its own source checkpoint to the creative/axis skeleton.
+    parser.add_argument("--layers", choices=("1", "2"))
+    parser.add_argument(
+        "--sample-pairs", type=_sample_pairs, default=DEFAULT_SAMPLE_PAIRS
+    )
+    parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
     try:
         args = parser.parse_args(argv)
     except SystemExit as error:
@@ -289,11 +379,16 @@ def main(
                     Path("config/efficacy_concerns.yaml"),
                 )
                 rules = load_claim_rules(Path("config/claim_rules.yaml"))
+            elif args.layers == "2" and args.sample is None:
+                split = load_brand_split(Path("config/brand_split.yaml"))
             deps = (
                 deps_factory()
                 if deps_factory is not None
                 else _live_deps(
-                    environ=environ, env_file=env_file, stack=stack, layers=args.layers
+                    environ=environ,
+                    env_file=env_file,
+                    stack=stack,
+                    layers=None if args.sample is not None else args.layers,
                 )
             )
             if args.layers == "1":
@@ -304,6 +399,17 @@ def main(
                     limit=args.limit,
                     full=args.full,
                     verify=args.verify,
+                )
+            elif args.layers == "2" and args.sample is None:
+                report = run_layer2_sync(
+                    deps,
+                    dev_brands=split.dev,
+                    test_brands=split.test,
+                    limit=args.limit,
+                    full=args.full,
+                    verify=args.verify,
+                    sample_pairs=args.sample_pairs,
+                    seed=args.seed,
                 )
             else:
                 report = run_sync(
