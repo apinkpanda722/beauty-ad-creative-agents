@@ -104,7 +104,16 @@
     {
       "step": 7,
       "name": "product-records",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-15T16:22:02+0900",
+      "summary": "제품 실행기·성분/인증 대조·광고 성분 매핑·별칭 로더·스캔/빈도 보고와 live-products 구현. make verify 2,404개 통과, 실제 호출·추가 패키지 설치 없음.",
+      "completed_at": "2026-11-15T16:35:56+0900",
+      "usage": {
+        "input_tokens": 2819773,
+        "cached_input_tokens": 2696320,
+        "output_tokens": 30028,
+        "attempts": 1
+      }
     },
     {
       "step": 8,
