@@ -590,9 +590,12 @@ def test_detail_images_after_an_empty_anchor_extend_past_the_review_anchor():
     # Real abib structure: #prdDetail is empty and a review anchor follows it
     # immediately; the detail images come later, before #prdRelated. An image that
     # precedes the #prdDetail anchor is not part of the detail section.
-    product = _product(
-        "cafe24_empty_anchor.html", "abib", "https://abib.com/product/x/721/"
+    # The real abib page also lists its ingredients as text (read as text since
+    # that path wins); relabel it so this test exercises the image structure.
+    body = recorded("cafe24_empty_anchor.html").replace(
+        "전성분".encode(), "성분정보".encode()
     )
+    product = _product(None, "abib", "https://abib.com/product/x/721/", body=body)
     urls = product.detail_image_urls
     assert len(urls) == 4
     before_anchor = "https:" + _first_image_source("cafe24_empty_anchor.html")
@@ -853,3 +856,29 @@ def test_http_boundary_exposes_location_and_content_type_without_following(
     assert seen["follow_redirects"] is False
     final = httpx_mall_get("https://x.example.net/error.html", {}, 1.0, 10)
     assert final.status == 200 and final.content_type.startswith("text/html")
+
+
+def test_accordion_ingredients_are_read_as_text_and_skip_the_image_path():
+    # Real abib structure: <li>전성분<ul class="acco-inner"><li class="ingr2">...
+    # The list is plain text (INCI names), so no detail image is needed.
+    product = _product(
+        "cafe24_accordion_ingredients.html",
+        "abib",
+        "https://abib.com/product/x/721/",
+    )
+    assert product.ingredients_text
+    assert product.ingredients_text.startswith("Water (Aqua)")
+    assert "," in product.ingredients_text
+    assert product.detail_image_urls == ()
+
+
+def test_accordion_with_an_empty_ingredient_list_is_not_text():
+    body = re.sub(
+        rb'(<li class="ingr2">).*?(</li>)',
+        rb"\1 \2",
+        recorded("cafe24_accordion_ingredients.html"),
+        flags=re.DOTALL,
+    )
+    assert b"Water (Aqua)" not in body
+    product = _product(None, "abib", "https://abib.com/product/x/721/", body=body)
+    assert product.ingredients_text is None

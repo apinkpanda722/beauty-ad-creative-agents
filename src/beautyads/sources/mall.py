@@ -206,6 +206,21 @@ def _ingredients(root: _Node) -> str | None:
         elif row.tag == "div" and row.has_class("info-row"):
             label = next((n for n in row.walk() if n.has_class("info-label")), None)
             content = next((n for n in row.walk() if n.has_class("info-content")), None)
+        elif row.tag == "li":
+            # Accordion item: <li>전성분<span/><ul><li>values</li></ul></li>. The
+            # label is the item's own text, the value its nested list or block.
+            own = "".join(child for child in row.children if isinstance(child, str))
+            if len("".join(own.split())) > 12:
+                continue
+            label = _Node("li", children=[own])
+            content = next(
+                (
+                    child
+                    for child in row.children
+                    if isinstance(child, _Node) and child.tag in {"ul", "div"}
+                ),
+                None,
+            )
         else:
             continue
         if label is None or content is None:
