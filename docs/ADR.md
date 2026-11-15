@@ -72,7 +72,7 @@
 3. **한계**: 범위가 제한적이며 CQ-01·02·04·05·10·14의 답은 이 연결이 있는 범위에서만 나온다. 연결이 없는 성분·효능은 "근거 연결 없음"으로 보고하고 답이 없다는 뜻으로 해석하지 않는다.
 4. CQ-09는 TikTok 한정으로 적고 소규모 시드 표본·집행 주체 규칙(`config/retailers.yaml`, 사용자 확인 대기)에 의존한다는 한계를 명시한다(`docs/COMPETENCY_QUESTIONS.md`).
 5. **`SkinType`·`SkinConcern` 값 목록(2026-11-15, 사용자 결정)**: `SkinType` = 건성·지성·복합성·민감성. `SkinConcern` = 건조, 트러블·여드름, 홍조·민감, 모공·피지, 칙칙함·잡티, 탄력 저하, 주름, 거친 피부결(8개).
-6. **`Efficacy→ADDRESSES→SkinConcern` 대응(2026-11-15, 초안 — 출처 없음, 사용자 확인 전)**: hydration→건조, soothing→홍조·민감, brightening→칙칙함·잡티, firming_elasticity→탄력 저하, pore_sebum→모공·피지, acne_trouble→트러블·여드름, barrier→건조·홍조·민감, anti_aging→주름, other→거친 피부결, texture_finish·sun_protection은 연결 없음. **이 대응은 출처가 없는 초안이다.** 출처 없는 연결은 만들지 않는다는 규칙에 따라, 출처를 붙이거나 사용자가 확인하기 전에는 `ADDRESSES` 관계를 그래프에 올리지 않고 초안 표시를 단다.
+6. **`Efficacy→ADDRESSES→SkinConcern` 대응(2026-11-15, 초안 — 출처 없음, 사용자 확인 전)**: hydration→건조, soothing→홍조·민감, brightening→칙칙함·잡티, firming_elasticity→탄력 저하, pore_sebum→모공·피지, acne_trouble→트러블·여드름, barrier→건조·홍조·민감, anti_aging→주름, other→거친 피부결, texture_finish·sun_protection은 연결 없음. **(2026-11-15 조언 세션 확정: 이 대응은 실증 주장이 아니라 프로젝트의 분류 체계 정의이며 `basis: taxonomy_definition`으로 적재한다. 효능 주장이 아니다.)** 아래는 확정 이전의 원문이다: **이 대응은 출처가 없는 초안이다.** 출처 없는 연결은 만들지 않는다는 규칙에 따라, 출처를 붙이거나 사용자가 확인하기 전에는 `ADDRESSES` 관계를 그래프에 올리지 않고 초안 표시를 단다.
 7. **성분→효능 수기 표의 작성 시점**: 지금 만들지 않는다. 상세페이지 추출(`live-products`) 뒤 성분 빈도(성분명·건수만)를 보고하면 조언 세션이 상위 약 20개에 출처를 붙여 만든다.
 8. **`PROMOTES` 규칙 승인(2026-11-15)**: 소재의 제목·캡션에 같은 브랜드 제품 이름 전체가 있으면 잇고 모호하면 만들지 않는다(`docs/ARCHITECTURE.md` 2층). 제품마다 영문명·줄임말 별칭 칸을 둔다. 규칙은 dev 브랜드에서 다듬고 test 브랜드에서 커버리지를 보고한다.
 

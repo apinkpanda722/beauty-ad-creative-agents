@@ -1,0 +1,224 @@
+# 성분 -> 효능(HAS_EFFICACY) 수기 표 (2026-11-15, 조언 세션 작성, 구현 세션이 카탈로그로 연결 확인)
+# 규칙: 성분은 영문 INCI를 mfds_ingredient_catalog의 영문명과 정확 일치(eng_name_exact, 대소문자·공백·앞뒤 구두점만 정규화)로
+#   연결했고 한글 표준명을 함께 적는다. 정확 일치하지 않는 항목은 추측으로 연결하지 않고 unmatched에 둔다.
+# 각 연결에는 출처(source_ref)와 근거 종류(basis: regulatory_notice | literature_review)가 있다.
+# conditional: true(식약처 고시)는 고시 함량 조건과 기능성 심사(보고)가 따른다는 뜻이다. 성분이 들었다고 그 효능이 인정되는 것이 아니다.
+# 이 표에 없는 성분은 HAS_EFFICACY를 만들지 않는다(not_linked_for_now 포함, 출처 미확인).
+version: '2026-11-15'
+author: advisor-session
+efficacy_values:
+- hydration
+- soothing
+- brightening
+- firming_elasticity
+- pore_sebum
+- acne_trouble
+- barrier
+- anti_aging
+- sun_protection
+- texture_finish
+- other
+links:
+- efficacy:
+  - brightening
+  basis: regulatory_notice
+  conditional: true
+  source_ref: MFDS 기능성화장품 심사에 관한 규정 별표 (자료제출이 생략되는 기능성화장품의 종류, 제6조제3항 관련), law.go.kr flSeq=133405543
+  ingredients:
+  - inci: Niacinamide
+    standard_name: 나이아신아마이드
+    matched_by: eng_name_exact
+  - inci: Arbutin
+    standard_name: 알부틴
+    matched_by: eng_name_exact
+  - inci: Ascorbyl Glucoside
+    standard_name: 아스코빌글루코사이드
+    matched_by: eng_name_exact
+  - inci: Magnesium Ascorbyl Phosphate
+    standard_name: 마그네슘아스코빌포스페이트
+    matched_by: eng_name_exact
+  - inci: Ethyl Ascorbyl Ether
+    standard_name: 에칠아스코빌에텔
+    matched_by: eng_name_exact
+  - inci: Bisabolol
+    standard_name: 비사보롤
+    matched_by: eng_name_exact
+  - inci: Ascorbyl Tetraisopalmitate
+    standard_name: 아스코빌테트라이소팔미테이트
+    matched_by: eng_name_exact
+  - inci: Broussonetia Kazinoki Bark Extract
+    standard_name: 닥나무껍질추출물
+    matched_by: eng_name_exact
+- efficacy:
+  - anti_aging
+  basis: regulatory_notice
+  conditional: true
+  source_ref: MFDS 기능성화장품 심사에 관한 규정 별표 (자료제출이 생략되는 기능성화장품의 종류, 제6조제3항 관련), law.go.kr flSeq=133405543
+  ingredients:
+  - inci: Adenosine
+    standard_name: 아데노신
+    matched_by: eng_name_exact
+  - inci: Retinol
+    standard_name: 레티놀
+    matched_by: eng_name_exact
+  - inci: Retinyl Palmitate
+    standard_name: 레티닐팔미테이트
+    matched_by: eng_name_exact
+  - inci: Polyethoxylated Retinamide
+    standard_name: 폴리에톡실레이티드레틴아마이드
+    matched_by: eng_name_exact
+- efficacy:
+  - sun_protection
+  basis: regulatory_notice
+  conditional: true
+  source_ref: MFDS 기능성화장품 심사에 관한 규정 별표 (자료제출이 생략되는 기능성화장품의 종류, 제6조제3항 관련), law.go.kr flSeq=133405543
+  ingredients:
+  - inci: Ethylhexyl Triazone
+    standard_name: 에칠헥실트리아존
+    matched_by: eng_name_exact
+  - inci: Bis-Ethylhexyloxyphenol Methoxyphenyl Triazine
+    standard_name: 비스-에칠헥실옥시페놀메톡시페닐트리아진
+    matched_by: eng_name_exact
+  - inci: Diethylamino Hydroxybenzoyl Hexyl Benzoate
+    standard_name: 디에칠아미노하이드록시벤조일헥실벤조에이트
+    matched_by: eng_name_exact
+  - inci: Ethylhexyl Methoxycinnamate
+    standard_name: 에칠헥실메톡시신나메이트
+    matched_by: eng_name_exact
+  - inci: Ethylhexyl Salicylate
+    standard_name: 에칠헥실살리실레이트
+    matched_by: eng_name_exact
+  - inci: Butyl Methoxydibenzoylmethane
+    standard_name: 부틸메톡시디벤조일메탄
+    matched_by: eng_name_exact
+  - inci: Octocrylene
+    standard_name: 옥토크릴렌
+    matched_by: eng_name_exact
+  - inci: Homosalate
+    standard_name: 호모살레이트
+    matched_by: eng_name_exact
+  - inci: Methylene Bis-Benzotriazolyl Tetramethylbutylphenol
+    standard_name: 메칠렌비스-벤조트리아졸릴테트라메칠부틸페놀
+    matched_by: eng_name_exact
+  - inci: Drometrizole Trisiloxane
+    standard_name: 드로메트리졸트리실록산
+    matched_by: eng_name_exact
+  - inci: Diethylhexyl Butamido Triazone
+    standard_name: 디에칠헥실부타미도트리아존
+    matched_by: eng_name_exact
+  - inci: Polysilicone-15
+    standard_name: 폴리실리콘-15
+    matched_by: eng_name_exact
+  - inci: Terephthalylidene Dicamphor Sulfonic Acid
+    standard_name: 테레프탈릴리덴디캠퍼설포닉애씨드
+    matched_by: eng_name_exact
+  - inci: Phenylbenzimidazole Sulfonic Acid
+    standard_name: 페닐벤즈이미다졸설포닉애씨드
+    matched_by: eng_name_exact
+  - inci: Disodium Phenyl Dibenzimidazole Tetrasulfonate
+    standard_name: 디소듐페닐디벤즈이미다졸테트라설포네이트
+    matched_by: eng_name_exact
+  - inci: Isoamyl p-Methoxycinnamate
+    standard_name: 이소아밀p-메톡시신나메이트
+    matched_by: eng_name_exact
+  - inci: Benzophenone-3
+    standard_name: 벤조페논-3
+    matched_by: eng_name_exact
+  - inci: Benzophenone-4
+    standard_name: 벤조페논-4
+    matched_by: eng_name_exact
+  - inci: Benzophenone-8
+    standard_name: 벤조페논-8
+    matched_by: eng_name_exact
+  - inci: 4-Methylbenzylidene Camphor
+    standard_name: 4-메칠벤질리덴캠퍼
+    matched_by: eng_name_exact
+  - inci: Menthyl Anthranilate
+    standard_name: 멘틸안트라닐레이트
+    matched_by: eng_name_exact
+  - inci: Drometrizole
+    standard_name: 드로메트리졸
+    matched_by: eng_name_exact
+  - inci: Digalloyl Trioleate
+    standard_name: 디갈로일트리올리에이트
+    matched_by: eng_name_exact
+- efficacy:
+  - hydration
+  - barrier
+  basis: literature_review
+  conditional: false
+  source_ref: 'Fluhr JW, Darlenski R, Surber C. Glycerol and the skin: holistic approach to its origin and functions. Br J Dermatol 2008;159:23-34. PMID 18510666'
+  ingredients:
+  - inci: Glycerin
+    standard_name: 글리세린
+    matched_by: eng_name_exact
+- efficacy:
+  - hydration
+  - barrier
+  basis: literature_review
+  conditional: false
+  source_ref: Gehring W, Gloor M. Effect of topically applied dexpanthenol on epidermal barrier function and stratum corneum hydration. Arzneimittelforschung 2000. PMID 10965426; Ebner F et al. Am J Clin Dermatol 2002. PMID 12113650
+  ingredients:
+  - inci: Panthenol
+    standard_name: 판테놀
+    matched_by: eng_name_exact
+- efficacy:
+  - hydration
+  basis: literature_review
+  conditional: false
+  source_ref: Zanchetta C, Scandolera A, Reynaud R. Hyaluronic acid in topical applications. Biomolecules 2025. PMID 41463312 (HA와 유도체의 효능 리뷰); Pavicic T et al. J Drugs Dermatol 2011. PMID 22052267
+  ingredients:
+  - inci: Hyaluronic Acid
+    standard_name: 하이알루로닉애씨드
+    matched_by: eng_name_exact
+  - inci: Sodium Hyaluronate
+    standard_name: 소듐하이알루로네이트
+    matched_by: eng_name_exact
+  - inci: Hydrolyzed Hyaluronic Acid
+    standard_name: 하이드롤라이즈드하이알루로닉애씨드
+    matched_by: eng_name_exact
+  - inci: Hydrolyzed Sodium Hyaluronate
+    standard_name: 하이드롤라이즈드소듐하이알루로네이트
+    matched_by: eng_name_exact
+  - inci: Sodium Acetylated Hyaluronate
+    standard_name: 소듐아세틸레이티드하이알루로네이트
+    matched_by: eng_name_exact
+  - inci: Potassium Hyaluronate
+    standard_name: 포타슘하이알루로네이트
+    matched_by: eng_name_exact
+  - inci: Hydroxypropyltrimonium Hyaluronate
+    standard_name: 하이드록시프로필트라이모늄하이알루로네이트
+    matched_by: eng_name_exact
+- efficacy:
+  - soothing
+  basis: literature_review
+  conditional: false
+  source_ref: Park KS. Pharmacological effects of Centella asiatica on skin diseases. Evid Based Complement Alternat Med 2021. PMID 34845411 (문헌 리뷰, 임상 근거 제한)
+  ingredients:
+  - inci: Centella Asiatica Extract
+    standard_name: 병풀추출물
+    matched_by: eng_name_exact
+- efficacy:
+  - barrier
+  basis: literature_review
+  conditional: false
+  source_ref: Fujii M. The pathogenic and therapeutic implications of ceramide abnormalities in atopic dermatitis. Cells 2021. PMID 34572035 (세라마이드 일반의 근거, NP 특이 근거 아님)
+  ingredients:
+  - inci: Ceramide NP
+    standard_name: 세라마이드엔피
+    matched_by: eng_name_exact
+unmatched:
+- inci: Titanium Dioxide
+  efficacy: sun_protection
+  basis: regulatory_notice
+  reason: 카탈로그 영문명과 정확 일치하지 않아 연결하지 않음
+- inci: Zinc Oxide
+  efficacy: sun_protection
+  basis: regulatory_notice
+  reason: 카탈로그 영문명과 정확 일치하지 않아 연결하지 않음
+not_linked_for_now:
+- Allantoin
+- Betaine
+- Tocopherol
+- Arginine
+- Beta-Glucan
