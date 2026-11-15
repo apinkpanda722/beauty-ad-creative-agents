@@ -189,6 +189,62 @@ def test_existing_version_two_only_applies_later_migrations():
     assert not calls_for(conn, "ADD COLUMN IF NOT EXISTS account")
 
 
+def test_product_migration_v4_is_additive_repeatable_and_preserves_prior_versions():
+    import hashlib
+
+    assert [
+        (version, name, hashlib.sha256(sql.encode()).hexdigest())
+        for version, name, sql in MIGRATIONS
+        if version <= 3
+    ] == [
+        (
+            1,
+            "creative_source_of_truth",
+            "8baf3f2382951c0e20ca5bdf88761931728603c5f80b3c3724617046022c5c53",
+        ),
+        (
+            2,
+            "creative_brand_account",
+            "4d36a1f91e86c749dcff01adb580eb39704538c60f7f206477430fb278b22ebe",
+        ),
+        (
+            3,
+            "creative_attributes",
+            "9f5343670f2a756e2d415e0b7599caec33705cb16b383869411232567866873e",
+        ),
+    ]
+    [(_, _, sql)] = [migration for migration in MIGRATIONS if migration[0] == 4]
+    statements = [part.strip() for part in sql.split(";") if part.strip()]
+    assert statements and all(
+        re.match(r"CREATE (TABLE|INDEX) IF NOT EXISTS ", part) for part in statements
+    )
+    for table in (
+        "products",
+        "product_prices",
+        "product_ingredients",
+        "ingredient_standards",
+        "product_certs",
+        "product_extractions",
+    ):
+        assert f"CREATE TABLE IF NOT EXISTS {table}" in sql
+    assert "PRIMARY KEY (brand, source_url)" in sql
+    assert "aliases jsonb" in sql and "skin_types jsonb" in sql
+    assert "raw_output text" in sql and "prompt_version text" in sql
+    assert not re.search(
+        r"\b(creatives|analysis_jobs|DROP|TRUNCATE|DELETE|UPDATE)\b", sql
+    )
+    executed = []
+    for _ in range(2):
+        conn = FakeConnection([FakeCursor(), FakeCursor([(1,), (2,), (3,)])])
+        assert apply_migrations(conn) == [4]
+        executed.append([query for query, _ in conn.calls if query == sql])
+        assert conn.commits == 1 and conn.rollbacks == 0
+    assert executed == [[sql], [sql]]
+    conn = FakeConnection([FakeCursor(), FakeCursor([(1,), (2,), (3,), (4,)])])
+    assert apply_migrations(conn) == []
+    assert not calls_for(conn, "CREATE TABLE IF NOT EXISTS products")
+
+
 @pytest.mark.parametrize(
     "fragment",
     [
