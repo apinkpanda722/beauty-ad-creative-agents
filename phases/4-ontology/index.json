@@ -132,7 +132,16 @@
     {
       "step": 9,
       "name": "layer2-links",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-15T21:52:48+0900",
+      "summary": "PROMOTES·CLAIMS·MENTIONS 증분 동기화, dev/test 커버리지·출처별 후보 수·고정 시드 표본 보고 및 --layers 2 구현. make verify 2,634개 통과, 실제 서비스 호출·추가 패키지 설치 없음.",
+      "completed_at": "2026-11-15T22:09:17+0900",
+      "usage": {
+        "input_tokens": 2755019,
+        "cached_input_tokens": 2655360,
+        "output_tokens": 32698,
+        "attempts": 1
+      }
     },
     {
       "step": 10,
