@@ -81,7 +81,7 @@ description: 이 프로젝트(beauty-ad-creative-agents)와 앞선 프로젝트 
 - **증상**: P4 첫 `--scan`에서 상세 이미지를 읽어야 하는 59개 제품 중 24개(4개 몰)가 이미지 0개로 잡혔다. 어댑터는 `#prdDetail`의 `ec-data-src` 이미지만 읽었고, 달바(고도몰)는 이미지가 `#prdDetail` 밖에, 이즈앤트리는 정적 이미지가 없었다. 어댑터 테스트는 모두 통과했다.
 - **원인**: 몰마다 마크업이 다른데 픽스처를 만들 때 어댑터가 읽는 요소(`ec-data-src` 이미지)만 남기고 나머지를 잘라 냈고, 코스알엑스·아누아 같은 일부 몰의 원본만 기준으로 삼았다. 같은 가짜로 어댑터와 테스트가 같은 가정을 공유했다(B-FP-020).
 - **규칙**: 몰·출처마다 **실제 응답 원본을 최소 1개씩 보관**해 어댑터를 검증한다. 구조가 다른 몰(플랫폼이 다르거나 템플릿이 다른 몰)은 각각 별도 픽스처가 있어야 하고, 픽스처를 줄일 때는 어댑터가 읽는 요소만 남기지 말고 다른 구조의 판별에 필요한 주변 요소(이미지가 없는 경우의 컨테이너 등)를 남긴다. 첫 live 전에 전체 대상을 훑는 읽기 전용 점검(`--scan` 같은)으로 "읽은 값이 0인 항목"을 확인한다. 값이 0인 항목은 오류가 아니므로 결과에 별도 집계한다(B-FP-040).
-- **강제 수단**: 어댑터 수정 뒤 테스트 이름을 여기에 적는다(몰 구조별 픽스처 테스트). /review 체크(몰·출처별 원본 픽스처가 있는가, 픽스처가 어댑터가 읽는 요소만 남기고 잘렸는가).
+- **강제 수단**: `tests/test_mall.py`의 몰 구조별 테스트(`test_detail_images_in_a_tab_container_use_plain_src_and_skip_icons`, `test_detail_images_after_an_empty_anchor_extend_past_the_review_anchor`, `test_detail_images_in_a_content_block_use_plain_src`, `test_godomall_detail_section_images_are_read`)가 실제 원본에서 만든 픽스처(`mall_cafe24_tab_src`·`empty_anchor`·`tab_cont`, `mall_godomall_detail`)를 읽는다. /review 체크(몰·출처별 원본 픽스처가 있는가, 픽스처가 어댑터가 읽는 요소만 남기고 잘렸는가).
 - **출처**: 2026-11-15 P4 `make live-products --scan`, `docs/TROUBLESHOOTING_LOG.md`
 
 ---

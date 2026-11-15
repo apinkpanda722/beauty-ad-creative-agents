@@ -150,14 +150,16 @@
 - **근거**: `src/beautyads/store/sync_source.py`, `src/beautyads/pipeline/sync.py`, `tests/test_sync_source.py`, `tests/test_sync_pipeline.py`.
 
 ## 2026-11-15 상세 이미지가 0개로 잡힌 제품 24개(4개 몰)
-- **문제**: `--scan`에서 이미지를 읽어야 하는 59개 제품 중 24개(abib·dalba·isntree·round_lab 각 6개)가 상세 이미지 0개였다. 현재 어댑터로는 전성분을 얻을 수 없다.
-- **원인**: 어댑터가 `#prdDetail`의 `ec-data-src` 이미지만 읽는다. 달바(고도몰)는 이미지가 `#prdDetail` 밖(`/data/editor`)에 있고 이즈앤트리는 `#prdDetail`에 정적 이미지가 없다(저장한 원본으로 확인). abib·round_lab은 원본을 저장하지 않아 미진단. 픽스처가 `ec-data-src` 이미지만 남긴 최소본이라 다른 구조를 잡지 못했다(FP-C08).
-- **해결**: 미해결. 실제 HTML 원본으로 만든 픽스처·테스트를 먼저 쓰고 어댑터를 보강한다(`fix:` 커밋).
+- **문제**: `--scan`에서 이미지를 읽어야 하는 59개 제품 중 24개(abib·dalba·isntree·round_lab 각 6개)가 상세 이미지 0개였다. 현재 어댑터로는 전성분을 얻을 수 없었다.
+- **원인**: 어댑터가 `#prdDetail` 안의 `ec-data-src` 이미지만 읽었다. 실제 구조는 몰마다 달랐다: 이즈앤트리·round_lab은 `#prdDetail`이 탭 컨테이너이고 이미지가 일반 `src`로 그 뒤에 있고, abib은 `#prdDetail`이 빈 앵커이며 바로 뒤에 리뷰 앵커가 오고 이미지는 더 뒤에 있고, 달바(고도몰)는 `#detail` 구획의 일반 `src`다. 픽스처가 `ec-data-src` 이미지만 남긴 최소본이라 다른 구조를 잡지 못했다(FP-C08). 이 항목의 이전 판에 적은 달바 `/data/editor` 경로는 부정확했다(실제는 `/data/img/product/detail/`).
+- **해결**: 실제 HTML 원본에서 만든 픽스처 4개(구조별)와 테스트를 먼저 쓰고 어댑터를 상세 구획 기반으로 바꿨다(앵커~다음 구획 앵커, 빈 구획은 확장, 지연 로딩 속성 우선, 아이콘·버튼 제외). 저장된 실제 원본에서 코스알엑스 9장·아누아(텍스트)는 기존과 같고 이즈앤트리 19~21장·abib 7장·round_lab 5장·달바 34장이 읽힌다.
+- **결과**: 해결(오프라인 테스트와 저장 원본 확인, 24개 추출은 다음 live에서 확인).
 - **근거**: `src/beautyads/sources/mall.py`, `tests/test_mall.py`.
 
 ## 2026-11-15 소규모 상세 추출에서 제품 2개 실패와 식약처 API 오류 중단
 - **문제**: 이미지가 잡힌 제품 5개(브랜드 5곳)로 한 첫 Gemini 추출에서 3개가 완료, 2개가 `PRODUCT_DETAIL_FAILED`(Gemini 호출 0회, 추출 0건)였고 실행이 `STOPPED MFDS_API_ERROR`(종료 코드 3)로 멈췄다. 비용은 4호출 $0.0151이고 성분 86개 중 표준명 일치 91.9%(미해결 7)였다. 제품 인증 대조는 3개 모두 `unknown`이다.
-- **원인**: 미확인. 코드상 `PRODUCT_DETAIL_FAILED`는 이미지를 읽는 모든 시도가 추출에 성공하지 못했을 때이고 개별 이미지의 오류 코드(`MALL_*`·`PRODUCT_IMAGE_*`)는 `issues`에만 담겨 기록에 남지 않는다. `MFDS_API_ERROR`는 식약처 응답 본문의 `resultCode`가 `"00"`이 아닐 때이고 어떤 코드인지는 출력되지 않는다.
-- **해결**: 미해결(조언 세션 지시 대기). 실패 시 원인 코드를 기록에 남기는 보강과 식약처 `resultCode`·`resultMsg` 확인이 필요하다.
+- **원인(이후 확인)**: 제품 2개의 실패는 이미지 전용 호스트(`cosrxinc.jpg3.kr` 등)의 `robots.txt`가 404인데 어댑터가 `MALL_ROBOTS_UNREADABLE`로 거부한 것이다(제품마다 이미지 4장 모두, 진단 보강 뒤 `issues`로 확인). 식약처 `MFDS_API_ERROR`는 `provider_code=01`, `http_status=200`, `provider_message=System Error!!`였고 제품 단계가 아니라 광고 소재 성분 대조 단계에서 났다(이 단계는 제품이 모두 끝난 뒤 돈다). 아래 "미확인" 서술은 첫 관측 당시 것이다.
+- **원인(첫 관측)**: 미확인. 코드상 `PRODUCT_DETAIL_FAILED`는 이미지를 읽는 모든 시도가 추출에 성공하지 못했을 때이고 개별 이미지의 오류 코드(`MALL_*`·`PRODUCT_IMAGE_*`)는 `issues`에만 담겨 기록에 남지 않는다. `MFDS_API_ERROR`는 식약처 응답 본문의 `resultCode`가 `"00"`이 아닐 때이고 어떤 코드인지는 출력되지 않는다.
+- **해결**: (1) 진단 보강(실패 시 이미지·조각 오류 코드를 `issues`에, 식약처 중단 시 `provider_code`·`provider_message`를 `STOPPED` 줄과 `stopped_detail`에 기록). (2) `robots.txt`가 404·410인 호스트는 제한 없음으로 읽도록 어댑터를 고쳤다(401·403·5xx·연결 실패는 계속 거부). (3) 식약처 `provider_code=01`(System Error!!)이 광고 소재 성분 대조 단계를 중단시키는 문제는 미해결이다: 어떤 조회 문자열에서 나는지와 중단이 아닌 항목 단위 처리로 바꿀지 결정이 필요하다. 제품 추출 자체는 이 단계 앞에서 끝나므로 막히지 않는다.
 - **근거**: `src/beautyads/pipeline/products.py`, `src/beautyads/sources/mfds.py`.
 

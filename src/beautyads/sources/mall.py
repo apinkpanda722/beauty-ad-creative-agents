@@ -7,6 +7,7 @@ for product requests, images and retries so host pacing is shared.
 """
 
 import json
+import re
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
@@ -249,17 +250,7 @@ def _parse_product(body: bytes, url: str) -> MallProduct:
     if price is None:
         raise MallError("MALL_PRODUCT_GONE")
     ingredients = _ingredients(parser.root)
-    images = []
-    if ingredients is None:
-        for detail in nodes:
-            if detail.attrs.get("id") == "prdDetail":
-                images.extend(
-                    urljoin(url, source.strip())
-                    for node in detail.walk()
-                    if node.tag == "img"
-                    and (source := node.attrs.get("ec-data-src"))
-                    and source.strip()
-                )
+    images = _detail_images(nodes, url) if ingredients is None else []
     return MallProduct(
         source_url=url,
         list_price=list_price,
@@ -270,6 +261,75 @@ def _parse_product(body: bytes, url: str) -> MallProduct:
         ingredients_text=ingredients,
         detail_image_urls=tuple(images),
     )
+
+
+# Detail-section anchors seen on real malls: Cafe24 `#prdDetail`, Godomall `#detail`.
+_DETAIL_ANCHORS = frozenset({"prdDetail", "detail"})
+# Anchors of the sections that follow the detail content on those templates.
+_SECTION_ENDS = frozenset(
+    {
+        "prdInfo",
+        "prdReview",
+        "prdQna",
+        "prdQnA",
+        "prdRelated",
+        "delivery",
+        "exchange",
+        "reviews",
+        "qna",
+    }
+)
+_IMAGE_ATTRIBUTES = ("ec-data-src", "data-src", "data-original", "src")
+# Icons, buttons, spacers and logos are page chrome, not product detail images.
+_CHROME_IMAGE = re.compile(
+    r"/skin/|/design/|icon|ico_|btn_|blank|spacer|logo|loading|\.svg(?:\?|$)",
+    re.IGNORECASE,
+)
+
+
+def _detail_images(nodes: list[_Node], url: str) -> tuple[str, ...]:
+    """Detail images in document order after the detail anchor.
+
+    Malls differ: the anchor may be a container, an empty marker, or a tab bar,
+    and images may use a lazy-loading attribute or a plain src. The section runs
+    from the anchor to the next section anchor; a section with no image (an
+    empty anchor followed at once by a review anchor) is extended to the next
+    section anchor. Lazy attributes win over a placeholder src.
+    """
+    start = next(
+        (i for i, node in enumerate(nodes) if node.attrs.get("id") in _DETAIL_ANCHORS),
+        None,
+    )
+    if start is None:
+        return ()
+    ends = [
+        i
+        for i in range(start + 1, len(nodes))
+        if nodes[i].attrs.get("id") in _SECTION_ENDS
+    ]
+    for end in [*ends, len(nodes)]:
+        found: list[str] = []
+        for node in nodes[start:end]:
+            if node.tag != "img":
+                continue
+            source = next(
+                (
+                    value.strip()
+                    for attribute in _IMAGE_ATTRIBUTES
+                    if (value := node.attrs.get(attribute))
+                    and value.strip()
+                    and not value.strip().startswith("data:")
+                ),
+                None,
+            )
+            if source is None or _CHROME_IMAGE.search(source):
+                continue
+            absolute = urljoin(url, source)
+            if absolute not in found:
+                found.append(absolute)
+        if found:
+            return tuple(found)
+    return ()
 
 
 def _encoded_url(url: str) -> str:

@@ -559,3 +559,104 @@ def test_missing_robots_on_one_host_does_not_relax_another_host():
             brand="cosrx",
             max_bytes=len(data),
         )
+
+
+def _product(fixture, brand, url, body=None):
+    page_response = MallHttpResponse(200, body) if body is not None else page(fixture)
+    mall = client(FakeGet(robots(), page_response))
+    return mall.fetch_product(brand, url)
+
+
+def _first_image_source(fixture_name):
+    text = recorded(fixture_name).decode("utf-8")
+    return re.search(r'<img\b[^>]*?\s(?:ec-data-src|src)="([^"]+)"', text).group(1)
+
+
+def test_detail_images_in_a_tab_container_use_plain_src_and_skip_icons():
+    # Real isntree structure: #prdDetail is a tab container, images use plain src
+    # (there is no ec-data-src) and an icon sits at the end of the section.
+    product = _product(
+        "cafe24_tab_src.html", "isntree", "https://www.isntree.com/product/x/46/"
+    )
+    urls = product.detail_image_urls
+    assert len(urls) == 5
+    assert all(url.startswith("https://") for url in urls)
+    assert urls[0].startswith("https://www.isntree.com/web/upload/NNEditor/20260428/")
+    assert urlsplit(urls[3]).hostname == "isntree01.openhost.cafe24.com"
+    assert not any("icon_basket" in url for url in urls)
+
+
+def test_detail_images_after_an_empty_anchor_extend_past_the_review_anchor():
+    # Real abib structure: #prdDetail is empty and a review anchor follows it
+    # immediately; the detail images come later, before #prdRelated. An image that
+    # precedes the #prdDetail anchor is not part of the detail section.
+    product = _product(
+        "cafe24_empty_anchor.html", "abib", "https://abib.com/product/x/721/"
+    )
+    urls = product.detail_image_urls
+    assert len(urls) == 4
+    before_anchor = "https:" + _first_image_source("cafe24_empty_anchor.html")
+    assert before_anchor not in urls
+    assert all(urlsplit(url).hostname == "cafe24.poxo.com" for url in urls)
+
+
+def test_detail_images_in_a_content_block_use_plain_src():
+    product = _product(
+        "cafe24_tab_cont.html", "round_lab", "https://roundlab.co.kr/product/x/1/"
+    )
+    urls = product.detail_image_urls
+    assert len(urls) == 5
+    assert all(urlsplit(url).hostname == "gi.esmplus.com" for url in urls)
+
+
+def test_godomall_detail_section_images_are_read():
+    # Real dalba structure: #detail section, plain src, ends at #delivery.
+    product = _product(
+        "godomall_detail.html",
+        "dalba",
+        "https://dalba.co.kr/goods/goods_view.php?goodsNo=1000000043",
+    )
+    urls = product.detail_image_urls
+    assert len(urls) == 5
+    assert urlsplit(urls[0]).hostname == "cdn-saas-web-116-52.cdn-nhncommerce.com"
+    # Root-relative sources resolve against the page, not an unrelated host.
+    assert any(url.startswith("https://dalba.co.kr/data/img/notice/") for url in urls)
+
+
+def test_lazy_placeholder_src_does_not_hide_the_real_image():
+    original = _product(
+        "cafe24_image_only.html", "cosrx", "https://www.cosrx.co.kr/product/732/"
+    ).detail_image_urls
+    body = recorded("cafe24_image_only.html").replace(
+        b" ec-data-src=", b' src="/web/img/blank.gif" ec-data-src='
+    )
+    lazy = _product(
+        None, "cosrx", "https://www.cosrx.co.kr/product/732/", body=body
+    ).detail_image_urls
+    assert lazy == original and len(lazy) > 0
+
+
+def test_icons_and_banners_inside_the_section_are_not_detail_images():
+    body = recorded("cafe24_tab_cont.html")
+    real = b'<img src="https://gi.esmplus.com/roundlab/DOKDO/DWM30/DWM30_01.jpg"'
+    assert real in body  # a real detail image inside the #prdDetail section
+    body = body.replace(
+        real,
+        b'<img src="/skin/front/icon_cart.png"><img src="/web/img/btn_buy.png">' + real,
+        1,
+    )
+    urls = _product(
+        None, "round_lab", "https://roundlab.co.kr/product/x/1/", body=body
+    ).detail_image_urls
+    assert not any("icon_cart" in url or "btn_buy" in url for url in urls)
+    assert len(urls) == 5
+
+
+def test_page_without_a_detail_anchor_has_no_detail_images_not_an_error():
+    body = (
+        b"<html><head>"
+        b'<meta property="product:price:amount" content="1000"></head><body>'
+        b'<img src="/a.jpg"></body></html>'
+    )
+    product = _product(None, "cosrx", "https://www.cosrx.co.kr/product/9/", body=body)
+    assert product.detail_image_urls == ()
