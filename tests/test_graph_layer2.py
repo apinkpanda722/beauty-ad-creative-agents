@@ -83,7 +83,13 @@ def test_reclassification_and_ambiguity_remove_old_promotes():
     graph = Graph()
     load(graph, [creative(a.name_ko)], [a, b])
     load(graph, [creative(a.name_ko + b.name_ko)], [a, b])
-    assert graph.state[("youtube", "1")]["promotes"] == []
+    both = graph.state[("youtube", "1")]["promotes"]
+    assert {row["source_url"] for row in both} == {a.source_url, b.source_url}
+    assert all(row["multi_product"] is True for row in both)
+    load(graph, [creative(a.name_ko)], [a, b])
+    assert [r["multi_product"] for r in graph.state[("youtube", "1")]["promotes"]] == [
+        False
+    ]
     load(graph, [creative(a.name_ko, content_type="other")], [a, b])
     assert graph.state[("youtube", "1")]["promotes"] == []
 
@@ -180,3 +186,17 @@ def test_invalid_load_options_rejected_before_writes(option, value):
     with pytest.raises(ValueError):
         load(graph, [], **{option: value})
     assert graph.calls == []
+
+
+def test_multi_product_is_a_relationship_property_set_for_every_link():
+    assert "r.multi_product = target.multi_product" in REPLACE_LINKS
+
+
+def test_ambiguous_shared_mention_removes_old_promotes():
+    one = product("합성 세럼", aliases=("푸른빛",), url="one")
+    two = product("가상 앰플", aliases=("푸른빛",), url="two")
+    graph = Graph()
+    load(graph, [creative(one.name_ko)], [one, two])
+    assert len(graph.state[("youtube", "1")]["promotes"]) == 1
+    load(graph, [creative("푸른빛 추천")], [one, two])
+    assert graph.state[("youtube", "1")]["promotes"] == []

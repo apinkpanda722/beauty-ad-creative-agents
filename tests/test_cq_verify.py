@@ -362,3 +362,31 @@ def test_driver_temporal_values_and_offset_boundaries_are_supported():
     assert _datetime("2026-08-15T08:59:59+09:00") == datetime(
         2026, 8, 14, 23, 59, 59, tzinfo=UTC
     )
+
+
+def test_multi_product_links_are_counted_separately_in_the_coverage():
+    scope = [
+        {"creative_id": "youtube:a", "linked": True, "multi_linked": True},
+        {"creative_id": "youtube:b", "linked": True, "multi_linked": False},
+        {"creative_id": "youtube:c", "linked": False},
+    ]
+    driver = Driver(
+        scope=scope,
+        answers={
+            QUESTIONS["CQ-04"].cypher: [
+                {"creative_ids": ["youtube:a", "youtube:b", "youtube:c"]}
+            ]
+        },
+    )
+    _, rows, _ = run(driver)
+    row = rows["CQ-04"]
+    assert row["connected_creatives"] == 2
+    assert row["multi_product_connected_creatives"] == 1
+    # Questions without any multi-product link report zero, never a missing key.
+    assert rows["CQ-01"]["multi_product_connected_creatives"] == 0
+
+
+def test_the_scope_query_reads_the_multi_product_relationship_property():
+    from beautyads.eval.cq_verify import CREATIVE_SCOPE
+
+    assert "r.multi_product = true" in CREATIVE_SCOPE

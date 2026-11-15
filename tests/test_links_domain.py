@@ -6,7 +6,7 @@ import pytest
 from beautyads.domain.links import (
     MIN_ALIAS_LEN,
     LinkCreative,
-    match_product,
+    match_products,
     plan_links,
     select_rules,
     summarize_links,
@@ -65,8 +65,10 @@ def creative(
 )
 def test_full_name_in_same_brand_text(title, caption, basis):
     p = product()
-    result = match_product(creative(title, caption), [p])
-    assert result.status == "matched" and result.product == p
+    links = match_products(creative(title, caption), [p])
+    assert links.status == "matched" and len(links.matches) == 1
+    result = links.matches[0]
+    assert result.product == p and not links.multi_product
     assert result.basis == basis and result.confidence == "name_full"
     assert result.matched_text == p.name_ko
 
@@ -75,47 +77,106 @@ def test_full_name_in_same_brand_text(title, caption, basis):
     "text", ["BLUE Serum", "ｂｌｕｅ　ＳＥＲＵＭ", "b l u e\tserum"]
 )
 def test_normalization_and_english_name(text):
-    result = match_product(creative(text), [product(name_en="Blue Serum")])
-    assert result.status == "matched" and result.confidence == "alias"
+    links = match_products(creative(text), [product(name_en="Blue Serum")])
+    assert links.status == "matched" and links.matches[0].confidence == "alias"
 
 
 def test_alias_minimum_and_no_partial_name_or_cross_brand_match():
     p = product(aliases=("푸세", "푸른빛"))
     assert MIN_ALIAS_LEN == 3
-    assert match_product(creative("푸른빛"), [p]).confidence == "alias"
+    assert match_products(creative("푸른빛"), [p]).matches[0].confidence == "alias"
     for text in ("푸세", "합성 푸른", ""):
-        assert match_product(creative(text), [p]).product is None
-    assert match_product(creative(p.name_ko, brand="test"), [p]).product is None
-    assert (
-        match_product(creative(p.name_ko, content_type="brand_campaign"), [p]).product
-        is None
-    )
+        assert match_products(creative(text), [p]).matches == ()
+    assert match_products(creative(p.name_ko, brand="test"), [p]).matches == ()
+    other = match_products(creative(p.name_ko, content_type="brand_campaign"), [p])
+    assert other.status == "not_product" and other.matches == ()
 
 
-def test_longest_match_and_cross_product_tie_are_order_independent():
+def test_a_longer_name_containing_a_shorter_one_wins_in_either_product_order():
     a, b = product("합성 세럼"), product("합성 세럼 플러스", url="b")
     for products in ([a, b], [b, a]):
-        assert match_product(creative(b.name_ko), products).product == b
-    c = product("가상 앰플", url="c")
-    assert len("합성세럼") == len("가상앰플")
+        links = match_products(creative(b.name_ko), products)
+        assert [m.product for m in links.matches] == [b]
+        assert not links.multi_product
+    # The shorter name alone still links the shorter product.
+    assert [m.product for m in match_products(creative(a.name_ko), [a, b]).matches] == [
+        a
+    ]
+
+
+def test_every_product_named_in_the_text_is_linked_and_marked_multi_product():
+    a, c = product("합성 세럼"), product("가상 앰플", url="c")
     for products in ([a, c], [c, a]):
-        result = match_product(creative(a.name_ko + c.name_ko), products)
-        assert result.status == "ambiguous" and result.product is None
+        links = match_products(creative(a.name_ko + " " + c.name_ko), products)
+        assert links.status == "matched" and links.multi_product
+        # Deterministic order: where each name first appears in the text.
+        assert [m.product for m in links.matches] == [a, c]
 
 
-def test_one_product_multiple_matches_is_not_ambiguous_and_prefers_full_title():
-    p = product("Blue Serum", name_en="BLUE SERUM", aliases=("blue serum",))
-    result = match_product(creative("blue serum", "Blue Serum"), [p, p])
-    assert result.status == "matched" and result.basis == "title"
-    assert result.confidence == "name_full"
-
-
-def test_longest_match_precedes_basis_and_short_full_names_are_allowed():
+def test_names_in_title_and_caption_both_link_and_title_comes_first():
     short = product("가상", aliases=("짧음",))
     long = product("합성 긴 세럼", url="long")
-    assert match_product(creative("가상"), [short]).confidence == "name_full"
-    result = match_product(creative(short.name_ko, long.name_ko), [short, long])
-    assert result.product == long and result.basis == "caption"
+    links = match_products(creative(short.name_ko, long.name_ko), [short, long])
+    assert [m.product for m in links.matches] == [short, long]
+    assert [m.basis for m in links.matches] == ["title", "caption"]
+    assert links.multi_product
+
+
+def test_dalba_employee_best_five_video_links_all_five_products():
+    # Regression input: one video introducing five products of the same brand.
+    names = [
+        "워터풀 에센스 선크림",
+        "워터풀 톤업 선크림",
+        "화이트 트러플 퍼스트 스프레이 세럼",
+        "비타 토닝 캡슐 크림",
+        "그린 토마토 모공 세럼",
+    ]
+    products = [product(n, brand="dalba", url=f"d{i}") for i, n in enumerate(names)]
+    title = "달바 직원 BEST 5 " + " / ".join(names)
+    links = match_products(creative(title, brand="dalba"), products)
+    assert links.status == "matched" and links.multi_product
+    assert {m.product.name_ko for m in links.matches} == set(names)
+    assert len(links.matches) == 5
+
+
+def test_two_products_sharing_the_same_mention_are_ambiguous_and_not_linked():
+    one = product("합성 세럼", aliases=("푸른빛",), url="one")
+    two = product("가상 앰플", aliases=("푸른빛",), url="two")
+    links = match_products(creative("푸른빛 추천"), [one, two])
+    assert links.status == "ambiguous" and links.matches == ()
+    # A third product named elsewhere in the text still links on its own.
+    third = product("전혀 다른 크림", url="three")
+    links = match_products(creative("푸른빛 추천", third.name_ko), [one, two, third])
+    assert links.status == "matched"
+    assert [m.product for m in links.matches] == [third]
+    assert not links.multi_product
+
+
+def test_one_product_multiple_matches_is_one_link_and_prefers_full_title():
+    p = product("Blue Serum", name_en="BLUE SERUM", aliases=("blue serum",))
+    links = match_products(creative("blue serum", "Blue Serum"), [p, p])
+    assert len(links.matches) == 1 and not links.multi_product
+    result = links.matches[0]
+    assert result.basis == "title" and result.confidence == "name_full"
+
+
+def test_longest_name_of_one_product_precedes_basis_and_short_names_are_allowed():
+    short = product("가상", aliases=("짧음",))
+    assert (
+        match_products(creative("가상"), [short]).matches[0].confidence == "name_full"
+    )
+    p = product("합성 긴 세럼", aliases=("합성 긴",), url="p")
+    result = match_products(creative("합성 긴", p.name_ko), [p]).matches[0]
+    assert result.matched_text == p.name_ko and result.basis == "caption"
+
+
+def test_plan_exposes_links_and_status():
+    a, c = product("합성 세럼"), product("가상 앰플", url="c")
+    plan = plan_links(creative(a.name_ko + c.name_ko), [a, c])
+    assert plan.status == "matched" and len(plan.links) == 2
+    assert plan.multi_product is True
+    single = plan_links(creative(a.name_ko), [a, c])
+    assert single.multi_product is False and len(single.links) == 1
 
 
 def test_claims_and_mentions_use_only_completed_final_jobs_and_exact_raw_names():
@@ -245,16 +306,19 @@ def test_summary_split_missing_products_tiktok_and_hand_counts():
         creative(brand="missing", id="4"),
         creative(a.name_ko + b.name_ko, brand="test", id="5"),
         creative(a.name_ko, brand="test", source="instagram", id="6"),
+        creative("이름 없는 제품 소개", brand="test", id="7"),
     ]
     report = summarize_links(
         entries, [p, a, b], dev_brands=["dev"], test_brands=["test", "missing"]
     )
-    assert report["promotes"] == 2 and report["product_creatives"] == 5
-    assert report["all_product_creatives"] == 6 and report["ambiguous"] == 1
-    assert report["dev"]["promotes"] == 1 and report["test"]["promotes"] == 1
-    assert report["dev"]["coverage"] == 1 / 3 and report["test"]["coverage"] == 1 / 2
+    # Entry 5 names two products: it links to both and counts once as a creative.
+    assert report["promotes"] == 3 and report["product_creatives"] == 6
+    assert report["all_product_creatives"] == 7 and report["ambiguous"] == 0
+    assert report["promotes_links"] == 4 and report["multi_product_creatives"] == 1
+    assert report["dev"]["promotes"] == 1 and report["test"]["promotes"] == 2
+    assert report["dev"]["coverage"] == 1 / 3 and report["test"]["coverage"] == 2 / 3
     assert report["no_product_info_brands"] == ["missing"]
-    assert report["candidates_by_source"] == {"youtube": 3, "instagram": 1, "tiktok": 0}
+    assert report["candidates_by_source"] == {"youtube": 4, "instagram": 1, "tiktok": 0}
     assert report["claims"] == report["mentions"] == report["unresolved"] == 0
     assert "별도 추출" in report["recommendation"]
     assert list(inspect.signature(select_rules).parameters) == ["dev_creatives"]
@@ -321,3 +385,20 @@ def test_rule_selection_receives_dev_entries_only(monkeypatch):
     dev, test = creative(), creative(brand="test", id="2")
     summarize_links([dev, test], [], dev_brands=["dev"], test_brands=["test"])
     assert seen == [dev]
+
+
+def test_summary_reports_multi_product_creatives_and_link_counts_separately():
+    a, c = product("합성 세럼"), product("가상 앰플", url="c")
+    entries = [
+        creative(a.name_ko, id="1"),
+        creative(a.name_ko + " " + c.name_ko, id="2"),
+        creative("무관한 영상", id="3"),
+    ]
+    report = summarize_links(entries, [a, c], dev_brands=["dev"], test_brands=[])
+    # promotes counts creatives, as before; links count every PROMOTES relationship.
+    assert report["promotes"] == 2 and report["product_creatives"] == 3
+    assert report["promotes_links"] == 3 and report["multi_product_creatives"] == 1
+    assert report["by_source"]["youtube"]["multi_product_creatives"] == 1
+    pairs = report["sample_pairs"]
+    assert {(p["source_id"], p["multi_product"]) for p in pairs} >= {("1", False)}
+    assert any(p["multi_product"] for p in pairs)

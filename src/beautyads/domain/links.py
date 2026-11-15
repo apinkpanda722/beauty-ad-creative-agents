@@ -48,27 +48,49 @@ class LinkCreative:
 
 @dataclass(frozen=True)
 class ProductMatch:
+    status: Literal["matched"]
+    product: Product
+    basis: Literal["title", "caption"]
+    confidence: Literal["name_full", "alias"]
+    matched_text: str
+
+
+@dataclass(frozen=True)
+class ProductLinks:
+    """Every product named in a creative's text (one link per product)."""
+
     status: Literal["matched", "ambiguous", "no_match", "not_product"]
-    product: Product | None = None
-    basis: Literal["title", "caption"] | None = None
-    confidence: Literal["name_full", "alias"] | None = None
-    matched_text: str | None = None
+    matches: tuple[ProductMatch, ...] = ()
+
+    @property
+    def multi_product(self) -> bool:
+        return len(self.matches) > 1
 
 
-def match_product(creative: LinkCreative, products: Sequence[Product]) -> ProductMatch:
-    """Match whole names/aliases, then choose the uniquely longest product.
+def _occurrences(text: str, needle: str):
+    start = text.find(needle)
+    while start != -1:
+        yield start, start + len(needle)
+        start = text.find(needle, start + 1)
 
-    matched_text preserves the stored spelling of the matching name or alias.
-    Within one product, equal matches prefer full names, then title, then lexical
-    order. These tie breakers never decide between different products.
+
+def match_products(creative: LinkCreative, products: Sequence[Product]) -> ProductLinks:
+    """Link every same-brand product whose whole name or alias appears in the text.
+
+    A mention inside a longer different product's mention (a shorter name within a
+    longer product name) does not count. Two different products with the identical
+    mention are ambiguous and neither is linked for it. One product with several
+    matching names is one link: the longest name, full name before alias, title
+    before caption. Links are ordered by where they appear (title first). A creative
+    that names more than one product is multi_product.
     """
     if not creative.is_product:
-        return ProductMatch("not_product")
+        return ProductLinks("not_product")
     properties = creative.creative.properties
     texts = [
         (basis, normalize(properties.get(basis))) for basis in ("title", "caption")
     ]
-    candidates = {}
+    mentions = []
     for product in products:
         if product.brand != properties.get("brand"):
             continue
@@ -82,26 +104,53 @@ def match_product(creative: LinkCreative, products: Sequence[Product]) -> Produc
             if not compact or (confidence == "alias" and len(compact) < MIN_ALIAS_LEN):
                 continue
             for basis, text in texts:
-                if compact not in text:
-                    continue
-                rank = (
-                    -len(compact),
-                    confidence != "name_full",
-                    basis != "title",
-                    compact,
-                    name,
-                )
-                current = candidates.get(product.key)
-                if current is None or rank < current[0]:
-                    candidates[product.key] = (
-                        rank,
-                        ProductMatch("matched", product, basis, confidence, name),
+                for start, end in _occurrences(text, compact):
+                    mentions.append(
+                        (basis, start, end, product, name, confidence, compact)
                     )
-    if not candidates:
-        return ProductMatch("no_match")
-    longest = min(rank[0] for rank, _ in candidates.values())
-    winners = [result for rank, result in candidates.values() if rank[0] == longest]
-    return winners[0] if len(winners) == 1 else ProductMatch("ambiguous")
+    survivors = []
+    ambiguous = False
+    for mention in mentions:
+        basis, start, end, product, *_ = mention
+        covered = any(
+            other[0] == basis
+            and other[3].key != product.key
+            and other[1] <= start
+            and end <= other[2]
+            and other[2] - other[1] > end - start
+            for other in mentions
+        )
+        if covered:
+            continue
+        shared = any(
+            other[:3] == mention[:3] and other[3].key != product.key
+            for other in mentions
+        )
+        if shared:
+            ambiguous = True
+            continue
+        survivors.append(mention)
+    best = {}
+    for basis, start, end, product, name, confidence, compact in survivors:
+        rank = (
+            -len(compact),
+            confidence != "name_full",
+            basis != "title",
+            compact,
+            name,
+        )
+        position = (basis != "title", start)
+        current = best.get(product.key)
+        if current is None or rank < current[0]:
+            best[product.key] = (
+                rank,
+                position,
+                ProductMatch("matched", product, basis, confidence, name),
+            )
+    if not best:
+        return ProductLinks("ambiguous" if ambiguous else "no_match")
+    ordered = sorted(best.values(), key=lambda item: (item[1], item[0]))
+    return ProductLinks("matched", tuple(item[2] for item in ordered))
 
 
 @dataclass(frozen=True)
@@ -112,10 +161,22 @@ class Mention:
 
 @dataclass(frozen=True)
 class LinkPlan:
-    match: ProductMatch
+    product_links: ProductLinks
     claims: tuple[str, ...]
     mentions: tuple[Mention, ...]
     unresolved: int
+
+    @property
+    def status(self) -> str:
+        return self.product_links.status
+
+    @property
+    def links(self) -> tuple[ProductMatch, ...]:
+        return self.product_links.matches
+
+    @property
+    def multi_product(self) -> bool:
+        return self.product_links.multi_product
 
 
 def _list(value) -> list:
@@ -152,7 +213,7 @@ def plan_links(creative: LinkCreative, products: Sequence[Product]) -> LinkPlan:
         if len(standards) == 1:
             mentions.append(Mention(raw, next(iter(standards))))
     return LinkPlan(
-        match_product(creative, products),
+        match_products(creative, products),
         claims,
         tuple(mentions),
         len(raw_names) - len(mentions),
@@ -188,14 +249,16 @@ def summarize_links(
             for entry, plan in product_rows
             if entry.creative.properties.get("brand") in available
         ]
-        promotes = sum(plan.match.status == "matched" for _, plan in eligible)
+        promotes = sum(plan.status == "matched" for _, plan in eligible)
         return {
             "promotes": promotes,
             "product_creatives": len(eligible),
             "all_product_creatives": len(product_rows),
             "excluded_no_product_info": len(product_rows) - len(eligible),
             "coverage": promotes / len(eligible) if eligible else 0,
-            "ambiguous": sum(plan.match.status == "ambiguous" for _, plan in eligible),
+            "ambiguous": sum(plan.status == "ambiguous" for _, plan in eligible),
+            "promotes_links": sum(len(plan.links) for _, plan in eligible),
+            "multi_product_creatives": sum(plan.multi_product for _, plan in eligible),
             "claims": sum(len(plan.claims) for _, plan in rows),
             "mentions": sum(len(plan.mentions) for _, plan in rows),
             "unresolved": sum(plan.unresolved for _, plan in rows),
@@ -236,10 +299,11 @@ def summarize_links(
     )
     report["no_product_info_brands"] = sorted(b for b in brands - available if b)
     linked = sorted(
-        [(e, p.match) for e, p in prepared if p.match.status == "matched"],
-        key=lambda pair: (
-            pair[0].creative.key.source.value,
-            pair[0].creative.key.source_id,
+        [(e, match, p.multi_product) for e, p in prepared for match in p.links],
+        key=lambda item: (
+            item[0].creative.key.source.value,
+            item[0].creative.key.source_id,
+            item[1].product.source_url,
         ),
     )
     report["sample_pairs"] = [
@@ -253,8 +317,9 @@ def summarize_links(
             "matched_text": match.matched_text,
             "basis": match.basis,
             "confidence": match.confidence,
+            "multi_product": multi,
         }
-        for entry, match in random.Random(seed).sample(
+        for entry, match, multi in random.Random(seed).sample(
             linked, min(sample_pairs, len(linked))
         )
     ]

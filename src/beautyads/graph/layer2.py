@@ -29,7 +29,8 @@ REPLACE_LINKS = """
         MERGE (p:Product {brand: target.brand, source_url: target.source_url})
         MERGE (c)-[r:PROMOTES]->(p)
         SET r.basis = target.basis, r.confidence = target.confidence,
-            r.matched_text = target.matched_text
+            r.matched_text = target.matched_text,
+            r.multi_product = target.multi_product
     )
     CALL {
         WITH c, row
@@ -118,18 +119,17 @@ def load_layer2(
         rows = []
         for entry in entries[offset : offset + batch_size]:
             plan = plan_links(entry, products)
-            match = plan.match
-            promotes = []
-            if match.product is not None:
-                promotes.append(
-                    {
-                        "brand": match.product.brand,
-                        "source_url": match.product.source_url,
-                        "basis": match.basis,
-                        "confidence": match.confidence,
-                        "matched_text": match.matched_text,
-                    }
-                )
+            promotes = [
+                {
+                    "brand": match.product.brand,
+                    "source_url": match.product.source_url,
+                    "basis": match.basis,
+                    "confidence": match.confidence,
+                    "matched_text": match.matched_text,
+                    "multi_product": plan.multi_product,
+                }
+                for match in plan.links
+            ]
             rows.append(
                 {
                     "source": entry.creative.key.source.value,

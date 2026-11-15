@@ -75,6 +75,8 @@ CREATIVE_SCOPE = """
       AND ($category IS NULL OR c.category = $category)
     RETURN c.source + ':' + c.source_id AS creative_id,
            EXISTS { MATCH (c)-[:PROMOTES]->(:Product) } AS linked,
+           EXISTS { MATCH (c)-[r:PROMOTES]->(:Product) WHERE r.multi_product = true }
+               AS multi_linked,
            c.latest_view_count AS views, c.source AS source,
            c.brand AS channel_brand, c.published_at AS published_at
 """
@@ -237,6 +239,7 @@ def run_verification(
             "code": "OK",
             "rows": 0,
             "connected_creatives": None,
+            "multi_product_connected_creatives": None,
             "scope_product_creatives": None,
             "promotes_coverage": None,
             "limitations": LIMITATIONS[qid],
@@ -274,6 +277,8 @@ def run_verification(
             report["rows"] = len(answers)
             numerator = len(_ids(answers) & linked)
             report["connected_creatives"] = numerator
+            multi = {r.get("creative_id") for r in scope if r.get("multi_linked")}
+            report["multi_product_connected_creatives"] = len(_ids(answers) & multi)
             report["promotes_coverage"] = numerator / len(scope_ids) if scope_ids else 0
             report["answers"] = answers
             report["scope"] = {"sources": sources, "category": category}
