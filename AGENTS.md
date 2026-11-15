@@ -64,6 +64,7 @@
 - CRITICAL: `make verify` 가 유일한 검증 진입점이다. 검증 항목을 추가할 때는 Makefile 의 verify 타깃에 넣는다.
 - 커밋 메시지는 conventional commits 형식을 따를 것 (feat:, fix:, docs:, refactor:)
 - 실제로 겪은 문제는 `docs/TROUBLESHOOTING_LOG.md`에 적는다.
+- 대기 루프는 `pgrep -f`처럼 명령줄 문자열 검색으로 자기 자신을 찾지 않게 PID(`kill -0`)와 완료 신호(`index.json` 상태·로그의 `completed!` 줄)로 확인하고, 상한(timeout)을 둔다.
 
 ## 명령어
 make verify      # ruff check + ruff format --check + pytest (Stop hook, execute.py, CI가 모두 이 명령을 부른다)
