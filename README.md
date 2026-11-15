@@ -884,3 +884,83 @@ make live-tiktok-analyze ARGS="--per-brand-limit 20"                 # 전체 14
 - 소재는 광고 id로 기존 저장분과 병합한다(멱등). `--retry-failed` 재조회는 TikTok에 쓰지 않는다.
 - 정지: 토큰·요청 오류는 전체 정지, 브랜드 하나의 서버 오류는 그 브랜드만 건너뜀, 일일 한도·크레딧 소진·비용 상한은 정지(남은 소재는 대기).
 - 환경 점검은 `live-analyze`와 같다(TikTok 키, Gemini 키, 사전 등록, 비용 상한).
+
+## live-products (P4)
+
+대표 단품(`config/product_candidates.yaml`)의 공식몰 가격·전성분과 식약처 표준명·
+기능성 보고/심사품목을 대조해 PostgreSQL에 저장한다. **사용자가 직접 실행한다.**
+이 step에서는 `--scan`을 포함한 실제 호출을 실행하지 않는다.
+
+실행 순서는 **`--scan` → 이미지 수·예상 비용 보고 → 사용자 승인 → 실행**이다.
+스캔 결과를 보고한 뒤 멈추고 사용자 지시를 기다린다. 식약처 일일 한도는
+미확인이므로 모든 모드에서 `--max-mfds-requests N`을 명시한다.
+
+```bash
+# 키·네트워크·DB 없이 ESTIMATE 한 줄만 출력
+make live-products ARGS='--dry-run --products 1,2 --max-mfds-requests 20'
+# 먼저 공식몰 HTTP만 사용해 가격·텍스트 전성분 여부·상세 이미지 수 확인
+make live-products ARGS='--scan --products 1,2 --max-mfds-requests 20'
+# 위 결과를 보고하고 멈춘 뒤, 사용자 승인 후 작게 실행
+BEAUTYADS_CAP_GEMINI_USD=14 make live-products ARGS='--products 1,2 --max-mfds-requests 20 --thinking-level minimal'
+```
+
+`BEAUTYADS_CAP_GEMINI_USD=14`는 **2026-11-15 이 live에 한해 승인된 한도**다.
+코드와 Makefile에 고정하지 않으며 사용자가 실행 환경에서 설정한다. 한도는
+이번 실행의 예산이 아니라 `data/manifest/costs.jsonl`의 Gemini 누적액에 적용한다.
+`.env`의 `DATA_GO_KR_SERVICE_KEY`·`GEMINI_API_KEY`·`POSTGRES_PASSWORD`를 준비하고,
+실행에는 OrbStack과 `make db-up`도 필요하다. 값·토큰·이미지 바이트는 출력하지 않는다.
+`--scan`도 키 이름·누적액을 먼저 점검하지만 Docker·DB 점검/접속은 생략하며,
+모델·식약처·이미지 다운로드를 호출하지 않는다. 공식몰의 robots.txt와 호스트별
+요청 간격은 기존 어댑터를 따른다. 제외 몰은 요청하지 않는다.
+
+`--products`는 후보 파일의 **1부터 시작하는 순번**, 제품명, `브랜드:제품명`,
+또는 상세페이지 URL을 쉼표로 구분한다. 순번은 후보 파일의 목록 순서 기준이다.
+생략하면 전체 후보를 처리한다. `--thinking-level` 기본값은 `minimal`이다.
+`--top-n`은 별도 성분 빈도 표의 최대 행 수이며 기본 50이다.
+
+스캔의 두 상수는 각각 **가정(미실측)**이다. 이미지당 조각 수 4(관측 1건 기반)와
+조각당 $0.0009(2026-11-15 합성 이미지 실측 참고)를 곱한다. 실제 이미지 높이와
+전성분 출력 길이를 재지 않은 견적이며 판정 기준으로 쓰지 않는다.
+**전성분을 찾으면 멈추므로 상한 추정**이다. 텍스트 전성분이 있는 페이지도
+이미지 수를 표시하지만 실제 실행은 이미지를 내려받거나 모델을 부르지 않는다.
+`--dry-run`의 후보 수×호출 종류는 기본 조회만 세며, 성분 조회·쪽 넘김·robots·
+이미지·재요청은 별도다. 식약처 총 HTTP 요청·재시도는 지정한 N을 넘지 않는다.
+호출당 시간·비용은 가정(미실측)이다.
+
+제품 별칭은 `derive_aliases`가 같은 브랜드의 `config/brand_product_pool.yaml`
+이름 목록만 받아 만든다. 풀을 읽을 수 없거나 해당 브랜드 목록이 없으면
+`BRAND_POOL_UNREADABLE`로 시작하지 않는다. 선택적인 추가·제외는
+`config/product_aliases.yaml`의 `aliases` 목록에서 제품별 `brand`·`name_ko`·
+`extra`·`drop`으로 지정한다. 성분 별칭은 `config/ingredient_aliases.yaml`의
+`aliases` 목록에 `alias`·`standard_name`·`source`를 모두 적는다.
+이 두 파일은 머리 주석만 있는 상태로 제공하며, 없거나 비어 있으면 추가 0개다.
+성분 별칭은 사용자·조언 세션이 출처를 확인해 채우고, 출처가 없으면 `ALIAS_INVALID`다.
+
+성분은 표준명 캐시를 먼저 읽고 **정확 일치**만 연결한다. 괄호 속 수치 함량은
+비교할 때만 분리하며 성분 원문·순서·반복은 보존한다. 목록 밖 표기는 `unresolved`
+(`미해결`)로 남긴다. 불완전한 식약처 조회는 `pending`으로 남겨 재실행 대상으로
+삼으며 미해결로 확정하지 않는다. 제품명 인증 대조는 공백 제거 후 정확 일치이고,
+취하 품목은 제외한다. 업체명으로 브랜드를 판정하지 않으며 SPF·PA가 null이면
+자외선 차단은 `unknown`이다. 공식몰의 기능성 문구 자체를 인증으로 쓰지 않는다.
+광고의 `full@v1.ingredients`도 같은 사전으로 대조하고, 원래 라벨은 유지한 채
+`ingredient-matches@v1` 작업에 원문·표준명·상태를 저장한다.
+
+마지막 JSON `summary`에는 제품 상태·성분 묶임 비율·미해결/대기 수·인증 연결
+커버리지(인증 종류별 수도 별도)·별칭 수·오류/보류 코드와 이번 실행 원장의
+`purpose=product-detail` 모델 호출 수·비용을 표시한다. 별도의
+`ingredient_frequency`에는 **표준명·제품 건수만** 내림차순으로 출력한다.
+같은 제품에 같은 성분이 반복돼도 빈도는 한 번 센다. 이 표를 조언 세션에
+전달해 상위 약 20개 성분→효능 수기 표에 출처를 붙인다.
+
+제품별 대기·실패·보류 상태와 추출 원문은 `data/interim/products/records.json`에
+보존한다(이미지는 저장하지 않는다). 재실행은 선택한 후보를 다시 조회하고,
+기존 표준명 캐시와 저장소 upsert를 사용한다. 성분·제품 하나의 실패는 다음
+항목을 막지 않는다. 402·인증·일일 한도·요청 수/비용 상한은 즉시 중단하며 현재와
+남은 제품은 대기로 남긴다. `STOPPED <코드>`를 확인하고 원인을 해소한 뒤 재실행한다.
+
+점검 실패는 `PREFLIGHT_FAILED <코드>`와 종료 코드 2다. 이유 코드는
+`ENV_MISSING:<이름>`·`DOCKER_DOWN`·`POSTGRES_UNREACHABLE`·`COST_CAP:gemini`·
+`POSTGRES_AUTH_FAILED`·`POSTGRES_CONNECT_FAILED`·`BRAND_POOL_UNREADABLE`·
+`ALIAS_INVALID` 등이다. 키 누락·비용 상한·Docker 실패 뒤에는 다음 접속 점검도
+진행하지 않는다. 성공/계획/스캔 완료는 0, 시스템 중단 또는 제품 오류·보류·대기가
+있으면 3이다. `live-products`는 `make verify`에 포함하지 않는다.
