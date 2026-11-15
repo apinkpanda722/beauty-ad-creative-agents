@@ -20,7 +20,16 @@
     {
       "step": 1,
       "name": "claim-rules",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-15T15:10:01+0900",
+      "summary": "확정 YAML 원문·해시 보존, ClaimRule 검증·한영 경계 및 예외 검사·필드별 면책 문구·로더·피부 타입/고민 목록 구현. make verify 2,080개 통과, 추가 패키지 설치 없음.",
+      "completed_at": "2026-11-15T15:15:28+0900",
+      "usage": {
+        "input_tokens": 924239,
+        "cached_input_tokens": 842368,
+        "output_tokens": 12529,
+        "attempts": 1
+      }
     },
     {
       "step": 2,
