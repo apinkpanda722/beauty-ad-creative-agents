@@ -146,7 +146,16 @@
     {
       "step": 10,
       "name": "cq-verify",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-15T22:09:44+0900",
+      "summary": "15개 CQ 고정 질의·검증 실행기, 광고주 분류·속성 동기화, live-cq 타깃 구현. make verify 2,686개 통과. 실제 서비스 접속·추가 패키지 설치 없음.",
+      "completed_at": "2026-11-15T22:20:51+0900",
+      "usage": {
+        "input_tokens": 1894883,
+        "cached_input_tokens": 1792256,
+        "output_tokens": 24047,
+        "attempts": 1
+      }
     }
   ]
 }
