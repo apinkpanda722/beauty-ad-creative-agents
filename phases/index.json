@@ -20,6 +20,10 @@
       "dir": "4-ontology",
       "status": "completed",
       "completed_at": "2026-11-17T12:21:07+0900"
+    },
+    {
+      "dir": "5-agents",
+      "status": "pending"
     }
   ]
 }
