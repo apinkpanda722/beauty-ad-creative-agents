@@ -4,6 +4,7 @@ from unittest.mock import Mock
 import pytest
 from test_links_domain import NOW, product
 
+from beautyads.domain import links as links_domain
 from beautyads.store.links_source import LINK_COLUMNS, SYNC_NAME, PostgresLinksSource
 from beautyads.store.product_repository import _PRODUCT_COLUMNS
 
@@ -143,7 +144,8 @@ def test_failure_mid_snapshot_rolls_back_and_does_not_return_partial_input():
     assert conn.rollbacks == 1 and conn.commits == 0
 
 
-def test_video_job_is_read_and_participates_in_incremental_change_time():
+def test_video_job_is_read_and_participates_in_incremental_change_time(monkeypatch):
+    monkeypatch.setattr(links_domain, "PRODUCT_ID_APPROVED_TAG", "v2")
     conn = Connection()
     execute = conn.execute
 
@@ -155,7 +157,7 @@ def test_video_job_is_read_and_participates_in_incremental_change_time():
                 (
                     "youtube",
                     "1",
-                    "product-id@v1",
+                    "product-id@v2",
                     "done",
                     {"products": [product().key.model_dump()]},
                 )
@@ -165,7 +167,19 @@ def test_video_job_is_read_and_participates_in_incremental_change_time():
 
     conn.execute = with_video
     snapshot = PostgresLinksSource(conn).read_snapshot(since=NOW, limit=None)
-    assert snapshot.changed[0].final_labels("product-id@v1")["products"]
-    for query, _ in conn.calls:
+    assert snapshot.changed[0].final_labels("product-id@v2")["products"]
+    for query, params in conn.calls:
         if "FROM changed" in query or "SELECT source, source_id, kind" in query:
-            assert "product-id@v1" in query
+            assert "product-id@v2" in params[0]
+
+
+def test_unapproved_video_jobs_are_not_read_or_part_of_change_time():
+    assert links_domain.PRODUCT_ID_APPROVED_TAG == ""
+    conn = Connection()
+    PostgresLinksSource(conn).read_snapshot(since=NOW, limit=None)
+    for query, params in conn.calls:
+        assert "product-id" not in query
+        assert not any(
+            isinstance(p, list) and any("product-id" in str(k) for k in p)
+            for p in params
+        )

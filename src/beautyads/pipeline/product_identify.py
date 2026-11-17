@@ -401,7 +401,7 @@ def run_identification(
                 prior.creative,
                 (*prior.labels, SyncLabel(PRODUCT_ID_KIND, "done", outcome.labels)),
             )
-            plan = plan_links(entry, deps.products)
+            plan = plan_links(entry, deps.products, video_kind=PRODUCT_ID_KIND)
             report["newly_linked"] += bool(plan.links)
             report["video_multi_product"] += plan.multi_product
             report["video_links"] += len(plan.links)

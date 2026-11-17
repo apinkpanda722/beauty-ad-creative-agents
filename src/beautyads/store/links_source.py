@@ -3,6 +3,7 @@
 import json
 from datetime import datetime
 
+from beautyads.domain import links as links_domain
 from beautyads.domain.links import LinkCreative, LinksSnapshot, LinksSource
 from beautyads.domain.products import Product
 from beautyads.domain.sync import SyncCreative, SyncLabel
@@ -28,7 +29,7 @@ class PostgresLinksSource(LinksSource):
                     GREATEST(c.updated_at,
                         (SELECT max(j.updated_at) FROM analysis_jobs AS j
                          WHERE j.source = c.source AND j.source_id = c.source_id
-                           AND (j.kind = ANY(%s) OR j.kind = 'product-id@v1')),
+                           AND (j.kind = ANY(%s))),
                         (SELECT max(p.updated_at) FROM products AS p
                          WHERE p.brand = c.brand)) AS updated_at
                 FROM creatives AS c
@@ -37,7 +38,8 @@ class PostgresLinksSource(LinksSource):
         """
         ordered = " ORDER BY updated_at, source, source_id"
         changed_query = query
-        params = [list(KINDS)]
+        kinds = [*KINDS, *links_domain.approved_video_kinds()]
+        params = [kinds]
         if since is not None:
             changed_query += " WHERE updated_at > %s"
             params.append(since)
@@ -61,9 +63,9 @@ class PostgresLinksSource(LinksSource):
             ]
             labels = self.conn.execute(
                 """SELECT source, source_id, kind, status, labels FROM analysis_jobs
-                   WHERE (kind = ANY(%s) OR kind = 'product-id@v1') AND status = %s
+                   WHERE (kind = ANY(%s)) AND status = %s
                    ORDER BY source, source_id, kind""",
-                (list(KINDS), "done"),
+                (kinds, "done"),
             ).fetchall()
             by_key = {}
             for source, source_id, kind, status, data in labels:

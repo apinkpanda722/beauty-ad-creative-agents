@@ -7,7 +7,7 @@ from pathlib import Path
 from pydantic import BaseModel, ValidationError
 
 from beautyads.domain import Creative, CreativeKey, JobStatus, Source
-from beautyads.domain.product_id import ProductIdResult
+from beautyads.domain.product_id import ProductIdResult, product_id_schema
 from beautyads.domain.products import Product
 from beautyads.llm import (
     DailyLimitReached,
@@ -80,8 +80,7 @@ def identify_product(
             mime_type=video.mime_type if video is not None else None,
         ),
     ]
-    schema = ProductIdResult.model_json_schema()
-    schema["properties"]["candidates"]["items"]["enum"] = list(candidates)
+    schema = product_id_schema(candidates)
     for attempt in range(2):
         outcome.attempts = attempt + 1
         outcome.raw_output = None
@@ -117,10 +116,16 @@ def identify_product(
             else:
                 outcome.status = JobStatus.done
                 outcome.error_code = None
+                evidence = selection.kept_evidence()
                 outcome.labels = {
                     "products": [
                         key.model_dump() for key in selection.products(candidates)
-                    ]
+                    ],
+                    "selections": [
+                        {**candidates[cid].key.model_dump(), "evidence": kind}
+                        for cid, kind in evidence.items()
+                    ],
+                    "dropped": selection.dropped,
                 }
         if on_attempt is not None:
             on_attempt(outcome.model_copy(deep=True))

@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 
 import pytest
 
+from beautyads.domain import links as links_domain
 from beautyads.domain.links import (
     MIN_ALIAS_LEN,
     LinkCreative,
@@ -453,11 +454,37 @@ def test_summary_reports_multi_product_creatives_and_link_counts_separately():
     assert any(p["multi_product"] for p in pairs)
 
 
+@pytest.fixture
+def approved_v2(monkeypatch):
+    monkeypatch.setattr(links_domain, "PRODUCT_ID_APPROVED_TAG", "v2")
+
+
+def test_video_links_are_not_read_until_a_version_is_approved():
+    assert links_domain.PRODUCT_ID_APPROVED_TAG == ""
+    p = product()
+    for version in ("v1", "v2"):
+        label = SyncLabel(
+            f"product-id@{version}", "done", {"products": [p.key.model_dump()]}
+        )
+        assert plan_links(creative(jobs=[label]), [p]).links == ()
+
+
+def test_only_the_approved_video_version_is_read(approved_v2):
+    p = product()
+    rows = {"products": [p.key.model_dump()]}
+    v1 = SyncLabel("product-id@v1", "done", rows)
+    v2 = SyncLabel("product-id@v2", "done", rows)
+    assert plan_links(creative(jobs=[v1]), [p]).links == ()
+    assert len(plan_links(creative(jobs=[v2]), [p]).links) == 1
+    explicit = plan_links(creative(jobs=[v1]), [p], video_kind="product-id@v1")
+    assert len(explicit.links) == 1
+
+
 @pytest.mark.parametrize("status", ["done", "held", "failed", "pending"])
-def test_video_links_supplement_only_unmatched_text(status):
+def test_video_links_supplement_only_unmatched_text(status, approved_v2):
     products = [product(url="a"), product("합성 붉은 앰플", url="b")]
     label = SyncLabel(
-        "product-id@v1", status, {"products": [p.key.model_dump() for p in products]}
+        "product-id@v2", status, {"products": [p.key.model_dump() for p in products]}
     )
     entry = creative(jobs=[label])
     plan = plan_links(entry, products)
@@ -475,11 +502,11 @@ def test_video_links_supplement_only_unmatched_text(status):
     assert len(text_plan.links) == 1 and text_plan.links[0].basis == "title"
 
 
-def test_video_links_reject_cross_brand_unknown_and_tiktok():
+def test_video_links_reject_cross_brand_unknown_and_tiktok(approved_v2):
     p = product()
     jobs = [
         SyncLabel(
-            "product-id@v1",
+            "product-id@v2",
             "done",
             {
                 "products": [

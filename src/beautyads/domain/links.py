@@ -183,15 +183,35 @@ def _list(value) -> list:
     return value if isinstance(value, list) else []
 
 
+# Video identification feeds PROMOTES only for a version a person approved after
+# reviewing its pairs. Empty means no video result is read.
+PRODUCT_ID_APPROVED_TAG = ""
+
+
+def approved_video_kinds() -> tuple[str, ...]:
+    return (f"product-id@{PRODUCT_ID_APPROVED_TAG}",) if PRODUCT_ID_APPROVED_TAG else ()
+
+
 def _video_supplement(
-    creative: LinkCreative, products: Sequence[Product], text: ProductLinks
+    creative: LinkCreative,
+    products: Sequence[Product],
+    text: ProductLinks,
+    video_kind: str | None,
 ) -> ProductLinks:
-    if text.status in {
-        "matched",
-        "not_product",
-    } or creative.creative.key.source not in {Source.youtube, Source.instagram}:
+    if video_kind is None:
+        kinds = approved_video_kinds()
+        video_kind = kinds[0] if kinds else None
+    if (
+        video_kind is None
+        or text.status
+        in {
+            "matched",
+            "not_product",
+        }
+        or creative.creative.key.source not in {Source.youtube, Source.instagram}
+    ):
         return text
-    selected = _list(creative.final_labels("product-id@v1").get("products"))
+    selected = _list(creative.final_labels(video_kind).get("products"))
     identities = {
         (row.get("brand"), row.get("source_url"))
         for row in selected
@@ -208,7 +228,12 @@ def _video_supplement(
     return ProductLinks("matched", matches) if matches else text
 
 
-def plan_links(creative: LinkCreative, products: Sequence[Product]) -> LinkPlan:
+def plan_links(
+    creative: LinkCreative,
+    products: Sequence[Product],
+    *,
+    video_kind: str | None = None,
+) -> LinkPlan:
     full = creative.final_labels("full@v1")
     allowed = {claim.value for claim in Claim if claim is not Claim.other}
     claims = tuple(
@@ -238,7 +263,9 @@ def plan_links(creative: LinkCreative, products: Sequence[Product]) -> LinkPlan:
         if len(standards) == 1:
             mentions.append(Mention(raw, next(iter(standards))))
     return LinkPlan(
-        _video_supplement(creative, products, match_products(creative, products)),
+        _video_supplement(
+            creative, products, match_products(creative, products), video_kind
+        ),
         claims,
         tuple(mentions),
         len(raw_names) - len(mentions),

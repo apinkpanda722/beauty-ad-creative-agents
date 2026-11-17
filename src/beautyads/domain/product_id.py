@@ -1,6 +1,7 @@
 """Closed, per-request product candidates, independent of model and storage."""
 
 from collections.abc import Mapping, Sequence
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, ValidationInfo, field_validator
 
@@ -8,7 +9,16 @@ from beautyads.domain.creative import Source
 from beautyads.domain.links import LinkCreative, match_products
 from beautyads.domain.products import Product, ProductKey
 
-PRODUCT_ID_KIND = "product-id@v1"
+PRODUCT_ID_KIND = "product-id@v2"
+# resembles_only gives the model an honest outlet; validation discards it.
+EVIDENCE_KINDS = (
+    "spoken_name",
+    "on_screen_text",
+    "package_label",
+    "title_caption",
+    "resembles_only",
+)
+REJECTED_EVIDENCE = "resembles_only"
 
 
 def candidates_for_brand(
@@ -23,23 +33,69 @@ def candidates_for_brand(
     }
 
 
+class ProductSelection(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    candidate: str
+    evidence: Literal[
+        "spoken_name",
+        "on_screen_text",
+        "package_label",
+        "title_caption",
+        "resembles_only",
+    ]
+
+
 class ProductIdResult(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    candidates: list[str]
+    selections: list[ProductSelection]
 
-    @field_validator("candidates")
+    @field_validator("selections")
     @classmethod
-    def closed_unique_ids(cls, values: list[str], info: ValidationInfo) -> list[str]:
+    def closed_unique_ids(
+        cls, values: list[ProductSelection], info: ValidationInfo
+    ) -> list[ProductSelection]:
         allowed = (info.context or {}).get("candidates", {})
-        if len(set(values)) != len(values) or any(
-            value not in allowed for value in values
-        ):
+        ids = [value.candidate for value in values]
+        if len(set(ids)) != len(ids) or any(i not in allowed for i in ids):
             raise ValueError("candidates must be unique ids from this request")
         return values
 
+    def kept(self) -> list[ProductSelection]:
+        return [s for s in self.selections if s.evidence != REJECTED_EVIDENCE]
+
+    @property
+    def dropped(self) -> int:
+        return len(self.selections) - len(self.kept())
+
+    def kept_evidence(self) -> dict[str, str]:
+        return {s.candidate: s.evidence for s in self.kept()}
+
     def products(self, candidates: Mapping[str, Product]) -> list[ProductKey]:
-        return [candidates[value].key for value in self.candidates]
+        return [candidates[s.candidate].key for s in self.kept()]
+
+
+def product_id_schema(candidates: Mapping[str, Product]) -> dict:
+    return {
+        "type": "object",
+        "properties": {
+            "selections": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "candidate": {"type": "string", "enum": list(candidates)},
+                        "evidence": {"type": "string", "enum": list(EVIDENCE_KINDS)},
+                    },
+                    "required": ["candidate", "evidence"],
+                    "additionalProperties": False,
+                },
+            }
+        },
+        "required": ["selections"],
+        "additionalProperties": False,
+    }
 
 
 def select_targets(

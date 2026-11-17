@@ -4,7 +4,7 @@ from unittest.mock import Mock
 
 import pytest
 from test_links_domain import product
-from test_product_identify import material, response
+from test_product_identify import material, response, sel
 
 from beautyads.domain import JobStatus
 from beautyads.llm import (
@@ -78,7 +78,7 @@ def deps_for(creatives, interact=None):
     return IdentifyDeps(
         analysis,
         [product()],
-        interact or Mock(return_value=response({"candidates": ["C1"]})),
+        interact or Mock(return_value=response({"selections": [sel("C1")]})),
     )
 
 
@@ -106,7 +106,7 @@ def test_sample_is_reproducible_bounded_and_reports_review_pairs(tmp_path):
         len(p["caption"]) == 120 and p["url"].startswith("https://")
         for p in first["sample_pairs"]
     )
-    assert all(kind == "product-id@v1" for kind, _, _ in deps.analysis.store.writes)
+    assert all(kind == "product-id@v2" for kind, _, _ in deps.analysis.store.writes)
     # A second run never reopens completed product identification jobs.
     repeated, _ = run(tmp_path, deps, sample=23)
     assert repeated["processed"] == 7 and deps.interact.call_count == 30
@@ -137,9 +137,9 @@ def test_failure_isolated_and_validation_attempts_persist(tmp_path):
     deps = deps_for([material(id=str(i)) for i in range(3)])
     deps.interact.side_effect = [
         RuntimeError("synthetic"),
-        response({"candidates": ["outside"]}),
-        response({"candidates": []}),
-        response({"candidates": ["C1"]}),
+        response({"selections": [sel("outside")]}),
+        response({"selections": []}),
+        response({"selections": [sel("C1")]}),
     ]
     report, _ = run(tmp_path, deps)
     assert report["processed"] == 3 and report["failed"] == 1 and report["done"] == 2
@@ -261,9 +261,9 @@ def test_multi_product_gain_and_cost_use_ledger_not_model_accuracy(tmp_path):
 
     def interact(**kwargs):
         assert kwargs["purpose"] == "product-identify"
-        candidate_ids = kwargs["response_format"]["schema"]["properties"]["candidates"][
+        candidate_ids = kwargs["response_format"]["schema"]["properties"]["selections"][
             "items"
-        ]["enum"]
+        ]["properties"]["candidate"]["enum"]
         append_entry(
             tmp_path / "costs",
             LedgerEntry(
@@ -276,7 +276,7 @@ def test_multi_product_gain_and_cost_use_ledger_not_model_accuracy(tmp_path):
                 cost_source="response_cost",
             ),
         )
-        return response({"candidates": candidate_ids})
+        return response({"selections": [sel(c) for c in candidate_ids]})
 
     deps = deps._replace(interact=interact)
     report, _ = run(tmp_path, deps)
@@ -300,8 +300,10 @@ def test_instagram_reuses_expired_download_rerefresh_and_redacts_uris(tmp_path):
     deps.analysis.rerefresh.return_value = refresh
     deps.interact.return_value = response(
         {
-            "candidates": [
-                "files/synthetic https://example.test/refreshed https://example.test/transient"
+            "selections": [
+                sel(
+                    "files/synthetic https://example.test/refreshed https://example.test/transient"
+                )
             ]
         }
     )
@@ -362,7 +364,7 @@ def test_file_permission_failure_is_isolated_from_authentication(tmp_path):
         LlmCallError(
             kind=ErrorKind.FATAL, code="FILE_NOT_FOUND", message="403 permission_denied"
         ),
-        response({"candidates": []}),
+        response({"selections": []}),
     ]
     report, _ = run(tmp_path, deps)
     assert report["failed"] == 1 and report["done"] == 1 and report["stopped"] is None
@@ -420,14 +422,14 @@ def test_quota_resume_leaves_previously_unsuccessful_selected_jobs_pending(
 ):
     creative = material()
     deps = deps_for([creative])
-    deps.analysis.store.jobs[(creative.key, "product-id@v1")] = SimpleNamespace(
+    deps.analysis.store.jobs[(creative.key, "product-id@v2")] = SimpleNamespace(
         key=creative.key,
-        kind="product-id@v1",
+        kind="product-id@v2",
         status=prior_status,
         labels=None,
         model=None,
         thinking_level="minimal",
-        prompt_version="product-id-v1",
+        prompt_version="product-id-v2",
         error_code="INVALID_OUTPUT",
     )
     deps.interact.side_effect = DailyLimitReached(
@@ -436,7 +438,7 @@ def test_quota_resume_leaves_previously_unsuccessful_selected_jobs_pending(
     report, _ = run(tmp_path, deps)
     assert report["processed"] == report["failed"] == 0
     assert (
-        deps.analysis.store.jobs[(creative.key, "product-id@v1")].status
+        deps.analysis.store.jobs[(creative.key, "product-id@v2")].status
         == JobStatus.pending
     )
     assert all(
