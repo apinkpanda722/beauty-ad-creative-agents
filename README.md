@@ -1105,3 +1105,35 @@ CQ-16은 서버 컨텍스트의 가격 범위로 조회하고, 범위가 없으�
 `ENV_MISSING:NEO4J_PASSWORD`, `DOCKER_DOWN`, `NEO4J_UNREACHABLE`, `GRAPH_EMPTY`이며,
 빈 그래프는 먼저 `make sync`로 준비한다. 질문 오류는 다음 질문을 막지 않고 종료 코드 3으로
 보고한다. 성공(0행 및 합성 전용 건너뜀 포함)은 종료 코드 0이다.
+
+## 영상에서 제품 식별 (`product-id@v1`)
+
+텍스트로 제품에 연결하지 못한 YouTube·Instagram 최종 제품 소재에 한해,
+같은 브랜드의 PostgreSQL 제품 후보 안에서만 영상으로 식별한다. TikTok과 이미
+완료된 작업은 제외한다. v1 분류 축·E1은 변경하지 않는다. 영상은 앞 60초·fps 1이
+기본이며 Instagram은 기존 재조회·메모리 다운로드·Files 업로드 경로를 사용하고
+처리 직후 삭제한다. 결과는 별도 분석 작업에 원문·프롬프트 버전·시도 횟수와 함께
+저장하며 다음 `make sync ARGS="--layers 2"`에서 `basis=video`, `confidence=model`로
+연결한다. 텍스트로 이미 연결된 소재는 텍스트 판정을 유지한다.
+
+아래 명령은 사용자가 실행한다. 개발·검증 중에는 실제 호출하지 않는다.
+
+```bash
+make live-product-identify ARGS="--dry-run --sample 50 --seed 20261115"
+make live-product-identify ARGS="--sample 50 --seed 20261115 --sample-pairs 20 --thinking-level minimal --window-max-s 60"
+```
+
+`--dry-run`은 대상 수와 영상 길이×약 91토큰/초 비용을 **가정(미실측)**으로
+표시하고 영상 다운로드·모델 호출·작업 저장을 하지 않는다. 같은 모델의 원장 실측
+비용/입력 토큰이 있으면 출력·추론을 포함한 유효 단가로 사용하고, 없으면 입력
+$0.75/M을 가정한다. 후보 글자·출력·추론·재요청에 따라 실제 비용은 달라지며
+추정치는 판정 기준으로 쓰지 않는다.
+
+`--sample N`은 고정 시드로 N건만 처리하고 멈춘다. `--max-videos`는 추가 상한이다.
+요약에는 대상·처리·완료·보류·실패·대기, 새로 연결된 소재 수, 복수 제품 소재 수,
+근거별 연결 수, 원장 비용과 정밀도 확인용 무작위 20쌍(제목·캡션 앞 120자,
+YouTube 영상 주소 또는 Instagram permalink, 제품 이름)이 나온다. 사람이 표본을
+확인하고 **전체 실행 비용을 승인한 뒤에만** `--sample`을 빼고 `--approve-cost`를
+지정한다. 시작 전 Gemini 키·Docker·PostgreSQL·Gemini 누적액을 점검하며 상한은
+$12다. 일일 한도·크레딧 소진·인증·비용 상한에 걸리면 남은 작업은 대기로 두고
+멈춘다. 원인을 해결한 뒤 같은 명령으로 재개하면 완료 작업은 제외된다.

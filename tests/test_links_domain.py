@@ -451,3 +451,44 @@ def test_summary_reports_multi_product_creatives_and_link_counts_separately():
     pairs = report["sample_pairs"]
     assert {(p["source_id"], p["multi_product"]) for p in pairs} >= {("1", False)}
     assert any(p["multi_product"] for p in pairs)
+
+
+@pytest.mark.parametrize("status", ["done", "held", "failed", "pending"])
+def test_video_links_supplement_only_unmatched_text(status):
+    products = [product(url="a"), product("합성 붉은 앰플", url="b")]
+    label = SyncLabel(
+        "product-id@v1", status, {"products": [p.key.model_dump() for p in products]}
+    )
+    entry = creative(jobs=[label])
+    plan = plan_links(entry, products)
+    if status == "done":
+        assert len(plan.links) == 2 and plan.multi_product
+        assert all(
+            m.basis == "video" and m.confidence == "model" and m.matched_text == ""
+            for m in plan.links
+        )
+        report = summarize_links([entry], products, dev_brands=["dev"], test_brands=[])
+        assert report["by_basis"] == {"title": 0, "caption": 0, "video": 2}
+    else:
+        assert plan.links == ()
+    text_plan = plan_links(creative(products[0].name_ko, jobs=[label]), products)
+    assert len(text_plan.links) == 1 and text_plan.links[0].basis == "title"
+
+
+def test_video_links_reject_cross_brand_unknown_and_tiktok():
+    p = product()
+    jobs = [
+        SyncLabel(
+            "product-id@v1",
+            "done",
+            {
+                "products": [
+                    p.key.model_dump(),
+                    {"brand": "other", "source_url": p.source_url},
+                ]
+            },
+        )
+    ]
+    assert len(plan_links(creative(jobs=jobs), [p]).links) == 1
+    assert plan_links(creative(source="tiktok", jobs=jobs), [p]).links == ()
+    assert plan_links(creative(jobs=jobs), []).links == ()

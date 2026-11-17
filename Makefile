@@ -72,3 +72,7 @@ live-cert-recheck:
 
 live-cq:
 	uv run python -m beautyads.eval.cq_verify
+
+.PHONY: live-product-identify
+live-product-identify:
+	uv run python -m beautyads.pipeline.product_identify $(ARGS)

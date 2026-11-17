@@ -141,3 +141,31 @@ def test_failure_mid_snapshot_rolls_back_and_does_not_return_partial_input():
     with pytest.raises(RuntimeError):
         PostgresLinksSource(conn).read_snapshot(since=None, limit=None)
     assert conn.rollbacks == 1 and conn.commits == 0
+
+
+def test_video_job_is_read_and_participates_in_incremental_change_time():
+    conn = Connection()
+    execute = conn.execute
+
+    def with_video(query, params=()):
+        cursor = execute(query, params)
+        if "SELECT source, source_id, kind" in query:
+            rows = cursor.fetchall()
+            rows.append(
+                (
+                    "youtube",
+                    "1",
+                    "product-id@v1",
+                    "done",
+                    {"products": [product().key.model_dump()]},
+                )
+            )
+            return Mock(fetchall=lambda: rows)
+        return cursor
+
+    conn.execute = with_video
+    snapshot = PostgresLinksSource(conn).read_snapshot(since=NOW, limit=None)
+    assert snapshot.changed[0].final_labels("product-id@v1")["products"]
+    for query, _ in conn.calls:
+        if "FROM changed" in query or "SELECT source, source_id, kind" in query:
+            assert "product-id@v1" in query

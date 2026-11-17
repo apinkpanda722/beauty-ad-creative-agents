@@ -50,8 +50,8 @@ class LinkCreative:
 class ProductMatch:
     status: Literal["matched"]
     product: Product
-    basis: Literal["title", "caption"]
-    confidence: Literal["name_full", "alias"]
+    basis: Literal["title", "caption", "video"]
+    confidence: Literal["name_full", "alias", "model"]
     matched_text: str
 
 
@@ -183,6 +183,31 @@ def _list(value) -> list:
     return value if isinstance(value, list) else []
 
 
+def _video_supplement(
+    creative: LinkCreative, products: Sequence[Product], text: ProductLinks
+) -> ProductLinks:
+    if text.status in {
+        "matched",
+        "not_product",
+    } or creative.creative.key.source not in {Source.youtube, Source.instagram}:
+        return text
+    selected = _list(creative.final_labels("product-id@v1").get("products"))
+    identities = {
+        (row.get("brand"), row.get("source_url"))
+        for row in selected
+        if isinstance(row, Mapping)
+        and isinstance(row.get("brand"), str)
+        and isinstance(row.get("source_url"), str)
+    }
+    matches = tuple(
+        ProductMatch("matched", product, "video", "model", "")
+        for product in products
+        if product.brand == creative.creative.properties.get("brand")
+        and (product.brand, product.source_url) in identities
+    )
+    return ProductLinks("matched", matches) if matches else text
+
+
 def plan_links(creative: LinkCreative, products: Sequence[Product]) -> LinkPlan:
     full = creative.final_labels("full@v1")
     allowed = {claim.value for claim in Claim if claim is not Claim.other}
@@ -213,7 +238,7 @@ def plan_links(creative: LinkCreative, products: Sequence[Product]) -> LinkPlan:
         if len(standards) == 1:
             mentions.append(Mention(raw, next(iter(standards))))
     return LinkPlan(
-        match_products(creative, products),
+        _video_supplement(creative, products, match_products(creative, products)),
         claims,
         tuple(mentions),
         len(raw_names) - len(mentions),
@@ -258,6 +283,12 @@ def summarize_links(
             "coverage": promotes / len(eligible) if eligible else 0,
             "ambiguous": sum(plan.status == "ambiguous" for _, plan in eligible),
             "promotes_links": sum(len(plan.links) for _, plan in eligible),
+            "by_basis": {
+                basis: sum(
+                    match.basis == basis for _, plan in eligible for match in plan.links
+                )
+                for basis in ("title", "caption", "video")
+            },
             "multi_product_creatives": sum(plan.multi_product for _, plan in eligible),
             "claims": sum(len(plan.claims) for _, plan in rows),
             "mentions": sum(len(plan.mentions) for _, plan in rows),

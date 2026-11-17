@@ -28,7 +28,7 @@ class PostgresLinksSource(LinksSource):
                     GREATEST(c.updated_at,
                         (SELECT max(j.updated_at) FROM analysis_jobs AS j
                          WHERE j.source = c.source AND j.source_id = c.source_id
-                           AND j.kind = ANY(%s)),
+                           AND (j.kind = ANY(%s) OR j.kind = 'product-id@v1')),
                         (SELECT max(p.updated_at) FROM products AS p
                          WHERE p.brand = c.brand)) AS updated_at
                 FROM creatives AS c
@@ -61,7 +61,7 @@ class PostgresLinksSource(LinksSource):
             ]
             labels = self.conn.execute(
                 """SELECT source, source_id, kind, status, labels FROM analysis_jobs
-                   WHERE kind = ANY(%s) AND status = %s
+                   WHERE (kind = ANY(%s) OR kind = 'product-id@v1') AND status = %s
                    ORDER BY source, source_id, kind""",
                 (list(KINDS), "done"),
             ).fetchall()
