@@ -138,10 +138,9 @@ def test_cap_is_checked_before_injected_call(tmp_path):
     interact.assert_not_called()
 
 
-def test_resemblance_only_selection_is_stored_as_empty_with_dropped_count(tmp_path):
-    interact = Mock(
-        return_value=response({"selections": [sel("C1", "resembles_only")]})
-    )
+@pytest.mark.parametrize("weak", ["resembles_only", "package_label"])
+def test_weak_evidence_selection_is_stored_as_empty_with_dropped_count(tmp_path, weak):
+    interact = Mock(return_value=response({"selections": [sel("C1", weak)]}))
     outcome = identify(tmp_path, interact)
     assert outcome.status == JobStatus.done
     assert outcome.labels == {"products": [], "selections": [], "dropped": 1}

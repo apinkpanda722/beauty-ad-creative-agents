@@ -106,7 +106,7 @@ def test_sample_is_reproducible_bounded_and_reports_review_pairs(tmp_path):
         len(p["caption"]) == 120 and p["url"].startswith("https://")
         for p in first["sample_pairs"]
     )
-    assert all(kind == "product-id@v2" for kind, _, _ in deps.analysis.store.writes)
+    assert all(kind == "product-id@v3" for kind, _, _ in deps.analysis.store.writes)
     # A second run never reopens completed product identification jobs.
     repeated, _ = run(tmp_path, deps, sample=23)
     assert repeated["processed"] == 7 and deps.interact.call_count == 30
@@ -422,9 +422,9 @@ def test_quota_resume_leaves_previously_unsuccessful_selected_jobs_pending(
 ):
     creative = material()
     deps = deps_for([creative])
-    deps.analysis.store.jobs[(creative.key, "product-id@v2")] = SimpleNamespace(
+    deps.analysis.store.jobs[(creative.key, "product-id@v3")] = SimpleNamespace(
         key=creative.key,
-        kind="product-id@v2",
+        kind="product-id@v3",
         status=prior_status,
         labels=None,
         model=None,
@@ -438,7 +438,7 @@ def test_quota_resume_leaves_previously_unsuccessful_selected_jobs_pending(
     report, _ = run(tmp_path, deps)
     assert report["processed"] == report["failed"] == 0
     assert (
-        deps.analysis.store.jobs[(creative.key, "product-id@v2")].status
+        deps.analysis.store.jobs[(creative.key, "product-id@v3")].status
         == JobStatus.pending
     )
     assert all(
@@ -498,3 +498,16 @@ def test_the_gemini_cap_comes_from_the_setting_not_a_fixed_ceiling(tmp_path):
     _ledger_with_gemini_spend(tmp_path, 2)
     code, text = _cli(tmp_path, "14")
     assert code == 2 and "PREFLIGHT_FAILED COST_CAP:gemini" in text
+
+
+@pytest.mark.parametrize("old", ["product-id@v1", "product-id@v2"])
+def test_creatives_already_seen_in_earlier_versions_are_not_sampled(tmp_path, old):
+    seen, fresh = material(id="seen"), material(id="fresh")
+    deps = deps_for([seen, fresh])
+    deps.analysis.store.jobs[(seen.key, old)] = SimpleNamespace(
+        key=seen.key, kind=old, status=JobStatus.done, labels={"products": []}
+    )
+    report, _ = run(tmp_path, deps)
+    assert report["target_count"] == 1 and report["processed"] == 1
+    assert [k for k, _, _ in deps.analysis.store.writes] == ["product-id@v3"]
+    assert deps.analysis.store.writes[0][1] == fresh.key

@@ -54,20 +54,46 @@ def test_empty_is_valid_and_extra_names_are_rejected():
         ProductIdResult.model_validate({"selections": [], "name": "new"})
 
 
-def test_resemblance_only_evidence_is_dropped_by_validation():
-    candidates = candidates_for_brand("dev", [product(url="a"), product(url="b")])
+@pytest.mark.parametrize("weak", ["resembles_only", "package_label"])
+def test_only_spoken_screen_text_and_title_caption_evidence_is_accepted(weak):
+    candidates = candidates_for_brand(
+        "dev", [product(url="a"), product(url="b"), product(url="c")]
+    )
     result = ProductIdResult.model_validate(
-        {"selections": [sel("C1", "resembles_only"), sel("C2", "package_label")]},
+        {"selections": [sel("C1", weak), sel("C2", "on_screen_text")]},
         context={"candidates": candidates},
     )
     assert result.products(candidates) == [candidates["C2"].key]
     assert result.dropped == 1
-    assert result.kept_evidence() == {"C2": "package_label"}
-    only_similar = ProductIdResult.model_validate(
-        {"selections": [sel("C1", "resembles_only")]},
-        context={"candidates": candidates},
+    assert result.kept_evidence() == {"C2": "on_screen_text"}
+    for good in ("spoken_name", "on_screen_text", "title_caption"):
+        kept = ProductIdResult.model_validate(
+            {"selections": [sel("C3", good)]}, context={"candidates": candidates}
+        )
+        assert kept.products(candidates) == [candidates["C3"].key] and not kept.dropped
+    only_weak = ProductIdResult.model_validate(
+        {"selections": [sel("C1", weak)]}, context={"candidates": candidates}
     )
-    assert only_similar.products(candidates) == [] and only_similar.dropped == 1
+    assert only_weak.products(candidates) == [] and only_weak.dropped == 1
+
+
+def test_work_kind_is_v3_and_earlier_versions_are_never_reselected():
+    from beautyads.domain.product_id import PRODUCT_ID_KIND
+
+    assert PRODUCT_ID_KIND == "product-id@v3"
+    p = product()
+    rows = [
+        creative(id="fresh"),
+        *[
+            creative(id=version, jobs=[SyncLabel(f"product-id@{version}", "done", {})])
+            for version in ("v1", "v2", "v3")
+        ],
+        creative(id="held", jobs=[SyncLabel("product-id@v1", "held", None)]),
+    ]
+    assert [r.creative.key.source_id for r in select_targets(rows, [p])] == [
+        "fresh",
+        "held",
+    ]
 
 
 def test_json_schema_closes_candidate_and_evidence_values():
@@ -91,7 +117,7 @@ def test_selection_hand_count_includes_ambiguous_only_from_supported_sources():
         creative(products[0].name_ko, id="text"),
         creative(brand="absent", id="absent"),
         creative(
-            id="done", jobs=[SyncLabel("product-id@v2", "done", {"products": []})]
+            id="done", jobs=[SyncLabel("product-id@v3", "done", {"products": []})]
         ),
     ]
     selected = select_targets(rows, products)

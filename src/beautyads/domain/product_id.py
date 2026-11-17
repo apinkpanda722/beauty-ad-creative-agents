@@ -9,8 +9,11 @@ from beautyads.domain.creative import Source
 from beautyads.domain.links import LinkCreative, match_products
 from beautyads.domain.products import Product, ProductKey
 
-PRODUCT_ID_KIND = "product-id@v2"
-# resembles_only gives the model an honest outlet; validation discards it.
+PRODUCT_ID_KIND = "product-id@v3"
+# Earlier versions' rows stay in place; a creative they already saw is not drawn again.
+SEEN_KINDS = ("product-id@v1", "product-id@v2", PRODUCT_ID_KIND)
+# The prompt still lists package_label and resembles_only as answers (product-id-v2);
+# v3 validation accepts only evidence that names the product in words.
 EVIDENCE_KINDS = (
     "spoken_name",
     "on_screen_text",
@@ -18,7 +21,7 @@ EVIDENCE_KINDS = (
     "title_caption",
     "resembles_only",
 )
-REJECTED_EVIDENCE = "resembles_only"
+ACCEPTED_EVIDENCE = frozenset({"spoken_name", "on_screen_text", "title_caption"})
 
 
 def candidates_for_brand(
@@ -63,7 +66,7 @@ class ProductIdResult(BaseModel):
         return values
 
     def kept(self) -> list[ProductSelection]:
-        return [s for s in self.selections if s.evidence != REJECTED_EVIDENCE]
+        return [s for s in self.selections if s.evidence in ACCEPTED_EVIDENCE]
 
     @property
     def dropped(self) -> int:
@@ -109,7 +112,7 @@ def select_targets(
         and entry.is_product
         and entry.creative.properties.get("brand") in brands
         and not any(
-            job.kind == PRODUCT_ID_KIND and job.status == "done" for job in entry.labels
+            job.kind in SEEN_KINDS and job.status == "done" for job in entry.labels
         )
         and match_products(entry, products).status != "matched"
     ]

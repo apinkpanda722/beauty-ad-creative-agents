@@ -22,6 +22,7 @@ from beautyads.domain import Creative, JobStatus, Source
 from beautyads.domain.links import DEFAULT_SEED, LinkCreative, plan_links
 from beautyads.domain.product_id import (
     PRODUCT_ID_KIND,
+    SEEN_KINDS,
     candidates_for_brand,
     select_targets,
 )
@@ -130,7 +131,7 @@ def _targets(deps: IdentifyDeps) -> tuple[list[Creative], dict]:
     jobs = (
         [
             job
-            for kind in ("content_type@v1", PRODUCT_ID_KIND)
+            for kind in ("content_type@v1", *SEEN_KINDS)
             for job in store.get_job_results(kind, keys)
         ]
         if keys
