@@ -18,7 +18,7 @@
 **수정할 파일**: `src/beautyads/domain/tenant.py`(새 파일), `src/beautyads/store/tenant_repository.py`(새 파일), `src/beautyads/store/schema.py`, `src/beautyads/store/__init__.py`, `tests/test_tenant_domain.py`(새 파일), `tests/test_tenant_repository.py`(새 파일), `tests/test_store.py`
 
 열람 금지 경로: `data/interim/`
-수정 허용 경로: `src/beautyads/domain/tenant.py`, `src/beautyads/store/tenant_repository.py`, `src/beautyads/store/schema.py`(마이그레이션 추가에 한함, 기존 마이그레이션·테스트 단언 불변), `src/beautyads/store/__init__.py`(export 추가에 한함), `tests/test_tenant_domain.py`, `tests/test_tenant_repository.py`, `tests/test_store.py`(케이스 추가에 한함, 단언 약화 금지)
+수정 허용 경로: `src/beautyads/domain/tenant.py`, `src/beautyads/store/tenant_repository.py`, `src/beautyads/store/schema.py`(마이그레이션 추가에 한함, 기존 마이그레이션·테스트 단언 불변), `src/beautyads/store/__init__.py`(export 추가에 한함), `tests/test_tenant_domain.py`, `tests/test_tenant_repository.py`, `tests/test_store.py`(새 마이그레이션 버전을 반영하는 데 필요한 기대값의 갱신과 케이스 추가에 한함. 이 갱신 외에 단언을 약화하거나 삭제하지 않는다. 갱신은 `apply_migrations(conn) == [4, 5, 6]`, `conn.commits == 3`, 버전 1~6 적용 완료 픽스처의 세 곳으로 한정하고, 갱신한 줄은 새 버전 목록을 기존 목록 + 7로 정확히 표현한다(`>=` 같은 느슨한 비교나 길이만 보는 단언으로 바꾸지 않는다))
 열람 금지의 범위: 이 금지는 **Codex 세션이 해당 경로의 파일을 직접 열람·출력·인용하는 것**에 대한 것이다. 이 step의 코드가 런타임에 그 경로를 다루는 것(기본 입력·출력 경로 등)은 대상이 아니다. 테스트가 그 경로의 실제 파일 **내용**을 읽는 것은 여전히 금지이며 테스트는 임시 디렉터리와 합성 데이터만 쓴다.
 
 테넌트 전용 데이터(작업 공간 프로필·기획안·피드백·thread 소유)를 PostgreSQL에 두고, 모든 읽기·쓰기가 `tenant_id`로 범위를 건다. **이 step은 PostgreSQL 저장소와 도메인 타입까지만 만든다.** Neo4j `Feedback` 적재는 이 step에서 만들지 않는다. **이 step 안에서는 실제 접속·실행을 하지 않는다.**
@@ -45,7 +45,7 @@
 - `summarize_feedback`: 윈도 밖 항목 제외, 사유 원문이 그대로 보존되고 순서가 최신순이며 `max_reasons`를 넘으면 오래된 것이 빠지고 건수 집계에는 남는다, 입력이 비어도 예외 없이 빈 요약이다.
 - **격리(핵심)**: 저장소의 모든 공개 메서드를 돌려 기록된 모든 `SELECT`·`UPDATE`·`DELETE` 문장에 `tenant_id = %s`가 있고 첫 파라미터(또는 해당 위치 파라미터)가 호출 인자의 `tenant_id`임을 단언한다. 모든 `INSERT`의 열 목록에 `tenant_id`가 있다(문장을 메서드별로 분해해 검사하고, **검사 대상 문장이 0건이면 실패**한다).
 - 잘못된 `tenant_id`로 부르면 SQL이 하나도 실행되지 않고 `TENANT_CONTEXT_MISSING`이다(모든 메서드). thread: 같은 테넌트 재등록은 멱등, 다른 테넌트는 `TenantMismatch`, 접두 불일치는 등록 전에 거부, 없는 thread의 접근 검사는 거부.
-- 마이그레이션: 새 버전이 마지막 번호 + 1이고 기존 항목 불변이며 `DROP`·`TRUNCATE`·`DELETE FROM`이 없고 모든 전용 테이블 `tenant_id`가 `NOT NULL`이다. `tests/test_store.py`의 기존 단언(버전 목록, 적용 목록)이 새 항목을 포함해 계속 통과한다(단언을 약화하지 않는다).
+- 마이그레이션: 새 버전이 마지막 번호 + 1이고 기존 항목 불변이며 `DROP`·`TRUNCATE`·`DELETE FROM`이 없고 모든 전용 테이블 `tenant_id`가 `NOT NULL`이다. `tests/test_store.py`의 기존 단언 중 버전 목록·커밋 횟수·적용 완료 픽스처는 새 버전 7을 정확히 반영하도록 갱신하고(위 세 곳, 정확 일치 유지), 그 밖의 단언은 그대로 통과한다.
 - `tests/test_architecture.py`가 통과한다(`store`는 `domain`·`settings`만 import한다).
 
 ## Acceptance Criteria

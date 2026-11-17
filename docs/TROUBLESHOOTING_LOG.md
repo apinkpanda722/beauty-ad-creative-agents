@@ -163,3 +163,17 @@
 - **해결**: (1) 진단 보강(실패 시 이미지·조각 오류 코드를 `issues`에, 식약처 중단 시 `provider_code`·`provider_message`를 `STOPPED` 줄과 `stopped_detail`에 기록). (2) `robots.txt`가 404·410인 호스트는 제한 없음으로 읽도록 어댑터를 고쳤다(401·403·5xx·연결 실패는 계속 거부). (3) 식약처 `provider_code=01`(System Error!!)은 중단이 아니라 항목 단위 일시 오류로 처리한다: 백오프 재시도 3번 뒤 `MFDS_LOOKUP_FAILED`(대기)로 두고 배치를 계속하며, `03`(데이터 없음)은 빈 결과, 계정 수준 코드(20·22·30·31·32)와 연속 20건 실패는 중단한다(`fix:` 커밋, 테스트 먼저). (4) 로봇 리다이렉트·텍스트 전성분·성분 0개 보류는 각각 별도 `fix:` 커밋이다. 이전에는 `resultCode != "00"`이면 모두 시스템 중단이라 제품 추출이 끝난 뒤 광고 대조가 한 건의 일시 오류로 멈췄다.
 - **근거**: `src/beautyads/pipeline/products.py`, `src/beautyads/sources/mfds.py`.
 
+## 2026-11-17 P5 step 4가 마이그레이션 버전 단언과 충돌해 blocked됐다
+- **문제**: `tenant-memory` step이 구현 전에 `blocked`로 보고됐다. 사유는 step 파일의 자기모순이다. "`MIGRATIONS`에 새 버전 7을 추가한다"와 "`tests/test_store.py`는 케이스 추가에 한함, 단언 약화 금지"가 충돌했고 `test_store.py`의 `apply_migrations(conn) == [4, 5, 6]`·`conn.commits == 3`·버전 1~6 적용 완료 픽스처가 버전 7 추가로 실패한다.
+- **원인**: 설계 때 `step_file_checks`의 `apply_migrations` 소비자 경고를 보고도 하드코딩된 버전 단언을 갱신 허용 목록에 넣지 않았다.
+- **해결**: step 파일의 수정 허용 문구를 "새 버전을 반영하는 기대값의 갱신(세 곳, 정확 일치 유지)과 케이스 추가에 한함"으로 바꾸고 `blocked`를 `pending`으로 되돌려 재실행한다. FP-C11을 추가했다.
+- **결과**: 코드 변경 없이 중단돼 되돌릴 것이 없었다(Codex 토큰 입력 약 20만, 출력 약 1천). 재실행 결과는 step 4 완료 뒤 보고한다.
+- **근거**: `phases/5-agents/step4.md`, `phases/5-agents/index.json`, `tests/test_store.py`.
+
+## 2026-11-17 terra·haiku·sonnet 호출의 `response_cost`가 0.0이라 상한이 걸리지 않는다
+- **문제**: step 0 시험의 terra·haiku·sonnet 호출 12건이 모두 `response_cost=0.0`이었고, 시험 스크립트가 그 0.0을 `cost_source=response_cost`로 장부에 적었다. 이 공급사는 호출을 아무리 해도 누적액이 늘지 않아 공급사 상한(OpenAI $10, Anthropic $8)이 작동하지 않는다.
+- **원인**: litellm 1.103.3의 로컬 단가표에 terra·haiku·sonnet 단가가 없어 비용을 계산하지 못하고 0.0을 돌려준다(OpenAI luna·Gemini는 `response_cost`가 정상). 시험 스크립트는 값이 0인지 확인하지 않았다.
+- **해결(예정)**: P5 step 0에서 공식 가격 페이지(2026-11-17 확인) 기준 가격표를 만들어 응답 usage 토큰으로 비용을 계산하고 `cost_source=price_table`로 기록한다. `response_cost`가 0 또는 None이면 가격표로 대체하고 가격표에도 없으면 호출을 거부한다. 장부는 추가 전용이라 이미 쓴 0.0 기록 12건은 그대로 두고(실제 사용량 기준 누락 약 $0.0007) 시험 스크립트는 이후 `computed`로 기록한다.
+- **결과**: 미해결(step 0 구현 전). 이후 시험(sonnet·terra·네이티브)은 `computed`로 장부에 기록했다.
+- **근거**: `data/interim/probes/p5_step0_out.json`(미커밋), `data/manifest/costs.jsonl`.
+

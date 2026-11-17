@@ -98,6 +98,13 @@ description: 이 프로젝트(beauty-ad-creative-agents)와 앞선 프로젝트 
 - **강제 수단**: `tests/test_links_domain.py`(승인 태그가 비면 어떤 영상 결과도 읽지 않음), `tests/test_product_id_domain.py`(v3 인정 근거, 이전 버전 재선정 금지), `tests/test_links_source.py`.
 - **출처**: 2026-11-17 P4 영상 식별 v1·v2, `data/interim/design/product_id_v2_check.csv` 검수
 
+### FP-C11 하드코딩된 마이그레이션 버전 단언이 새 버전 추가 step과 충돌
+- **증상**: P5 step 4가 `MIGRATIONS`에 새 버전 7을 추가해야 하는데, step 파일이 `tests/test_store.py`를 "케이스 추가에 한함, 단언 약화 금지"로 묶었다. 그 파일에는 `apply_migrations(conn) == [4, 5, 6]`, `conn.commits == 3`, 버전 1~6 적용 완료 픽스처가 정확 일치로 있어 버전 7을 추가하면 실패한다. Codex가 구현 전에 `blocked`로 보고했다.
+- **원인**: 새 마이그레이션 버전을 추가하는 step의 소비자 테스트 점검(B-FP-060·071)에서 `test_store.py`의 하드코딩 단언을 "추가에 한함"으로만 적고 갱신 허용을 적지 않았다.
+- **규칙**: 마이그레이션 버전·커밋 횟수·적용 완료 목록을 하드코딩한 단언은 새 버전을 추가하는 step의 수정 허용 목록에 **갱신 허용**으로 명시한다. 갱신할 줄(`apply_migrations` 반환 목록, 커밋 횟수, 적용 완료 픽스처)을 구체적으로 적고 갱신 뒤에도 정확 일치를 유지하며(`>=`·길이만 보는 단언으로 바꾸지 않는다) 그 밖의 단언은 약화하지 않는다.
+- **강제 수단**: /harness 설계 점검(`rg -n "apply_migrations|== \[[0-9, ]+\]|commits ==" tests/test_store.py`)과 /review 체크. `step_file_checks`의 소비자 경고(`apply_migrations` 심볼)가 신호다.
+- **출처**: 2026-11-17 P5 step 4 blocked, `phases/5-agents/index.json`, 이슈 #43
+
 ---
 
 ## B에서 이식한 항목 (프로젝트 B `failure-patterns`의 번호)
