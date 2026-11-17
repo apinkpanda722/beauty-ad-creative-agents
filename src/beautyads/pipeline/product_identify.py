@@ -581,12 +581,9 @@ def main(
     env_file = DEFAULT_ENV_FILE if environ is None else None
     try:
         settings = load_settings(environ=environ, env_file=env_file)
-        # This extraction retains the project's Gemini cap even when another
-        # explicitly approved product-image run used a higher environment cap.
-        caps = {
-            **settings.provider_caps_usd,
-            "gemini": min(12.0, settings.provider_caps_usd["gemini"]),
-        }
+        # The cap is the setting (default 12, raised only by an explicit
+        # BEAUTYADS_CAP_GEMINI_USD), the same as `live-products`.
+        caps = dict(settings.provider_caps_usd)
         problems = preflight(
             environ=environ,
             env_file=env_file,

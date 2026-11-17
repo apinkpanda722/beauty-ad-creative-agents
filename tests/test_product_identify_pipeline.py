@@ -442,3 +442,57 @@ def test_quota_resume_leaves_previously_unsuccessful_selected_jobs_pending(
     assert all(
         row[2]["status"] == JobStatus.pending for row in deps.analysis.store.writes
     )
+
+
+def _ledger_with_gemini_spend(tmp_path, usd):
+    from datetime import UTC, datetime
+
+    from beautyads.analysis.models import ANALYSIS_MODEL_ID
+    from beautyads.obs.ledger import LedgerEntry, append_entry
+
+    append_entry(
+        tmp_path / "ledger",
+        LedgerEntry(
+            ts=datetime.now(UTC),
+            provider="gemini",
+            model=ANALYSIS_MODEL_ID,
+            purpose="synthetic",
+            cost_usd=usd,
+            cost_source="response_cost",
+        ),
+    )
+
+
+def _cli(tmp_path, cap):
+    environ = {
+        "GEMINI_API_KEY": "synthetic",
+        "POSTGRES_PASSWORD": "synthetic",
+        "BEAUTYADS_LEDGER_PATH": str(tmp_path / "ledger"),
+    }
+    if cap is not None:
+        environ["BEAUTYADS_CAP_GEMINI_USD"] = cap
+    out = StringIO()
+    code = main(
+        ["--dry-run", "--sample", "1"],
+        environ=environ,
+        out=out,
+        deps_factory=lambda: deps_for([material()]),
+        docker_check=lambda: True,
+        tcp_check=lambda *_: True,
+    )
+    return code, out.getvalue()
+
+
+def test_the_gemini_cap_comes_from_the_setting_not_a_fixed_ceiling(tmp_path):
+    # Spend above the default 12 but below an explicitly raised cap (the same
+    # environment override `live-products` uses): the run must start.
+    _ledger_with_gemini_spend(tmp_path, 12.5)
+    code, text = _cli(tmp_path, "14")
+    assert "COST_CAP" not in text and code == 0
+    # Without the override the default cap still stops it, and so does a spend
+    # above the raised cap.
+    code, text = _cli(tmp_path, None)
+    assert code == 2 and "PREFLIGHT_FAILED COST_CAP:gemini" in text
+    _ledger_with_gemini_spend(tmp_path, 2)
+    code, text = _cli(tmp_path, "14")
+    assert code == 2 and "PREFLIGHT_FAILED COST_CAP:gemini" in text
