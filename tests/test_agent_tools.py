@@ -87,6 +87,8 @@ def ctx():
 
 
 def valid_inputs(tool):
+    if tool.name in EVIDENCE_INPUTS:
+        return EVIDENCE_INPUTS[tool.name]
     values = {
         "category": Category.serum_ampoule.value,
         "claim": Claim.soothing.value,
@@ -128,6 +130,15 @@ def test_registry_is_stable_described_and_closed():
         for name, field in schema.get("properties", {}).items():
             assert field.get("description")
             assert not forbidden.intersection(name.split("_"))
+        if tool.name in EVIDENCE_INPUTS:
+            assert tool.question_id is None
+            assert set(schema["properties"]) == EVIDENCE_FIELDS[tool.name]
+            assert tool.kind == (
+                ToolKind.lookup
+                if tool.name == "find_example_creatives"
+                else ToolKind.compare
+            )
+            continue
         if tool.kind != ToolKind.display:
             assert tool.question_id == QUESTION_IDS[tool.name]
             assert set(schema["properties"]) == set(QUESTIONS[tool.question_id].inputs)
@@ -418,3 +429,151 @@ def test_agents_only_use_domain_graph_and_no_query_literals():
             )
         if isinstance(node, ast.Constant) and isinstance(node.value, str):
             assert "MATCH (" not in node.value and "RETURN " not in node.value
+
+
+# New cases retain every frozen-CQ assertion above for the original tools.
+EVIDENCE_INPUTS = {
+    "compare_axis_by_category": {
+        "category": "mask_pack",
+        "source": "youtube",
+        "axis": "hook_type",
+    },
+    "top_vs_bottom_axis": {
+        "category": "mask_pack",
+        "source": "youtube",
+        "axis": "hook_type",
+    },
+    "find_example_creatives": {"category": "mask_pack"},
+}
+EVIDENCE_FIELDS = {
+    "compare_axis_by_category": {"category", "source", "axis", "category_basis"},
+    "top_vs_bottom_axis": {"category", "source", "axis", "category_basis"},
+    "find_example_creatives": {
+        "category",
+        "source",
+        "hook_type",
+        "angle",
+        "format",
+        "claim",
+        "category_basis",
+        "limit",
+    },
+}
+
+
+@pytest.mark.parametrize("name", EVIDENCE_INPUTS)
+@pytest.mark.parametrize(
+    "basis,phrase",
+    [
+        ("creative_label", "모델 라벨 기준(E1 채점 전)"),
+        ("product_link", "제품 연결 기준(연결된 소재만)"),
+    ],
+)
+def test_evidence_tools_basis_empty_and_graph_error(name, basis, phrase, ctx):
+    inputs = dict(EVIDENCE_INPUTS[name], category_basis=basis)
+    result = run_tool(name, inputs, ctx, FakeGraph())
+    assert isinstance(result, ToolResult)
+    assert result.no_evidence and not result.evidence_ids and result.row_count == 0
+    assert phrase in result.summary and basis in result.summary
+    assert "근거 없음" in result.summary
+    assert ("연결된 소재 기준" in result.summary) == (basis == "product_link")
+    spec = get_tool(name)
+    caution = spec.description.split("쓰지 않는 때:")[1]
+    assert "creative_label" in caution and "product_link" in caution
+    for text in ("기본값", "E1", "PROMOTES", "성분", "정확", "많", "적"):
+        assert text in caution
+    assert_failure(
+        run_tool(name, inputs, ctx, FakeGraph(error=GraphError("NEO4J_UNREACHABLE"))),
+        ToolErrorCode.GRAPH_UNAVAILABLE,
+        retryable=True,
+    )
+
+
+@pytest.mark.parametrize("name", EVIDENCE_INPUTS)
+def test_evidence_tools_use_new_queries_and_valid_sorted_ids(name, ctx):
+    import re
+
+    from beautyads.domain.tools import EVIDENCE_ID_PATTERN
+    from beautyads.graph.evidence_queries import (
+        axis_count_query,
+        axis_rows_query,
+        example_query,
+    )
+
+    rows = [
+        {
+            "creative_id": f"youtube:c{i}",
+            "source": "youtube",
+            "channel_brand": "synthetic",
+            "views": i,
+            "published_at": "2025-01-01T00:00:00Z",
+            "value": f"value{i}",
+        }
+        for i in range(24)
+    ]
+    graph = FakeGraph(rows + rows)
+    result = run_tool(name, EVIDENCE_INPUTS[name], ctx, graph)
+    assert isinstance(result, ToolResult) and not result.no_evidence
+    assert result.evidence_ids == sorted(set(result.evidence_ids))
+    assert all(re.fullmatch(EVIDENCE_ID_PATTERN, item) for item in result.evidence_ids)
+    assert len(result.top_rows) <= 5
+    assert get_tool(name).question_id is None
+    expected = {
+        "compare_axis_by_category": axis_count_query("hook_type", "creative_label"),
+        "top_vs_bottom_axis": axis_rows_query("hook_type", "creative_label"),
+        "find_example_creatives": example_query("creative_label"),
+    }
+    assert graph.calls[0][0] == expected[name]
+
+
+@pytest.mark.parametrize("n,low", [(0, True), (9, True), (10, False)])
+def test_top_bottom_summary_always_reports_n_and_causal_limit(n, low, ctx):
+    rows = [
+        {
+            "creative_id": f"youtube:c{i}",
+            "source": "youtube",
+            "channel_brand": "synthetic",
+            "views": i,
+            "published_at": "2025-01-01T00:00:00Z",
+            "value": "question",
+        }
+        for i in range(4 * n)
+    ]
+    result = run_tool(
+        "top_vs_bottom_axis",
+        EVIDENCE_INPUTS["top_vs_bottom_axis"],
+        ctx,
+        FakeGraph(rows),
+    )
+    assert isinstance(result, ToolResult)
+    assert f"상위 n={n}" in result.summary and f"하위 n={n}" in result.summary
+    assert "인과를 뜻하지 않는다" in result.summary
+    assert ("표본 부족" in result.summary) is low
+
+
+def test_top_bottom_rejects_tiktok_and_examples_validate_closed_filters(ctx):
+    assert_failure(
+        run_tool(
+            "top_vs_bottom_axis",
+            dict(EVIDENCE_INPUTS["top_vs_bottom_axis"], source="tiktok"),
+            ctx,
+            ForbiddenGraph(),
+        ),
+        ToolErrorCode.INPUT_INVALID,
+    )
+    for changes in (
+        {"limit": 21},
+        {"limit": 0},
+        {"claim": "invented"},
+        {"category": "other"},
+        {"source": "unknown"},
+    ):
+        assert_failure(
+            run_tool(
+                "find_example_creatives",
+                dict(EVIDENCE_INPUTS["find_example_creatives"], **changes),
+                ctx,
+                ForbiddenGraph(),
+            ),
+            ToolErrorCode.INPUT_INVALID,
+        )

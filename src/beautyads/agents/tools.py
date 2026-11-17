@@ -1,17 +1,26 @@
 """Stable high-level registry over the frozen CQ-v1 queries."""
 
 import json
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
-from beautyads.domain.labels import Category, Claim
+from beautyads.domain.evidence import (
+    CategoryBasis,
+    EvidenceAxis,
+    EvidenceSource,
+    split_top_bottom,
+)
+from beautyads.domain.labels import Angle, Category, Claim, Format, HookType
 from beautyads.domain.skin import SkinConcern, SkinType
 from beautyads.domain.tools import (
     EVIDENCE_ID_PATTERN,
+    EvidenceCategory,
     GraphReader,
+    RankedEvidenceSource,
     ToolContext,
     ToolErrorCode,
     ToolFailure,
@@ -20,6 +29,12 @@ from beautyads.domain.tools import (
     UiCommand,
 )
 from beautyads.graph.connection import GraphError
+from beautyads.graph.evidence_queries import (
+    axis_count_query,
+    axis_rows_query,
+    evidence_parameters,
+    example_query,
+)
 from beautyads.graph.queries import QUESTIONS, question_parameters
 
 PROMOTES_QUESTION_IDS = frozenset(
@@ -66,6 +81,64 @@ class PlanInput(EmptyInput):
     )
 
 
+class AxisEvidenceInput(EmptyInput):
+    category: EvidenceCategory = Field(description="조회할 소재의 지원 카테고리")
+    source: EvidenceSource = Field(description="집계할 소재 출처")
+    axis: EvidenceAxis = Field(description="비교할 닫힌 분류 축")
+    category_basis: CategoryBasis = Field(
+        default=CategoryBasis.creative_label,
+        description="모델 소재 라벨 또는 제품 연결 기준",
+    )
+
+
+class RankedAxisEvidenceInput(AxisEvidenceInput):
+    source: RankedEvidenceSource = Field(
+        description="조회수가 있는 YouTube 또는 Instagram 출처"
+    )
+
+
+class ExampleCreativesInput(EmptyInput):
+    category: EvidenceCategory = Field(description="조회할 소재의 지원 카테고리")
+    source: EvidenceSource | None = Field(
+        default=None, description="소재 출처, 생략하면 전체"
+    )
+    hook_type: HookType | None = Field(
+        default=None, description="선택할 훅 분류, 생략하면 제한 없음"
+    )
+    angle: Angle | None = Field(
+        default=None, description="선택할 앵글 분류, 생략하면 제한 없음"
+    )
+    format: Format | None = Field(
+        default=None, description="선택할 포맷 분류, 생략하면 제한 없음"
+    )
+    claim: Claim | None = Field(
+        default=None, description="선택할 효능 분류, 생략하면 제한 없음"
+    )
+    category_basis: CategoryBasis = Field(
+        default=CategoryBasis.creative_label,
+        description="모델 소재 라벨 또는 제품 연결 기준",
+    )
+    limit: int = Field(
+        default=10, ge=1, le=20, strict=True, description="반환할 소재 수(1~20)"
+    )
+
+
+_EVIDENCE_CAUTION = (
+    "쓰지 않는 때: 제품 단위 주장(성분 연결)이 필요한데 기본값에 의존할 때. "
+    "category_basis 기본값 creative_label은 분석 모델이 소재에 붙인 category로 "
+    "E1 채점 전이라 정확도는 미확정이고 근거 소재가 많다. "
+    "product_link는 PROMOTES로 공식몰 제품에 연결된 소재만이라 정확하지만 적다. "
+    "제품 단위 주장에는 product_link를 명시한다."
+)
+_EVIDENCE_TOOL_NAMES = frozenset(
+    {
+        "compare_axis_by_category",
+        "top_vs_bottom_axis",
+        "find_example_creatives",
+    }
+)
+
+
 @dataclass(frozen=True)
 class ToolSpec:
     name: str
@@ -83,6 +156,14 @@ TOOLS: tuple[ToolSpec, ...] = (
         "쓰지 않는 때: 개별 제품의 효능 근거가 필요할 때.",
         SkinTypeInput,
         "CQ-08",
+    ),
+    ToolSpec(
+        "compare_axis_by_category",
+        ToolKind.compare,
+        "쓰는 때: 카테고리의 축별 소재 수와 대표 근거 ID를 비교할 때.\n"
+        + _EVIDENCE_CAUTION,
+        AxisEvidenceInput,
+        None,
     ),
     ToolSpec(
         "compare_competitor_claims",
@@ -115,6 +196,13 @@ TOOLS: tuple[ToolSpec, ...] = (
         "쓰지 않는 때: 전체 광고의 효능이나 제품의 임상 효과를 판단할 때.",
         EfficacyInput,
         "CQ-04",
+    ),
+    ToolSpec(
+        "find_example_creatives",
+        ToolKind.lookup,
+        "쓰는 때: 닫힌 분류 조건에 맞는 근거 소재를 찾을 때.\n" + _EVIDENCE_CAUTION,
+        ExampleCreativesInput,
+        None,
     ),
     ToolSpec(
         "ingredient_ad_trend",
@@ -187,6 +275,14 @@ TOOLS: tuple[ToolSpec, ...] = (
         "쓰지 않는 때: 모든 성분이나 전체 광고 시장의 순위가 필요할 때.",
         EmptyInput,
         "CQ-05",
+    ),
+    ToolSpec(
+        "top_vs_bottom_axis",
+        ToolKind.compare,
+        "쓰는 때: 같은 출처·브랜드 안 조회수 상위·하위 25%의 축 분포를 비교할 때.\n"
+        + _EVIDENCE_CAUTION,
+        RankedAxisEvidenceInput,
+        None,
     ),
     ToolSpec(
         "unclaimed_efficacy_gaps",
@@ -268,6 +364,9 @@ def run_tool(
                 ui_command=UiCommand(kind=name, data=inputs),
             )
 
+        if name in _EVIDENCE_TOOL_NAMES:
+            return _run_evidence_tool(tool, inputs, ctx, graph)
+
         context = {"tenant_id": ctx.tenant_id}
         if tool.question_id == "CQ-16":
             if ctx.price_band is None:
@@ -303,3 +402,51 @@ def run_tool(
         )
     except Exception as exc:  # noqa: BLE001 -- tool boundary returns sanitized failures
         return _failure(ToolErrorCode.TOOL_INTERNAL_ERROR, type(exc).__name__)
+
+
+def _run_evidence_tool(tool, inputs, ctx, graph) -> ToolResult:
+    basis = inputs["category_basis"]
+    axis = inputs.get("axis", EvidenceAxis.hook_type)
+    operation = {
+        "compare_axis_by_category": "count",
+        "top_vs_bottom_axis": "rows",
+        "find_example_creatives": "examples",
+    }[tool.name]
+    params = evidence_parameters(**inputs, as_of=ctx.as_of, operation=operation)
+    if operation == "examples":
+        query = example_query(basis)
+    elif operation == "count":
+        query = axis_count_query(axis, basis)
+    else:
+        query = axis_rows_query(axis, basis)
+    rows = graph.run(query, params).records
+    band_summary = ""
+    if operation == "rows":
+        bands = split_top_bottom(rows, mature_before=params["mature_before"])
+        rows = [row.model_dump() for row in bands.rows]
+        band_summary = " " + bands.summary
+    evidence_ids = [
+        value
+        for value in _evidence_ids(rows)
+        if re.fullmatch(EVIDENCE_ID_PATTERN, value)
+    ]
+    label = (
+        "모델 라벨 기준(E1 채점 전)"
+        if basis == CategoryBasis.creative_label
+        else "제품 연결 기준(연결된 소재만)"
+    )
+    summary = f"조회 결과 {len(rows)}행." if rows else "근거 없음."
+    summary += f" category_basis={basis}: {label}." + band_summary
+    linked = basis == CategoryBasis.product_link
+    if linked:
+        summary += " 연결된 소재 기준."
+    return ToolResult(
+        tool=tool.name,
+        kind=tool.kind,
+        summary=summary,
+        top_rows=rows[:5],
+        row_count=len(rows),
+        evidence_ids=evidence_ids,
+        no_evidence=not rows,
+        linked_creative_count=len(evidence_ids) if linked else None,
+    )

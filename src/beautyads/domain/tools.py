@@ -74,3 +74,8 @@ class GraphReader(Protocol):
     def run(
         self, query: str, params: Mapping[str, Any] | None = None
     ) -> GraphRecords: ...
+
+
+# Shared closed inputs for evidence expansion (the frozen CQ inputs stay intact).
+EvidenceCategory = Literal["mask_pack", "serum_ampoule", "sun_care"]
+RankedEvidenceSource = Literal["youtube", "instagram"]
