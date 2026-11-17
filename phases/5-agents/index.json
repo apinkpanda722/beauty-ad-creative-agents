@@ -89,14 +89,16 @@
     {
       "step": 1,
       "name": "agent-api-skeleton",
-      "status": "pending",
+      "status": "completed",
       "started_at": "2026-11-17T23:14:11+0900",
       "usage": {
-        "input_tokens": 90302,
-        "cached_input_tokens": 52608,
-        "output_tokens": 764,
+        "input_tokens": 1866876,
+        "cached_input_tokens": 1767680,
+        "output_tokens": 21210,
         "attempts": 1
-      }
+      },
+      "summary": "테넌트 검사·체크포인터 기반 단일 노드/도구 그래프, /chat SSE, live-agent 사전점검·비용 제한 구현. make verify 통과(3,478 tests). 설치: langgraph 1.2.20, langgraph-checkpoint-postgres 3.2.0, psycopg-pool 3.3.3, fastapi 0.163.1, uvicorn 0.54.0.",
+      "completed_at": "2026-11-17T23:30:58+0900"
     },
     {
       "step": "5a",
