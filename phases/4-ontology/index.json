@@ -160,7 +160,16 @@
     {
       "step": 11,
       "name": "product-identify",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-17T12:07:42+0900",
+      "summary": "후보 제한 영상 제품 식별·product-id@v1 저장·video PROMOTES 보충·표본/비용/중단 처리·live-product-identify 구현. make verify 2,745개 통과. 실제 서비스 호출·추가 패키지 설치 없음.",
+      "completed_at": "2026-11-17T12:21:07+0900",
+      "usage": {
+        "input_tokens": 3859471,
+        "cached_input_tokens": 3734656,
+        "output_tokens": 27878,
+        "attempts": 1
+      }
     }
   ],
   "completed_at": "2026-11-15T22:20:51+0900"
