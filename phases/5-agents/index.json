@@ -33,14 +33,16 @@
     {
       "step": 4,
       "name": "tenant-memory",
-      "status": "pending",
+      "status": "completed",
       "started_at": "2026-11-17T22:31:00+0900",
       "usage": {
-        "input_tokens": 202348,
-        "cached_input_tokens": 151424,
-        "output_tokens": 1074,
+        "input_tokens": 935672,
+        "cached_input_tokens": 855040,
+        "output_tokens": 13571,
         "attempts": 1
-      }
+      },
+      "summary": "테넌트 도메인 타입·PostgreSQL 저장소·v7 마이그레이션 구현, 격리·thread 소유권·피드백 원문 보존 검증. make verify 통과(3,193 tests), 설치한 패키지 없음.",
+      "completed_at": "2026-11-17T22:41:52+0900"
     },
     {
       "step": "4b",
