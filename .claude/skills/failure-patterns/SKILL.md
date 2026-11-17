@@ -91,6 +91,13 @@ description: 이 프로젝트(beauty-ad-creative-agents)와 앞선 프로젝트 
 - **강제 수단**: `tests/test_product_store.py`의 `test_replace_ingredients_drops_surplus_rows_in_the_same_transaction`·`test_replace_with_an_empty_list_removes_the_product_ingredients`, `tests/test_ingredient_cleanup.py`, `tests/test_products_pipeline.py::test_product_ingredients_are_saved_as_a_whole_set_replacement`. 바이오던스 인라인 텍스트 파서 테스트는 (b) 구현 때 여기에 적는다. /review 체크(보류·실패 사유가 "데이터 없음"이면 본문 텍스트 검색 기록이 있는가, 하위 행 저장이 집합 교체인가).
 - **출처**: 2026-11-15 P4 바이오던스 보류, 성분 재파싱 잔여 행, `docs/TROUBLESHOOTING_LOG.md`
 
+### FP-C10 모델이 적은 근거 종류는 검증 수단이 아니다 / 사후 제한안은 새 표본에서 검증한다
+- **증상**: P4 영상 제품 식별 v1(50건)에서 후보에 없는 비슷한 제품을 고른 쌍이 있었다. v2(프롬프트에 "같은 제품이 없으면 []"와 근거 종류 출력 추가, 같은 50건)에서도 의심 3쌍이 그대로였다. 사람 검수 13쌍 결과는 O 9, △ 2, ? 2, X 0이고 근거 종류별로 spoken_name 4/4, on_screen_text 2/2, package_label 3/7만 O였다.
+- **원인**: 근거 종류는 모델의 자기 신고라 프롬프트나 형식 검증으로 걸러지지 않는다. 포장 라벨 근거는 같은 라인의 다른 제품 외형을 구분하지 못했다.
+- **규칙**: (1) 모델이 적은 근거를 검증으로 믿지 않고 사람 검수로 정밀도를 잰다. (2) "spoken_name·on_screen_text·title_caption만 인정"은 **같은 13쌍을 보고 만든 사후 기준**이므로 v3(`product-id@v3`, 프롬프트 `product-id-v2` 그대로, 검증만 변경)로 **새 표본(150건, seed 20261118, v1·v2에서 본 50건 제외)에서 따로 검증**한 뒤에만 채택한다. (3) 채택 전에는 `PRODUCT_ID_APPROVED_TAG`를 비워 그래프에 넣지 않는다.
+- **강제 수단**: `tests/test_links_domain.py`(승인 태그가 비면 어떤 영상 결과도 읽지 않음), `tests/test_product_id_domain.py`(v3 인정 근거, 이전 버전 재선정 금지), `tests/test_links_source.py`.
+- **출처**: 2026-11-17 P4 영상 식별 v1·v2, `data/interim/design/product_id_v2_check.csv` 검수
+
 ---
 
 ## B에서 이식한 항목 (프로젝트 B `failure-patterns`의 번호)
