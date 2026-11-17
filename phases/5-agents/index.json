@@ -47,7 +47,16 @@
     {
       "step": "4b",
       "name": "feedback-graph",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-17T22:42:00+0900",
+      "summary": "피드백 증분 동기화(--layers 3), 테넌트 복합 키 MERGE·ABOUT 원자적 교체·값 검증·전용 워터마크 구현. CQ-12·아키텍처 검사 포함 make verify 통과(3,228 tests). 설치한 패키지 없음.",
+      "completed_at": "2026-11-17T22:48:47+0900",
+      "usage": {
+        "input_tokens": 2000569,
+        "cached_input_tokens": 1877888,
+        "output_tokens": 12916,
+        "attempts": 1
+      }
     },
     {
       "step": 0,
