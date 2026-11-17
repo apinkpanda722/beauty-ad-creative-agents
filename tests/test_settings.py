@@ -258,3 +258,43 @@ def test_invalid_provider_cap_has_name_only(tmp_path, provider, value, source):
     assert caught.value.code == "INVALID_SETTING"
     assert str(caught.value) == name
     assert value not in str(caught.value)
+
+
+def test_purpose_caps_defaults_and_overrides(tmp_path):
+    name = "BEAUTYADS_CAP_IMAGE_USD"
+    defaults = load_settings(environ={}, env_file=None)
+    assert defaults.purpose_caps_usd == {"image": 3.5}
+    defaults.purpose_caps_usd["image"] = 0
+    assert Settings().purpose_caps_usd == {"image": 3.5}
+    path = tmp_path / ".env"
+    path.write_text(f"{name}=2.5\n", encoding="utf-8")
+    assert load_settings(environ={}, env_file=path).purpose_caps_usd == {"image": 2.5}
+    assert load_settings(environ={name: "0"}, env_file=path).purpose_caps_usd == {
+        "image": 0
+    }
+
+
+@pytest.mark.parametrize("value", ["", " \t "])
+def test_blank_purpose_cap_preserves_default(tmp_path, value):
+    name = "BEAUTYADS_CAP_IMAGE_USD"
+    path = tmp_path / ".env"
+    path.write_text(f"{name}='{value}'\n", encoding="utf-8")
+    assert load_settings(environ={name: value}, env_file=path).purpose_caps_usd == {
+        "image": 3.5
+    }
+
+
+@pytest.mark.parametrize("value", ["negative-invalid", "-1", "nan", "inf", "-inf"])
+@pytest.mark.parametrize("source", ["file", "environment"])
+def test_invalid_purpose_cap(tmp_path, value, source):
+    name = "BEAUTYADS_CAP_IMAGE_USD"
+    path = tmp_path / ".env"
+    if source == "file":
+        path.write_text(f"{name}={value}\n", encoding="utf-8")
+    with pytest.raises(InvalidSetting) as caught:
+        load_settings(
+            environ={name: value} if source == "environment" else {}, env_file=path
+        )
+    assert caught.value.name == name
+    assert caught.value.code == "INVALID_SETTING"
+    assert str(caught.value) == name

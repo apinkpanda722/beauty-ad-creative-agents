@@ -112,6 +112,7 @@ class Settings(BaseModel):
     provider_caps_usd: dict[str, float] = Field(
         default_factory=lambda: {"gemini": 12.0, "openai": 10.0, "anthropic": 8.0}
     )
+    purpose_caps_usd: dict[str, float] = Field(default_factory=lambda: {"image": 3.5})
     analysis_window_max_s: int = Field(default=60, gt=0)
     video_length_cut_s: int = Field(default=600, gt=0)
     thinking_level: ThinkingLevel = "minimal"
@@ -151,6 +152,19 @@ def load_settings(
                 raise InvalidSetting(name)
             caps[provider] = cap
     values["provider_caps_usd"] = caps
+    purpose_caps = Settings().purpose_caps_usd
+    for purpose in purpose_caps:
+        name = f"BEAUTYADS_CAP_{purpose.upper()}_USD"
+        value = get_setting(name, environ=environ, env_file=env_file)
+        if value is not None:
+            try:
+                cap = float(value)
+            except ValueError:
+                raise InvalidSetting(name) from None
+            if not isfinite(cap) or cap < 0:
+                raise InvalidSetting(name)
+            purpose_caps[purpose] = cap
+    values["purpose_caps_usd"] = purpose_caps
     try:
         return Settings.model_validate(values)
     except ValidationError as error:

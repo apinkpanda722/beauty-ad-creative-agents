@@ -26,7 +26,8 @@ class LedgerEntry(BaseModel):
     thought_tokens: int = 0
     cached_tokens: int = 0
     cost_usd: float
-    cost_source: Literal["response_cost", "computed", "missing"]
+    cost_source: Literal["response_cost", "computed", "missing", "price_table"]
+    reasoning_effort: str | None = None
 
     @field_validator("ts")
     @classmethod
@@ -100,3 +101,19 @@ def check_cap(
     total = provider_total(path, provider)
     if total + additional_usd >= cap:
         raise CostCapExceeded(provider, total, cap)
+
+
+def purpose_total(path: Path, prefix: str) -> float:
+    return fsum(
+        entry.cost_usd
+        for entry in read_entries(path).entries
+        if entry.purpose == prefix or entry.purpose.startswith(prefix + "-")
+    )
+
+
+def check_purpose_cap(
+    path: Path, prefix: str, cap: float, *, additional_usd: float = 0.0
+) -> None:
+    total = purpose_total(path, prefix)
+    if total + additional_usd >= cap:
+        raise CostCapExceeded(f"purpose:{prefix}", total, cap)
