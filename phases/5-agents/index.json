@@ -1,0 +1,61 @@
+{
+  "project": "beauty-ad-creative-agents",
+  "phase": "5-agents",
+  "steps": [
+    {
+      "step": 2,
+      "name": "tool-registry",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "checks",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "tenant-memory",
+      "status": "pending"
+    },
+    {
+      "step": "4b",
+      "name": "feedback-graph",
+      "status": "pending"
+    },
+    {
+      "step": 0,
+      "name": "llm-chat-models",
+      "status": "pending"
+    },
+    {
+      "step": 1,
+      "name": "agent-api-skeleton",
+      "status": "pending"
+    },
+    {
+      "step": 5,
+      "name": "research-agent",
+      "status": "pending"
+    },
+    {
+      "step": 6,
+      "name": "planning-evaluation",
+      "status": "pending"
+    },
+    {
+      "step": 7,
+      "name": "supervisor-sse",
+      "status": "pending"
+    },
+    {
+      "step": 8,
+      "name": "obs-langfuse",
+      "status": "pending"
+    },
+    {
+      "step": 9,
+      "name": "agents-live-target",
+      "status": "pending"
+    }
+  ]
+}

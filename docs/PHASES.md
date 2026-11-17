@@ -50,6 +50,7 @@
 | 37 | **P4 개정(2026-11-15)**: 구 step 4(`product-records`)를 `llm-image-input`·`store-products`·`product-detail`·`product-records`로 4분할해 P4를 11 step으로 변경(레이어당 한 step). `make live-products`와 `uv add pillow` 추가. `PROMOTES` 규칙 승인(제목·캡션에 같은 브랜드 제품 이름 전체 또는 영문명·줄임말 별칭, 모호하면 안 만듦, dev에서 다듬고 test에서 커버리지 보고, step 9 보고에 무작위 20쌍). `live-products`에 한해 Gemini 상한을 `BEAUTYADS_CAP_GEMINI_USD=14`까지 승인(실행 전 이미지 수·예상 비용 보고 후 멈춤). `SkinType`·`SkinConcern` 목록 확정과 `ADDRESSES` 대응은 출처 없는 초안(ADR-012 후속). 성분→효능 수기 표는 step 7 live 뒤 성분 빈도(성분명·건수만)를 보고받아 조언 세션이 상위 약 20개에 출처를 붙여 만든다. `CLAIMS` "주장 원문" 속성 삭제(v1 라벨은 값만 저장) | 사용자 결정(조언 세션 권고) |
 | 38 | **P4 규칙 초안 확정과 선정 방식 변경(2026-11-15, 조언 세션 검토)**: `claim_rules.yaml`을 원문 9~16쪽과 대조해 확정(쪽을 건너는 예외는 `exception_refs`로 [별표 2]를 참조, 넓은 일반어 제거, 영어 대응어는 `terms_en_added`·`en_origin: advisor_added_en`, 영어는 ASCII 단어 경계로만 비교, `applies_to`는 `advisor_approved`)하고 step 1에 붙였다. 기획안 제목도 검사 대상이고 평가 출력에 면책 문구를 표시한다(P5 `checks`). TikTok은 CQ-09와 분포 용도로만 쓰고 `PROMOTES` 질문은 YouTube·Instagram에서만 답이 나온다. **대표 단품 선정을 임시 후보(공식몰 첫 화면)에서 원래 확정 규칙(M1: 브랜드×카테고리별로 광고 소재 텍스트에 많이 등장하는 단품 최대 2개, 제외 몰 제외)으로 변경**하고 제품 별칭은 `derive_aliases`가 제품명에서 기계적으로 만든다(사용자가 채우지 않는다). 선정은 step 3 전에 끝낸다 | 사용자 결정(조언 세션) |
 | 39 | **P4 후속(2026-11-15, 조언 세션 검토)**: (1) `PROMOTES`가 한 소재의 여러 제품을 모두 잇는다(`multi_product` 속성, 달바 직원 BEST 5 회귀 테스트; 기존 "가장 긴 하나만, 같은 길이면 모호" 규칙 변경), (2) 성분은 식약처 원료성분 전체 목록(DB 카탈로그)과 정확 일치로 대조(영문 INCI는 `eng_name_exact`), (3) 인증 대조 규칙을 브랜드 한글명 접두어 + 정규화한 제품명의 정확 일치로 변경, (4) 제품 성분 저장을 집합 교체로 변경, (5) step 11 `product-identify` 추가(사용자 승인 전 설계 초안, 소량 측정 뒤 멈춤), (6) 영상 식별을 `product-id-v2`·`product-id@v2`로 개정(없으면 `[]`, 고른 후보마다 근거 종류, `resembles_only`는 검증에서 버림)하고 `PROMOTES` 영상 보충은 `PRODUCT_ID_APPROVED_TAG`(기본 빈 값 = 어떤 영상 결과도 읽지 않음)에 승인된 버전만 읽는다. v1 결과는 그대로 둔다, (7) v3(`product-id@v3`): 프롬프트는 v2 그대로 두고 검증만 바꿔 spoken_name·on_screen_text·title_caption만 인정(사후 기준이라 새 표본 150건으로 검증), 이전 버전에서 본 소재는 다시 뽑지 않는다 | 조언 세션 검토 |
+| 40 | **P5 착수 승인(2026-11-17, 조언 세션 검토)**: (1) P5를 **11 step**으로 확정: `4b feedback-graph`(Neo4j `Feedback` 적재, CQ-12 실데이터 검증용)를 step 4 뒤에 추가한다. (2) **실행 순서 `[2, 3, 4, 4b, 0, 1, 5, 6, 7, 8, 9]`**(`phases/5-agents/index.json` 배열 순서, step 번호 유지): 외부 계약 시험 결과가 필요한 step 0을 뒤로 돌려 모델 호출 없는 step 2·3·4·4b를 먼저 실행한다. (3) 이미지 시안은 Gemini 3.1 Flash Lite Image(1K, `completion` 경로, `generateContent`만 지원), 이미지 목적 상한 `BEAUTYADS_CAP_IMAGE_USD`(기본 3.5, 목적 접두어 `image`)와 총 80장 계획, 실험·개발 반복에서 이미지 끄기 옵션. `BEAUTYADS_CAP_GEMINI_USD`는 20.5로 승인. (4) CQ-16 가격대는 우리 제품 단위당 정가 ±30%를 workspace 프로필 설정으로 둔다(CQ v1 불변). (5) 무료 호스팅 재생 데모는 P7 시간이 남을 때. (6) workspace 후보: test A=isntree 히알루론산 세럼 50ml·B=beauty_of_joseon 인삼선세럼 SPF50(최종 평가·시연 전용), dev=mixsoon 세럼·cosrx 선세럼(개발 반복). 평가셋은 dev 요청 10·질문 10, 나머지는 test A·B. 한계: 경쟁 소재 검색은 전 브랜드를 대상으로 하므로 개발 중에도 test 브랜드 소재가 검색 대상에 들어간다(라벨·정답은 아님). (7) 넘버즈인 유지(결과 문서에 "공식 여부를 프로필 문구로 판단"을 한계로). (8) step 0에 비용 가격표 대체 추가(terra·haiku·sonnet은 litellm 단가를 몰라 `response_cost`가 0.0): 가격표로 usage 토큰을 계산해 `cost_source=price_table`로 기록하고 `response_cost`가 0·None이면 대체, 가격표에도 없으면 호출 거부. (9) AGENTS.md의 "평가(haiku)는 줄 수 없다" 문구는 `temperature`에 대한 규칙임을 명확히 했다(`reasoning_effort`는 haiku·sonnet이 수락했으나 효과는 미확인). (10) step 6·7은 "근거 연결 없음(unknown)" 건수를 사용자가 보는 결과 화면·보고에 눈에 띄게 노출한다. | 사용자 결정(조언 세션 검토) |
 
 ## 1. 전제와 일정
 
@@ -194,7 +195,7 @@ step 본문은 `phases/4-ontology/step*.md`가 원본이다. 구 번호와의 �
 
 **P4 착수 전 입력(2026-11-15 결정)**: 식약처 안내서 PDF 내려받기와 `claim_rules.yaml` 초안(완료), 공식몰 응답 원본 5쪽+robots.txt(완료), Gemini 이미지 입력 계약 실측 2회 $0.00183(완료), `SkinType`·`SkinConcern` 목록과 `ADDRESSES` 대응 초안(ADR-012 후속), 성분→효능 수기 표(step 7 live 뒤).
 
-### P5 agents (10 step)
+### P5 agents (11 step, 실행 순서 2 → 3 → 4 → 4b → 0 → 1 → 5 → 6 → 7 → 8 → 9)
 
 | step | 이름 | 내용 |
 |---|---|---|
@@ -202,10 +203,11 @@ step 본문은 `phases/4-ontology/step*.md`가 원본이다. 구 번호와의 �
 | 1 | `agent-api-skeleton` | (P1에서 이동) 도구 1개, 노드 1개(luna, `reasoning_effort="none"`), 체크포인터 풀(`autocommit`·`dict_row`·`prepare_threshold=0`)은 api가 조립, FastAPI `/chat` SSE, **짧은 live 확인 타깃 `make live-agent`**(step 뒤에 끊어 사용자가 돌림), **서버 진입점 경유 테스트**, 테넌트 컨텍스트 fail-closed |
 | 2 | `tool-registry` | 조회·집계·비교·표시 4종, 도구 등록 목록, 구조화 실패, 테넌트 범위 |
 | 3 | `checks` | 근거 ID 존재, 분류 값 유효성, 금지 표현(**기획안의 제목도 검사 대상 — 안내서 III.7**, `domain.claims.check_plan_fields`), 효능 근거 경로. **평가 출력에 "식약처 안내서 기준 점검이며 법적 판단이 아님"(`CLAIM_CHECK_DISCLAIMER`)을 표시한다** |
-| 4 | `tenant-memory` | 테넌트 전용 저장, 피드백 메모리, thread 소유 테넌트 검증 |
+| 4 | `tenant-memory` | 테넌트 전용 저장(PostgreSQL), 피드백 메모리, thread 소유 테넌트 검증, 가격대 ±pct 함수 |
+| 4b | `feedback-graph` | PostgreSQL `tenant_feedback` → Neo4j `Feedback` 증분 MERGE(`--layers 3`), CQ-12 호환 |
 | 5 | `research-agent` | 하위 그래프(전용 상태), 지시서·구조화 핸드오프, 근거 미달이면 "근거 없음" |
-| 6 | `planning-evaluation` | 기획(terra)·평가(Sonnet), 코드 검사 + LLM 채점, 되돌림 상태 카운터 최대 2회 |
-| 7 | `supervisor-sse` | Supervisor, 한도, 기준일 고정, SSE 4종 |
+| 6 | `planning-evaluation` | 기획(terra)·평가(Sonnet), 코드 검사 + LLM 채점, 되돌림 상태 카운터 최대 2회, 이미지 시안(Gemini Flash Lite Image). **평가 결과에 "근거 연결 없음(unknown)" 건수(`unknown_count`)를 별도로 표시한다** |
+| 7 | `supervisor-sse` | Supervisor, 한도, 기준일 고정, SSE 4종. **사용자 화면(기획안 카드·평가)과 보고에 "근거 연결 없음" 건수를 눈에 띄게 노출한다**(`passed`에 섞지 않는다) |
 | 8 | `obs-langfuse` | JSONL(기본), Langfuse(`obs` profile, `langfuse==3.15.0`, `cost_details` 전송) |
 | 9 | `agents-live-target` | `make live-agents` |
 
