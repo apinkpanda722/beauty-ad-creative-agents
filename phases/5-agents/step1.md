@@ -16,10 +16,10 @@
 
 ## 작업
 
-**수정할 파일**: `pyproject.toml`, `uv.lock`, `src/beautyads/agents/state.py`(새 파일), `src/beautyads/agents/skeleton.py`(새 파일), `src/beautyads/api/__init__.py`(새 파일), `src/beautyads/api/app.py`(새 파일), `src/beautyads/api/session.py`(새 파일), `src/beautyads/api/checkpointer.py`(새 파일), `src/beautyads/api/sse.py`(새 파일), `src/beautyads/pipeline/live_agent.py`(새 파일), `Makefile`, `README.md`, `tests/test_agent_skeleton.py`(새 파일), `tests/test_api_chat.py`(새 파일), `tests/test_api_session.py`(새 파일), `tests/test_live_agent.py`(새 파일), `tests/test_architecture.py`, `tests/test_compose.py`
+**수정할 파일**: `pyproject.toml`, `uv.lock`, `src/beautyads/agents/state.py`(새 파일), `src/beautyads/agents/skeleton.py`(새 파일), `src/beautyads/api/__init__.py`(새 파일), `src/beautyads/api/app.py`(새 파일), `src/beautyads/api/session.py`(새 파일), `src/beautyads/api/checkpointer.py`(새 파일), `src/beautyads/api/sse.py`(새 파일), `src/beautyads/api/chat_client.py`(새 파일), `src/beautyads/eval/live_agent.py`(새 파일), `Makefile`, `README.md`, `tests/test_agent_skeleton.py`(새 파일), `tests/test_api_chat.py`(새 파일), `tests/test_api_session.py`(새 파일), `tests/test_api_chat_client.py`(새 파일), `tests/test_live_agent.py`(새 파일), `tests/test_architecture.py`, `tests/test_compose.py`
 
 열람 금지 경로: `data/interim/`
-수정 허용 경로: `pyproject.toml`(아래 `uv add`가 만드는 의존성 추가에 한함), `uv.lock`, `src/beautyads/agents/state.py`, `src/beautyads/agents/skeleton.py`, `src/beautyads/api/__init__.py`, `src/beautyads/api/app.py`, `src/beautyads/api/session.py`, `src/beautyads/api/checkpointer.py`, `src/beautyads/api/sse.py`, `src/beautyads/pipeline/live_agent.py`, `Makefile`(`live-agent` 타깃과 `.PHONY` 추가에 한함, `verify` 불변), `README.md`(live-agent 절 추가에 한함), `tests/test_agent_skeleton.py`, `tests/test_api_chat.py`, `tests/test_api_session.py`, `tests/test_live_agent.py`, `tests/test_architecture.py`(새 `api` 모듈을 반영하는 케이스 추가에 한함, 계층·SDK 표 단언 약화 금지), `tests/test_compose.py`(`Makefile` 타깃 목록을 단언한다면 `live-agent` 추가를 반영하는 갱신에 한함, 그 외 단언 약화 금지)
+수정 허용 경로: `pyproject.toml`(아래 `uv add`가 만드는 의존성 추가에 한함), `uv.lock`, `src/beautyads/agents/state.py`, `src/beautyads/agents/skeleton.py`, `src/beautyads/api/__init__.py`, `src/beautyads/api/app.py`, `src/beautyads/api/session.py`, `src/beautyads/api/checkpointer.py`, `src/beautyads/api/sse.py`, `src/beautyads/api/chat_client.py`, `src/beautyads/eval/live_agent.py`, `Makefile`(`live-agent` 타깃과 `.PHONY` 추가에 한함, `verify` 불변), `README.md`(live-agent 절 추가에 한함), `tests/test_agent_skeleton.py`, `tests/test_api_chat.py`, `tests/test_api_session.py`, `tests/test_api_chat_client.py`, `tests/test_live_agent.py`, `tests/test_architecture.py`(새 `api` 모듈을 반영하는 케이스 추가에 한함, 계층·SDK 표 단언 약화 금지), `tests/test_compose.py`(`Makefile` 타깃 목록을 단언한다면 `live-agent` 추가를 반영하는 갱신에 한함, 그 외 단언 약화 금지)
 열람 금지의 범위: 이 금지는 **Codex 세션이 해당 경로의 파일을 직접 열람·출력·인용하는 것**에 대한 것이다. 이 step의 코드가 런타임에 그 경로를 다루는 것(기본 입력·출력 경로 등)은 대상이 아니다. 테스트가 그 경로의 실제 파일 **내용**을 읽는 것은 여전히 금지이며 테스트는 임시 디렉터리와 합성 데이터만 쓴다.
 
 도구 1개와 노드 1개로 **요청 하나가 끝까지 도는 뼈대**를 만든다: FastAPI `/chat`(SSE) → 테넌트 세션 검사 → LangGraph(체크포인터, luna `reasoning_effort="none"`) → 도구 1개(`lookup_certified_products`) → 답. 에이전트 4종과 Supervisor는 이후 step이다. **이 step 안에서는 실제 접속·실행을 하지 않는다.**
@@ -34,7 +34,9 @@
 
 **`api/app.py`·`api/sse.py`**: `create_app(assemble: Callable[[], Assembly]) -> FastAPI`. `Assembly`(`graph`, `tenants`(`TenantRepository`), `allowed_tenants`, `as_of`, `last_collected_at`, `chat`, `tool_runner`, 종료 함수). **서비스는 앱 시작 시(`lifespan`) `assemble()`로 만들고 라우트는 `app.state.assembly`에서 요청 시점에 꺼내 쓴다**(생성 시점 값을 라우트에 붙잡지 않는다, B-FP-070). `POST /chat`(본문: `message: str`, 선택 `thread_id`)은 SSE(`text/event-stream`)로 `event: step`(에이전트 단계 시작·종료), `event: tool_start`(도구 이름·종류), `event: token`(최종 답 글자, 이 step은 완성된 답 하나를 한 번에 보낸다)을 보낸다. `ui_command`는 이 step에서 만들지 않는다(타입만 `sse.py`에 이름으로 정의). 이벤트 본문은 JSON 한 줄이고 비밀·키·응답 전문을 싣지 않는다. 예기치 못한 예외는 `event: error`(코드만)로 보내고 스트림을 닫는다. `GET /healthz`는 `{"status": "ok"}`만 돌려준다(의존 서비스를 부르지 않는다).
 
-**`pipeline/live_agent.py`와 `make live-agent`**: 실제 조립(`Assembly`의 실물 버전)을 만드는 진입점이다. 시작 전에 사전 점검을 한다(키·서비스를 값 없이 확인): `OPENAI_API_KEY`·`NEO4J_PASSWORD`·`POSTGRES_PASSWORD` 설정 여부(이름만 출력), Postgres·Neo4j 컨테이너 기동 여부(`pipeline/preflight.py`의 방식을 따른다), 마이그레이션 적용 여부. 하나라도 어긋나면 이유 코드를 출력하고 **호출 없이** 종료한다. 통과하면 앱을 프로세스 안에서(`httpx.ASGITransport`) 만들어 데모 테넌트(`--tenant`, 기본값 없음, 필수)로 `/chat` 한 건(`--message`)을 보내고 SSE 이벤트 종류와 최종 답, 비용(장부 증가분)을 출력한다. 모델 한 호출의 비용 상한을 `--max-usd`(기본 0.02)로 두고 넘으면 호출 전에 멈춘다. `Makefile`에 `live-agent: uv run python -m beautyads.pipeline.live_agent $(ARGS)`를 추가하고 `.PHONY`에 넣는다(`verify`에는 넣지 않는다).
+**`api/chat_client.py`와 `eval/live_agent.py`, `make live-agent`**(계층 규칙: `httpx`는 `sources`만, `pipeline`은 `api`를 import하지 않으므로 실행 진입점은 `api`를 import할 수 있는 `eval`에 둔다. `fastapi`는 `api`만 import하므로 앱을 한 건 호출하는 일은 `api` 안의 얇은 헬퍼가 한다):
+- `api/chat_client.py`: `run_chat_once(app, *, tenant_id, message, thread_id=None) -> ChatOutcome`(`with TestClient(app) as client:` 형태로만 쓴다: `lifespan`이 실행돼 비동기 연결 풀·체크포인터가 같은 이벤트 루프에서 만들어지고 종료 때 닫힌다. 프로세스 안에서 `/chat`을 한 번 호출하고 SSE를 파싱해 `events`(이름·JSON 본문 목록), `final_text`, `status_code`를 돌려준다. `httpx`를 직접 import하지 않는다).
+- `eval/live_agent.py`: 사전 점검과 실행·보고. 실제 조립(`Assembly`의 실물 버전, `api`의 `create_app`)을 만들고, 시작 전에 사전 점검을 한다(키·서비스를 값 없이 확인): `OPENAI_API_KEY`·`NEO4J_PASSWORD`·`POSTGRES_PASSWORD` 설정 여부(이름만 출력), Postgres·Neo4j 컨테이너 기동 여부(`pipeline/preflight.py`의 방식을 따른다: `eval`은 `pipeline`을 import할 수 있다), 마이그레이션 적용 여부. 하나라도 어긋나면 이유 코드를 출력하고 **호출 없이** 종료한다. 통과하면 `run_chat_once`로 데모 테넌트(`--tenant`, 기본값 없음, 필수)에 `/chat` 한 건(`--message`)을 보내고 SSE 이벤트 종류와 최종 답, 비용(장부 증가분)을 출력한다. 모델 한 호출의 비용 상한을 `--max-usd`(기본 0.02)로 두고 넘으면 호출 전에 멈춘다. `Makefile`에 `live-agent: uv run python -m beautyads.eval.live_agent $(ARGS)`를 추가하고 `.PHONY`에 넣는다(`verify`에는 넣지 않는다).
 
 **반드시 있어야 하는 테스트**(가짜 `chat`·`tool_runner`·가짜 저장소·가짜 풀. 실제 서비스에 접속하지 않는다. 모델이 만든 문장을 기대값으로 굳히지 않는다):
 - 상태: 그래프 상태 값이 dict·기본 타입뿐이다(그래프를 가짜 체인으로 돌린 뒤 모든 값의 타입을 검사). 도구 실패가 예외가 아니라 모델에 전달된다. `step_count` 상한에서 미완료 표시와 함께 끝난다. 노드가 `llm.chat_complete`를 `reasoning_effort="none"`·`model="gpt-6-luna"`로 부른다(주입된 가짜가 받은 인자를 검사). 모델에 보내는 도구 정의에 `tenant`·`user`·`date` 칸이 없다.
@@ -42,8 +44,9 @@
 - 세션: 헤더 없음·형식 오류는 400, 허용 목록 밖은 403, 다른 테넌트의 `thread_id`는 403, 본문의 `tenant_id` 필드는 422이고 **모든 거부에서 그래프(호출하면 실패하는 가짜)가 불리지 않는다**. 정상 요청은 그래프를 부르고 `ToolContext.tenant_id`가 헤더 값이다.
 - **서버 진입점 경유 테스트(필수)**: `create_app(assemble=<가짜 조립>)`로 만든 앱을 `lifespan`을 거쳐 시작하고, 모든 서비스 라우트(`/chat`)가 **시작 시점에 `assemble()`이 돌려준 가짜**를 부름을 단언한다. 앱 생성 뒤 `app.state.assembly`의 `graph`를 다른 가짜로 바꿔 두 번째 요청이 바뀐 가짜를 부르는 것도 단언한다(생성 시점 값을 붙잡지 않음).
 - SSE: 응답 `Content-Type`이 `text/event-stream`이고 이벤트 이름 집합이 `{step, tool_start, token}`의 부분집합이며 `step`이 시작과 종료를 가진다. 본문에 키·헤더·응답 전문이 없다. 예외를 던지는 그래프에서 `event: error`가 코드만 싣고 스트림이 닫힌다. `/healthz`는 의존 서비스를 부르지 않는다.
+- `run_chat_once`: **`with` 안에서 `lifespan`이 실행되고 `with`를 나갈 때 종료 처리가 돌아 풀이 닫힌다**(가짜 풀의 `open`·`close` 호출 기록으로 단언). 가짜 앱(조립 가짜)으로 SSE 이벤트 이름·본문·`final_text`를 파싱한다(실제 서비스 접속 없음). 이 모듈은 `httpx`를 직접 import하지 않는다(`tests/test_architecture.py` 통과).
 - `live_agent`: 사전 점검이 키 누락·서비스 미기동·마이그레이션 미적용에서 호출 없이 이유 코드로 종료한다(가짜 점검 함수). `--tenant` 누락은 인자 오류다. `--max-usd` 초과 예상은 호출 전에 멈춘다. 출력에 키·값이 없다.
-- `tests/test_architecture.py`가 통과한다(`api`는 `fastapi`·`psycopg`·`langgraph`를 쓸 수 있고, `agents`는 `fastapi`를 import하지 않는다, `litellm`은 `llm`만).
+- `tests/test_architecture.py`가 통과한다(`api`는 `fastapi`·`psycopg`·`langgraph`를 쓸 수 있고, `eval`은 `api`·`pipeline`을 import하지만 `fastapi`·`httpx`는 import하지 않는다, `agents`는 `fastapi`를 import하지 않는다, `litellm`은 `llm`만).
 
 ## Acceptance Criteria
 
@@ -75,6 +78,7 @@ make verify   # lint + test 통과
 
 ## 이 step의 금지사항
 
+- `pipeline/`에 `api`를 import하는 실행 진입점을 만들거나 `httpx`를 직접 import하지 마라. 이유: 계층 표에서 `pipeline`은 `api`를 import하지 않고 `httpx`는 `sources`만 허용한다(AGENTS.md, `tests/test_architecture.py`). 실행 진입점은 `eval/live_agent.py`, 앱 호출은 `api/chat_client.py`.
 - `app = FastAPI()`를 모듈 최상위에서 만들거나 라우트가 서비스를 생성 시점에 붙잡게 하지 마라. 이유: 진입점이 시작 때 교체하는 의존성을 라우트가 붙잡아 가짜가 안 먹은 실패가 있었다(B-FP-070). `create_app(assemble)`과 `app.state`만 쓴다.
 - LangGraph 상태에 pydantic 객체(`ToolResult`·`Plan` 등)를 넣지 마라. 이유: dict·기본 타입만 넣는다(AGENTS.md CRITICAL). 직렬화한 dict만 쓴다.
 - 체크포인터 풀을 기본 설정으로 만들지 마라. 이유: `autocommit=True`·`row_factory=dict_row`·`prepare_threshold=0` 없이는 `setup()`이 실패한다(CONTRACTS 실측, FP-C01).

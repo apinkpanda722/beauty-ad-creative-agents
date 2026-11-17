@@ -184,3 +184,10 @@
 - **결과**: 코드 변경 없이 중단돼 되돌릴 것이 없었다. 재실행 결과는 step 0 완료 뒤 보고한다.
 - **근거**: `phases/5-agents/step0.md`, `phases/5-agents/step0b.md`, `src/beautyads/obs/ledger.py`.
 
+## 2026-11-17 P5 step 1이 계층 규칙 위반으로 blocked됐다
+- **문제**: `agent-api-skeleton` step이 구현 전에 `blocked`로 보고됐다. step 파일이 실행 진입점을 `pipeline/live_agent.py`에 두고 `httpx.ASGITransport`로 `api` 앱을 호출하게 했는데, 계층표에서 `pipeline`은 `api`를 import하지 않고 `httpx`는 `sources`만 허용된다(`tests/test_architecture.py`가 금지).
+- **원인**: 설계 점검(하네스 설계 원칙 9번 (2))에서 새 파일의 계층 배치를 AGENTS.md 계층 경계 표와 대조하지 않았다.
+- **해결**: 진입점을 `api`를 import할 수 있는 `eval/live_agent.py`로 옮기고, 앱 한 건 호출은 `api/chat_client.py`가 `with TestClient(app)`(lifespan 실행, 풀·체크포인터가 같은 이벤트 루프에서 만들어지고 종료 때 닫힘)로 한다. 금지사항에 "pipeline에 api를 import하는 진입점을 만들거나 httpx를 직접 import하지 마라"를 추가했다. 이후 step 설계 때 api·pipeline·eval 배치를 파일별 표로 먼저 점검한다.
+- **결과**: 코드 변경 없이 중단돼 되돌릴 것이 없었다. 재실행 결과는 step 1 완료 뒤 보고한다.
+- **근거**: `phases/5-agents/step1.md`, `tests/test_architecture.py`.
+
