@@ -2,6 +2,36 @@
 
 뷰티 광고 크리에이티브를 분석해 근거가 달린 기획안을 만드는 멀티에이전트 프로젝트.
 
+## live-agent (P5 요청 뼈대)
+
+사용자가 PostgreSQL 마이그레이션·Neo4j 제품 그래프와 서비스를 준비하고 실행한다.
+`OPENAI_API_KEY`, `NEO4J_PASSWORD`, `POSTGRES_PASSWORD`를 기존 설정 방식으로
+준비한다. 다음 명령은 개발·검증 과정에서 실행하지 않으며 `verify`에도 포함하지 않는다.
+
+```bash
+make live-agent ARGS='--tenant demo-a --message "기능성 인증에 연결된 제품을 알려줘" --max-usd 0.02'
+```
+
+`--tenant`와 `--message`는 필수다. 키 설정 여부(이름만), 컨테이너·포트·기존
+마이그레이션을 점검하고 실패하면 `PREFLIGHT_FAILED <이유 코드>`와 종료 코드 2로
+끝난다. 점검을 통과하면 앱 lifespan 안에서 체크포인터 풀을 열고 `setup()`한 뒤,
+프로세스 안에서 `/chat` 한 건을 호출하고 자원을 닫는다. SSE 이벤트 종류·최종 답·
+원장 비용 증가분을 출력한다. HTTP/SSE 실행 실패는 종료 코드 3이다.
+
+모델은 `gpt-6-luna`, `reasoning_effort="none"`이며 조회 도구는
+`lookup_certified_products` 하나다. 모델은 최대 두 번 호출한다.
+`--max-usd`(기본 $0.02)는 **모델 한 호출**의 예상 비용 상한이다. 호출마다
+UTF-8 입력 크기·가격표·출력 최대 1,024토큰으로 보수적으로 추정하고
+초과하면 호출 전에 멈춘다. 공급사 누적액 상한도 기존 원장으로 검사한다.
+
+데모 세션은 `X-Tenant-Id` 헤더이며 인증 기능은 아니다. 조립의 허용 목록과
+thread 소유권을 그래프 실행 전에 검사한다. `/chat` 본문은 `message`와 선택
+`thread_id`만 받는다. 새 thread는 `X-Thread-Id` 응답 헤더로 돌려준다.
+`step`·`tool_start`·`token` 이벤트를 보내며, 예외는 코드만 담은 `error`로 닫는다.
+`/healthz`는 의존 서비스를 조회하지 않는다. PostgreSQL 원본의 마지막 수집 시각을
+프롬프트에 넣고, 수집 기록이 없으면 unknown으로 표시한다.
+Supervisor·역할별 에이전트·화면 명령 생성은 이후 step의 범위다.
+
 ## sync: 피드백 패턴 (P5)
 
 사용자가 PostgreSQL의 `tenant_feedback`과 Neo4j를 준비한 뒤 실행한다.

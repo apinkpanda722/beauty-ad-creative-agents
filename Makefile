@@ -76,3 +76,7 @@ live-cq:
 .PHONY: live-product-identify
 live-product-identify:
 	uv run python -m beautyads.pipeline.product_identify $(ARGS)
+
+.PHONY: live-agent
+live-agent:
+	uv run python -m beautyads.eval.live_agent $(ARGS)

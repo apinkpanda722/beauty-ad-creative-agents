@@ -321,6 +321,23 @@ def test_empty_tree_is_rejected(tmp_path):
         ("graph/x.py", "from neo4j import GraphDatabase", set()),
         ("agents/x.py", "import fastapi", {("fastapi", "SDK")}),
         ("api/x.py", "import fastapi", set()),
+        (
+            "api/checkpointer.py",
+            "import psycopg\nimport psycopg_pool\nimport langgraph",
+            set(),
+        ),
+        ("api/chat_client.py", "from fastapi.testclient import TestClient", set()),
+        ("api/chat_client.py", "import httpx", {("httpx", "SDK")}),
+        (
+            "eval/live_agent.py",
+            "import beautyads.api\nimport beautyads.pipeline",
+            set(),
+        ),
+        (
+            "eval/live_agent.py",
+            "import fastapi\nimport httpx",
+            {("fastapi", "SDK"), ("httpx", "SDK")},
+        ),
         ("agents/x.py", "import langfuse", {("langfuse", "SDK")}),
         ("obs/x.py", "import langfuse", set()),
         ("domain/x.py", "__import__(name)", {("__import__", "DYNAMIC_IMPORT")}),
