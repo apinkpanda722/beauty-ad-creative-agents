@@ -61,14 +61,16 @@
     {
       "step": 0,
       "name": "llm-chat-models",
-      "status": "pending",
+      "status": "completed",
       "started_at": "2026-11-17T22:54:34+0900",
       "usage": {
-        "input_tokens": 172933,
-        "cached_input_tokens": 112256,
-        "output_tokens": 1903,
+        "input_tokens": 1470799,
+        "cached_input_tokens": 1376512,
+        "output_tokens": 17477,
         "attempts": 1
-      }
+      },
+      "summary": "OpenAI·Anthropic 채팅·스트리밍 래퍼, 가격표 기반 비용 계산, reasoning_effort 원장 기록, 목적별 상한·설정 구현. 아키텍처 검사 포함 make verify 통과(3,349 tests). 설치한 패키지 없음.",
+      "completed_at": "2026-11-17T23:05:39+0900"
     },
     {
       "step": "0b",
