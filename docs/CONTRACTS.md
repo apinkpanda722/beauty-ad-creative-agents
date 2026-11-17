@@ -290,6 +290,24 @@
 - Gemini Files의 큰 파일 소요와 실패 형태는 "Gemini 분석 비용·Files 실측 2차" 절에 있다(8.19MB 한 건 약 25초, 비영상은 `status: error`, 없는 파일 403, 빈 파일 `ValueError`).
 - 이 실측으로 `llm`에서 `httpx`를 직접 쓸 필요가 없어졌다(Files도 SDK로 된다). `AGENTS.md`의 SDK 허용 표에서 `llm`의 `httpx`를 뺐다.
 
+## P5 step 0 시험 (2026-11-17 실측, `litellm==1.103.3`, 호출 합계 약 $0.05)
+
+원본은 HTTP 원문이 아니라 SDK 객체의 `model_dump`와 실행 결과이고 **축약본**이다: 300자를 넘는 문자열(이미지 base64, `thought_signatures`)은 `<str len=N>`으로 길이만 남겼다(원본 아님, 키·토큰 없음을 확인함). 이미지 응답의 mime은 축약돼 **미확인**이다.
+
+| 확인한 것 | 실제 형태 | 원본 |
+|---|---|---|
+| **terra·haiku·sonnet의 `response_cost`** | 모두 **0.0**이다(LiteLLM 로컬 단가표에 단가가 없다). luna·Gemini는 양수. 원장에 0.0을 그대로 적으면 공급사 상한이 걸리지 않는다 → 가격표로 `usage`에서 계산한다(공식 가격 2026-11-17, `llm/prices.py`) | `litellm_p5_chat_models.json` |
+| terra `reasoning_effort` 4값 | 쉬운 한 줄 계산(`17×23`): 입력 20, 출력 4·4·16·4, 추론 0·0·6·0(none·low·medium·high). **어려운 합성 문제 1개**: 입력 43, 출력 5·92·147·164, 추론 0·81·136·153, 계산 비용 $0.000068·0.000503·0.000778·0.000863(none 대비 1·7.4·11.4·12.7배). 한 문제·1회씩이라 분포가 아니고 네 값이 같은 답이었다 | `litellm_p5_chat_models.json`(쉬운 문제), `litellm_p5_sonnet_structured.json`(`f_terra_hard_*`) |
+| terra 구조화 출력 | `response_format` `json_schema` `strict`가 `reasoning_effort="none"`에서 성공, 본문 `{"value":391}` | `litellm_p5_chat_models.json`(`terra_schema`) |
+| haiku·sonnet `reasoning_effort="low"`·`thinking` | 둘 다 **수락**(오류 없음)하지만 `thinking_blocks`가 `None`이고 `reasoning_tokens`가 0이다. 쉬운 문제와 어려운 문제(`e_thinking_visible`, sonnet) 모두 그렇다 → **효과 미확인**, 추론 비용을 가정하지 않는다 | 위 두 파일 |
+| haiku `response_format`(`json_schema`) | 성공(입력 511·출력 32). LiteLLM이 스키마를 도구로 바꿔 보낸다 | `litellm_p5_chat_models.json`(`haiku_schema`) |
+| **sonnet `response_format`** | **400** `invalid_request_error`: "tool_choice: type \"tool\" and \"any\" are not supported for this model." (LiteLLM이 강제 `tool_choice`로 바꿔 보내기 때문) | `litellm_p5_chat_models.json`(`sonnet_schema`) |
+| sonnet 도구 + `tool_choice="auto"` | **성공**. `message.tool_calls[0].function.arguments`가 JSON 문자열 `{"value": 391}`, `finish_reason` `tool_calls`, 입력 415·출력 46. `thinking` enabled를 더해도 성공(블록 없음) | `litellm_p5_sonnet_structured.json`(`a_tools_auto`, `c3_*`) |
+| sonnet 지시문만 JSON | 성공, 본문 `{"value": 391}`(울타리 없음). 형식은 코드가 검증한다 | 위와 같음(`d_instruction_only`) |
+| sonnet 네이티브 구조화 출력 | `litellm.completion`의 `extra_body={"output_config": ...}`는 **400** "extra_body: Extra inputs are not permitted". `litellm.anthropic.messages.create`는 `anthropic_messages_handler is not implemented for sync calls`. **`await litellm.anthropic.messages.acreate(..., output_config={"format": {"type": "json_schema", "schema": ...}})`는 성공**: `content` 블록 `type == "text"` 본문 `{"value":391}`, `stop_reason` `end_turn`, 입력 216·출력 8. `thinking`(adaptive·enabled)을 함께 줘도 성공하나 같은 토큰·블록 없음 | `litellm_p5_sonnet_structured.json`(`b1`·`b2`·`c1`·`c2`), `litellm_p5_sonnet_native.json` |
+| Gemini 이미지 모델 | 모델 목록에 `gemini-2.5-flash-image`, `gemini-3-pro-image(-preview)`, `gemini-3.1-flash-image(-preview)`, `gemini-3.1-flash-lite-image`가 있고 지원 방식은 `generateContent`·`countTokens`·`batchGenerateContent`뿐이다(Interactions 경로는 쓰지 않는다) | `litellm_p5_chat_models.json`(`gemini_models_with_image`) |
+| **이미지 생성 호출** | `litellm.completion(model="gemini/gemini-3.1-flash-lite-image", messages=[...], modalities=["image","text"])`가 성공. 이미지는 `choices[0].message.images[0]`(`type: "image_url"`, `image_url.url`은 data URL 약 58만 자, `index` 0). `usage` 입력 20, 출력 1,509(텍스트 389, 이미지 1,120). **`response_cost` $0.0341885**(1K 이미지 공식 단가 $0.0336 + 텍스트). `provider_specific_fields.thought_signatures`가 **약 82만 자**라 원장·로그·상태·trace에 넣지 않고 버린다. 이미지 mime은 축약돼 미확인(저장 시 확인) | `gemini_image_completion_flash_lite_abridged.json` |
+
 ## LangGraph (2026-11-12 실측, 외부 API 호출 없음)
 
 버전: `langgraph 1.2.20`, `langgraph-checkpoint 4.3.1`, `langgraph-checkpoint-postgres 3.2.0`, `langgraph-prebuilt 1.1.1`, `psycopg 3.3.8`, `psycopg-pool 3.3.3`, `pydantic 2.14.3`. Postgres는 `postgres:17.11` 임시 컨테이너. 원본: `langgraph_checkpointer_probe.json`(실행 결과).

@@ -64,6 +64,11 @@
       "status": "pending"
     },
     {
+      "step": "0b",
+      "name": "structured-output",
+      "status": "pending"
+    },
+    {
       "step": 1,
       "name": "agent-api-skeleton",
       "status": "pending"
