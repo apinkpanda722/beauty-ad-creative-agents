@@ -75,7 +75,16 @@
     {
       "step": "0b",
       "name": "structured-output",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-17T23:05:46+0900",
+      "summary": "구조화 출력 어댑터 4종·팩토리·최대 1회 재요청·통계·네이티브 비동기 연결 및 비용 검증 구현. 아키텍처 검사 포함 make verify 통과(3,437 tests). 설치한 패키지 없음.",
+      "completed_at": "2026-11-17T23:14:04+0900",
+      "usage": {
+        "input_tokens": 1394295,
+        "cached_input_tokens": 1315328,
+        "output_tokens": 18325,
+        "attempts": 1
+      }
     },
     {
       "step": 1,
