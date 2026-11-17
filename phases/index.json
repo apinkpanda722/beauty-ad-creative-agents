@@ -23,7 +23,8 @@
     },
     {
       "dir": "5-agents",
-      "status": "pending"
+      "status": "blocked",
+      "blocked_at": "2026-11-17T22:31:55+0900"
     }
   ]
 }
