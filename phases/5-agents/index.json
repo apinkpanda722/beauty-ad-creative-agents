@@ -117,7 +117,16 @@
     {
       "step": 5,
       "name": "research-agent",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-17T23:39:21+0900",
+      "summary": "리서치 전용 LangGraph 하위 그래프·도메인 계약·근거 제한·원출력 분리·실패 처리와 합성 테스트 구현. 아키텍처 검사 포함 make verify 통과(3,618 tests). 실제 서비스 접속·패키지 설치 없음.",
+      "completed_at": "2026-11-17T23:46:49+0900",
+      "usage": {
+        "input_tokens": 1452049,
+        "cached_input_tokens": 1372416,
+        "output_tokens": 14610,
+        "attempts": 1
+      }
     },
     {
       "step": 6,
