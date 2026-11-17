@@ -90,6 +90,7 @@ make sync ARGS='--layers 1 --full --verify'
 단위, 제품명·영문명·별칭·가격 수집 시각을 보존하고 `unit_list_price`는
 용량당 정가다(`price_basis: sale_price_fallback`이면 판매가로 계산).
 전성분의 핵심 성분 여부는 원본에 없어 `is_key`를 null로 전달한다.
+**새 속성을 추가하는 step 뒤에는 `--full` 재동기화가 필요하다.** 증분 동기화는 PostgreSQL 변경 시각이 바뀐 소재·제품만 다시 읽으므로, 이미 적재된 노드에는 새 속성이 채워지지 않는다(예: `Creative.advertiser_name`은 `--layers` 없이 `make sync ARGS='--full'`로 기본 동기화를 한 번 다시 돌려야 CQ-09 분류가 나온다).
 
 1층 워터마크는 `public_products_layer1_v1`로 기존 소재 워터마크와 분리한다.
 제품·성분·인증의 `updated_at`과 재추출 기록의 `created_at` 중 최대값을
