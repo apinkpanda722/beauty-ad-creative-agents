@@ -1,103 +1,437 @@
-# 1층 대표 단품 후보 (2026-11-12, 임시)
-# 공식몰 첫 화면에 노출된 상품에서 카테고리 키워드로 고른 후보다. 확정 목록이 아니다.
-# 확정 규칙(M1): 광고 소재 분석 뒤, 카테고리별로 광고에 가장 많이 등장한 단품을 브랜드당 최대 2개 고른다.
-#   세트·기획·증정·N+1·용량 묶음, 패드·클렌저·미스트·토너는 제외한다. 가격은 메타 태그의 정가를 쓴다.
-# 제외 몰: 토리든(robots.txt가 AI 크롤러 차단), 넘버즈인(접근 401). 믹순·달바·조선미녀는 2026-11-12 확인해 사용 가능(docs/CONTRACTS.md). 달바는 메타 태그가 없고 정가가 0이라 판매가를 쓰고 price_basis를 남긴다.
+# 1층 대표 단품 목록 (2026-11-15 확정, 사용자 승인)
+# 선정 규칙(M1): 브랜드×카테고리별로 광고 소재 텍스트(분석된 YouTube·Instagram 소재의 제목·캡션)에 많이 등장하는 단품을 최대 2개 고른다.
+#   B(제품명에서 용량·SPF 표기를 뺀 핵심어가 모두 들어 있는 소재 수) 내림차순 -> A(이름 전체 포함 소재 수) -> 공식몰 목록 순서.
+#   세트·기획·증정·N+1·용량 묶음·패드·클렌저·미스트·토너·디바이스·리필·패치는 제외한다. 제외 몰: 토리든(robots.txt가 AI 크롤러 차단), 넘버즈인(접근 401).
+# 근거의 한계: 71개 중 광고 텍스트에서 이름이 확인되는 것(hits_A 또는 hits_B가 1건 이상)은 31개이고 나머지 40개는 공식몰 목록 순서로 채웠다(docs/COMPETENCY_QUESTIONS.md).
+# 후보 풀은 2026-11-15에 받은 공식몰 목록 페이지(전체 목록 방식 몰은 6쪽까지)이며 목록을 끝까지 보지 못한 몰이 있다.
+# hits_A·hits_B는 선정 시점(2026-11-15)의 값이다. 별칭은 이 파일에 두지 않고 제품명에서 기계적으로 만든다(derive_aliases).
+# 교체(2026-11-15): abib 마스크팩 2번째 후보 '히알루로닉 프렙 스킨팩 퀵 부스터'(product_no=778)는 상세 페이지에 성분이 공개돼 있지 않아(텍스트 없음, 이미지 4장에도 없음) M1 순위상 다음 후보인 'PDRN 광채 시트 마스크 데일리 픽'(product_no=775)으로 바꿨다.
+# 가격은 메타 태그의 정가를 쓰고(고도몰은 판매가와 price_basis), 값은 이 파일에 두지 않는다.
 
 candidates:
-  - brand: abib
-    category: mask_pack
-    title: "부활초 탄력 시트 마스크 데일리 픽"
-    url: "https://abib.com/product/부활초-탄력-시트-마스크-데일리-픽/630/"
-  - brand: abib
-    category: mask_pack
-    title: "pdrn 광채 시트 마스크 데일리 픽"
-    url: "https://abib.com/product/pdrn-광채-시트-마스크-데일리-픽/775/"
-  - brand: abib
-    category: serum_ampoule
-    title: "pdrn 글로우 세럼 40 펌프"
-    url: "https://abib.com/product/pdrn-글로우-세럼-40-펌프/660/"
-  - brand: abib
-    category: sun_care
-    title: "수분초 히알루론 선세럼 워터리 튜브 spf50 pa"
-    url: "https://abib.com/product/수분초-히알루론-선세럼-워터리-튜브-spf50-pa/551/"
-  - brand: abib
-    category: sun_care
-    title: "어성초 마일드 선크림 릴리프 튜브 spf50 pa"
-    url: "https://abib.com/product/어성초-마일드-선크림-릴리프-튜브-spf50-pa/552/"
-  - brand: anua
-    category: mask_pack
-    title: "PDRN 히알루론산 캡슐 100 세럼 마스크"
-    url: "https://anua.kr/product/detail.html?product_no=390"
-  - brand: anua
-    category: serum_ampoule
-    title: "PDRN 히알루론산 캡슐 100 세럼 30ml"
-    url: "https://anua.kr/product/detail.html?product_no=359"
-  - brand: anua
-    category: serum_ampoule
-    title: "7 라이스 세라마이드 하이드레이팅 베리어 세럼"
-    url: "https://anua.kr/product/detail.html?product_no=349"
-  - brand: cosrx
-    category: serum_ampoule
-    title: "더 6 펩타이드 스킨 부스터 세럼 150ml"
-    url: "https://www.cosrx.co.kr/product/더-6-펩타이드-스킨-부스터-세럼-150ml/732/"
-  - brand: cosrx
-    category: serum_ampoule
-    title: "어드밴스드 더 비타민 씨 23 세럼"
-    url: "https://www.cosrx.co.kr/product/어드밴스드-더-비타민-씨-23-세럼/763/"
-  - brand: isntree
-    category: mask_pack
-    title: "리뉴얼 초저분자 히아루론산 마스크 25g 10매"
-    url: "https://www.isntree.com/product/리뉴얼-초저분자-히아루론산-마스크-25g-10매/46/"
-  - brand: isntree
-    category: serum_ampoule
-    title: "어니언 뉴페어 앰플 플러스 50ml"
-    url: "https://www.isntree.com/product/어니언-뉴페어-앰플-플러스-50ml/36/"
-  - brand: isntree
-    category: serum_ampoule
-    title: "하이퍼 나이아신아마이드 20 세럼 20ml"
-    url: "https://www.isntree.com/product/하이퍼-나이아신아마이드-20-세럼-20ml/25/"
-  - brand: isntree
-    category: sun_care
-    title: "new 히알루론산 프레쉬 선 세럼 50ml"
-    url: "https://www.isntree.com/product/new-히알루론산-프레쉬-선-세럼-50ml/366/"
-  - brand: mediheal
-    category: mask_pack
-    title: "마데카소사이드 에센셜 마스크 흔적 리페어 10매"
-    url: "https://www.medihealshop.com/product/마데카소사이드-에센셜-마스크-흔적-리페어-10매/1035/"
-  - brand: mediheal
-    category: mask_pack
-    title: "티트리 에센셜 마스크 진정 수분 10매"
-    url: "https://www.medihealshop.com/product/티트리-에센셜-마스크-진정-수분-10매/1396/"
-  - brand: mediheal
-    category: serum_ampoule
-    title: "마데카소사이드 더마 세럼 50ml"
-    url: "https://www.medihealshop.com/product/마데카소사이드-더마-세럼-50ml/1861/"
-  - brand: mediheal
-    category: serum_ampoule
-    title: "피디알엔 더마 세럼 50ml"
-    url: "https://www.medihealshop.com/product/피디알엔-더마-세럼-50ml/1863/"
-  - brand: mediheal
-    category: sun_care
-    title: "마데카소사이드 수분 선세럼 흔적 리페어"
-    url: "https://www.medihealshop.com/product/마데카소사이드-수분-선세럼-흔적-리페어/1731/"
-  - brand: mediheal
-    category: sun_care
-    title: "마데카소사이드 수분 선세럼 흔적 리페어 15g"
-    url: "https://www.medihealshop.com/product/마데카소사이드-수분-선세럼-흔적-리페어-15g/1758/"
-  - brand: round_lab
-    category: sun_care
-    title: "자작나무 수분 선크림 50ml"
-    url: "https://roundlab.co.kr/product/자작나무-수분-선크림-50ml/138/"
-  - brand: round_lab
-    category: sun_care
-    title: "자작나무 수분 톤업 선크림 50ml"
-    url: "https://roundlab.co.kr/product/자작나무-수분-톤업-선크림-50ml/199/"
-  - brand: skin1004
-    category: serum_ampoule
-    title: "마다가스카르 센텔라 매트릭실 10 부스팅샷 앰플 30ml"
-    url: "https://skin1004korea.com/product/마다가스카르-센텔라-매트릭실-10-부스팅샷-앰플-30ml/363/"
-  - brand: skin1004
-    category: serum_ampoule
-    title: "마다가스카르 센텔라 나이아신아마이드 10 부스팅샷 앰플 30ml"
-    url: "https://skin1004korea.com/product/마다가스카르-센텔라-나이아신아마이드-10-부스팅샷-앰플-30ml/367/"
+- brand: abib
+  category: mask_pack
+  title: 히알루로닉 수분 시트 마스크 데일리 픽
+  url: https://abib.com/product/detail.html?product_no=711
+  hits_A: 1
+  hits_B: 1
+- brand: abib
+  category: mask_pack
+  title: PDRN 광채 시트 마스크 데일리 픽
+  url: https://abib.com/product/detail.html?product_no=775
+  hits_A: 0
+  hits_B: 0
+- brand: abib
+  category: serum_ampoule
+  title: 부활초 비피다 세럼 퍼밍 드롭
+  url: https://abib.com/product/detail.html?product_no=330
+  hits_A: 2
+  hits_B: 2
+- brand: abib
+  category: serum_ampoule
+  title: 히알루로닉 붐 세럼 워터 드롭
+  url: https://abib.com/product/detail.html?product_no=689
+  hits_A: 1
+  hits_B: 1
+- brand: abib
+  category: sun_care
+  title: 어성초 마일드 선크림 릴리프 튜브 SPF50+ PA++++
+  url: https://abib.com/product/detail.html?product_no=552
+  hits_A: 0
+  hits_B: 0
+- brand: abib
+  category: sun_care
+  title: 글루타치온좀 CC 선크림 토닝 튜브 SPF50+ PA++++
+  url: https://abib.com/product/detail.html?product_no=553
+  hits_A: 0
+  hits_B: 0
+- brand: anua
+  category: mask_pack
+  title: 비타씨 포어스트릭스 미백 토닝 세럼 마스크
+  url: https://anua.kr/product/detail.html?product_no=479
+  hits_A: 0
+  hits_B: 0
+- brand: anua
+  category: mask_pack
+  title: 나이아신아마이드 TXA 다크스팟 세럼 마스크
+  url: https://anua.kr/product/detail.html?product_no=478
+  hits_A: 0
+  hits_B: 0
+- brand: anua
+  category: serum_ampoule
+  title: PDRN 히알루론산 캡슐 100 세럼 30ml
+  url: https://anua.kr/product/detail.html?product_no=359
+  hits_A: 0
+  hits_B: 0
+- brand: anua
+  category: serum_ampoule
+  title: 나이아신아마이드 10 TXA 4 다크 스팟 코렉팅 세럼
+  url: https://anua.kr/product/detail.html?product_no=325
+  hits_A: 0
+  hits_B: 0
+- brand: anua
+  category: sun_care
+  title: 제로캐스트 데일리 투명 수분 선크림
+  url: https://anua.kr/product/detail.html?product_no=434
+  hits_A: 1
+  hits_B: 1
+- brand: anua
+  category: sun_care
+  title: ANUA SILKY MOISTURE SUN CREAM 50ml
+  url: https://anua.kr/product/detail.html?product_no=231
+  hits_A: 0
+  hits_B: 0
+- brand: beauty_of_joseon
+  category: mask_pack
+  title: 맑은쌀 꿀채운 마스크
+  url: https://beautyofjoseon.co.kr/product/%EB%A7%91%EC%9D%80%EC%8C%80-%EA%BF%80%EC%B1%84%EC%9A%B4-%EB%A7%88%EC%8A%A4%ED%81%AC/69/category/117/display/1/
+  hits_A: 0
+  hits_B: 0
+- brand: beauty_of_joseon
+  category: mask_pack
+  title: 붉은 팥 모공정화마스크
+  url: https://beautyofjoseon.co.kr/product/%EB%B6%89%EC%9D%80-%ED%8C%A5-%EB%AA%A8%EA%B3%B5%EC%A0%95%ED%99%94%EB%A7%88%EC%8A%A4%ED%81%AC/19/category/117/display/1/
+  hits_A: 0
+  hits_B: 0
+- brand: beauty_of_joseon
+  category: serum_ampoule
+  title: 녹차 히알루론산 수분진정 세럼 30ml (Green Tea-HA™ + Panthenol)
+  url: https://beautyofjoseon.co.kr/product/%EB%85%B9%EC%B0%A8-%ED%9E%88%EC%95%8C%EB%A3%A8%EB%A1%A0%EC%82%B0-%EC%88%98%EB%B6%84%EC%A7%84%EC%A0%95-%EC%84%B8%EB%9F%BC-30ml-green-tea-ha-panthenol/221/category/117/display/1/
+  hits_A: 0
+  hits_B: 0
+- brand: beauty_of_joseon
+  category: serum_ampoule
+  title: 병풀비타세럼
+  url: https://beautyofjoseon.co.kr/product/%EB%B3%91%ED%92%80%EB%B9%84%ED%83%80%EC%84%B8%EB%9F%BC/17/category/117/display/1/
+  hits_A: 0
+  hits_B: 0
+- brand: beauty_of_joseon
+  category: sun_care
+  title: 인삼선세럼 (SPF 50+ PA++++)
+  url: https://beautyofjoseon.co.kr/product/%EC%9D%B8%EC%82%BC%EC%84%A0%EC%84%B8%EB%9F%BC-spf-50-pa/27/category/117/display/1/
+  hits_A: 0
+  hits_B: 0
+- brand: beauty_of_joseon
+  category: sun_care
+  title: '맑은쌀선크림 : 쌀추출물+나이아신아마이드 (SPF 50+ PA++++)'
+  url: https://beautyofjoseon.co.kr/product/%EB%A7%91%EC%9D%80%EC%8C%80%EC%84%A0%ED%81%AC%EB%A6%BC-%EC%8C%80%EC%B6%94%EC%B6%9C%EB%AC%BC%EB%82%98%EC%9D%B4%EC%95%84%EC%8B%A0%EC%95%84%EB%A7%88%EC%9D%B4%EB%93%9C-spf-50-pa/14/category/117/display/1/
+  hits_A: 0
+  hits_B: 0
+- brand: biodance
+  category: mask_pack
+  title: 바이오 콜라겐 리얼 딥 마스크
+  url: https://biodance.co.kr/product/%EA%B3%B5%EC%8B%9D%EB%AA%B01%EB%93%B1-16%EB%A7%A432%EB%A7%A4-%EB%B0%94%EC%9D%B4%EC%98%A4-%EC%BD%9C%EB%9D%BC%EA%B2%90-%EB%A6%AC%EC%96%BC-%EB%94%A5-%EB%A7%88%EC%8A%A4%ED%81%AC/132/category/28/display/2/
+  hits_A: 0
+  hits_B: 0
+- brand: biodance
+  category: mask_pack
+  title: 캐비어 PDRN 리포좀 버블팩
+  url: https://biodance.co.kr/product/%EC%98%A4%EB%A1%9C%EB%9D%BC-%EB%B2%84%EB%B8%94%ED%8C%A9-%EC%BA%90%EB%B9%84%EC%96%B4-pdrn-%EB%A6%AC%ED%8F%AC%EC%A2%80-%EB%B2%84%EB%B8%94%ED%8C%A9/680/category/28/display/2/
+  hits_A: 0
+  hits_B: 0
+- brand: biodance
+  category: serum_ampoule
+  title: 스킨 글로우 바이탈 앰플 30ml
+  url: https://biodance.co.kr/product/%EC%8A%A4%ED%82%A8-%EA%B8%80%EB%A1%9C%EC%9A%B0-%EB%B0%94%EC%9D%B4%ED%83%88-%EC%95%B0%ED%94%8C-30ml/138/category/28/display/2/
+  hits_A: 0
+  hits_B: 0
+- brand: biodance
+  category: serum_ampoule
+  title: 하이드로 세라놀 세럼 30ml+30ml
+  url: https://biodance.co.kr/product/%ED%95%98%EC%9D%B4%EB%93%9C%EB%A1%9C-%EC%84%B8%EB%9D%BC%EB%86%80-%EC%84%B8%EB%9F%BC-30ml30ml/775/category/28/display/1/
+  hits_A: 0
+  hits_B: 0
+- brand: biodance
+  category: sun_care
+  title: 인비저블 콜라겐 펩타이드 선세럼
+  url: https://biodance.co.kr/product/%EB%9F%B0%EC%B9%AD%ED%9B%841%EC%9C%84-%EC%9D%B8%EB%B9%84%EC%A0%80%EB%B8%94-%EC%BD%9C%EB%9D%BC%EA%B2%90-%ED%8E%A9%ED%83%80%EC%9D%B4%EB%93%9C-%EC%84%A0%EC%84%B8%EB%9F%BC/640/category/28/display/1/
+  hits_A: 0
+  hits_B: 0
+- brand: cosrx
+  category: mask_pack
+  title: 피디알엔 엑소좀 스킨플래닝 글레이즈 마스크
+  url: https://www.cosrx.co.kr/product/%ED%94%BC%EB%94%94%EC%95%8C%EC%97%94-%EC%97%91%EC%86%8C%EC%A2%80-%EC%8A%A4%ED%82%A8%ED%94%8C%EB%9E%98%EB%8B%9D-%EA%B8%80%EB%A0%88%EC%9D%B4%EC%A6%88-%EB%A7%88%EC%8A%A4%ED%81%AC/765/category/57/display/1/
+  hits_A: 0
+  hits_B: 0
+- brand: cosrx
+  category: mask_pack
+  title: 더 펩타이드 콜라겐 리프팅 글로우 하이드로겔 마스크 3매입
+  url: https://www.cosrx.co.kr/product/%EB%8D%94-%ED%8E%A9%ED%83%80%EC%9D%B4%EB%93%9C-%EC%BD%9C%EB%9D%BC%EA%B2%90-%EB%A6%AC%ED%94%84%ED%8C%85-%EA%B8%80%EB%A1%9C%EC%9A%B0-%ED%95%98%EC%9D%B4%EB%93%9C%EB%A1%9C%EA%B2%94-%EB%A7%88%EC%8A%A4%ED%81%AC-3%EB%A7%A4%EC%9E%85/755/category/57/display/1/
+  hits_A: 0
+  hits_B: 0
+- brand: cosrx
+  category: serum_ampoule
+  title: 더 6 펩타이드 스킨 부스터 세럼 150ml
+  url: https://www.cosrx.co.kr/product/%EB%8D%94-6-%ED%8E%A9%ED%83%80%EC%9D%B4%EB%93%9C-%EC%8A%A4%ED%82%A8-%EB%B6%80%EC%8A%A4%ED%84%B0-%EC%84%B8%EB%9F%BC-150ml/732/category/57/display/1/
+  hits_A: 0
+  hits_B: 19
+- brand: cosrx
+  category: serum_ampoule
+  title: 더 나이아신아마이드 15 세럼 20ml
+  url: https://www.cosrx.co.kr/product/%EB%8D%94-%EB%82%98%EC%9D%B4%EC%95%84%EC%8B%A0%EC%95%84%EB%A7%88%EC%9D%B4%EB%93%9C-15-%EC%84%B8%EB%9F%BC-20ml/674/category/57/display/1/
+  hits_A: 0
+  hits_B: 4
+- brand: cosrx
+  category: sun_care
+  title: 에어리-라이트 인비저블 선스틱 SPF50+ PA++++
+  url: https://www.cosrx.co.kr/product/%EC%97%90%EC%96%B4%EB%A6%AC-%EB%9D%BC%EC%9D%B4%ED%8A%B8-%EC%9D%B8%EB%B9%84%EC%A0%80%EB%B8%94-%EC%84%A0%EC%8A%A4%ED%8B%B1-spf50-pa/753/category/57/display/1/
+  hits_A: 0
+  hits_B: 1
+- brand: cosrx
+  category: sun_care
+  title: 울트라 라이트 인비저블 선세럼 50ml
+  url: https://www.cosrx.co.kr/product/%EC%9A%B8%ED%8A%B8%EB%9D%BC-%EB%9D%BC%EC%9D%B4%ED%8A%B8-%EC%9D%B8%EB%B9%84%EC%A0%80%EB%B8%94-%EC%84%A0%EC%84%B8%EB%9F%BC-50ml/740/category/57/display/1/
+  hits_A: 0
+  hits_B: 0
+- brand: dalba
+  category: mask_pack
+  title: 화이트 트러플 너리싱 트리트먼트 마스크
+  url: https://dalba.co.kr/goods/goods_view.php?goodsNo=1000000053
+  hits_A: 1
+  hits_B: 1
+- brand: dalba
+  category: mask_pack
+  title: 화이트 트러플 더블 마스크팩 (진정/보습)
+  url: https://dalba.co.kr/goods/goods_view.php?goodsNo=1000000088
+  hits_A: 0
+  hits_B: 0
+- brand: dalba
+  category: serum_ampoule
+  title: 화이트 트러플 더블 레이어 세럼 펩타이드
+  url: https://dalba.co.kr/goods/goods_view.php?goodsNo=1000000068
+  hits_A: 1
+  hits_B: 5
+- brand: dalba
+  category: serum_ampoule
+  title: 워터 베리어 안티 선 에이징 앰플
+  url: https://dalba.co.kr/goods/goods_view.php?goodsNo=1000000726
+  hits_A: 0
+  hits_B: 0
+- brand: dalba
+  category: sun_care
+  title: 워터풀 에센스 선크림 50ml
+  url: https://dalba.co.kr/goods/goods_view.php?goodsNo=1000000044
+  hits_A: 0
+  hits_B: 12
+- brand: dalba
+  category: sun_care
+  title: 워터풀 톤업 선크림
+  url: https://dalba.co.kr/goods/goods_view.php?goodsNo=1000000094
+  hits_A: 5
+  hits_B: 10
+- brand: isntree
+  category: mask_pack
+  title: 김 PDRN 딥 슬립 마스크 80ml
+  url: https://www.isntree.com/product/%EA%B9%80-pdrn-%EB%94%A5-%EC%8A%AC%EB%A6%BD-%EB%A7%88%EC%8A%A4%ED%81%AC-80ml/416/category/42/display/1/
+  hits_A: 0
+  hits_B: 1
+- brand: isntree
+  category: mask_pack
+  title: 플럼 펩타이드 플럼핑 겔 마스크 30g 4매
+  url: https://www.isntree.com/product/new-%ED%94%8C%EB%9F%BC-%ED%8E%A9%ED%83%80%EC%9D%B4%EB%93%9C-%ED%94%8C%EB%9F%BC%ED%95%91-%EA%B2%94-%EB%A7%88%EC%8A%A4%ED%81%AC-30g-4%EB%A7%A4/374/category/42/display/1/
+  hits_A: 0
+  hits_B: 0
+- brand: isntree
+  category: serum_ampoule
+  title: 초저분자 히아루론산 세럼 50ml
+  url: https://www.isntree.com/product/%EC%B4%88%EC%A0%80%EB%B6%84%EC%9E%90-%ED%9E%88%EC%95%84%EB%A3%A8%EB%A1%A0%EC%82%B0-%EC%84%B8%EB%9F%BC-50ml/55/category/42/display/1/
+  hits_A: 1
+  hits_B: 2
+- brand: isntree
+  category: serum_ampoule
+  title: 어니언 뉴페어 앰플 플러스 50ml
+  url: https://www.isntree.com/product/%EC%96%B4%EB%8B%88%EC%96%B8-%EB%89%B4%ED%8E%98%EC%96%B4-%EC%95%B0%ED%94%8C-%ED%94%8C%EB%9F%AC%EC%8A%A4-50ml/36/category/42/display/1/
+  hits_A: 1
+  hits_B: 1
+- brand: isntree
+  category: sun_care
+  title: 히알루론산 프레쉬 선 세럼 50ml
+  url: https://www.isntree.com/product/new-%ED%9E%88%EC%95%8C%EB%A3%A8%EB%A1%A0%EC%82%B0-%ED%94%84%EB%A0%88%EC%89%AC-%EC%84%A0-%EC%84%B8%EB%9F%BC-50ml/366/category/42/display/1/
+  hits_A: 0
+  hits_B: 3
+- brand: isntree
+  category: sun_care
+  title: 히알루론산 에어리 바디 선크림 150ml
+  url: https://www.isntree.com/product/%ED%9E%88%EC%95%8C%EB%A3%A8%EB%A1%A0%EC%82%B0-%EC%97%90%EC%96%B4%EB%A6%AC-%EB%B0%94%EB%94%94-%EC%84%A0%ED%81%AC%EB%A6%BC-150ml/588/category/42/display/1/
+  hits_A: 0
+  hits_B: 1
+- brand: medicube
+  category: mask_pack
+  title: EGF NAD 탄력 앰플 마스크
+  url: https://themedicube.co.kr/product/detail.html?product_no=3027
+  hits_A: 0
+  hits_B: 0
+- brand: medicube
+  category: mask_pack
+  title: PDRN 핑크 콜라겐 크림 마스크
+  url: https://themedicube.co.kr/product/detail.html?product_no=2999
+  hits_A: 0
+  hits_B: 0
+- brand: medicube
+  category: serum_ampoule
+  title: EGF NAD 탄력 앰플
+  url: https://themedicube.co.kr/product/detail.html?product_no=2698
+  hits_A: 0
+  hits_B: 0
+- brand: medicube
+  category: serum_ampoule
+  title: 제로 모공 원데이 펩타이드 세럼
+  url: https://themedicube.co.kr/product/detail.html?product_no=2961
+  hits_A: 0
+  hits_B: 0
+- brand: medicube
+  category: sun_care
+  title: PDRN 실키 선 스틱
+  url: https://themedicube.co.kr/product/detail.html?product_no=2824
+  hits_A: 0
+  hits_B: 0
+- brand: medicube
+  category: sun_care
+  title: PDRN 하이드레이팅 선 세럼
+  url: https://themedicube.co.kr/product/detail.html?product_no=2728
+  hits_A: 0
+  hits_B: 0
+- brand: mediheal
+  category: mask_pack
+  title: 마데카소사이드 에센셜 마스크 흔적 리페어 10매
+  url: https://www.medihealshop.com/product/%EB%A7%88%EB%8D%B0%EC%B9%B4%EC%86%8C%EC%82%AC%EC%9D%B4%EB%93%9C-%EC%97%90%EC%84%BC%EC%85%9C-%EB%A7%88%EC%8A%A4%ED%81%AC-%ED%9D%94%EC%A0%81-%EB%A6%AC%ED%8E%98%EC%96%B4-10%EB%A7%A4/1035/category/94/display/1/
+  hits_A: 0
+  hits_B: 2
+- brand: mediheal
+  category: mask_pack
+  title: 티트리 에센셜 마스크 진정 수분 10매
+  url: https://www.medihealshop.com/product/%ED%8B%B0%ED%8A%B8%EB%A6%AC-%EC%97%90%EC%84%BC%EC%85%9C-%EB%A7%88%EC%8A%A4%ED%81%AC-%EC%A7%84%EC%A0%95-%EC%88%98%EB%B6%84-10%EB%A7%A4/1396/category/94/display/1/
+  hits_A: 0
+  hits_B: 1
+- brand: mediheal
+  category: serum_ampoule
+  title: 마데카소사이드 흔적 리페어 세럼 40ml
+  url: https://www.medihealshop.com/product/%EB%A7%88%EB%8D%B0%EC%B9%B4%EC%86%8C%EC%82%AC%EC%9D%B4%EB%93%9C-%ED%9D%94%EC%A0%81-%EB%A6%AC%ED%8E%98%EC%96%B4-%EC%84%B8%EB%9F%BC-40ml/955/category/97/display/1/
+  hits_A: 1
+  hits_B: 5
+- brand: mediheal
+  category: serum_ampoule
+  title: 피디알엔 모공 탄력 세럼 40ml
+  url: https://www.medihealshop.com/product/%ED%94%BC%EB%94%94%EC%95%8C%EC%97%94-%EB%AA%A8%EA%B3%B5-%ED%83%84%EB%A0%A5-%EC%84%B8%EB%9F%BC-40ml/1586/category/97/display/1/
+  hits_A: 0
+  hits_B: 0
+- brand: mediheal
+  category: sun_care
+  title: 마데카소사이드 수분 선세럼 흔적 리페어
+  url: https://www.medihealshop.com/product/%EB%A7%88%EB%8D%B0%EC%B9%B4%EC%86%8C%EC%82%AC%EC%9D%B4%EB%93%9C-%EC%88%98%EB%B6%84-%EC%84%A0%EC%84%B8%EB%9F%BC-%ED%9D%94%EC%A0%81-%EB%A6%AC%ED%8E%98%EC%96%B4/1731/category/100/display/1/
+  hits_A: 2
+  hits_B: 2
+- brand: mediheal
+  category: sun_care
+  title: PDRN 수분 선세럼 매끈 톤업
+  url: https://www.medihealshop.com/product/pdrn-%EC%88%98%EB%B6%84-%EC%84%A0%EC%84%B8%EB%9F%BC-%EB%A7%A4%EB%81%88-%ED%86%A4%EC%97%85/1746/category/100/display/1/
+  hits_A: 0
+  hits_B: 0
+- brand: mixsoon
+  category: mask_pack
+  title: 내추럴 콩 립 마스크 밤 11g
+  url: https://mixsoon.co.kr/product/detail.html?product_no=736
+  hits_A: 0
+  hits_B: 1
+- brand: mixsoon
+  category: mask_pack
+  title: 마스터 딥 베리어 마스크 (5매입)
+  url: https://mixsoon.co.kr/product/detail.html?product_no=368
+  hits_A: 0
+  hits_B: 0
+- brand: mixsoon
+  category: serum_ampoule
+  title: 콩 에센스 50ml
+  url: https://mixsoon.co.kr/product/detail.html?product_no=215
+  hits_A: 1
+  hits_B: 18
+- brand: mixsoon
+  category: serum_ampoule
+  title: 히알레배 포어 버블 세럼 70ml
+  url: https://mixsoon.co.kr/product/detail.html?product_no=921
+  hits_A: 0
+  hits_B: 11
+- brand: mixsoon
+  category: sun_care
+  title: 콩 선세럼 50ml
+  url: https://mixsoon.co.kr/product/detail.html?product_no=771
+  hits_A: 0
+  hits_B: 2
+- brand: mixsoon
+  category: sun_care
+  title: 병풀 선크림 50g SPF 50+ PA++++
+  url: https://mixsoon.co.kr/product/detail.html?product_no=279
+  hits_A: 0
+  hits_B: 0
+- brand: round_lab
+  category: mask_pack
+  title: 1025 독도 수분 워터겔 마스크 30ml (10매)
+  url: https://roundlab.co.kr/product/1025-%EB%8F%85%EB%8F%84-%EC%88%98%EB%B6%84-%EC%9B%8C%ED%84%B0%EA%B2%94-%EB%A7%88%EC%8A%A4%ED%81%AC-30ml-10%EB%A7%A4/145/category/57/display/1/
+  hits_A: 0
+  hits_B: 0
+- brand: round_lab
+  category: mask_pack
+  title: 소나무 진정 시카 마스크 (10매)
+  url: https://roundlab.co.kr/product/%EC%86%8C%EB%82%98%EB%AC%B4-%EC%A7%84%EC%A0%95-%EC%8B%9C%EC%B9%B4-%EB%A7%88%EC%8A%A4%ED%81%AC-10%EB%A7%A4/213/category/57/display/1/
+  hits_A: 0
+  hits_B: 0
+- brand: round_lab
+  category: serum_ampoule
+  title: 자작나무 수분 앰플 50ml
+  url: https://roundlab.co.kr/product/%EC%9E%90%EC%9E%91%EB%82%98%EB%AC%B4-%EC%88%98%EB%B6%84-%EC%95%B0%ED%94%8C-50ml/243/category/58/display/1/
+  hits_A: 0
+  hits_B: 1
+- brand: round_lab
+  category: serum_ampoule
+  title: 소나무 진정 시카 앰플 50ml
+  url: https://roundlab.co.kr/product/%EC%86%8C%EB%82%98%EB%AC%B4-%EC%A7%84%EC%A0%95-%EC%8B%9C%EC%B9%B4-%EC%95%B0%ED%94%8C-50ml/242/category/58/display/1/
+  hits_A: 0
+  hits_B: 1
+- brand: round_lab
+  category: sun_care
+  title: 자작나무 수분 선크림 50ml
+  url: https://roundlab.co.kr/product/%EC%9E%90%EC%9E%91%EB%82%98%EB%AC%B4-%EC%88%98%EB%B6%84-%EC%84%A0%ED%81%AC%EB%A6%BC-50ml/138/category/87/display/1/
+  hits_A: 0
+  hits_B: 2
+- brand: round_lab
+  category: sun_care
+  title: 자작나무 수분 선세럼 50ml
+  url: https://roundlab.co.kr/product/%EC%9E%90%EC%9E%91%EB%82%98%EB%AC%B4-%EC%88%98%EB%B6%84-%EC%84%A0%EC%84%B8%EB%9F%BC-50ml/292/category/87/display/1/
+  hits_A: 0
+  hits_B: 1
+- brand: skin1004
+  category: mask_pack
+  title: 마다가스카르 센텔라 히알루-시카 슬리핑 팩 100ml
+  url: https://skin1004korea.com/product/%EB%A7%88%EB%8B%A4%EA%B0%80%EC%8A%A4%EC%B9%B4%EB%A5%B4-%EC%84%BC%ED%85%94%EB%9D%BC-%ED%9E%88%EC%95%8C%EB%A3%A8-%EC%8B%9C%EC%B9%B4-%EC%8A%AC%EB%A6%AC%ED%95%91-%ED%8C%A9-100ml/285/category/141/display/1/
+  hits_A: 0
+  hits_B: 3
+- brand: skin1004
+  category: mask_pack
+  title: 마다가스카르 센텔라 포어마이징 퀵 클레이 스틱 마스크 27g
+  url: https://skin1004korea.com/product/%EB%A7%88%EB%8B%A4%EA%B0%80%EC%8A%A4%EC%B9%B4%EB%A5%B4-%EC%84%BC%ED%85%94%EB%9D%BC-%ED%8F%AC%EC%96%B4%EB%A7%88%EC%9D%B4%EC%A7%95-%ED%80%B5-%ED%81%B4%EB%A0%88%EC%9D%B4-%EC%8A%A4%ED%8B%B1-%EB%A7%88%EC%8A%A4%ED%81%AC-27g/341/category/141/display/1/
+  hits_A: 0
+  hits_B: 0
+- brand: skin1004
+  category: serum_ampoule
+  title: 마다가스카르 센텔라 앰플 100ml
+  url: https://skin1004korea.com/product/%EB%A7%88%EB%8B%A4%EA%B0%80%EC%8A%A4%EC%B9%B4%EB%A5%B4-%EC%84%BC%ED%85%94%EB%9D%BC-%EC%95%B0%ED%94%8C-100ml/275/category/140/display/1/
+  hits_A: 0
+  hits_B: 7
+- brand: skin1004
+  category: serum_ampoule
+  title: 마다가스카르 센텔라 톤 브라이트닝 캡슐 앰플 100ml
+  url: https://skin1004korea.com/product/%EB%A7%88%EB%8B%A4%EA%B0%80%EC%8A%A4%EC%B9%B4%EB%A5%B4-%EC%84%BC%ED%85%94%EB%9D%BC-%ED%86%A4-%EB%B8%8C%EB%9D%BC%EC%9D%B4%ED%8A%B8%EB%8B%9D-%EC%BA%A1%EC%8A%90-%EC%95%B0%ED%94%8C-100ml/292/category/140/display/1/
+  hits_A: 0
+  hits_B: 1
+- brand: skin1004
+  category: sun_care
+  title: 마다가스카르 센텔라 히알루-시카 워터핏 선 세럼 50ml
+  url: https://skin1004korea.com/product/%EB%A7%88%EB%8B%A4%EA%B0%80%EC%8A%A4%EC%B9%B4%EB%A5%B4-%EC%84%BC%ED%85%94%EB%9D%BC-%ED%9E%88%EC%95%8C%EB%A3%A8-%EC%8B%9C%EC%B9%B4-%EC%9B%8C%ED%84%B0%ED%95%8F-%EC%84%A0-%EC%84%B8%EB%9F%BC-50ml/322/category/142/display/1/
+  hits_A: 0
+  hits_B: 0
+- brand: skin1004
+  category: sun_care
+  title: 마다가스카르 센텔라 히알루-시카 실키핏 선 스틱 20g
+  url: https://skin1004korea.com/product/%EB%A7%88%EB%8B%A4%EA%B0%80%EC%8A%A4%EC%B9%B4%EB%A5%B4-%EC%84%BC%ED%85%94%EB%9D%BC-%ED%9E%88%EC%95%8C%EB%A3%A8-%EC%8B%9C%EC%B9%B4-%EC%8B%A4%ED%82%A4%ED%95%8F-%EC%84%A0-%EC%8A%A4%ED%8B%B1-20g/343/category/142/display/1/
+  hits_A: 0
+  hits_B: 0

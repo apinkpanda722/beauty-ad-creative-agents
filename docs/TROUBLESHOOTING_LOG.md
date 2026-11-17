@@ -141,3 +141,25 @@
 - **해결**: 코드 변경 없음. 정지선을 승인 범위($14) 안에서 운영하고 청구는 사용자가 콘솔에서 확인한다. 결과 문서에 원장 합계와 청구 가능 범위(추정)를 분리해 적었다.
 - **결과**: 원장 $11.698, 청구 가능 범위 약 $11~$12(충전 이후 관측값 적용, 청구 반영 지연으로 소폭 높아질 수 있음).
 - **근거**: `docs/results/2026-11-15-p3-live.md`.
+
+## 2026-11-15 `make live-graph`의 표본 50건이 라벨 없는 소재라 분류 축 관계를 검증하지 못했다
+- **문제**: 첫 `make live-graph`가 `nodes_created 50`, `relationships_created 0`이고 두 번째 적재는 `nodes_created 0`·`relationships_created 0`(노드 수 불변)이었다. 멱등성은 확인됐지만 분류 축 관계(`USES_HOOK` 등)는 한 건도 검증되지 않았다.
+- **원인**: `--limit 50`이 갱신 시각 오름차순의 처음 50건을 읽는데, 갱신 시각이 가장 이른 소재는 수집만 되고 분석되지 않은 소재다(읽기 전용 조회: 그 50건 중 완료된 `*@v1` 작업이 있는 소재 0건). 분석된 소재는 작업 갱신 시각이 더 늦어 표본에 들어가지 않았다. 표본이 라벨이 있는 소재를 포함하는지 확인하지 않았다.
+- **해결**: 새 `--sample N` 모드를 만들었다. 훅·전체 라벨이 완료된 소재, 그다음 분석 완료 소재, 그다음 오래된 변경 순으로 고르고 **워터마크를 올리지 않는다**(변경 시각이 아닌 순서로 고른 표본으로 워터마크를 올리면 이후 증분 동기화가 오래된 소재를 건너뛴다). `--limit`·`--full`과는 함께 쓸 수 없다(`SYNC_OPTIONS_CONFLICT`). 검증 모드는 요약에 `graph_check`(표본의 라벨 있는 소재 수, 분류 축 관계 수)를 내고, **표본에 분석 완료 소재가 없으면 `GRAPH_VERIFY_NO_LABELED_SAMPLE`, 라벨이 있는데 관계가 0이면 `GRAPH_VERIFY_NO_RELATIONSHIPS`로 실패한다.** `make live-graph`는 `--sample 50 --verify`가 됐다. 테스트를 먼저 썼다.
+- **결과**: 해결(오프라인 테스트로 검증, 사용자의 재실행 대기). 기존 단언은 `live-graph` 레시피 문자열 한 곳만 바꿨다.
+- **근거**: `src/beautyads/store/sync_source.py`, `src/beautyads/pipeline/sync.py`, `tests/test_sync_source.py`, `tests/test_sync_pipeline.py`.
+
+## 2026-11-15 상세 이미지가 0개로 잡힌 제품 24개(4개 몰)
+- **문제**: `--scan`에서 이미지를 읽어야 하는 59개 제품 중 24개(abib·dalba·isntree·round_lab 각 6개)가 상세 이미지 0개였다. 현재 어댑터로는 전성분을 얻을 수 없었다.
+- **원인**: 어댑터가 `#prdDetail` 안의 `ec-data-src` 이미지만 읽었다. 실제 구조는 몰마다 달랐다: 이즈앤트리·round_lab은 `#prdDetail`이 탭 컨테이너이고 이미지가 일반 `src`로 그 뒤에 있고, abib은 `#prdDetail`이 빈 앵커이며 바로 뒤에 리뷰 앵커가 오고 이미지는 더 뒤에 있고, 달바(고도몰)는 `#detail` 구획의 일반 `src`다. 픽스처가 `ec-data-src` 이미지만 남긴 최소본이라 다른 구조를 잡지 못했다(FP-C08). 이 항목의 이전 판에 적은 달바 `/data/editor` 경로는 부정확했다(실제는 `/data/img/product/detail/`).
+- **해결**: 실제 HTML 원본에서 만든 픽스처 4개(구조별)와 테스트를 먼저 쓰고 어댑터를 상세 구획 기반으로 바꿨다(앵커~다음 구획 앵커, 빈 구획은 확장, 지연 로딩 속성 우선, 아이콘·버튼 제외). 저장된 실제 원본에서 코스알엑스 9장·아누아(텍스트)는 기존과 같고 이즈앤트리 19~21장·abib 7장·round_lab 5장·달바 34장이 읽힌다.
+- **결과**: 해결(오프라인 테스트와 저장 원본 확인, 24개 추출은 다음 live에서 확인).
+- **근거**: `src/beautyads/sources/mall.py`, `tests/test_mall.py`.
+
+## 2026-11-15 소규모 상세 추출에서 제품 2개 실패와 식약처 API 오류 중단
+- **문제**: 이미지가 잡힌 제품 5개(브랜드 5곳)로 한 첫 Gemini 추출에서 3개가 완료, 2개가 `PRODUCT_DETAIL_FAILED`(Gemini 호출 0회, 추출 0건)였고 실행이 `STOPPED MFDS_API_ERROR`(종료 코드 3)로 멈췄다. 비용은 4호출 $0.0151이고 성분 86개 중 표준명 일치 91.9%(미해결 7)였다. 제품 인증 대조는 3개 모두 `unknown`이다.
+- **원인(이후 확인)**: 제품 2개의 실패는 이미지 전용 호스트(`cosrxinc.jpg3.kr` 등)의 `robots.txt`가 404인데 어댑터가 `MALL_ROBOTS_UNREADABLE`로 거부한 것이다(제품마다 이미지 4장 모두, 진단 보강 뒤 `issues`로 확인). 식약처 `MFDS_API_ERROR`는 `provider_code=01`, `http_status=200`, `provider_message=System Error!!`였고 제품 단계가 아니라 광고 소재 성분 대조 단계에서 났다(이 단계는 제품이 모두 끝난 뒤 돈다). 아래 "미확인" 서술은 첫 관측 당시 것이다.
+- **원인(첫 관측)**: 미확인. 코드상 `PRODUCT_DETAIL_FAILED`는 이미지를 읽는 모든 시도가 추출에 성공하지 못했을 때이고 개별 이미지의 오류 코드(`MALL_*`·`PRODUCT_IMAGE_*`)는 `issues`에만 담겨 기록에 남지 않는다. `MFDS_API_ERROR`는 식약처 응답 본문의 `resultCode`가 `"00"`이 아닐 때이고 어떤 코드인지는 출력되지 않는다.
+- **해결**: (1) 진단 보강(실패 시 이미지·조각 오류 코드를 `issues`에, 식약처 중단 시 `provider_code`·`provider_message`를 `STOPPED` 줄과 `stopped_detail`에 기록). (2) `robots.txt`가 404·410인 호스트는 제한 없음으로 읽도록 어댑터를 고쳤다(401·403·5xx·연결 실패는 계속 거부). (3) 식약처 `provider_code=01`(System Error!!)은 중단이 아니라 항목 단위 일시 오류로 처리한다: 백오프 재시도 3번 뒤 `MFDS_LOOKUP_FAILED`(대기)로 두고 배치를 계속하며, `03`(데이터 없음)은 빈 결과, 계정 수준 코드(20·22·30·31·32)와 연속 20건 실패는 중단한다(`fix:` 커밋, 테스트 먼저). (4) 로봇 리다이렉트·텍스트 전성분·성분 0개 보류는 각각 별도 `fix:` 커밋이다. 이전에는 `resultCode != "00"`이면 모두 시스템 중단이라 제품 추출이 끝난 뒤 광고 대조가 한 건의 일시 오류로 멈췄다.
+- **근거**: `src/beautyads/pipeline/products.py`, `src/beautyads/sources/mfds.py`.
+

@@ -189,6 +189,64 @@ def test_existing_version_two_only_applies_later_migrations():
     assert not calls_for(conn, "ADD COLUMN IF NOT EXISTS account")
 
 
+def test_product_migration_v4_is_additive_repeatable_and_preserves_prior_versions():
+    import hashlib
+
+    assert [
+        (version, name, hashlib.sha256(sql.encode()).hexdigest())
+        for version, name, sql in MIGRATIONS
+        if version <= 3
+    ] == [
+        (
+            1,
+            "creative_source_of_truth",
+            "8baf3f2382951c0e20ca5bdf88761931728603c5f80b3c3724617046022c5c53",
+        ),
+        (
+            2,
+            "creative_brand_account",
+            "4d36a1f91e86c749dcff01adb580eb39704538c60f7f206477430fb278b22ebe",
+        ),
+        (
+            3,
+            "creative_attributes",
+            "9f5343670f2a756e2d415e0b7599caec33705cb16b383869411232567866873e",
+        ),
+    ]
+    [(_, _, sql)] = [migration for migration in MIGRATIONS if migration[0] == 4]
+    statements = [part.strip() for part in sql.split(";") if part.strip()]
+    assert statements and all(
+        re.match(r"CREATE (TABLE|INDEX) IF NOT EXISTS ", part) for part in statements
+    )
+    for table in (
+        "products",
+        "product_prices",
+        "product_ingredients",
+        "ingredient_standards",
+        "product_certs",
+        "product_extractions",
+    ):
+        assert f"CREATE TABLE IF NOT EXISTS {table}" in sql
+    assert "PRIMARY KEY (brand, source_url)" in sql
+    assert "aliases jsonb" in sql and "skin_types jsonb" in sql
+    assert "raw_output text" in sql and "prompt_version text" in sql
+    assert not re.search(
+        r"\b(creatives|analysis_jobs|DROP|TRUNCATE|DELETE|UPDATE)\b", sql
+    )
+    executed = []
+    for _ in range(2):
+        conn = FakeConnection([FakeCursor(), FakeCursor([(1,), (2,), (3,)])])
+        assert apply_migrations(conn) == [4, 5, 6]
+        executed.append([query for query, _ in conn.calls if query == sql])
+        assert conn.commits == 3 and conn.rollbacks == 0
+    assert executed == [[sql], [sql]]
+    conn = FakeConnection(
+        [FakeCursor(), FakeCursor([(1,), (2,), (3,), (4,), (5,), (6,)])]
+    )
+    assert apply_migrations(conn) == []
+    assert not calls_for(conn, "CREATE TABLE IF NOT EXISTS products")
+
+
 @pytest.mark.parametrize(
     "fragment",
     [
@@ -1029,3 +1087,31 @@ def test_existing_analysis_methods_preserve_run_tag_and_serialize_general_labels
     assert json.loads(update_params[2]) == labels
     assert all(kind not in query for query, _ in conn.calls)
     assert conn.commits == 2 and conn.rollbacks == 1
+
+
+def test_migration_5_only_adds_the_ingredient_lookup_cache():
+    [(version, name, sql)] = [item for item in MIGRATIONS if item[0] == 5]
+    assert version == 5 and name == "ingredient_lookup_cache"
+    normalized = " ".join(sql.split()).upper()
+    assert "CREATE TABLE IF NOT EXISTS INGREDIENT_LOOKUPS" in normalized
+    assert "PRIMARY KEY (QUERY_KEY, KIND)" in normalized
+    # Additive: nothing is removed or altered, and no other table is touched.
+    assert "DR" + "OP " not in normalized and "ALT" + "ER " not in normalized
+    assert normalized.count("CREATE TABLE") == 1
+
+
+def test_migration_6_adds_the_catalog_and_match_source_without_removing_anything():
+    [(version, name, sql)] = [item for item in MIGRATIONS if item[0] == 6]
+    assert version == 6 and name == "ingredient_catalog_and_match_source"
+    normalized = " ".join(sql.split()).upper()
+    assert "CREATE TABLE IF NOT EXISTS MFDS_INGREDIENT_CATALOG" in normalized
+    assert "PRIMARY KEY (PAGE_NO, ROW_NO)" in normalized
+    assert (
+        "ALTER TABLE PRODUCT_INGREDIENTS ADD COLUMN IF NOT EXISTS MATCHED_BY"
+        in normalized
+    )
+    assert "'KOR_EXACT'" in normalized and "'ENG_NAME_EXACT'" in normalized
+    assert "DR" + "OP " not in normalized and "TRUNCATE" not in normalized
+    assert (
+        normalized.count("CREATE TABLE") == 1 and normalized.count("ALTER TABLE") == 1
+    )

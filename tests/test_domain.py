@@ -377,3 +377,22 @@ def test_repository_protocols_declare_batch_queries_and_general_labels():
         "limit": int | None,
         "return": list[Creative],
     }
+
+
+def test_skin_values_match_adr_012_followup_decision_5():
+    from enum import StrEnum
+    from pathlib import Path
+
+    from beautyads.domain.skin import SkinConcern, SkinType
+
+    adr = (Path(__file__).resolve().parents[1] / "docs" / "ADR.md").read_text(
+        encoding="utf-8"
+    )
+    decision = adr.split("5. **`SkinType`·`SkinConcern` 값 목록", 1)[1].split("\n", 1)[
+        0
+    ]
+    types = decision.split("`SkinType` = ", 1)[1].split(". `SkinConcern`", 1)[0]
+    concerns = decision.split("`SkinConcern` = ", 1)[1].split("(8개)", 1)[0]
+    assert issubclass(SkinType, StrEnum) and issubclass(SkinConcern, StrEnum)
+    assert {item.value for item in SkinType} == set(types.split("·"))
+    assert {item.value for item in SkinConcern} == set(concerns.split(", "))

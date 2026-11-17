@@ -94,6 +94,130 @@ MIGRATIONS: list[tuple[int, str, str]] = [
         ALTER TABLE creatives ADD COLUMN IF NOT EXISTS attributes jsonb;
         """,
     ),
+    (
+        4,
+        "product_source_of_truth",
+        """
+        CREATE TABLE IF NOT EXISTS products (
+            brand text NOT NULL,
+            source_url text NOT NULL,
+            category text NOT NULL
+                CHECK (category IN ('mask_pack', 'serum_ampoule', 'sun_care')),
+            name_ko text NOT NULL,
+            name_en text,
+            aliases jsonb NOT NULL DEFAULT '[]'::jsonb
+                CHECK (jsonb_typeof(aliases) = 'array'),
+            volume numeric CHECK (volume > 0),
+            volume_unit text CHECK (volume_unit IN ('ml', 'g', '매', '입', 'ea')),
+            list_price numeric CHECK (list_price >= 0),
+            sale_price numeric CHECK (sale_price >= 0),
+            price_basis text NOT NULL
+                CHECK (price_basis IN ('list_price', 'sale_price_fallback')),
+            price_collected_at timestamptz,
+            form text,
+            skin_types jsonb NOT NULL DEFAULT '[]'::jsonb
+                CHECK (jsonb_typeof(skin_types) = 'array'),
+            efficacy_texts jsonb NOT NULL DEFAULT '[]'::jsonb
+                CHECK (jsonb_typeof(efficacy_texts) = 'array'),
+            functional_texts jsonb NOT NULL DEFAULT '[]'::jsonb
+                CHECK (jsonb_typeof(functional_texts) = 'array'),
+            updated_at timestamptz NOT NULL DEFAULT now(),
+            PRIMARY KEY (brand, source_url)
+        );
+        CREATE TABLE IF NOT EXISTS product_prices (
+            id bigserial PRIMARY KEY,
+            brand text NOT NULL,
+            source_url text NOT NULL,
+            collected_at timestamptz NOT NULL,
+            list_price numeric CHECK (list_price >= 0),
+            sale_price numeric CHECK (sale_price >= 0),
+            price_basis text NOT NULL
+                CHECK (price_basis IN ('list_price', 'sale_price_fallback')),
+            FOREIGN KEY (brand, source_url) REFERENCES products (brand, source_url)
+        );
+        CREATE TABLE IF NOT EXISTS product_ingredients (
+            brand text NOT NULL,
+            source_url text NOT NULL,
+            ingredient_order int NOT NULL CHECK (ingredient_order >= 1),
+            raw_name text NOT NULL,
+            standard_name text,
+            status text NOT NULL CHECK (status IN ('resolved', 'unresolved')),
+            updated_at timestamptz NOT NULL DEFAULT now(),
+            PRIMARY KEY (brand, source_url, ingredient_order),
+            CHECK ((status = 'resolved' AND standard_name IS NOT NULL)
+                OR (status = 'unresolved' AND standard_name IS NULL)),
+            FOREIGN KEY (brand, source_url) REFERENCES products (brand, source_url)
+        );
+        CREATE TABLE IF NOT EXISTS ingredient_standards (
+            name_ko text PRIMARY KEY,
+            name_en text,
+            cas_no text,
+            queried_at timestamptz NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS product_certs (
+            brand text NOT NULL,
+            source_url text NOT NULL,
+            kind text NOT NULL
+                CHECK (kind IN ('brightening', 'anti_aging', 'sun_protection')),
+            status text NOT NULL CHECK (status IN ('certified', 'unknown')),
+            evidence_item_name text,
+            evidence_api text NOT NULL CHECK (evidence_api IN ('report', 'screening')),
+            updated_at timestamptz NOT NULL DEFAULT now(),
+            PRIMARY KEY (brand, source_url, kind),
+            FOREIGN KEY (brand, source_url) REFERENCES products (brand, source_url)
+        );
+        CREATE TABLE IF NOT EXISTS product_extractions (
+            id bigserial PRIMARY KEY,
+            brand text NOT NULL,
+            source_url text NOT NULL,
+            prompt_version text NOT NULL,
+            raw_output text NOT NULL,
+            created_at timestamptz NOT NULL DEFAULT now(),
+            FOREIGN KEY (brand, source_url) REFERENCES products (brand, source_url)
+        );
+        CREATE INDEX IF NOT EXISTS products_updated_at_idx
+            ON products (updated_at, brand, source_url);
+        CREATE INDEX IF NOT EXISTS product_ingredients_updated_at_idx
+            ON product_ingredients (updated_at, brand, source_url, ingredient_order);
+        CREATE INDEX IF NOT EXISTS product_certs_updated_at_idx
+            ON product_certs (updated_at, brand, source_url, kind);
+        CREATE INDEX IF NOT EXISTS product_prices_product_idx
+            ON product_prices (brand, source_url, collected_at, id);
+        CREATE INDEX IF NOT EXISTS product_extractions_product_idx
+            ON product_extractions (brand, source_url, id);
+        """,
+    ),
+    (
+        5,
+        "ingredient_lookup_cache",
+        """
+        CREATE TABLE IF NOT EXISTS ingredient_lookups (
+            query_key text NOT NULL,
+            kind text NOT NULL CHECK (kind IN ('kor_exact', 'eng_exact')),
+            standard_name text,
+            queried_at timestamptz NOT NULL,
+            PRIMARY KEY (query_key, kind)
+        );
+        """,
+    ),
+    (
+        6,
+        "ingredient_catalog_and_match_source",
+        """
+        CREATE TABLE IF NOT EXISTS mfds_ingredient_catalog (
+            page_no int NOT NULL CHECK (page_no >= 1),
+            row_no int NOT NULL CHECK (row_no >= 0),
+            name_ko text NOT NULL,
+            name_en text,
+            cas_no text,
+            source_total int NOT NULL CHECK (source_total >= 1),
+            fetched_at timestamptz NOT NULL,
+            PRIMARY KEY (page_no, row_no)
+        );
+        ALTER TABLE product_ingredients ADD COLUMN IF NOT EXISTS matched_by text
+            CHECK (matched_by IN ('kor_exact', 'eng_name_exact'));
+        """,
+    ),
 ]
 
 # Fixed identifiers and SQL types, never caller input. Explicit casts preserve

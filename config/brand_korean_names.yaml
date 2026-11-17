@@ -1,0 +1,17 @@
+# 몰 브랜드의 한글 브랜드명 (2026-11-15 확인)
+# 인증 대조에서 식약처 보고 품목명의 앞부분(브랜드 접두어)과 비교하는 이름 문자열이다.
+# 각 값은 공식몰 페이지(제목·og:title·본문)에서 확인한 한글 표기만 적는다. 회사명으로 브랜드를 정하지 않는다.
+# 표에 없는 브랜드는 인증 대조를 하지 않고 unknown으로 둔다.
+brands:
+  abib: 아비브
+  anua: 아누아
+  beauty_of_joseon: 조선미녀
+  biodance: 바이오던스
+  cosrx: 코스알엑스
+  dalba: 달바
+  isntree: 이즈앤트리
+  medicube: 메디큐브
+  mediheal: 메디힐
+  mixsoon: 믹순
+  round_lab: 라운드랩
+  skin1004: 스킨1004

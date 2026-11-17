@@ -1,0 +1,29 @@
+User-agent: facebookexternalhit
+User-agent: DotBot
+User-agent: Screaming Frog SEO Spide
+User-agent: heritrix
+User-agent: bingbot
+User-agent: owasp
+User-agent: Geofeed
+User-agent: DirBuster-1.0-RC1
+User-agent: PFINAPP
+User-agent: Droid Build
+User-agent: Googlebot
+User-agent: Cowbot
+User-agent: Yeti
+User-agent: Ads-Naver
+User-agent: Blueno
+User-agent: Daumoa
+Disallow: /admin/
+Disallow: /config/
+Disallow: /data/
+Allow: /data/skin/front/dalba2/img/favicon/
+Allow: /data/goods/
+Allow: /data/img/
+Allow: /data/editor/
+Allow: /data/skin/front/dalba_main/img/
+Disallow: /module/
+Disallow: /tmp/
+Crawl-delay: 10
+
+Sitemap: https://dalba.co.kr/sitemap.xml

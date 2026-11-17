@@ -1,5 +1,6 @@
 """Synchronous Gemini Interactions calls, retries, and immediate cost recording."""
 
+import base64
 import json
 import re
 import time
@@ -30,6 +31,21 @@ class GeminiInteractionsFn(Protocol):
 
 def text_part(text: str) -> dict:
     return {"type": "text", "text": text}
+
+
+def image_part(data: bytes, mime_type: str, *, max_bytes: int) -> dict:
+    """Build an inline image using a caller-supplied byte limit."""
+    if not mime_type.startswith("image/"):
+        raise ValueError("IMAGE_MIME_INVALID")
+    if not data:
+        raise ValueError("IMAGE_EMPTY")
+    if len(data) > max_bytes:
+        raise ValueError("IMAGE_TOO_LARGE")
+    return {
+        "type": "image",
+        "data": base64.b64encode(data).decode("ascii"),
+        "mime_type": mime_type,
+    }
 
 
 def video_part(
@@ -114,6 +130,19 @@ def usage_from_response(response: Any) -> UsageInfo:
         cached_tokens=usage.get("total_cached_tokens") or 0,
         cost_usd=hidden.get("response_cost"),
     )
+
+
+def usage_by_modality(response: Any) -> dict[str, int]:
+    """Read input tokens by modality name, independent of response order."""
+    raw = _response_dict(response)
+    usage = raw.get("usage") or {}
+    return {
+        item.get("modality"): item.get("tokens")
+        for item in (usage.get("input_tokens_by_modality") or [])
+        if isinstance(item, Mapping)
+        and isinstance(item.get("modality"), str)
+        and isinstance(item.get("tokens"), int)
+    }
 
 
 class InteractionResult(NamedTuple):

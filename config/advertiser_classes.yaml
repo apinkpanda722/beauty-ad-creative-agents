@@ -1,0 +1,227 @@
+# TikTok 광고주 이름 -> 집행 주체 분류 (CQ-09 입력, 2026-11-15)
+# 대상: 훅·전체 분석 결과(hook@v1·full@v1 완료)가 있는 TikTok 소재의 광고주 44곳. 목록에 없는 이름은 unknown으로 읽는다.
+# source: user = 사용자가 채팅으로 분류, rule = 이름에 브랜드 이름 또는 config/retailers.yaml 판매처 시드가 들어 있거나 숫자 ID·이름 없음(판단 불가)이라 규칙으로 채움.
+# 기억이나 추정으로 분류를 추가하지 않는다. 이름은 strip·NFKC·소문자 정규화로 비교한다(DB의 이름 뒤 공백 등을 흡수).
+# creatives는 분류 시점의 소재 수(참고용)이며 판정에 쓰지 않는다.
+# CQ-09는 brand_direct·retailer 중 한쪽의 소재 수가 30건 미만이면 표본 부족으로 방향만 제시한다(docs/COMPETENCY_QUESTIONS.md).
+advertisers:
+- name: 엘엔피코스메틱 (주)
+  class: brand_direct
+  source: user
+  basis: 사용자 분류(2026-11-15)
+  creatives: 13
+- name: COSRX INC.
+  class: brand_direct
+  source: rule
+  basis: 이름에 브랜드 'cosrx' 포함
+  creatives: 11
+- name: Vita Group AS
+  class: retailer
+  source: user
+  basis: 사용자 분류(2026-11-15)
+  creatives: 6
+- name: Mixsoon Limited
+  class: brand_direct
+  source: rule
+  basis: 이름에 브랜드 'mixsoon' 포함
+  creatives: 5
+- name: Cosibella
+  class: retailer
+  source: rule
+  basis: 판매처 시드 'cosibella' 포함
+  creatives: 4
+- name: Etos B.V.
+  class: retailer
+  source: rule
+  basis: 판매처 시드 'etos' 포함
+  creatives: 4
+- name: Normal A/S
+  class: retailer
+  source: user
+  basis: 사용자 분류(2026-11-15)
+  creatives: 4
+- name: '7569989477494423574'
+  class: unknown
+  source: rule
+  basis: 숫자 ID 또는 이름 없음(판단 불가)
+  creatives: 3
+- name: JJ Media Ltd
+  class: unknown
+  source: user
+  basis: 사용자 분류(2026-11-15)
+  creatives: 3
+- name: ''
+  class: unknown
+  source: rule
+  basis: 숫자 ID 또는 이름 없음(판단 불가)
+  creatives: 2
+- name: '1734728312596486'
+  class: unknown
+  source: rule
+  basis: 숫자 ID 또는 이름 없음(판단 불가)
+  creatives: 2
+- name: MIIN COSMETICS SRL
+  class: retailer
+  source: user
+  basis: 사용자 분류(2026-11-15)
+  creatives: 2
+- name: THE HUT.COM LIMITED
+  class: retailer
+  source: user
+  basis: 사용자 분류(2026-11-15)
+  creatives: 2
+- name: '1716963372401666'
+  class: unknown
+  source: rule
+  basis: 숫자 ID 또는 이름 없음(판단 불가)
+  creatives: 1
+- name: '1719846067258374'
+  class: unknown
+  source: rule
+  basis: 숫자 ID 또는 이름 없음(판단 불가)
+  creatives: 1
+- name: '1729223505914885'
+  class: unknown
+  source: rule
+  basis: 숫자 ID 또는 이름 없음(판단 불가)
+  creatives: 1
+- name: '1737798245092357'
+  class: unknown
+  source: rule
+  basis: 숫자 ID 또는 이름 없음(판단 불가)
+  creatives: 1
+- name: '1747766302691333'
+  class: unknown
+  source: rule
+  basis: 숫자 ID 또는 이름 없음(판단 불가)
+  creatives: 1
+- name: '1749676716560386'
+  class: unknown
+  source: rule
+  basis: 숫자 ID 또는 이름 없음(판단 불가)
+  creatives: 1
+- name: '1810549286062095'
+  class: unknown
+  source: rule
+  basis: 숫자 ID 또는 이름 없음(판단 불가)
+  creatives: 1
+- name: '1851106730972161'
+  class: unknown
+  source: rule
+  basis: 숫자 ID 또는 이름 없음(판단 불가)
+  creatives: 1
+- name: '1854527617939457'
+  class: unknown
+  source: rule
+  basis: 숫자 ID 또는 이름 없음(판단 불가)
+  creatives: 1
+- name: '7455697553728733206'
+  class: unknown
+  source: rule
+  basis: 숫자 ID 또는 이름 없음(판단 불가)
+  creatives: 1
+- name: '7536690942057644055'
+  class: unknown
+  source: rule
+  basis: 숫자 ID 또는 이름 없음(판단 불가)
+  creatives: 1
+- name: '7569279722748641302'
+  class: unknown
+  source: rule
+  basis: 숫자 ID 또는 이름 없음(판단 불가)
+  creatives: 1
+- name: '7572280272863936545'
+  class: unknown
+  source: rule
+  basis: 숫자 ID 또는 이름 없음(판단 불가)
+  creatives: 1
+- name: '7596649903267250209'
+  class: unknown
+  source: rule
+  basis: 숫자 ID 또는 이름 없음(판단 불가)
+  creatives: 1
+- name: '7603023675826110486'
+  class: unknown
+  source: rule
+  basis: 숫자 ID 또는 이름 없음(판단 불가)
+  creatives: 1
+- name: '7623554778965999649'
+  class: unknown
+  source: rule
+  basis: 숫자 ID 또는 이름 없음(판단 불가)
+  creatives: 1
+- name: '7635774791760216086'
+  class: unknown
+  source: rule
+  basis: 숫자 ID 또는 이름 없음(판단 불가)
+  creatives: 1
+- name: '7639778033355718689'
+  class: unknown
+  source: rule
+  basis: 숫자 ID 또는 이름 없음(판단 불가)
+  creatives: 1
+- name: '7640356571666448406'
+  class: unknown
+  source: rule
+  basis: 숫자 ID 또는 이름 없음(판단 불가)
+  creatives: 1
+- name: '7645777178793099286'
+  class: unknown
+  source: rule
+  basis: 숫자 ID 또는 이름 없음(판단 불가)
+  creatives: 1
+- name: '7648220666696564758'
+  class: unknown
+  source: rule
+  basis: 숫자 ID 또는 이름 없음(판단 불가)
+  creatives: 1
+- name: Boozt Fashion AB
+  class: retailer
+  source: user
+  basis: 사용자 분류(2026-11-15)
+  creatives: 1
+- name: CJ Olive Young Corporation
+  class: retailer
+  source: user
+  basis: 사용자 분류(2026-11-15)
+  creatives: 1
+- name: Danilo Greko
+  class: unknown
+  source: user
+  basis: 사용자 분류(2026-11-15)
+  creatives: 1
+- name: just.beatsi
+  class: unknown
+  source: user
+  basis: 사용자 분류(2026-11-15)
+  creatives: 1
+- name: KoCos Bulgaria LTD
+  class: retailer
+  source: user
+  basis: 사용자 분류(2026-11-15)
+  creatives: 1
+- name: LaBellaSocialite
+  class: unknown
+  source: user
+  basis: 사용자 분류(2026-11-15)
+  creatives: 1
+- name: MiiN Cosmetics
+  class: retailer
+  source: user
+  basis: 사용자 분류(2026-11-15)
+  creatives: 1
+- name: My Glow Skin
+  class: unknown
+  source: user
+  basis: 사용자 분류(2026-11-15)
+  creatives: 1
+- name: Rooddiyyahh – UGC
+  class: unknown
+  source: user
+  basis: 사용자 분류(2026-11-15)
+  creatives: 1
+- name: SkincarelabKoreano
+  class: unknown
+  source: user
+  basis: 사용자 분류(2026-11-15)
+  creatives: 1

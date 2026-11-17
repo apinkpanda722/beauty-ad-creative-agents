@@ -1,0 +1,18 @@
+# Official-mall facts only; never store or redistribute detail images (ADR-013).
+user_agent: beautyads-research/0.1
+default_interval_s: 6
+malls:
+  abib: {excluded: false}
+  anua: {excluded: false}
+  beauty_of_joseon: {excluded: false}
+  biodance: {excluded: false}
+  cosrx: {excluded: false}
+  dalba: {excluded: false, min_interval_s: 10}
+  isntree: {excluded: false}
+  medicube: {excluded: false}
+  mediheal: {excluded: false}
+  mixsoon: {excluded: false}
+  numbuzin: {excluded: true} # Access returns 401.
+  round_lab: {excluded: false}
+  skin1004: {excluded: false}
+  torriden: {excluded: true} # AI crawlers are disallowed.

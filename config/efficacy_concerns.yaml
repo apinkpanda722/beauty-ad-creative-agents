@@ -1,0 +1,17 @@
+# 효능(Efficacy) -> 피부 고민(SkinConcern) 대응, ADDRESSES 관계 (2026-11-15)
+# 이것은 실증 주장이 아니라 이 프로젝트의 분류 체계 정의다(ADR-012 후속 결정 5·6). 효능 주장이 아니다.
+# 그래서 근거 종류는 taxonomy_definition이고, 임상·문헌 근거를 붙이지 않는다.
+# texture_finish·sun_protection은 대응하는 피부 고민이 없어 행이 없다.
+version: 2026-11-15
+author: advisor-session
+rows:
+- {efficacy: hydration, concern: 건조, status: confirmed, basis: taxonomy_definition, source_ref: "ADR-012 후속 결정 5·6 (분류 체계 정의)"}
+- {efficacy: soothing, concern: 홍조·민감, status: confirmed, basis: taxonomy_definition, source_ref: "ADR-012 후속 결정 5·6 (분류 체계 정의)"}
+- {efficacy: brightening, concern: 칙칙함·잡티, status: confirmed, basis: taxonomy_definition, source_ref: "ADR-012 후속 결정 5·6 (분류 체계 정의)"}
+- {efficacy: firming_elasticity, concern: 탄력 저하, status: confirmed, basis: taxonomy_definition, source_ref: "ADR-012 후속 결정 5·6 (분류 체계 정의)"}
+- {efficacy: pore_sebum, concern: 모공·피지, status: confirmed, basis: taxonomy_definition, source_ref: "ADR-012 후속 결정 5·6 (분류 체계 정의)"}
+- {efficacy: acne_trouble, concern: 트러블·여드름, status: confirmed, basis: taxonomy_definition, source_ref: "ADR-012 후속 결정 5·6 (분류 체계 정의)"}
+- {efficacy: barrier, concern: 건조, status: confirmed, basis: taxonomy_definition, source_ref: "ADR-012 후속 결정 5·6 (분류 체계 정의)"}
+- {efficacy: barrier, concern: 홍조·민감, status: confirmed, basis: taxonomy_definition, source_ref: "ADR-012 후속 결정 5·6 (분류 체계 정의)"}
+- {efficacy: anti_aging, concern: 주름, status: confirmed, basis: taxonomy_definition, source_ref: "ADR-012 후속 결정 5·6 (분류 체계 정의)"}
+- {efficacy: other, concern: 거친 피부결, status: confirmed, basis: taxonomy_definition, source_ref: "ADR-012 후속 결정 5·6 (분류 체계 정의)"}

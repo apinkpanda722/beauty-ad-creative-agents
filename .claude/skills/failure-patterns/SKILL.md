@@ -77,6 +77,27 @@ description: 이 프로젝트(beauty-ad-creative-agents)와 앞선 프로젝트 
 - **강제 수단**: `ErrorKind.CREDITS_DEPLETED`(배치 정지, `tests/test_llm.py`·`tests/test_analyze_runner.py`), `LLM_CALL_FAILED` 사유 로그와 키 마스킹(`tests/test_analysis.py`).
 - **출처**: 2026-11-14 P3 YouTube 전체 분석, 커밋 7719803·811a01b
 
+### FP-C08 한 가지 마크업만 남긴 픽스처가 다른 구조의 결함을 못 잡는다
+- **증상**: P4 첫 `--scan`에서 상세 이미지를 읽어야 하는 59개 제품 중 24개(4개 몰)가 이미지 0개로 잡혔다. 어댑터는 `#prdDetail`의 `ec-data-src` 이미지만 읽었고, 달바(고도몰)는 이미지가 `#prdDetail` 밖에, 이즈앤트리는 정적 이미지가 없었다. 어댑터 테스트는 모두 통과했다.
+- **원인**: 몰마다 마크업이 다른데 픽스처를 만들 때 어댑터가 읽는 요소(`ec-data-src` 이미지)만 남기고 나머지를 잘라 냈고, 코스알엑스·아누아 같은 일부 몰의 원본만 기준으로 삼았다. 같은 가짜로 어댑터와 테스트가 같은 가정을 공유했다(B-FP-020).
+- **규칙**: 몰·출처마다 **실제 응답 원본을 최소 1개씩 보관**해 어댑터를 검증한다. 구조가 다른 몰(플랫폼이 다르거나 템플릿이 다른 몰)은 각각 별도 픽스처가 있어야 하고, 픽스처를 줄일 때는 어댑터가 읽는 요소만 남기지 말고 다른 구조의 판별에 필요한 주변 요소(이미지가 없는 경우의 컨테이너 등)를 남긴다. 첫 live 전에 전체 대상을 훑는 읽기 전용 점검(`--scan` 같은)으로 "읽은 값이 0인 항목"을 확인한다. 값이 0인 항목은 오류가 아니므로 결과에 별도 집계한다(B-FP-040).
+- **강제 수단**: `tests/test_mall.py`의 몰 구조별 테스트(`test_detail_images_in_a_tab_container_use_plain_src_and_skip_icons`, `test_detail_images_after_an_empty_anchor_extend_past_the_review_anchor`, `test_detail_images_in_a_content_block_use_plain_src`, `test_godomall_detail_section_images_are_read`)가 실제 원본에서 만든 픽스처(`mall_cafe24_tab_src`·`empty_anchor`·`tab_cont`, `mall_godomall_detail`)를 읽는다. /review 체크(몰·출처별 원본 픽스처가 있는가, 픽스처가 어댑터가 읽는 요소만 남기고 잘렸는가).
+- **출처**: 2026-11-15 P4 `make live-products --scan`, `docs/TROUBLESHOOTING_LOG.md`
+
+### FP-C09 추출 실패를 데이터 부재로 단정한다 / 재저장이 이전 행을 지우지 않는다
+- **증상**: P4에서 바이오던스 제품 5개가 "상세 이미지에 전성분이 없다"며 보류됐고 교체까지 논의됐는데, 저장해 둔 페이지의 본문에 `[전성분] 정제수, …`가 인라인 텍스트로 있었다. 어댑터가 라벨·값 구조만 읽었다. 같은 시기에 성분 쉼표 파싱을 고쳐 재실행하자 짧아진 결과의 끝쪽 이전 행이 DB에 그대로 남아(제품당 1~2행, 22개 제품), 해결률의 분모와 빈도표가 오염됐다.
+- **원인**: "못 찾았다"를 "없다"로 단정하고 이미지 읽기로 넘어갔다(FP-C05의 변형). 저장 방식이 (제품, 순서) 키 덮어쓰기뿐이라 집합이 줄어드는 재처리를 고려하지 않았다.
+- **규칙**: (1) 추출이 비면 데이터 부재로 보고하기 전에 **저장된 페이지의 본문 텍스트에서 '전성분' 문자열을 먼저 검색**한다. 마크업 구조(th/td, 아코디언, 팝업, 인라인 문단)를 하나씩 확인하고, 이미지로 넘어가거나 후보를 교체하는 것은 그다음이다. (2) 한 제품의 하위 행 집합은 **집합 교체**(같은 트랜잭션에서 새 행 upsert + 초과 행 삭제)로 저장하고, 재처리 결과가 짧아지는 경우를 테스트한다. 파생물(그래프)에도 삭제를 반영한다.
+- **강제 수단**: `tests/test_product_store.py`의 `test_replace_ingredients_drops_surplus_rows_in_the_same_transaction`·`test_replace_with_an_empty_list_removes_the_product_ingredients`, `tests/test_ingredient_cleanup.py`, `tests/test_products_pipeline.py::test_product_ingredients_are_saved_as_a_whole_set_replacement`. 바이오던스 인라인 텍스트 파서 테스트는 (b) 구현 때 여기에 적는다. /review 체크(보류·실패 사유가 "데이터 없음"이면 본문 텍스트 검색 기록이 있는가, 하위 행 저장이 집합 교체인가).
+- **출처**: 2026-11-15 P4 바이오던스 보류, 성분 재파싱 잔여 행, `docs/TROUBLESHOOTING_LOG.md`
+
+### FP-C10 모델이 적은 근거 종류는 검증 수단이 아니다 / 사후 제한안은 새 표본에서 검증한다
+- **증상**: P4 영상 제품 식별 v1(50건)에서 후보에 없는 비슷한 제품을 고른 쌍이 있었다. v2(프롬프트에 "같은 제품이 없으면 []"와 근거 종류 출력 추가, 같은 50건)에서도 의심 3쌍이 그대로였다. 사람 검수 13쌍 결과는 O 9, △ 2, ? 2, X 0이고 근거 종류별로 spoken_name 4/4, on_screen_text 2/2, package_label 3/7만 O였다.
+- **원인**: 근거 종류는 모델의 자기 신고라 프롬프트나 형식 검증으로 걸러지지 않는다. 포장 라벨 근거는 같은 라인의 다른 제품 외형을 구분하지 못했다.
+- **규칙**: (1) 모델이 적은 근거를 검증으로 믿지 않고 사람 검수로 정밀도를 잰다. (2) "spoken_name·on_screen_text·title_caption만 인정"은 **같은 13쌍을 보고 만든 사후 기준**이므로 v3(`product-id@v3`, 프롬프트 `product-id-v2` 그대로, 검증만 변경)로 **새 표본(150건, seed 20261118, v1·v2에서 본 50건 제외)에서 따로 검증**한 뒤에만 채택한다. (3) 채택 전에는 `PRODUCT_ID_APPROVED_TAG`를 비워 그래프에 넣지 않는다.
+- **강제 수단**: `tests/test_links_domain.py`(승인 태그가 비면 어떤 영상 결과도 읽지 않음), `tests/test_product_id_domain.py`(v3 인정 근거, 이전 버전 재선정 금지), `tests/test_links_source.py`.
+- **출처**: 2026-11-17 P4 영상 식별 v1·v2, `data/interim/design/product_id_v2_check.csv` 검수
+
 ---
 
 ## B에서 이식한 항목 (프로젝트 B `failure-patterns`의 번호)

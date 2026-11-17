@@ -89,6 +89,7 @@
 |---|---|---|
 | 원료성분정보 오퍼레이션 | `CsmtcsIngdCpntInfoService01/getCsmtcsIngdCpntInfoService01`, 검색 파라미터 `INGR_KOR_NAME` | `mfds_ingredient_query.json` |
 | 원료성분 응답 항목 | `INGR_KOR_NAME`, `INGR_ENG_NAME`, `CAS_NO`, `INGR_SYNONYM`, `ORIGIN_MAJOR_KOR_NAME`. `INGR_SYNONYM`은 표본에서 전부 `null` | 위와 같음 |
+| **영문명 검색 파라미터는 없다** | `INGR_ENG_NAME`을 넣어도 무시되고 전체 목록(`totalCount` 21968)이 목록 앞쪽 그대로 돌아온다. 영문명 4종(영문 2종·`Water`·공백 없는 한 단어)으로 읽기 전용 호출 4건을 보냈고 모두 같은 첫 20행이었다(2026-11-15). 그래서 영문 일치는 전체 목록을 한 번 내려받아(`pipeline/ingredient_catalog.py`, 100건씩 쪽 단위 재개) DB에서 한다. 응답 항목에 성분 코드는 없고 `INGR_ENG_NAME`은 null일 수 있다 | (측정 기록만, 원본 픽스처 없음) |
 | **검색은 부분 일치** | "병풀추출물"이 "하이드롤라이즈드병풀추출물" 등 7건을 돌려준다. "시카"는 "시카카이열매추출물" 같은 무관한 성분 20건을 돌려준다 | 위와 같음 |
 | **통용명은 표준명이 아니다** | "히알루론산" 0건(표준명은 "하이알루로닉애씨드" 계열), "센텔라" 0건. 광고·상세페이지의 표기를 그대로 넣으면 못 찾는다 | 콘솔 출력 |
 | 결과 없음 | 200, `totalCount` 0 | `mfds_ingredient_query_no_match.json` |
@@ -128,7 +129,18 @@
 - **`ENTP_NAME`은 브랜드와 다를 수 있다.** 표본의 `코스알엑스색소침착케어세럼`은 업체명이 "(주)아모레퍼시픽", `코스알엑스알로에수딩선크림01`은 "(주)코리아나화장품"이다. 브랜드를 업체명으로 판정하지 않고 품목명·공식몰 제품과 대조한다.
 - **자외선 차단(`SPF`·`PA`)은 이 API에서 얻을 수 없다.** 심사품목은 효능(미백·주름)에 쓰고 자외선 차단은 보고품목 API의 `SPF`·`PA`로 판정한다. 품목명에 SPF가 들어 있는 경우가 있으나 코드로 파싱해 판정하지 않는다. 취하 여부 필드가 없다는 점도 한계다.
 - `EE_DOC_DATA`가 `null`인 품목이 있다는 보고(조언 세션 관측: "선크림" 검색 결과 중 한 건)가 있으나 **저장한 원본에는 없다**. `null`일 수 있다고 보고 읽는다.
+- **200 응답 헤더의 `resultCode`(2026-11-15 처리 규칙)**: `00`이 성공이다. 실측: 광고 소재 성분 대조 중 `resultCode` **`01`**, `resultMsg` `System Error!!`(HTTP 200)가 나왔다. 처리: **`03`(데이터 없음)은 완료된 빈 결과**(재시도·오류 아님), 계정 수준 코드 **`20`·`22`·`30`·`31`·`32`는 즉시 중단**(`MFDS_API_ERROR`), 그 밖의 비`00` 코드(`01` 등)는 그 조회 하나의 일시 오류로 보고 **1·2·4초 백오프로 3번 재시도**한 뒤 `MFDS_LOOKUP_FAILED`(영구 실패가 아니라 재시도 가능한 대기, 배치는 계속)로 둔다. 조회가 연속 20번 `MFDS_LOOKUP_FAILED`이면 `MFDS_CONSECUTIVE_FAILURES`로 중단한다(성공 한 번이면 횟수가 0이 된다). 재시도도 호출 수 상한에 센다. 계정 수준 코드의 의미는 조언 세션 기억에 따른 것이며 `01` 외의 코드는 아직 실측하지 않았다
 - 호출 한도는 여전히 **미확인**이다. 어댑터는 HTTP 상태를 먼저 보고, 오류 본문의 형태가 성공 응답과 다름을 받아야 한다(FP-C01).
+
+식약처 안내서 PDF 내려받기 (2026-11-15, `claim-rules`의 원문)
+
+| 확인한 것 | 내용 |
+|---|---|
+| 출처 | 식약처 공식 사이트 게시글 `https://www.mfds.go.kr/brd/m_1060/view.do?seq=15700`(등록번호 안내서-0086-07, 2025-08-14). 첨부 `https://www.mfds.go.kr/brd/m_1060/down.do?brd_id=data0011&seq=15700&data_tp=A&file_seq=2` |
+| 응답 | HTTP 200, `Content-Type: application/octet-stream`, `Content-Disposition`에 파일명 `「화장품 표시·광고 관리 지침(민원인안내서)」.pdf`, 360,654바이트, PDF 1.4, **17쪽** |
+| SHA-256 | `a3efa6c204c73cb1bfd08bb7be5598c7344c9494c3180256577e315bbfdeb8bf` |
+| 저장 | `data/raw/claim_guide/`(gitignore). 원문은 저장소에 복사하지 않는다 |
+| 추출 | 이 환경에는 `pdftotext`가 없어 macOS PDFKit(Swift)로 쪽별 텍스트를 뽑았다. **별표 표는 열이 섞여 나오므로 쪽 이미지로 열(구분·금지표현·비고)을 확인해야 한다** |
 
 ## 브랜드 공식몰 상세페이지 (2026-11-12 실측: 코스알엑스 1개, 아누아 1개 상품)
 
@@ -179,6 +191,25 @@
 - 아누아의 클렌징 폼 페이지가 "기능성 화장품 심사(또는 보고)를 필함"이라고 적혀 있었다. 클렌징 폼에 맞지 않아 보이는 문구라, 페이지의 고시 문구를 그대로 믿지 말고 식약처 보고품목정보로 대조한다.
 - 이용약관(두 몰): 사이트에 지적재산권이 있는 정보를 사전 승낙 없이 **영리 목적으로** 복제·배포하는 것을 금지한다. 크롤링 자체를 금지하는 조항은 찾지 못했다. 비영리로 사실 정보(전성분·가격·효능 표기)만 추출하고 이미지는 저장·재배포하지 않는다.
 
+공식몰 재실측 (2026-11-15, 페이지 5개 + dalba 첫 화면, robots.txt 5개, 호스트마다 최소 6초 간격·dalba 11초, User-Agent `beautyads-research/0.1`, 원본은 `data/raw/mall/`(gitignore), 테스트용 최소본은 `tests/fixtures/contracts/mall_*`)
+
+| 확인한 것 | 실제 형태 | 원본(최소본) |
+|---|---|---|
+| **전성분 텍스트는 구조가 몰마다 다르고, "키워드가 있다"와 "값이 있다"가 다르다** | 아누아: `<table>`이 아니라 `div.info-row`의 `div.info-label`("화장품법에 따라 기재해야 하는 모든 성분")과 `div.info-content.ingredients`에 **값이 있다**. 이즈앤트리: `<table class="contents__table">`의 "모든 성분" 행이 있지만 **`<td>`가 비어 있다**. 코스알엑스: 텍스트 없음(이미지). 달바: 성분 탭이 비어 있음. **키워드 유무로 텍스트 여부를 판정하면 틀린다(이즈앤트리). 값 칸이 비어 있지 않은지로 판정한다** | `mall_cafe24_text_div.html`, `mall_cafe24_table_empty.html`, `mall_cafe24_image_only.html`, `mall_godomall_product.html` |
+| 가격 메타(카페24) | `product:price:amount`, `product:sale_price:amount`, `product:price:currency`는 세 몰 모두 있다. 정가와 판매가가 같은 상품이 있다 | 위 |
+| 고도몰(달바) | 메타 태그 없음. JSON-LD `offers.price` `"29900.00"`(문자열), hidden input `set_goods_price`가 `29900`, `set_goods_fixedPrice`가 `0.00`(정가 없음, 2026-11-12 관측과 같다) | `mall_godomall_product.html` |
+| **단종 상품이 HTTP 404로 왔다** | 믹순 `product_no=552`가 2026-11-12에는 HTTP 200 안내 HTML이었는데 2026-11-15에는 **HTTP 404**(본문 3.3KB 안내 HTML)였다. 단종 표현이 200과 404 두 형태일 수 있으므로 HTTP 상태를 먼저 보고, 200이면 가격 메타 유무로 판정한다 | `mall_discontinued_404.html` |
+| robots.txt | 아누아 `User-agent: *` `Allow: /`. 코스알엑스·이즈앤트리·믹순은 `*`에 관리·주문·검색 경로만 막고 상품 경로는 막지 않는다. 달바는 `*` 그룹이 없고 이름 지정 봇 목록에만 규칙·`Crawl-delay: 10`이 있으며 응답은 CRLF 줄바꿈이다 | `mall_robots_mixsoon.txt`, `mall_robots_dalba.txt` |
+| **이미지 전용 호스트의 robots.txt** | 코스알엑스 상세 이미지는 `cosrxinc.jpg3.kr`에 있고 그 호스트의 `/robots.txt`는 **404**(HTML 오류 페이지)다. robots.txt가 없는 호스트는 제한이 없는 것으로 읽고(RFC 9309, 404·410), 오류 페이지 본문을 규칙으로 읽지 않는다. 401·403·5xx·연결 실패·너무 큰 파일은 읽을 수 없음으로 거부한다. 요청 간격은 그대로 지킨다. 어댑터가 404를 읽을 수 없음으로 거부해 코스알엑스·바이오던스 제품 2개의 이미지 4장씩이 모두 `MALL_ROBOTS_UNREADABLE`이었다(2026-11-15) | `tests/test_mall.py` |
+| **robots.txt 리다이렉트** | 달바 이미지 호스트(`cdn-saas-web-116-52.cdn-nhncommerce.com`)는 `/robots.txt`에 **302**로 `https://godomall.cdn-nhncommerce.com/error.html`(HTML 오류 페이지)을 돌려준다. robots.txt 요청에 한해 리다이렉트를 최대 5번 직접 따라가고(각 요청이 호스트별 간격을 지킨다), 최종 응답이 `text/html`이거나 404·410이면 유효한 robots.txt 없음(허용)으로, `Location`이 없거나 http(s)가 아니거나 6번째 리다이렉트이면 읽을 수 없음으로 거부한다. 상품·이미지 요청은 리다이렉트를 따라가지 않는다(`MALL_HTTP_302`) | `tests/test_mall.py` |
+| **abib은 전성분이 HTML 텍스트(영문 INCI 이름)다** | 아코디언 항목 `<li>전성분<span class="ico"></span><ul class="acco-inner"><li class="ingr2">Water (Aqua), Methylpropanediol, …`. 값이 비어 있으면 텍스트가 아니다. 이전 어댑터는 이 구조를 몰라 이미지 경로로 가서 이미지 7장을 읽고도 성분 0개로 끝났다(2026-11-15). **텍스트가 영문 INCI 이름이라 식약처 원료성분정보의 한글 표준명(`INGR_KOR_NAME`) 정확 일치로는 연결되지 않고 대부분 미해결이 된다**(영문명 대조는 원료성분 전체 목록 DB로 한다. 위의 영문명 검색 파라미터 없음 행 참조) | `mall_cafe24_accordion_ingredients.html` |
+| **메디큐브는 전성분이 팝업 레이어 텍스트다(한글 표준명)** | 상세 정보 목록의 `전성분 보기` 링크가 여는 `<div class="dePop_layer" id="cpopBody1"><div class="dePop"><div class="pp_header">전성분 보기…</div><div class="depContent">정제수, 부틸렌글라이콜, …</div></div></div>`. 같은 구조의 `cpopBody2`는 주의사항이다. 이전 어댑터는 이 구조를 몰라 이미지 6~53장을 읽고도 성분 0개로 끝났다(2026-11-15 제품 1건 실측) | `mall_cafe24_popup_ingredients.html` |
+| **바이오던스는 전성분이 상품정보고시 문단의 인라인 텍스트다(한글 표준명)** | 라벨·값 요소가 아니라 `<span>` 안의 텍스트 줄 `[전성분] 정제수, 갈락토미세스발효여과물, …`로 있고, 같은 문단에 `사용방법`·사용기한이 이어진다. 이전 어댑터는 읽지 못해 이미지 13~26장을 읽고도 성분을 못 찾아 보류했고 "이미지에 전성분이 없다"고 단정했다(2026-11-15 제품 1건 실측, FP-C09). 변형: 라벨 `[전성분]&nbsp;`이 한 텍스트 조각에서 끝나고 목록이 **다음 텍스트 조각**에 있는 경우(문단·중첩 `<span>`·라벨 뒤 인라인 `<style>` 블록)가 3건 더 있었다(2026-11-15 실측 3건, 이 중 20·22·23번은 같은 이유로 보류였음). 목록은 쉼표 2개 이상이어야 하고 `<style>`·`<script>` 텍스트는 값이 아니다. 다음 `[라벨]` 줄 앞에서 끊는다 | `mall_cafe24_inline_ingredients.html`, `..._paragraph.html`, `..._next_run.html`, `..._style.html` |
+| **이미지 CDN의 robots.txt가 S3 XML 오류(403)면 규칙 없음으로 본다(좁은 예외)** | 바이오던스 상세 이미지는 CloudFront(`dayjsrwbk0r7f.cloudfront.net`)에 있고 그 `/robots.txt`는 파일이 없어서 403, `content-type: application/xml`, 본문 `<Error><Code>AccessDenied</Code><Message>Access Denied</Message></Error>`(서버 AmazonS3)로 답한다(2026-11-15 실측 2회). 이전 규칙은 모든 401/403을 거부해 바이오던스 5개가 `MALL_ROBOTS_UNREADABLE`로 끝났다. 이유: 파일이 없는 것이지 접근을 막은 것이 아니고(RFC 9309는 4xx를 규칙 없음으로 본다), 같은 브랜드의 본 사이트 robots.txt는 200으로 읽혀 규칙이 확인된다. **세 조건을 모두 만족할 때만** 적용한다: ① 상세 이미지 내려받기 요청이고 호스트가 제품 페이지 호스트와 다르다 ② 같은 브랜드 본 사이트의 robots.txt가 진짜 규칙 파일(200, HTML 오류 페이지 아님)이다 ③ 403에 XML 본문이 `<Error>`와 `<Code>AccessDenied</Code>`를 담는다. 그 밖의 401·403·5xx와 본 사이트 자신의 403은 계속 거부한다. 403 응답 본문은 최대 4096바이트만 읽는다 | `mall_robots_s3_access_denied.xml` |
+| **상세 이미지의 위치는 몰마다 다르다**(2026-11-15 원본 6쪽 확인) | 코스알엑스·아누아: `#prdDetail` 안, `ec-data-src`(지연 로딩). 이즈앤트리: `#prdDetail`이 탭 컨테이너이고 이미지는 그 뒤 `#prdInfo` 앞에 일반 `src`. abib: `#prdDetail`이 **빈 앵커**이고 바로 뒤에 리뷰 앵커(`#prdReview`)가 오며 실제 이미지(`ec-data-src`)는 `#prdRelated` 앞에 있다(앵커 앞에도 무관한 이미지가 있다). round_lab: 탭 컨테이너 뒤 `#prdInfo` 앞에 일반 `src`(`gi.esmplus.com`). 달바(고도몰): `#detail` 구획에 일반 `src` 이미지(`cdn-nhncommerce.com`)가 있고 `#delivery`에서 끝난다(이미지 경로는 `/data/img/product/detail/…`이며 `/data/editor`가 아니다). 읽는 규칙: 상세 앵커(`prdDetail`·`detail`) 이후부터 다음 구획 앵커 전까지의 이미지를 문서 순서로 읽고, 이미지가 없는 구획은 다음 구획 앵커까지 늘린다. 지연 로딩 속성이 자리표시 `src`보다 우선이고 아이콘·버튼·로고·스페이서는 제외한다 | `mall_cafe24_tab_src.html`, `mall_cafe24_empty_anchor.html`, `mall_cafe24_tab_cont.html`, `mall_godomall_detail.html` |
+| 달바 제품 주소 | `https://dalba.co.kr/goods/goods_view.php?goodsNo=<숫자>`, 첫 화면의 링크에서 찾았다 | — |
+| 후보 파일의 범위 | `config/product_candidates.yaml`에는 abib·anua·cosrx·isntree·mediheal·round_lab·skin1004 7개 브랜드만 있고 믹순·달바 등 나머지 몰 브랜드는 후보가 없다 | — |
+
 ## Gemini API
 
 | 확인한 것 | 실제 형태 | 원본 |
@@ -224,6 +255,17 @@
 | 병렬 호출 | 텍스트 호출 60개를 동시 30개로 보냈을 때 전부 200(총 8.5초). 유료 등급의 실제 분당 한도 수치는 알 수 없다(응답에 한도 헤더 없음) | 위와 같음 |
 
 - 분석 비용 영향(추정, 실측 값 아님): 소재 1건은 콘텐츠 유형·훅·전체 호출의 입력(길이 × 91토큰/초, 구간 상한 적용)과 출력·thought로 이루어진다. 45초 광고 두 호출을 가정하면 `minimal` 약 $0.0062, 기본 약 $0.0085이고 호출이 세 번이면 더 크다. 1,500건이면 $9.3~$12.8 범위의 추정이다. 시범 직후 `cost-recalc`가 원장으로 다시 계산한다.
+
+## Gemini 이미지 입력 (2026-11-15 실측, `litellm==1.103.3`, 호출 2회 합계 $0.00183)
+
+| 확인한 것 | 실제 형태 | 원본 |
+|---|---|---|
+| 요청 형태 | `litellm.interactions.create`의 `input`에 `{"type": "image", "data": "<base64>", "mime_type": "image/png"}`(인라인) 항목을 텍스트 항목과 함께 넣는다. 공식 문서(`ai.google.dev` Image understanding·Interactions API)에는 Files API 주소를 쓰는 `{"type": "image", "uri": ..., "mime_type": ...}`도 있다(이번에는 미실측). 첫 시도가 성공했다. `thinking_level` `minimal`, `response_format` 구조화 출력이 이미지 입력과 함께 동작했다 | `gemini_interactions_image_input.json` |
+| 응답 | 영상 입력과 같은 구조: `steps`에 `thought`, `model_output`. 답은 `type == "model_output"`의 `content[].text`다(`extract_output_text`가 그대로 동작) | 위와 같음 |
+| **이미지 토큰은 크기에 비례하지 않는다** | 합성 PNG 1000×2000 → 입력 1,108토큰(이미지 1,081 + 텍스트 27), 1000×4000 → 1,083토큰(이미지 1,056 + 텍스트 27). **높이가 두 배여도 토큰이 같다 = 큰 이미지는 고정 예산으로 축소된다.** 상세 이미지처럼 긴 이미지는 조각(예: 가로 1,000px·세로 2,000px)으로 나눠야 글자가 읽힐 해상도가 남는다(축소 뒤의 판독성은 미실측) | 위와 같음 |
+| 호출당 비용 | 1000×2000 → $0.00092, 1000×4000 → $0.00091(원장 `cost_source: response_cost`, `thinking_level` `minimal`, 출력 약 25토큰). **합성 이미지 2장의 값이며 실제 상세 이미지·긴 출력(전성분 목록)에서는 달라진다** | 원장 `purpose: probe-image-input` |
+| **`usage.input_tokens_by_modality`의 순서가 호출마다 다르다** | 첫 응답은 `text`가 앞, 둘째 응답은 `image`가 앞이었다. 모달리티는 위치가 아니라 `modality` 값으로 찾는다(FP-C02) | 위와 같음 |
+| 미실측 | 실제 상세 이미지의 글자 판독 정확도, 이미지 크기·바이트 상한, 지원 mime 종류(png만 확인), 인라인 한도, Files 경유 이미지 | — |
 
 ## LiteLLM SDK 경유 OpenAI·Anthropic·Gemini Files (2026-11-12 실측, `litellm==1.103.3`)
 

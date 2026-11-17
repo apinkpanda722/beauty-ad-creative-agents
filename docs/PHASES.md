@@ -46,6 +46,10 @@
 | 33 | **P3 step 0(`live-fixes`) 제거, step 1~10 파일 확정**(`phases/3-collect-freeze/`). Instagram 0건 계정 4개는 코드 변경 없이 한계로 기록(CONTRACTS·결과 문서). 실행기의 진행 표시(`Step N/total-1`)는 step이 0부터 시작한다고 가정하므로 P3는 `Step 10/9`처럼 보일 수 있다(표시만의 문제, 실행 순서는 `index.json`의 첫 `pending`을 따른다) | 사용자 결정 D4 |
 | 34 | **E1 1단계 사용 범위·2단계 표집 정정(2026-11-13)**: 1단계는 라벨링한 200건 전부를 쓰고, 2단계는 사람 제품 소재 중 지원 3종(`mask_pack`·`serum_ampoule`·`sun_care`) 전수 48건(목표 50건, `other` 제외, shortfall 2). 근거: 1단계 사람 라벨에서 제품 147건 중 `other`가 99건(67%)이고 `other`는 `hook`·`full`이 만들어지지 않아 모델 비교 불가, 100건에서 멈추면 지원 3종이 17건뿐. 정정 시점에 E1 모델 결과는 보지 않았다. 자세한 내용은 `docs/results/e1_preregistration.md` §7 | 사용자 승인, 사전 등록 정정 |
 | 35 | **P3 step 실행 순서 변경(2026-11-13)**: 부분 동결(11-18 예정)이 시범 비교 결과를 보고 정해야 해서 `pilot-compare`(3)와 `cost-recalc`(4)를 먼저 실행하고 이어 1·2·5·6·7 순으로 진행했다. 방법은 `phases/3-collect-freeze/index.json`의 step 배열 순서만 3, 4, 1, 2, 5, 6, 7, 8, 9, 10으로 바꾼 것이며 step 번호와 파일 이름은 그대로다(PHASES.md·사전 등록의 번호 불변). 실행기는 배열의 첫 `pending`을 고르므로 진행 표시는 `Step N/9` 꼴로 보인다 | 사용자 결정 |
+| 36 | **P4 착수 결정(2026-11-15)**: 역량 질문 v1 동결, 완성 기준을 1~3홉에서 **1~4홉**으로 변경(CQ-05·13·14·16이 4홉, 홉 정의 추가), 성분→효능 연결 출처 방침(ADR-012 후속), CQ-09는 TikTok 한정으로 한계 명시. `docs/EVAL.md` 동결 기준 숫자는 불변 | 사용자 결정(조언 세션 권고) |
+| 37 | **P4 개정(2026-11-15)**: 구 step 4(`product-records`)를 `llm-image-input`·`store-products`·`product-detail`·`product-records`로 4분할해 P4를 11 step으로 변경(레이어당 한 step). `make live-products`와 `uv add pillow` 추가. `PROMOTES` 규칙 승인(제목·캡션에 같은 브랜드 제품 이름 전체 또는 영문명·줄임말 별칭, 모호하면 안 만듦, dev에서 다듬고 test에서 커버리지 보고, step 9 보고에 무작위 20쌍). `live-products`에 한해 Gemini 상한을 `BEAUTYADS_CAP_GEMINI_USD=14`까지 승인(실행 전 이미지 수·예상 비용 보고 후 멈춤). `SkinType`·`SkinConcern` 목록 확정과 `ADDRESSES` 대응은 출처 없는 초안(ADR-012 후속). 성분→효능 수기 표는 step 7 live 뒤 성분 빈도(성분명·건수만)를 보고받아 조언 세션이 상위 약 20개에 출처를 붙여 만든다. `CLAIMS` "주장 원문" 속성 삭제(v1 라벨은 값만 저장) | 사용자 결정(조언 세션 권고) |
+| 38 | **P4 규칙 초안 확정과 선정 방식 변경(2026-11-15, 조언 세션 검토)**: `claim_rules.yaml`을 원문 9~16쪽과 대조해 확정(쪽을 건너는 예외는 `exception_refs`로 [별표 2]를 참조, 넓은 일반어 제거, 영어 대응어는 `terms_en_added`·`en_origin: advisor_added_en`, 영어는 ASCII 단어 경계로만 비교, `applies_to`는 `advisor_approved`)하고 step 1에 붙였다. 기획안 제목도 검사 대상이고 평가 출력에 면책 문구를 표시한다(P5 `checks`). TikTok은 CQ-09와 분포 용도로만 쓰고 `PROMOTES` 질문은 YouTube·Instagram에서만 답이 나온다. **대표 단품 선정을 임시 후보(공식몰 첫 화면)에서 원래 확정 규칙(M1: 브랜드×카테고리별로 광고 소재 텍스트에 많이 등장하는 단품 최대 2개, 제외 몰 제외)으로 변경**하고 제품 별칭은 `derive_aliases`가 제품명에서 기계적으로 만든다(사용자가 채우지 않는다). 선정은 step 3 전에 끝낸다 | 사용자 결정(조언 세션) |
+| 39 | **P4 후속(2026-11-15, 조언 세션 검토)**: (1) `PROMOTES`가 한 소재의 여러 제품을 모두 잇는다(`multi_product` 속성, 달바 직원 BEST 5 회귀 테스트; 기존 "가장 긴 하나만, 같은 길이면 모호" 규칙 변경), (2) 성분은 식약처 원료성분 전체 목록(DB 카탈로그)과 정확 일치로 대조(영문 INCI는 `eng_name_exact`), (3) 인증 대조 규칙을 브랜드 한글명 접두어 + 정규화한 제품명의 정확 일치로 변경, (4) 제품 성분 저장을 집합 교체로 변경, (5) step 11 `product-identify` 추가(사용자 승인 전 설계 초안, 소량 측정 뒤 멈춤), (6) 영상 식별을 `product-id-v2`·`product-id@v2`로 개정(없으면 `[]`, 고른 후보마다 근거 종류, `resembles_only`는 검증에서 버림)하고 `PROMOTES` 영상 보충은 `PRODUCT_ID_APPROVED_TAG`(기본 빈 값 = 어떤 영상 결과도 읽지 않음)에 승인된 버전만 읽는다. v1 결과는 그대로 둔다, (7) v3(`product-id@v3`): 프롬프트는 v2 그대로 두고 검증만 바꿔 spoken_name·on_screen_text·title_caption만 인정(사후 기준이라 새 표본 150건으로 검증), 이전 버전에서 본 소재는 다시 뽑지 않는다 | 조언 세션 검토 |
 
 ## 1. 전제와 일정
 
@@ -169,18 +173,26 @@ step 본문(내용·금지사항·수정 허용 경로)은 `phases/2-sources-pil
 
 설계 초안과 근거 수치(DB 집계, 기존 단언 충돌, 첫 live 위험)는 `data/interim/design/P3_DESIGN_DRAFT.md`(gitignore)에 있다.
 
-### P4 ontology
+### P4 ontology (11 step, 2026-11-15 개정: 구 step 4를 4분할)
 
-| step | 이름 | 내용 |
-|---|---|---|
-| 0 | `graph-sync` | (P1에서 이동) `graph/` 스키마(복합 유일 제약), PostgreSQL 변경 시각 기준 증분 MERGE, `make sync`, 가짜 드라이버로 멱등·오류 형태 재현, **짧은 live 확인 타깃 `make live-graph`**(step 뒤에 끊어 사용자가 돌림). `uv add neo4j==6.4.1` |
-| 1 | `claim-rules` | `config/claim_rules.yaml`(쪽 번호 필수, 세 종류, 한·영 쌍), 로더와 금지어 사전 |
-| 2 | `mfds-source` | 원료(정확히 같은 표준명만, 공백 제거 검색), 보고품목(`EE_NAME`, `SPF`·`PA`, 취하 제외), 심사품목(`EE_DOC_DATA` XML 파싱, `null` 허용, 403 오류 형태). 업체명으로 브랜드를 판정하지 않음. **자외선 차단은 `SPF`·`PA`(문자열 `"50+"`, `"4"`)에 값이 있을 때만 `FunctionalCert`로 인정하고, null(선크림·선스크린 60건 전부 null)은 "인증 없음"이 아니라 `unknown`**. `EE_NAME`·`EE_DOC_DATA`로 보완되지 않음. `ClaimRule` 검사에서 `unknown`은 위반으로 단정하지 않고 판정 불가 경고. 보고품목(선크림 4,837건)과 심사품목(1,222건)은 첫 쪽 기준 품목명이 겹치지 않아 **제품마다 두 API를 모두 조회**(겹침 전체 규모는 미확인) |
-| 3 | `mall-source` | robots.txt·간격(달바 10초), 가격(메타 / JSON-LD, 정가 0이면 `price_basis`), 텍스트 표 우선·이미지 추출(저장 안 함), 단종 페이지는 가격 메타 유무로 판정, gzip |
-| 4 | `product-records` | 제품 레코드, 성분 별칭 표, **광고 소재의 성분 원문을 표준명 사전과 대조해 묶고 목록 밖은 폐기·`미해결`로 보존**(P2는 원문 저장만 했다), `미해결` 성분 보존 |
-| 5 | `layer1-graph` | 1층 적재 |
-| 6 | `layer2-links` | `PROMOTES`(판정 못 하면 만들지 않음), `CLAIMS`, `MENTIONS` |
-| 7 | `cq-verify` | 역량 질문 1~3홉 검증 실행기와 `make live-cq` |
+step 본문은 `phases/4-ontology/step*.md`가 원본이다. 구 번호와의 관계: 구 4(`product-records`)가 4~7로 나뉘었고 구 5·6·7이 8·9·10이 됐다.
+
+| step | 이름 | 계층 | 내용 |
+|---|---|---|---|
+| 0 | `graph-sync` | graph·store·pipeline | (P1에서 이동) `graph/` 스키마(복합 유일 제약), PostgreSQL 변경 시각 기준 증분 MERGE, `make sync`, 가짜 드라이버로 멱등·오류 형태 재현, **짧은 live 확인 타깃 `make live-graph`**(step 뒤에 끊어 사용자가 돌림). `uv add neo4j==6.4.1` |
+| 1 | `claim-rules` | domain·sources | `config/claim_rules.yaml`(쪽 번호 필수, 세 종류, 한·영 쌍), 로더와 금지어 사전. 초안은 식약처 안내서 PDF에서 옮겼고 조언 세션이 원문과 대조한다 |
+| 2 | `mfds-source` | sources | 원료(정확히 같은 표준명만, 공백 제거 검색), 보고품목(`EE_NAME`, `SPF`·`PA`, 취하 제외), 심사품목(`EE_DOC_DATA` XML 파싱, `null` 허용, 403 오류 형태). 업체명으로 브랜드를 판정하지 않음. 자외선 차단은 `SPF`·`PA`에 값이 있을 때만 인정하고 null은 `unknown`. 심사품목은 기관 코드가 다르다 |
+| 3 | `mall-source` | sources | robots.txt·간격(달바 10초), 가격(메타 / JSON-LD, 정가 0이면 `price_basis`), 텍스트 여부는 **값 칸이 비어 있지 않은지**로 판정(이즈앤트리 사례), 단종은 HTTP 404 또는 가격 메타 없음, gzip. 원본은 2026-11-15에 저장됐다 |
+| 4 | `llm-image-input` | llm | Gemini 이미지 입력 경로(`image_part`), 계약 원본 `gemini_interactions_image_input.json` |
+| 5 | `store-products` | domain·store | 제품·성분·인증 타입과 마이그레이션 v4(제품, 제품 성분, 표준명 캐시, 제품 인증, 영문명·별칭) |
+| 6 | `product-detail` | analysis | 상세 이미지 조각 나누기, 전성분·용량·제형 추출, 가격은 읽지 않음. `uv add pillow` |
+| 7 | `product-records` | pipeline | 성분 대조(표준명 정확 일치, 별칭 표, `미해결` 보존), 제품 인증 대조, 광고 소재 성분 원문 대조, **`make live-products`**(PHASES 목록에 없던 추가, 사용자 승인). **Gemini 상한은 이 live에 한해 `BEAUTYADS_CAP_GEMINI_USD=14`까지 승인됐고, 실행 전에 이미지 수·예상 비용을 보고하고 멈춘다** |
+| 8 | `layer1-graph` | graph | 1층 적재. `HAS_EFFICACY` 표는 step 7 live 뒤 성분 빈도 보고를 받아 조언 세션이 만든다 |
+| 9 | `layer2-links` | graph | `PROMOTES`(제목·캡션에 제품 이름 전체 또는 별칭, 모호하면 안 만듦, dev에서 다듬고 test에서 커버리지 보고, **무작위 20쌍 보고**), `CLAIMS`, `MENTIONS` |
+| 10 | `cq-verify` | eval | 역량 질문 1~4홉 검증 실행기와 `make live-cq`. **질문마다 연결된 소재 수(`PROMOTES` 커버리지)를 답과 함께 보고한다.** CQ-12는 합성 데이터로만(P5 피드백 메모리 이후 실데이터), CQ-09는 TikTok 한정 |
+| 11 | `product-identify` | analysis·pipeline·domain | **(2026-11-15 추가, 사용자 승인 전 설계 초안)** 텍스트로 제품을 못 이은 YouTube·Instagram 제품 소재를 영상으로 식별하는 제한 분류 추출. 입력은 영상 + 같은 브랜드 후보 제품 목록(저장된 제품), 출력은 후보 id 목록 또는 없음(목록 밖 이름 불가), 프롬프트 `product-id-v1`·작업 종류 `product-id@v1`(v1 분류 축·E1과 무관), `PROMOTES`는 `basis=video`·`confidence=model`. TikTok 제외(영상 주소 미저장). `make live-product-identify`는 `--sample`(약 50건, 약 $0.15 가정)로 연결 증가와 정밀도(무작위 20쌍)를 먼저 재고 멈춘다. 전체 실행은 사용자 비용 승인 뒤 |
+
+**P4 착수 전 입력(2026-11-15 결정)**: 식약처 안내서 PDF 내려받기와 `claim_rules.yaml` 초안(완료), 공식몰 응답 원본 5쪽+robots.txt(완료), Gemini 이미지 입력 계약 실측 2회 $0.00183(완료), `SkinType`·`SkinConcern` 목록과 `ADDRESSES` 대응 초안(ADR-012 후속), 성분→효능 수기 표(step 7 live 뒤).
 
 ### P5 agents (10 step)
 
@@ -189,7 +201,7 @@ step 본문(내용·금지사항·수정 허용 경로)은 `phases/2-sources-pil
 | 0 | `llm-chat-models` | `llm/`에 OpenAI·Anthropic 경로 추가: **`reasoning_effort` 필수 인자**, `temperature` 기본 미지정(luna·terra `none`만 예외), 스트리밍 비용(`stream_chunk_builder`+`completion_cost`), 도구 호출 인자 JSON 문자열 파싱 실패 처리, Anthropic `cache_control`. 원본은 `litellm_*.json` |
 | 1 | `agent-api-skeleton` | (P1에서 이동) 도구 1개, 노드 1개(luna, `reasoning_effort="none"`), 체크포인터 풀(`autocommit`·`dict_row`·`prepare_threshold=0`)은 api가 조립, FastAPI `/chat` SSE, **짧은 live 확인 타깃 `make live-agent`**(step 뒤에 끊어 사용자가 돌림), **서버 진입점 경유 테스트**, 테넌트 컨텍스트 fail-closed |
 | 2 | `tool-registry` | 조회·집계·비교·표시 4종, 도구 등록 목록, 구조화 실패, 테넌트 범위 |
-| 3 | `checks` | 근거 ID 존재, 분류 값 유효성, 금지 표현, 효능 근거 경로 |
+| 3 | `checks` | 근거 ID 존재, 분류 값 유효성, 금지 표현(**기획안의 제목도 검사 대상 — 안내서 III.7**, `domain.claims.check_plan_fields`), 효능 근거 경로. **평가 출력에 "식약처 안내서 기준 점검이며 법적 판단이 아님"(`CLAIM_CHECK_DISCLAIMER`)을 표시한다** |
 | 4 | `tenant-memory` | 테넌트 전용 저장, 피드백 메모리, thread 소유 테넌트 검증 |
 | 5 | `research-agent` | 하위 그래프(전용 상태), 지시서·구조화 핸드오프, 근거 미달이면 "근거 없음" |
 | 6 | `planning-evaluation` | 기획(terra)·평가(Sonnet), 코드 검사 + LLM 채점, 되돌림 상태 카운터 최대 2회 |

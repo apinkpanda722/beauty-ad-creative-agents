@@ -2,6 +2,189 @@
 
 뷰티 광고 크리에이티브를 분석해 근거가 달린 기획안을 만드는 멀티에이전트 프로젝트.
 
+## live-graph (P4)
+
+PostgreSQL 원본에서 Creative와 분류 축(Hook·Angle·Format·Talent·CtaType)을
+Neo4j로 증분 동기화한다. OrbStack을 켜고 `.env`에 `POSTGRES_PASSWORD`와
+`NEO4J_PASSWORD`(8자 이상)를 준비한 뒤 사용자가 다음 명령을 실행한다.
+수집·분석 결과가 PostgreSQL에 있어야 하며 모델 호출과 다운로드는 없다.
+
+```bash
+make db-up
+# 컨테이너가 준비된 뒤 사용자가 실행한다.
+make live-graph
+# 전체 변경분 동기화와 선택적 읽기 상한·재구축
+make sync
+make sync ARGS='--limit 50'
+make sync ARGS='--full'
+```
+
+Neo4j 주소 기본값은 `bolt://127.0.0.1:7688`이며 필요하면
+`BEAUTYADS_NEO4J_URI`로 바꾼다. PostgreSQL 호스트 포트는 기본 5433이고
+기존 `BEAUTYADS_POSTGRES_PORT`를 따른다. Neo4j 드라이버는 `6.4.1`이다.
+
+`make live-graph`는 `--sample 50 --verify`로 **분석 완료(`*@v1`) 소재를 우선**
+고른 50건을 두 번 적재한다(`--sample`은 `--limit`·`--full`과 함께 쓸 수
+없고 워터마크를 올리지 않는다). 두 번째 `nodes_created`와
+`relationships_created`가 0인지, 두 번의 Creative `count`가 같은지,
+분류 값 노드가 닫힌 목록 안인지 `count`로 확인하고 요약의 `verification`에
+출력한다. 요약의 `graph_check`는 표본 중 훅·전체 라벨이 있는 소재 수
+(`labeled_in_sample`)와 그래프의 분류 축 관계 수(`axis_relationships`)다.
+**표본에 분석 완료 소재가 없으면 `GRAPH_VERIFY_NO_LABELED_SAMPLE`, 라벨이 있는데
+관계가 0이면 `GRAPH_VERIFY_NO_RELATIONSHIPS`로 실패한다**(검사한 것이 없는 것을
+통과로 보지 않는다). 전체를 처음부터 적재하며 검증하려면
+`make sync ARGS='--full --verify'`를 쓴다. 기본 동기화 요약에는 `read`, `nodes_created`,
+`relationships_created`, `skipped_invalid`, `watermark`, `elapsed_s`가 나온다.
+변경분이 없으면 정상 0건 요약이며 워터마크는 유지된다.
+
+변경 판정은 소재와 최종 분석 작업의 PostgreSQL `updated_at`으로 한다.
+워터마크보다 10분 앞에서 겹쳐 읽고, 모든 적재와 선택적 검증이 성공한 뒤에만
+읽은 행의 최대 변경 시각으로 워터마크를 올린다. `--full`은 워터마크를
+무시하고 처음부터 MERGE하며 그래프를 삭제하지 않는다. `properties_set`은
+같은 값을 다시 써도 증가하므로 변경 판정에 쓰지 않는다.
+라벨은 `FINAL_RUN_TAG`의 `content_type@v1`·`hook@v1`·`full@v1` 중
+`done` 작업만 사용한다. 제품 소재에만 분류 축 관계를 만들고 목록 밖 값은
+`skipped_invalid`로 센다. 기존 v1 훅 라벨은 묘사 필드가 없으므로,
+훅 묘사는 원본 라벨에 `hook_description`이 있을 때만 관계에 기록한다.
+
+**첫 볼륨 비밀번호 함정:** Neo4j 비밀번호는 데이터 볼륨을 처음 만들 때만
+적용된다. 나중에 `.env`만 바꾸면 인증에 실패한다. 원래 비밀번호를 확인하고,
+그래프를 원본에서 다시 만들기로 결정한 경우에만 사용자가 기존
+`make graph-reset CONFIRM=yes`와 `make db-up`, `make sync ARGS='--full'`을
+차례로 실행한다. `graph-reset`은 그래프 데이터를 삭제한다.
+PostgreSQL도 비밀번호가 첫 볼륨에 적용되므로 기존 원본 볼륨의 비밀번호를
+확인한다.
+
+실패 출력은 `PREFLIGHT_FAILED <코드>`와 종료 코드 2, 정상 완료는 0이다.
+점검이 실패하면 드라이버 생성과 저장소 접속을 하지 않는다. 키·비밀번호·URI의
+인증 정보는 출력하지 않으며 두 Make 타깃은 `verify`에 포함하지 않는다.
+
+| 이유 코드 | 의미와 조치 |
+|---|---|
+| `ENV_MISSING:NEO4J_PASSWORD` | 공백이 아닌 Neo4j 비밀번호를 설정한다. |
+| `ENV_MISSING:POSTGRES_PASSWORD` | 공백이 아닌 PostgreSQL 비밀번호를 설정한다. |
+| `INVALID_SETTING:NEO4J_PASSWORD` | Neo4j 비밀번호를 8자 이상으로 설정한다. |
+| `DOCKER_DOWN` | OrbStack을 켜고 Docker 데몬 준비를 기다린다. |
+| `POSTGRES_UNREACHABLE` | `make db-up`과 PostgreSQL 노출 포트를 확인한다. |
+| `NEO4J_UNREACHABLE` | `make db-up`과 Neo4j 주소·노출 포트를 확인한다. |
+| `NEO4J_AUTH_VOLUME_STALE` | 비밀번호는 데이터 볼륨을 처음 만들 때만 적용된다. 원래 값을 확인하거나 명시적으로 `make graph-reset`으로 재구축한다. |
+| `NEO4J_CONSTRAINT_VIOLATION` | 원본 키와 기존 그래프의 유일 제약 위반 데이터를 확인한다. |
+| `POSTGRES_AUTH_FAILED` / `POSTGRES_CONNECT_FAILED` | 원본 DB의 비밀번호·컨테이너·포트를 확인한다. |
+| `GRAPH_VERIFY_FAILED` | 반복 적재의 생성 수·Creative 수·닫힌 목록 검증이 실패했다. 워터마크를 갱신하지 않는다. |
+| `SYNC_FAILED` | 원본 스키마·데이터 형식·실행 환경을 확인하고 다시 실행한다. 워터마크 이전에 실패했다면 겹쳐 읽어 재적재한다. |
+
+## sync: 1층 제품 지식 (P4)
+
+사용자가 PostgreSQL의 제품 레코드와 Neo4j를 준비한 뒤 실행한다.
+
+```bash
+make sync ARGS='--layers 1'
+make sync ARGS='--layers 1 --limit 50'
+make sync ARGS='--layers 1 --full --verify'
+```
+
+`--layers 1`은 제품·성분·별칭·인증·표현 규칙과 효능·피부 분류를 MERGE한다.
+옵션을 생략하거나 `--layers 2`를 지정하면 기존 Creative·분류 축 동기화가
+실행된다. `--sample`은 기존 소재 확인 전용이며 1층과 함께 쓰면 거부한다.
+제품 키는 `(brand, source_url)`, 성분 키는 `standard_name`이다. 가격·용량과
+단위, 제품명·영문명·별칭·가격 수집 시각을 보존하고 `unit_list_price`는
+용량당 정가다(`price_basis: sale_price_fallback`이면 판매가로 계산).
+전성분의 핵심 성분 여부는 원본에 없어 `is_key`를 null로 전달한다.
+**새 속성을 추가하는 step 뒤에는 `--full` 재동기화가 필요하다.** 증분 동기화는 PostgreSQL 변경 시각이 바뀐 소재·제품만 다시 읽으므로, 이미 적재된 노드에는 새 속성이 채워지지 않는다(예: `Creative.advertiser_name`은 `--layers` 없이 `make sync ARGS='--full'`로 기본 동기화를 한 번 다시 돌려야 CQ-09 분류가 나온다).
+
+1층 워터마크는 `public_products_layer1_v1`로 기존 소재 워터마크와 분리한다.
+제품·성분·인증의 `updated_at`과 재추출 기록의 `created_at` 중 최대값을
+기준으로 10분 겹쳐 읽는다. 변경된 제품의 성분·인증은 같은 PostgreSQL
+스냅샷에서 **전체 집합**을 읽는다. `CONTAINS`를 MERGE한 뒤 원본에 없는
+순서·표준명 관계를 삭제하므로, 재파싱이 짧아지거나 표준명이 바뀌어도
+이전 관계가 남지 않는다. 미해결 성분은 PostgreSQL에만 남긴다.
+변경 시각이나 재추출 기록 없이 수동으로 행만 삭제했다면 `--full`로 반영한다.
+모든 적재와 선택적 반복 검증이 성공한 뒤에만 원본 시각으로 워터마크를
+갱신하며 그래프 생성 카운터는 변경 판정에 쓰지 않는다.
+
+`config/ingredient_efficacy.yaml`의 `links`만 `HAS_EFFICACY`로 적재하며
+`basis`·`source_ref`·`conditional`을 관계에 기록한다. `unmatched`와
+`not_linked_for_now`는 연결하지 않고 동명 요약 필드에 개수만 출력한다.
+표에 없는 성분은 **근거 연결 없음**이며, `conditional: true`는 고시 함량
+조건과 기능성 심사(보고)가 필요하다는 뜻이다. 성분 함유만으로 효능이나
+제품 인증이 인정되는 것은 아니다.
+
+`config/efficacy_concerns.yaml`의 `confirmed`·`taxonomy_definition`·출처가
+있는 행만 `ADDRESSES`로 올린다. 이는 효능의 실증 주장이 아닌 프로젝트
+분류 체계다. `claim_rules.yaml`의 규칙은 `advisor_approved`·`confirmed`
+범위만 효능·피부 고민·카테고리에 연결한다. 두 대응의 draft 합계는
+`draft_not_loaded`다. 인증은 `certified`만 연결하고 `unknown`은 연결하지
+않는다. 요약 `certification`에는 읽은 제품 수(`products`), 인증 상태별
+행 수(`certified`·`unknown`), 제품 단위 커버리지
+(`certified_products`·`unknown_products`)가 나온다.
+
+표 전체는 적재 전에 검증한다. 형식이나 필수 출처가 잘못되면
+`INGREDIENT_EFFICACY_INVALID`·`EFFICACY_CONCERN_INVALID`로 중단하며,
+`--verify`는 같은 입력을 재적재해 두 번째 생성 수가 0인지 확인한다.
+이 명령은 모델·출처 API 호출이나 이미지 다운로드를 하지 않는다.
+
+## sync: 2층 소재와 제품 연결 (P4)
+
+Step 9부터 명시적인 `--layers 2`는 기존 Creative·분류 축 동기화에
+`PROMOTES`·`CLAIMS`·`MENTIONS`를 추가한다. 사용자가 1층 제품 적재와
+step 7의 `ingredient-matches@v1` 대조를 마친 뒤 실행한다.
+
+```bash
+make sync ARGS='--layers 2 --full --verify'
+make sync ARGS='--layers 2'
+make sync ARGS='--layers 2 --sample-pairs 20 --seed 20261115'
+```
+
+`--layers` 생략 및 `--sample 50 --verify`는 기존 소재·분류 축 확인 동작을
+유지한다. `--sample-pairs`(기본 20, 0이면 생략)와 `--seed`(기본 20261115)는
+제품 연결 정밀도를 사람이 확인할 표본을 정한다. 제목·캡션은 각각 앞
+120자, 제품 이름·제품 URL·일치 문자열·`basis`·`confidence`와 함께 요약의
+`sample_pairs`에 나온다. 같은 입력·시드는 입력 순서와 무관하게 같은 쌍을
+고른다. `matched_text`는 정규화 비교에서 일치한 제품명·별칭의 저장 표기다.
+
+`PROMOTES`는 `content_type@v1`이 `done`인 제품 소재에만 만든다.
+NFKC·대소문자 무시·공백 제거 뒤 같은 브랜드의 한글 제품명 전체 또는
+영문명·별칭이 제목·캡션에 포함되어야 한다. 영문명·별칭은 정규화 길이
+3자 이상만 쓴다. 최장 일치 제품이 둘이면 `ambiguous`로 보류한다.
+제품명 일부만으로는 연결하지 않는다. `basis`는 `title`·`caption`,
+`confidence`는 한글 제품명 전체면 `name_full`, 영문명·별칭이면 `alias`다.
+동일 제품 안에서 길이가 같으면 전체 이름, 제목 순으로 근거를 고른다.
+
+`CLAIMS`는 `done`인 `full@v1`의 유효한 `claims` 값에서 `other`를 제외한다.
+주장 원문 속성은 없다. `MENTIONS`는 같은 `full@v1`의 성분 원문과
+`done`인 `ingredient-matches@v1`의 `raw_name`이 정확히 같고 표준명이 하나로
+묶인 경우에만 `IngredientAlias`로 잇고 `ALIAS_OF`로 `Ingredient`에 잇는다.
+`raw_name` 관계 속성에 원문을 보존하며 나머지는 `unresolved`로 센다.
+시범 `@minimal`·`@default`·v0 라벨은 읽지 않는다. 모델 재분석은 하지 않는다.
+
+2층 워터마크는 `public_links_layer2_v1`이다. 소재·v1 분석 작업과 같은
+브랜드 제품의 PostgreSQL 변경 시각 중 최대값을 10분 겹쳐 읽는다.
+제품명·별칭이 바뀌거나 새 제품이 생겨도 그 브랜드 소재를 재계산한다.
+해당 소재 키의 이전 `PROMOTES` 삭제와 새 관계의 MERGE는 한 트랜잭션이다.
+`CLAIMS`·`MENTIONS`도 해당 소재에서 사라진 할당을 제거한다. 변경 시각 없이
+수동 삭제한 원본은 `--full`로 반영한다. 모든 적재와 반복 검증이 성공한
+뒤에만 워터마크를 저장한다. `--verify`는 재생성 카운터 대신 관계·속성·대상
+집합의 동일성을 검사한다(`PROMOTES`는 반복 시에도 삭제 후 다시 만들어진다).
+
+요약의 `promotes`, `product_creatives`, `coverage`, `ambiguous`, `claims`,
+`mentions`, `unresolved`는 이번에 실제 적재한 소재 집합을 기준으로 집계하며
+`coverage_scope: applied_batch`으로 표시한다. `read`와 생성 카운터도
+이번 변경분 적재 수다. 표본 쌍은 이 집합에서 실제 연결한 소재만 대상으로
+고른다. 전체 커버리지와 전 소재의 정밀도 표본을 확인하려면 `--limit` 없이
+`--full --verify`를 사용한다. `config/brand_split.yaml`에 따라 `dev`·`test`와
+출처별로 같은 수를 보고하며 규칙 선택에는 dev 입력만 전달한다.
+test 결과로 별칭 길이나 후보 선택 규칙을 바꾸지 않는다.
+
+제품이 없는 브랜드는 `no_product_info_brands`(제품 정보 없음)에 나열하고
+`product_creatives` 분모에서 제외한다. `all_product_creatives`는 제외 전
+제품 소재 수다. 토리든·넘버즈인은 공식몰 제품 정보가 없어 이 한계에 해당한다.
+`candidates_by_source`는 제목·캡션이 비어 있지 않은 제품 소재 수다.
+TikTok은 두 필드가 비어 있어 후보에 포함되지 않으며 제품에 억지로 잇지
+않는다. TikTok은 CQ-09와 분포 용도이고 제품 연결 질문의 답은
+YouTube·Instagram에 한정된다. YouTube·Instagram의 test 대상 중 미연결이
+있으면 요약 마지막 `recommendation`에서 영상 제품 식별의 별도 추출을
+제안한다. 이 제안은 유료 모델 비용이 드는 후속 작업이며 실행하지 않는다.
+
 - 하네스 사용법: [scripts/README.md](scripts/README.md)
 - 요구사항·설계·결정 기록: [docs/](docs/)
 
@@ -813,3 +996,145 @@ make live-tiktok-analyze ARGS="--per-brand-limit 20"                 # 전체 14
 - 소재는 광고 id로 기존 저장분과 병합한다(멱등). `--retry-failed` 재조회는 TikTok에 쓰지 않는다.
 - 정지: 토큰·요청 오류는 전체 정지, 브랜드 하나의 서버 오류는 그 브랜드만 건너뜀, 일일 한도·크레딧 소진·비용 상한은 정지(남은 소재는 대기).
 - 환경 점검은 `live-analyze`와 같다(TikTok 키, Gemini 키, 사전 등록, 비용 상한).
+
+## live-products (P4)
+
+대표 단품(`config/product_candidates.yaml`)의 공식몰 가격·전성분과 식약처 표준명·
+기능성 보고/심사품목을 대조해 PostgreSQL에 저장한다. **사용자가 직접 실행한다.**
+이 step에서는 `--scan`을 포함한 실제 호출을 실행하지 않는다.
+
+실행 순서는 **`--scan` → 이미지 수·예상 비용 보고 → 사용자 승인 → 실행**이다.
+스캔 결과를 보고한 뒤 멈추고 사용자 지시를 기다린다. 식약처 일일 한도는
+미확인이므로 모든 모드에서 `--max-mfds-requests N`을 명시한다.
+
+```bash
+# 키·네트워크·DB 없이 ESTIMATE 한 줄만 출력
+make live-products ARGS='--dry-run --products 1,2 --max-mfds-requests 20'
+# 먼저 공식몰 HTTP만 사용해 가격·텍스트 전성분 여부·상세 이미지 수 확인
+make live-products ARGS='--scan --products 1,2 --max-mfds-requests 20'
+# 위 결과를 보고하고 멈춘 뒤, 사용자 승인 후 작게 실행
+BEAUTYADS_CAP_GEMINI_USD=14 make live-products ARGS='--products 1,2 --max-mfds-requests 20 --thinking-level minimal'
+```
+
+`BEAUTYADS_CAP_GEMINI_USD=14`는 **2026-11-15 이 live에 한해 승인된 한도**다.
+코드와 Makefile에 고정하지 않으며 사용자가 실행 환경에서 설정한다. 한도는
+이번 실행의 예산이 아니라 `data/manifest/costs.jsonl`의 Gemini 누적액에 적용한다.
+`.env`의 `DATA_GO_KR_SERVICE_KEY`·`GEMINI_API_KEY`·`POSTGRES_PASSWORD`를 준비하고,
+실행에는 OrbStack과 `make db-up`도 필요하다. 값·토큰·이미지 바이트는 출력하지 않는다.
+`--scan`도 키 이름·누적액을 먼저 점검하지만 Docker·DB 점검/접속은 생략하며,
+모델·식약처·이미지 다운로드를 호출하지 않는다. 공식몰의 robots.txt와 호스트별
+요청 간격은 기존 어댑터를 따른다. 제외 몰은 요청하지 않는다.
+
+`--products`는 후보 파일의 **1부터 시작하는 순번**, 제품명, `브랜드:제품명`,
+또는 상세페이지 URL을 쉼표로 구분한다. 순번은 후보 파일의 목록 순서 기준이다.
+생략하면 전체 후보를 처리한다. `--thinking-level` 기본값은 `minimal`이다.
+`--top-n`은 별도 성분 빈도 표의 최대 행 수이며 기본 50이다.
+
+스캔의 두 상수는 각각 **가정(미실측)**이다. 이미지당 조각 수 4(관측 1건 기반)와
+조각당 $0.0009(2026-11-15 합성 이미지 실측 참고)를 곱한다. 실제 이미지 높이와
+전성분 출력 길이를 재지 않은 견적이며 판정 기준으로 쓰지 않는다.
+**전성분을 찾으면 멈추므로 상한 추정**이다. 텍스트 전성분이 있는 페이지도
+이미지 수를 표시하지만 실제 실행은 이미지를 내려받거나 모델을 부르지 않는다.
+`--dry-run`의 후보 수×호출 종류는 기본 조회만 세며, 성분 조회·쪽 넘김·robots·
+이미지·재요청은 별도다. 식약처 총 HTTP 요청·재시도는 지정한 N을 넘지 않는다.
+호출당 시간·비용은 가정(미실측)이다.
+
+제품 별칭은 `derive_aliases`가 같은 브랜드의 `config/brand_product_pool.yaml`
+이름 목록만 받아 만든다. 풀을 읽을 수 없거나 해당 브랜드 목록이 없으면
+`BRAND_POOL_UNREADABLE`로 시작하지 않는다. 선택적인 추가·제외는
+`config/product_aliases.yaml`의 `aliases` 목록에서 제품별 `brand`·`name_ko`·
+`extra`·`drop`으로 지정한다. 성분 별칭은 `config/ingredient_aliases.yaml`의
+`aliases` 목록에 `alias`·`standard_name`·`source`를 모두 적는다.
+이 두 파일은 머리 주석만 있는 상태로 제공하며, 없거나 비어 있으면 추가 0개다.
+성분 별칭은 사용자·조언 세션이 출처를 확인해 채우고, 출처가 없으면 `ALIAS_INVALID`다.
+
+성분은 표준명 캐시를 먼저 읽고 **정확 일치**만 연결한다. 괄호 속 수치 함량은
+비교할 때만 분리하며 성분 원문·순서·반복은 보존한다. 목록 밖 표기는 `unresolved`
+(`미해결`)로 남긴다. 불완전한 식약처 조회는 `pending`으로 남겨 재실행 대상으로
+삼으며 미해결로 확정하지 않는다. 제품명 인증 대조는 공백 제거 후 정확 일치이고,
+취하 품목은 제외한다. 업체명으로 브랜드를 판정하지 않으며 SPF·PA가 null이면
+자외선 차단은 `unknown`이다. 공식몰의 기능성 문구 자체를 인증으로 쓰지 않는다.
+광고의 `full@v1.ingredients`도 같은 사전으로 대조하고, 원래 라벨은 유지한 채
+`ingredient-matches@v1` 작업에 원문·표준명·상태를 저장한다.
+
+마지막 JSON `summary`에는 제품 상태·성분 묶임 비율·미해결/대기 수·인증 연결
+커버리지(인증 종류별 수도 별도)·별칭 수·오류/보류 코드와 이번 실행 원장의
+`purpose=product-detail` 모델 호출 수·비용을 표시한다. 별도의
+`ingredient_frequency`에는 **표준명·제품 건수만** 내림차순으로 출력한다.
+같은 제품에 같은 성분이 반복돼도 빈도는 한 번 센다. 이 표를 조언 세션에
+전달해 상위 약 20개 성분→효능 수기 표에 출처를 붙인다.
+
+제품별 대기·실패·보류 상태와 추출 원문은 `data/interim/products/records.json`에
+보존한다(이미지는 저장하지 않는다). 재실행은 선택한 후보를 다시 조회하고,
+기존 표준명 캐시와 저장소 upsert를 사용한다. 성분·제품 하나의 실패는 다음
+항목을 막지 않는다. 402·인증·일일 한도·요청 수/비용 상한은 즉시 중단하며 현재와
+남은 제품은 대기로 남긴다. `STOPPED <코드>`를 확인하고 원인을 해소한 뒤 재실행한다. 식약처 오류로 멈추면 `STOPPED <코드> provider_code=… http_status=… provider_message=…`(마스킹·한 줄·200자 이하)가 출력되고 요약과 기록의 `stopped_detail`에도 남는다. 제품이 `PRODUCT_DETAIL_FAILED`·`PRODUCT_DETAIL_HELD`이면 기록의 `issues`에 이미지·조각별 오류 코드가 남는다.
+
+점검 실패는 `PREFLIGHT_FAILED <코드>`와 종료 코드 2다. 이유 코드는
+`ENV_MISSING:<이름>`·`DOCKER_DOWN`·`POSTGRES_UNREACHABLE`·`COST_CAP:gemini`·
+`POSTGRES_AUTH_FAILED`·`POSTGRES_CONNECT_FAILED`·`BRAND_POOL_UNREADABLE`·
+`ALIAS_INVALID` 등이다. 키 누락·비용 상한·Docker 실패 뒤에는 다음 접속 점검도
+진행하지 않는다. 성공/계획/스캔 완료는 0, 시스템 중단 또는 제품 오류·보류·대기가
+있으면 3이다. `live-products`는 `make verify`에 포함하지 않는다.
+
+
+## 역량 질문 확인 (`live-cq`)
+
+사용자가 `make sync`로 그래프를 준비한 뒤 `make live-cq`를 실행한다.
+모델 호출 없이 Neo4j를 읽기만 하며 비용은 0이다. `make verify`에는 포함하지 않는다.
+CQ-07을 제외한 동결 v1 질문을 고정 Cypher로 실행하고 질문별 JSON 한 줄과 요약을 출력한다.
+각 줄에는 홉 수, 성공/오류 코드, 결과 행 수, 답에 사용된 Creative 중 제품에 연결된 수 /
+질문 범위의 제품 소재 수(`PROMOTES` 커버리지), 문서의 한계 원문과 답을 표시한다.
+0행은 데이터 부족으로 따로 집계하며 홉 설계 실패와 합치지 않는다.
+
+CQ-09는 `config/advertiser_classes.yaml`을 정규화해 TikTok 광고주를 분류한다.
+분류 파일 오류는 CQ-09만 막으며 다른 질문은 계속한다. 두 비교 집단 중 하나라도
+30건 미만이면 “표본 부족으로 방향만 제시”라고 표시한다. 광고주 이름을 반영하려면
+기존 일반 소재 동기화를 `make sync ARGS='--full'`로 다시 실행한다.
+CQ-03·10·11은 제품 인증 연결의 certified/unknown/제품 수를 함께 출력한다.
+CQ-06은 조회수 없는 소재 수를 별도로 출력하고 출처/브랜드별 14일 이상 소재의
+백분위를 사용한다. 현재 그래프에는 원 채널 ID가 없어 브랜드를 대용하므로
+엄밀한 채널 내 비교는 P5 이후 보완해야 한다.
+CQ-12는 Feedback이 없으면 `SKIPPED_SYNTHETIC_ONLY`이고 임시 데이터를 쓰지 않는다.
+Feedback이 있어도 세션 테넌트가 없는 CLI는 `CQ_CONTEXT_MISSING`으로 거부한다.
+CQ-13·14·16은 공개 제품 각각을 기준 제품으로 표시한 쌍을 출력한다. 특정 작업 공간의
+“우리 제품” 해석에는 P5 브랜드 프로필이 필요하다. 핵심 성분 unknown은 추정하지 않는다.
+CQ-16은 서버 컨텍스트의 가격 범위로 조회하고, 범위가 없으면 기준 제품과 정확히 같은
+단위당 정가만 조회한다. 임의의 가격대 허용 폭을 판정 기준으로 만들지 않는다.
+
+점검 실패는 `PREFLIGHT_FAILED`와 종료 코드 2다. 이유는
+`ENV_MISSING:NEO4J_PASSWORD`, `DOCKER_DOWN`, `NEO4J_UNREACHABLE`, `GRAPH_EMPTY`이며,
+빈 그래프는 먼저 `make sync`로 준비한다. 질문 오류는 다음 질문을 막지 않고 종료 코드 3으로
+보고한다. 성공(0행 및 합성 전용 건너뜀 포함)은 종료 코드 0이다.
+
+## 영상에서 제품 식별 (`product-id@v1`)
+
+텍스트로 제품에 연결하지 못한 YouTube·Instagram 최종 제품 소재에 한해,
+같은 브랜드의 PostgreSQL 제품 후보 안에서만 영상으로 식별한다. TikTok과 이미
+완료된 작업은 제외한다. v1 분류 축·E1은 변경하지 않는다. 영상은 앞 60초·fps 1이
+기본이며 Instagram은 기존 재조회·메모리 다운로드·Files 업로드 경로를 사용하고
+처리 직후 삭제한다. 결과는 별도 분석 작업에 원문·프롬프트 버전·시도 횟수와 함께
+저장하며 다음 `make sync ARGS="--layers 2"`에서 `basis=video`, `confidence=model`로
+연결한다. 텍스트로 이미 연결된 소재는 텍스트 판정을 유지한다.
+
+아래 명령은 사용자가 실행한다. 개발·검증 중에는 실제 호출하지 않는다.
+
+```bash
+make live-product-identify ARGS="--dry-run --sample 50 --seed 20261115"
+make live-product-identify ARGS="--sample 50 --seed 20261115 --sample-pairs 20 --thinking-level minimal --window-max-s 60"
+```
+
+`--dry-run`은 대상 수와 영상 길이×약 91토큰/초 비용을 **가정(미실측)**으로
+표시하고 영상 다운로드·모델 호출·작업 저장을 하지 않는다. 같은 모델의 원장 실측
+비용/입력 토큰이 있으면 출력·추론을 포함한 유효 단가로 사용하고, 없으면 입력
+$0.75/M을 가정한다. 후보 글자·출력·추론·재요청에 따라 실제 비용은 달라지며
+추정치는 판정 기준으로 쓰지 않는다.
+
+`--sample N`은 고정 시드로 N건만 처리하고 멈춘다. `--max-videos`는 추가 상한이다.
+요약에는 대상·처리·완료·보류·실패·대기, 새로 연결된 소재 수, 복수 제품 소재 수,
+근거별 연결 수, 원장 비용과 정밀도 확인용 무작위 20쌍(제목·캡션 앞 120자,
+YouTube 영상 주소 또는 Instagram permalink, 제품 이름)이 나온다. 사람이 표본을
+확인하고 **전체 실행 비용을 승인한 뒤에만** `--sample`을 빼고 `--approve-cost`를
+지정한다. 시작 전 Gemini 키·Docker·PostgreSQL·Gemini 누적액을 점검하며 상한은
+$12다. 일일 한도·크레딧 소진·인증·비용 상한에 걸리면 남은 작업은 대기로 두고
+멈춘다. 원인을 해결한 뒤 같은 명령으로 재개하면 완료 작업은 제외된다.
