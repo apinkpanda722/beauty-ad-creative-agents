@@ -218,6 +218,49 @@ MIGRATIONS: list[tuple[int, str, str]] = [
             CHECK (matched_by IN ('kor_exact', 'eng_name_exact'));
         """,
     ),
+    (
+        7,
+        "tenant_memory",
+        """
+        CREATE TABLE IF NOT EXISTS tenant_profiles (
+            tenant_id text NOT NULL PRIMARY KEY,
+            display_name text NOT NULL,
+            brand text NOT NULL,
+            own_product_url text NOT NULL,
+            tone text NOT NULL,
+            forbidden_terms jsonb NOT NULL
+                CHECK (jsonb_typeof(forbidden_terms) = 'array'),
+            price_band_pct double precision NOT NULL DEFAULT 30.0
+                CHECK (price_band_pct > 0 AND price_band_pct <= 100)
+        );
+        CREATE TABLE IF NOT EXISTS tenant_plans (
+            tenant_id text NOT NULL,
+            plan_id text NOT NULL,
+            thread_id text NOT NULL,
+            payload jsonb NOT NULL CHECK (jsonb_typeof(payload) = 'object'),
+            created_at timestamptz NOT NULL,
+            PRIMARY KEY (tenant_id, plan_id)
+        );
+        CREATE TABLE IF NOT EXISTS tenant_feedback (
+            id bigserial PRIMARY KEY,
+            tenant_id text NOT NULL,
+            plan_id text NOT NULL,
+            decision text NOT NULL CHECK (decision IN ('approved', 'rejected')),
+            reason text NOT NULL,
+            hook_type text,
+            claims jsonb NOT NULL CHECK (jsonb_typeof(claims) = 'array'),
+            created_at timestamptz NOT NULL,
+            updated_at timestamptz NOT NULL DEFAULT now()
+        );
+        CREATE INDEX IF NOT EXISTS tenant_feedback_tenant_created_idx
+            ON tenant_feedback (tenant_id, created_at);
+        CREATE TABLE IF NOT EXISTS tenant_threads (
+            thread_id text NOT NULL PRIMARY KEY,
+            tenant_id text NOT NULL,
+            created_at timestamptz NOT NULL DEFAULT now()
+        );
+        """,
+    ),
 ]
 
 # Fixed identifiers and SQL types, never caller input. Explicit casts preserve

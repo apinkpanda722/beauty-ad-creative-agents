@@ -236,12 +236,12 @@ def test_product_migration_v4_is_additive_repeatable_and_preserves_prior_version
     executed = []
     for _ in range(2):
         conn = FakeConnection([FakeCursor(), FakeCursor([(1,), (2,), (3,)])])
-        assert apply_migrations(conn) == [4, 5, 6]
+        assert apply_migrations(conn) == [4, 5, 6, 7]
         executed.append([query for query, _ in conn.calls if query == sql])
-        assert conn.commits == 3 and conn.rollbacks == 0
+        assert conn.commits == 4 and conn.rollbacks == 0
     assert executed == [[sql], [sql]]
     conn = FakeConnection(
-        [FakeCursor(), FakeCursor([(1,), (2,), (3,), (4,), (5,), (6,)])]
+        [FakeCursor(), FakeCursor([(1,), (2,), (3,), (4,), (5,), (6,), (7,)])]
     )
     assert apply_migrations(conn) == []
     assert not calls_for(conn, "CREATE TABLE IF NOT EXISTS products")
