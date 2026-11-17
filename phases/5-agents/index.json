@@ -19,7 +19,16 @@
     {
       "step": 3,
       "name": "checks",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-17T22:21:38+0900",
+      "summary": "기획안 도메인 계약·조회 Protocol·결정론 검사기와 합성 테스트 구현. unknown·규칙 0개 별도 노출, 아키텍처 검사 포함 make verify 통과(3,054 tests). 설치한 패키지 없음.",
+      "completed_at": "2026-11-17T22:30:53+0900",
+      "usage": {
+        "input_tokens": 1746982,
+        "cached_input_tokens": 1663360,
+        "output_tokens": 18158,
+        "attempts": 1
+      }
     },
     {
       "step": 4,
