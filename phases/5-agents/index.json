@@ -89,7 +89,16 @@
     {
       "step": 1,
       "name": "agent-api-skeleton",
-      "status": "pending"
+      "status": "blocked",
+      "started_at": "2026-11-17T23:14:11+0900",
+      "blocked_reason": "live_agent 요구사항과 계층 규칙이 충돌합니다. 요구사항: \"통과하면 앱을 프로세스 안에서(`httpx.ASGITransport`) 만들어 데모 테넌트(`--tenant`, 기본값 없음, 필수)로 `/chat` 한 건(`--message`)을 보내고 SSE 이벤트 종류와 최종 답, 비용(장부 증가분)을 출력한다.\" 반면 AGENTS.md는 \"| `api`, `pipeline` | 조립. 모든 런타임 계층을 import해 의존성을 연결한다 | domain~agents 전부(서로·eval 제외) |\" 및 \"| `httpx` | `sources` |\"로 제한합니다. tests/test_architecture.py도 pipeline→api와 pipeline의 httpx 사용을 금지하며, 이 step은 해당 가드 완화를 금지합니다. 진입점 배치 또는 계층 허용 규칙을 정정해야 합니다. 선점검 지시에 따라 구현 전에 중단했습니다.",
+      "blocked_at": "2026-11-17T23:14:58+0900",
+      "usage": {
+        "input_tokens": 90302,
+        "cached_input_tokens": 52608,
+        "output_tokens": 764,
+        "attempts": 1
+      }
     },
     {
       "step": 5,
