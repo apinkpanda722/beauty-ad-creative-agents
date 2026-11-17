@@ -177,3 +177,10 @@
 - **결과**: 미해결(step 0 구현 전). 이후 시험(sonnet·terra·네이티브)은 `computed`로 장부에 기록했다.
 - **근거**: `data/interim/probes/p5_step0_out.json`(미커밋), `data/manifest/costs.jsonl`.
 
+## 2026-11-17 P5 step 0이 reasoning_effort 원장 기록 요구와 수정 허용 범위가 충돌해 blocked됐다
+- **문제**: `llm-chat-models` step이 구현 전에 `blocked`로 보고됐다. `AGENTS.md`는 "에이전트마다 `reasoning_effort`를 명시하고 비용 원장에 기록한다"고 요구하지만 step 파일은 `obs/ledger.py`를 `cost_source`·목적 접두어 함수 추가로만 제한했고, `LedgerEntry`(`extra="forbid"`)에는 `reasoning_effort` 필드가 없었다.
+- **원인**: 설계 때 수정 허용 목록을 작업과만 대조하고 `AGENTS.md` CRITICAL의 "기록한다·명시한다" 항목이 필요로 하는 스키마 변경과는 대조하지 않았다(FP-C11과 같은 종류).
+- **해결**: `LedgerEntry`에 선택 필드 `reasoning_effort: str | None = None`(기본값으로 기존 행이 그대로 읽힌다)을 허용 목록과 작업에 넣었다. `/harness` 설계 원칙 13번과 FP-C12를 추가했다. 같은 대조를 step 0b·1에도 돌려 0b의 비동기 네이티브 경로가 사전 점검(가격표·상한)과 원장 기록 규칙을 공유하도록 step 0의 공용 헬퍼(`precheck_call`·`record_usage`)를 추가했다.
+- **결과**: 코드 변경 없이 중단돼 되돌릴 것이 없었다. 재실행 결과는 step 0 완료 뒤 보고한다.
+- **근거**: `phases/5-agents/step0.md`, `phases/5-agents/step0b.md`, `src/beautyads/obs/ledger.py`.
+

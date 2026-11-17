@@ -105,6 +105,13 @@ description: 이 프로젝트(beauty-ad-creative-agents)와 앞선 프로젝트 
 - **강제 수단**: /harness 설계 점검(`rg -n "apply_migrations|== \[[0-9, ]+\]|commits ==" tests/test_store.py`)과 /review 체크. `step_file_checks`의 소비자 경고(`apply_migrations` 심볼)가 신호다.
 - **출처**: 2026-11-17 P5 step 4 blocked, `phases/5-agents/index.json`, 이슈 #43
 
+### FP-C12 규칙이 요구하는 기록 항목이 step의 수정 허용 범위 밖의 스키마를 필요로 함
+- **증상**: P5 step 0이 구현 전에 `blocked`로 보고됐다. `AGENTS.md` CRITICAL은 "에이전트마다 `reasoning_effort`를 명시하고 비용 원장에 기록한다"고 요구하는데, step 파일은 `obs/ledger.py`를 "`cost_source` 값 추가와 목적 접두어 함수 추가에 한함"으로 제한했고 `LedgerEntry`는 `extra="forbid"`라 `reasoning_effort` 필드가 없었다. (FP-C11과 같은 종류의 선점검 충돌, 이번이 세 번째.)
+- **원인**: step 설계 때 수정 허용 목록을 작업과만 대조하고 `AGENTS.md` CRITICAL의 "기록한다·명시한다" 항목이 필요로 하는 스키마·파일 변경과는 대조하지 않았다.
+- **규칙**: step 설계 때 `AGENTS.md` CRITICAL의 "기록한다·명시한다·검사한다" 항목을 뽑아, 그 항목을 구현하는 파일·스키마(원장 필드, 설정, 테스트)가 수정 허용 경로에 있는지 대조한다. 없으면 허용 목록을 먼저 고친다. 새 호출 경로(예: 비동기 네이티브 경로)가 같은 규칙(상한 검사, 가격표, 원장 기록)을 공유하는지도 같이 본다.
+- **강제 수단**: `/harness` 설계 원칙 13번과 `/review` 체크. 기계 검사는 아직 없다.
+- **출처**: 2026-11-17 P5 step 0 blocked, 이슈 #43
+
 ---
 
 ## B에서 이식한 항목 (프로젝트 B `failure-patterns`의 번호)
