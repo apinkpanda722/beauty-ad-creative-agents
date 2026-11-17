@@ -103,7 +103,16 @@
     {
       "step": "5a",
       "name": "evidence-tools",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-17T23:31:07+0900",
+      "summary": "근거 확장 도구 3개·고정 Cypher·동결 백분위 정규화·live-evidence 점검 구현. 기존 15개 도구 보존, make verify 통과(3,580 tests). 실제 서비스 접속·패키지 설치 없음.",
+      "completed_at": "2026-11-17T23:39:13+0900",
+      "usage": {
+        "input_tokens": 1227515,
+        "cached_input_tokens": 1133824,
+        "output_tokens": 18468,
+        "attempts": 1
+      }
     },
     {
       "step": 5,
