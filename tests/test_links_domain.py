@@ -122,21 +122,70 @@ def test_names_in_title_and_caption_both_link_and_title_comes_first():
     assert links.multi_product
 
 
-def test_dalba_employee_best_five_video_links_all_five_products():
-    # Regression input: one video introducing five products of the same brand.
-    names = [
-        "워터풀 에센스 선크림",
-        "워터풀 톤업 선크림",
-        "화이트 트러플 퍼스트 스프레이 세럼",
-        "비타 토닝 캡슐 크림",
-        "그린 토마토 모공 세럼",
+# Real YouTube video zeM1xMSYNkQ (dalba), the multi-product regression input.
+DALBA_BEST5_TITLE = (
+    "달바 직원도 돈주고 사는 제품? 달바 직원들이 뽑은 달바 숨은 꿀템  BEST 5"
+)
+DALBA_BEST5_CAPTION = (
+    "직원 구매 TOP 5를 통해 화이트 트러플 스프레이 세럼, 더블 크림, 블루 톤업 선크림, "
+    "워터풀 에센스 선크림, 더블 세럼을 소개합니다."
+)
+DALBA_BEST5_NAMED = [
+    "화이트 트러플 스프레이 세럼",
+    "더블 크림",
+    "블루 톤업 선크림",
+    "워터풀 에센스 선크림",
+    "더블 세럼",
+]
+
+
+def test_dalba_best_five_links_every_product_named_in_the_caption():
+    # The five names the caption introduces, as five products of the brand.
+    products = [
+        product(name, brand="dalba", url=f"d{i}")
+        for i, name in enumerate(DALBA_BEST5_NAMED)
     ]
-    products = [product(n, brand="dalba", url=f"d{i}") for i, n in enumerate(names)]
-    title = "달바 직원 BEST 5 " + " / ".join(names)
-    links = match_products(creative(title, brand="dalba"), products)
+    links = match_products(
+        creative(
+            DALBA_BEST5_TITLE, DALBA_BEST5_CAPTION, brand="dalba", id="zeM1xMSYNkQ"
+        ),
+        products,
+    )
     assert links.status == "matched" and links.multi_product
-    assert {m.product.name_ko for m in links.matches} == set(names)
-    assert len(links.matches) == 5
+    assert [m.product.name_ko for m in links.matches] == DALBA_BEST5_NAMED
+    assert {m.basis for m in links.matches} == {"caption"}
+    assert {m.confidence for m in links.matches} == {"name_full"}
+
+
+def test_dalba_best_five_with_the_six_stored_dalba_products_links_only_one():
+    # Hand-computed from the real stored names and their machine-derived aliases:
+    # only the alias "워터풀 에센스 선크림" of "워터풀 에센스 선크림 50ml" is in the
+    # caption. The other four named products are not among the stored candidates,
+    # and aliases such as "워터풀 선크림"·"화이트 세럼" are not substrings of the text.
+    # This is the gap product identification from the video is meant to close.
+    stored = [
+        ("화이트 트러플 너리싱 트리트먼트 마스크", ("화이트 마스크",)),
+        ("화이트 트러플 더블 마스크팩 (진정/보습)", ()),
+        ("화이트 트러플 더블 레이어 세럼 펩타이드", ("화이트 세럼",)),
+        ("워터 베리어 안티 선 에이징 앰플", ("워터 앰플",)),
+        ("워터풀 에센스 선크림 50ml", ("워터풀 에센스 선크림", "워터풀 선크림")),
+        ("워터풀 톤업 선크림", ("워터풀 선크림",)),
+    ]
+    products = [
+        product(name, brand="dalba", url=f"s{i}", aliases=aliases)
+        for i, (name, aliases) in enumerate(stored)
+    ]
+    links = match_products(
+        creative(
+            DALBA_BEST5_TITLE, DALBA_BEST5_CAPTION, brand="dalba", id="zeM1xMSYNkQ"
+        ),
+        products,
+    )
+    assert links.status == "matched" and not links.multi_product
+    [only] = links.matches
+    assert only.product.name_ko == "워터풀 에센스 선크림 50ml"
+    assert only.basis == "caption" and only.confidence == "alias"
+    assert only.matched_text == "워터풀 에센스 선크림"
 
 
 def test_two_products_sharing_the_same_mention_are_ambiguous_and_not_linked():
