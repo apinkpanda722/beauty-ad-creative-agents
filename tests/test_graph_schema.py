@@ -69,3 +69,21 @@ def test_layer1_constraints_are_additive_and_repeatable():
         for statement in LAYER1_CONSTRAINTS:
             graph.run(statement)
     assert driver.calls == [(statement, {}) for statement in LAYER1_CONSTRAINTS] * 2
+
+
+def test_feedback_constraint_is_separate_composite_and_repeatable():
+    from beautyads.graph.schema import FEEDBACK_CONSTRAINTS, LAYER1_CONSTRAINTS
+
+    assert len(CONSTRAINTS) == 7 and len(LAYER1_CONSTRAINTS) == 10
+    assert len(FEEDBACK_CONSTRAINTS) == 1
+    assert not set(FEEDBACK_CONSTRAINTS).intersection(
+        (*CONSTRAINTS, *LAYER1_CONSTRAINTS)
+    )
+    statement = FEEDBACK_CONSTRAINTS[0]
+    assert "IF NOT EXISTS" in statement and "FOR (f:Feedback)" in statement
+    assert "(f.tenant_id, f.feedback_id) IS UNIQUE" in statement
+    driver = Driver()
+    graph = GraphConnection(driver)
+    for _ in range(2):
+        graph.run(statement)
+    assert driver.calls == [(statement, {})] * 2

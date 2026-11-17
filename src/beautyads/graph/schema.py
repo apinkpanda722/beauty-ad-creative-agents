@@ -50,6 +50,14 @@ LAYER1_CONSTRAINTS = (
 )
 
 
+FEEDBACK_CONSTRAINTS = (
+    (
+        "CREATE CONSTRAINT feedback_identity IF NOT EXISTS FOR (f:Feedback) "
+        "REQUIRE (f.tenant_id, f.feedback_id) IS UNIQUE"
+    ),
+)
+
+
 def apply_schema(graph: GraphConnection) -> None:
     for statement in CONSTRAINTS:
         graph.run(statement)

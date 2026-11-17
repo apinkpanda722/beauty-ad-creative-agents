@@ -2,6 +2,31 @@
 
 뷰티 광고 크리에이티브를 분석해 근거가 달린 기획안을 만드는 멀티에이전트 프로젝트.
 
+## sync: 피드백 패턴 (P5)
+
+사용자가 PostgreSQL의 `tenant_feedback`과 Neo4j를 준비한 뒤 실행한다.
+
+```bash
+make sync ARGS='--layers 3'
+make sync ARGS='--layers 3 --limit 50'
+make sync ARGS='--layers 3 --full --verify'
+```
+
+`--layers 3`은 `(tenant_id, feedback_id)`로 Feedback을 MERGE하고,
+`plan_id`·`decision`·UTC ISO 문자열 `created_at`을 기록한다.
+`ABOUT`은 훅(Hook)과 효능(Efficacy)의 전체 집합으로 같은 트랜잭션에서
+교체한다. 반려 사유 원문과 기획안 본문은 PostgreSQL에만 남긴다.
+테넌트 ID나 훅·효능·승인/반려 값이 유효하지 않으면 해당 Feedback 전체를
+쓰지 않고 `FEEDBACK_VALUE_INVALID`로 보고한다. 요약에는 `read`·`loaded`·
+`rejected`·`errors`와 그래프 생성 수·워터마크가 나온다.
+
+전용 워터마크는 `tenant_feedback_layer3_v1`이다. PostgreSQL `updated_at`을
+기준으로 10분 겹쳐 읽고, 모든 적재와 선택적 검증 성공 뒤에만 읽은 행의
+최대 변경 시각으로 갱신한다. 거부한 행도 읽은 수와 워터마크에 포함되며,
+수정 후 다시 반영하려면 원본 `updated_at`도 갱신하거나 `--full`을 쓴다.
+`--verify`는 같은 입력을 재적재해 속성과 `ABOUT` 집합이 같은지 확인한다.
+`--sample`은 3층에서 사용할 수 없다. 모델 호출이나 다운로드는 없다.
+
 ## live-graph (P4)
 
 PostgreSQL 원본에서 Creative와 분류 축(Hook·Angle·Format·Talent·CtaType)을

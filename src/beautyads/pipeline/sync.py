@@ -12,10 +12,12 @@ from urllib.parse import urlsplit
 
 from beautyads.analysis.models import FINAL_RUN_TAG
 from beautyads.domain.claims import ClaimRule
+from beautyads.domain.feedback_sync import FeedbackSyncSource
 from beautyads.domain.layer1 import Layer1SyncSource, Layer1Tables
 from beautyads.domain.links import DEFAULT_SAMPLE_PAIRS, DEFAULT_SEED, LinksSource
 from beautyads.domain.sync import SYNC_OVERLAP, GraphSyncSource
 from beautyads.graph.connection import GraphConnection, GraphError, connect_graph
+from beautyads.graph.feedback import load_feedback, read_feedback_state
 from beautyads.graph.layer1 import load_layer1, load_layer1_tables
 from beautyads.graph.layer2 import load_layer2, read_link_state
 from beautyads.graph.load import (
@@ -23,7 +25,11 @@ from beautyads.graph.load import (
     load_creatives,
     verify_counts,
 )
-from beautyads.graph.schema import LAYER1_CONSTRAINTS, apply_schema
+from beautyads.graph.schema import (
+    FEEDBACK_CONSTRAINTS,
+    LAYER1_CONSTRAINTS,
+    apply_schema,
+)
 from beautyads.settings import (
     DEFAULT_ENV_FILE,
     SettingError,
@@ -34,6 +40,7 @@ from beautyads.settings import (
 from beautyads.sources.claim_rules import load_claim_rules
 from beautyads.sources.split import load_brand_split
 from beautyads.store.connection import StoreConnectError, connect, postgres_dsn
+from beautyads.store.feedback_source import PostgresFeedbackSource
 from beautyads.store.layer1_source import PostgresLayer1Source
 from beautyads.store.links_source import PostgresLinksSource
 from beautyads.store.sync_source import PostgresGraphSyncSource
@@ -42,7 +49,7 @@ from .preflight import docker_running, tcp_reachable
 
 
 class SyncDeps(NamedTuple):
-    source: GraphSyncSource | Layer1SyncSource | LinksSource
+    source: GraphSyncSource | Layer1SyncSource | LinksSource | FeedbackSyncSource
     graph: GraphConnection
 
 
@@ -292,6 +299,51 @@ def run_layer2_sync(
     }
 
 
+def run_feedback_sync(
+    deps: SyncDeps,
+    *,
+    limit: int | None = None,
+    full: bool = False,
+    verify: bool = False,
+) -> dict:
+    """Project feedback patterns without exporting private PostgreSQL text."""
+    started = time.monotonic()
+    apply_schema(deps.graph)
+    for statement in (*LAYER1_CONSTRAINTS, *FEEDBACK_CONSTRAINTS):
+        deps.graph.run(statement)
+    watermark = deps.source.get_watermark()
+    since = None if full or watermark is None else watermark - SYNC_OVERLAP
+    items = deps.source.read_changed(since=since, limit=limit)
+    report = load_feedback(deps.graph, items)
+    if verify:
+        before = read_feedback_state(deps.graph, items)
+        replay = load_feedback(deps.graph, items)
+        after = read_feedback_state(deps.graph, items)
+        same = before == after
+        report["verification"] = {
+            "same_feedback": same,
+            "nodes_created": replay["nodes_created"],
+            "relationships_created": replay["relationships_created"],
+        }
+        # ABOUT replacement allocates edges again. Compare content, not counters.
+        if not same or replay["nodes_created"]:
+            raise GraphError("GRAPH_VERIFY_FAILED")
+    # Rejections are reported and skipped; write/replay failures never checkpoint.
+    # PostgreSQL updated_at alone drives this checkpoint, never graph counters.
+    if items:
+        latest = max(item.updated_at for item in items)
+        watermark = max(watermark, latest) if watermark is not None else latest
+        deps.source.set_watermark(watermark)
+    return {
+        **report,
+        "event": "summary",
+        "layers": "3",
+        "read": len(items),
+        "watermark": watermark.isoformat() if watermark is not None else None,
+        "elapsed_s": time.monotonic() - started,
+    }
+
+
 def _live_deps(
     *, environ, env_file, stack: ExitStack, layers: str | None = None
 ) -> SyncDeps:
@@ -303,6 +355,8 @@ def _live_deps(
         source = PostgresLayer1Source(connection)
     elif layers == "2":
         source = PostgresLinksSource(connection)
+    elif layers == "3":
+        source = PostgresFeedbackSource(connection)
     else:
         source = PostgresGraphSyncSource(connection)
     return SyncDeps(source, graph)
@@ -345,7 +399,7 @@ def main(
     parser.add_argument("--verify", action="store_true")
     # Omitted --layers retains step-zero/live-graph behavior. Explicit layer 2
     # adds links and its own source checkpoint to the creative/axis skeleton.
-    parser.add_argument("--layers", choices=("1", "2"))
+    parser.add_argument("--layers", choices=("1", "2", "3"))
     parser.add_argument(
         "--sample-pairs", type=_sample_pairs, default=DEFAULT_SAMPLE_PAIRS
     )
@@ -357,7 +411,7 @@ def main(
     if args.sample is not None and (args.limit is not None or args.full):
         print("PREFLIGHT_FAILED SYNC_OPTIONS_CONFLICT", file=out)
         return 2
-    if args.layers == "1" and args.sample is not None:
+    if args.layers in {"1", "3"} and args.sample is not None:
         print("PREFLIGHT_FAILED SYNC_OPTIONS_CONFLICT", file=out)
         return 2
     env_file = DEFAULT_ENV_FILE if environ is None else None
@@ -410,6 +464,13 @@ def main(
                     verify=args.verify,
                     sample_pairs=args.sample_pairs,
                     seed=args.seed,
+                )
+            elif args.layers == "3":
+                report = run_feedback_sync(
+                    deps,
+                    limit=args.limit,
+                    full=args.full,
+                    verify=args.verify,
                 )
             else:
                 report = run_sync(
