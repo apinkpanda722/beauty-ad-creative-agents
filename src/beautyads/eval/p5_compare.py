@@ -449,6 +449,11 @@ def _inputs(root, graph, runtime, rows, research_fn, now):
                 "input": index + 1,
                 "output_sha256": file_hash(path),
                 "input_sha256": _value_hash(brief),
+                "unresolved": [
+                    item
+                    for item in handoff["unresolved"]
+                    if re.fullmatch(r"[a-z_]+: [A-Z][A-Z0-9_]{0,63}", item)
+                ],
                 "calls": runtime.calls[start:],
                 **{
                     key: sum(call[key] for call in runtime.calls[start:])

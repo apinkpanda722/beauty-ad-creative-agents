@@ -724,3 +724,41 @@ def test_certification_tool_graph_failure_is_not_no_evidence(code, retryable, ct
         FakeGraph(error=GraphError(code)),
     )
     assert_failure(result, ToolErrorCode.GRAPH_UNAVAILABLE, retryable=retryable)
+
+
+@pytest.mark.parametrize(
+    "tool", [t for t in TOOLS if t.kind != ToolKind.display], ids=lambda t: t.name
+)
+def test_actual_neo4j_values_serialize_through_every_tool_boundary(tool, ctx):
+    from neo4j.time import Date, DateTime, Duration, Time
+
+    from beautyads.agents.tool_messages import tool_message_content
+
+    published = DateTime(2025, 1, 1, 1, 2, 3)
+    row = {
+        "creative_id": "youtube:synthetic",
+        "source": "youtube",
+        "channel_brand": "synthetic",
+        "views": 10,
+        "value": "question",
+        "published_at": published,
+        "date": Date(2025, 1, 1),
+        "time": Time(1, 2, 3),
+        "duration": Duration(days=1, seconds=2),
+    }
+    graph = FakeGraph([row])
+    output = run_tool(tool.name, valid_inputs(tool), ctx, graph)
+    assert isinstance(output, ToolResult)
+    output.model_dump(mode="json")
+    json.loads(output.model_dump_json())
+    json.dumps(output.top_rows, allow_nan=False)
+    payload = json.loads(tool_message_content(tool.name, output))
+    assert "failure" not in payload
+    assert payload["rows"]
+    if tool.name == "top_vs_bottom_axis":
+        # Ranking consumes the temporal column and returns band counts instead.
+        assert output.top_rows[0]["n_top"] == 1
+    else:
+        for key in ("published_at", "date", "time", "duration"):
+            assert payload["rows"][0][key] == row[key].iso_format()
+    assert graph.records[0]["published_at"] is published

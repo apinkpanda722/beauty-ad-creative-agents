@@ -39,6 +39,7 @@ from beautyads.graph.evidence_queries import (
     example_query,
 )
 from beautyads.graph.queries import QUESTIONS, question_parameters
+from beautyads.graph.values import to_json_safe
 
 PROMOTES_QUESTION_IDS = frozenset(
     {"CQ-04", "CQ-05", "CQ-06", "CQ-08", "CQ-13", "CQ-14", "CQ-15", "CQ-16"}
@@ -347,6 +348,11 @@ def _evidence_ids(rows: list[dict]) -> list[str]:
     return sorted(found)[:50]
 
 
+def _tool_records(graph: GraphReader, query: str, params: dict) -> list[dict]:
+    """Normalize all graph result branches without changing other consumers."""
+    return [to_json_safe(row) for row in graph.run(query, params).records]
+
+
 def run_tool(
     name: str,
     arguments: Mapping | str,
@@ -390,7 +396,7 @@ def run_tool(
 
         if name == "certified_products_by_kind":
             params = certification_parameters(cert=inputs["certification"])
-            rows = graph.run(certified_by_kind_query(), params).records
+            rows = _tool_records(graph, certified_by_kind_query(), params)
             summary = f"조회 결과 {len(rows)}행." if rows else "근거 없음."
             summary += (
                 " 식약처 보고 품목과 연결된 제품만 해당한다. "
@@ -417,7 +423,7 @@ def run_tool(
         params = question_parameters(
             question, as_of=ctx.as_of, inputs=inputs, context=context
         )
-        rows = graph.run(question.cypher, params).records
+        rows = _tool_records(graph, question.cypher, params)
         evidence_ids = _evidence_ids(rows)
         linked = tool.question_id in PROMOTES_QUESTION_IDS
         summary = f"조회 결과 {len(rows)}행." if rows else "근거 없음."
@@ -458,7 +464,7 @@ def _run_evidence_tool(tool, inputs, ctx, graph) -> ToolResult:
         query = axis_count_query(axis, basis)
     else:
         query = axis_rows_query(axis, basis)
-    rows = graph.run(query, params).records
+    rows = _tool_records(graph, query, params)
     band_summary = ""
     if operation == "rows":
         bands = split_top_bottom(rows, mature_before=params["mature_before"])

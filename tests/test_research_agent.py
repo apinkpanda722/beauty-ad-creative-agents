@@ -633,3 +633,79 @@ def test_structured_failure_still_preserves_successful_tool_counts():
     assert output["result_counts"] == [
         {"tool": EXAMPLE, "row_count": 7, "shown_count": 1, "truncated": True}
     ]
+
+
+@pytest.mark.parametrize("name", [EXAMPLE, "ingredient_ad_trend"])
+def test_actual_neo4j_rows_reach_raw_store_and_serializable_handoff(name):
+    from types import SimpleNamespace
+
+    from neo4j.time import Date, DateTime, Duration, Time
+
+    from beautyads.agents.tools import run_tool
+
+    row = {
+        "creative_id": "youtube:synthetic",
+        "published_at": DateTime(2025, 1, 1, 1, 2, 3),
+        "date": Date(2025, 1, 1),
+        "time": Time(1, 2, 3),
+        "duration": Duration(seconds=5),
+    }
+
+    class Graph:
+        def run(self, query, params=None):
+            return SimpleNamespace(records=[row])
+
+    arguments = {"category": "mask_pack"} if name == EXAMPLE else {}
+    chat = Chat([reply([call(name, arguments)]), reply()])
+    store, structured = {}, Structured(draft([row["creative_id"]]))
+    graph = build_research_graph(
+        ctx=CTX,
+        chat=chat,
+        tool_runner=lambda n, a, c: run_tool(n, a, c, Graph()),
+        structured=structured,
+        raw_store=store,
+    )
+    state = graph.invoke(initial_research_state(brief()))
+    assert state["handoff"]["status"] == "ok"
+    assert state["handoff"]["unresolved"] == []
+    assert state["tool_log"][0]["code"] is None
+    assert state["handoff"]["evidence_ids"] == [row["creative_id"]]
+    json.dumps(state, allow_nan=False)
+    json.dumps(store, allow_nan=False)
+    raw = store[state["raw_refs"][0]]
+    assert raw["top_rows"][0]["published_at"] == row["published_at"].iso_format()
+    for options in (chat.calls[1], structured.calls[0][1]):
+        observation = json.loads(options["messages"][1]["content"])["observations"][0]
+        assert "failure" not in observation
+        assert (
+            observation["rows"][0]["published_at"] == row["published_at"].iso_format()
+        )
+
+
+@pytest.mark.parametrize(
+    "value", ["synthetic-private-body", [], {"private": "synthetic-private-body"}]
+)
+def test_unknown_runner_shape_is_logged_and_handed_off_as_unreadable(value):
+    store = {}
+    chat = Chat([reply([call()]), reply()])
+    graph = build_research_graph(
+        ctx=CTX,
+        chat=chat,
+        tool_runner=lambda *args: value,
+        structured=Structured(),
+        raw_store=store,
+    )
+    state = graph.invoke(initial_research_state(brief()))
+    assert next(iter(store.values())) == value
+    assert state["tool_log"][0]["code"] == "TOOL_RESULT_UNREADABLE"
+    assert state["handoff"]["unresolved"] == [f"{EXAMPLE}: TOOL_RESULT_UNREADABLE"]
+    assert state["handoff"]["status"] == "no_evidence"
+    assert state["handoff"]["result_counts"] == []
+    assert state["evidence_pool"] == []
+    observation = json.loads(chat.calls[1]["messages"][1]["content"])["observations"][0]
+    assert observation == {
+        "tool": EXAMPLE,
+        "failure": "TOOL_RESULT_UNREADABLE",
+        "retryable": False,
+    }
+    assert "synthetic-private-body" not in json.dumps(state) + str(chat.calls)

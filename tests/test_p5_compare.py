@@ -771,3 +771,149 @@ def test_unexpected_failure_reports_only_safe_code_and_class(tmp_path, code):
     )
     assert SECRET not in output + text and PROSE not in output + text
     assert "private" not in output + text
+
+
+@pytest.mark.parametrize("unreadable", [False, True])
+def test_inputs_actual_neo4j_rows_and_unreadable_codes_save_offline(
+    tmp_path, unreadable
+):
+    from neo4j.time import Date, DateTime, Duration, Time
+
+    from beautyads.agents.research import run_research
+    from beautyads.llm.chat import ToolCall
+
+    temporal = DateTime(2025, 1, 1, 1, 2, 3)
+    stores = []
+
+    class TemporalGraph(FakeGraph):
+        def run(self, query, params=None):
+            if "unit_list_price" in query:
+                return super().run(query, params)
+            return SimpleNamespace(
+                records=[
+                    {
+                        "creative_id": "youtube:one",
+                        "published_at": temporal,
+                        "date": Date(2025, 1, 1),
+                        "time": Time(1, 2, 3),
+                        "duration": Duration(seconds=5),
+                    }
+                ]
+            )
+
+    class HandoffStructured:
+        stats = StructuredStats()
+
+        def generate(self, spec, **kw):
+            value = {
+                k: v for k, v in handoff().items() if k in spec.schema["properties"]
+            }
+            value["aggregates"] = []
+            return StructuredResult(True, spec.validate(value), None, 1, 0, [])
+
+    def research(brief, *, ctx, tool_runner, **kw):
+        responses = iter(
+            [
+                ChatResult(
+                    None,
+                    [
+                        ToolCall(
+                            "one",
+                            "find_example_creatives",
+                            {"category": brief["category"]},
+                            None,
+                        )
+                    ],
+                    "stop",
+                    {},
+                    0,
+                    "price_table",
+                    {},
+                ),
+                ChatResult(None, [], "stop", {}, 0, "price_table", {}),
+            ]
+        )
+        store = {}
+        stores.append(store)
+        return run_research(
+            brief,
+            ctx=ctx,
+            chat=lambda **kw: next(responses),
+            tool_runner=(lambda *args: {"private": SECRET})
+            if unreadable
+            else tool_runner,
+            structured=HandoffStructured(),
+            raw_store=store,
+        )
+
+    out, base = StringIO(), tmp_path / "new"
+    status = compare.main(
+        ["inputs"],
+        root=base,
+        environ={},
+        out=out,
+        prereg_check=lambda p: True,
+        check=lambda **kw: None,
+        graph_factory=TemporalGraph,
+        research_fn=research,
+        structured_factory=lambda *args: HandoffStructured(),
+        settings=Settings(ledger_path=tmp_path / "ledger"),
+    )
+    assert status == 0
+    report = json.loads(next(base.glob("*-inputs.json")).read_text())
+    assert report["complete"] is True and len(report["rows"]) == 5
+    expected = ["find_example_creatives: TOOL_RESULT_UNREADABLE"] if unreadable else []
+    for index, row in enumerate(report["rows"], 1):
+        assert row["unresolved"] == expected
+        path = base / "inputs" / f"{index:02}.json"
+        saved = json.loads(path.read_text())
+        assert saved["unresolved"] == expected
+        assert row["output_sha256"] == compare.file_hash(path)
+        assert saved["status"] == ("no_evidence" if unreadable else "ok")
+    assert SECRET not in out.getvalue() + json.dumps(report)
+    if not unreadable:
+        assert all(
+            next(iter(store.values()))["top_rows"][0]["published_at"]
+            == temporal.iso_format()
+            for store in stores
+        )
+
+
+def test_inputs_unresolved_report_retains_only_tool_and_code(tmp_path):
+    def research(*args, **kw):
+        return {
+            **handoff(),
+            "unresolved": [
+                "find_example_creatives: TOOL_RESULT_UNREADABLE",
+                "ingredient_ad_trend: GRAPH_UNAVAILABLE",
+                SECRET,
+                f"find_example_creatives: TOOL_RESULT_UNREADABLE {SECRET}",
+                f"private prose: {PROSE}",
+            ],
+        }
+
+    out, base = StringIO(), tmp_path / "new"
+    assert (
+        compare.main(
+            ["inputs"],
+            root=base,
+            environ={},
+            out=out,
+            prereg_check=lambda p: True,
+            check=lambda **kw: None,
+            graph_factory=FakeGraph,
+            research_fn=research,
+            settings=Settings(ledger_path=tmp_path / "ledger"),
+        )
+        == 0
+    )
+    report = json.loads(next(base.glob("*-inputs.json")).read_text())
+    assert all(
+        row["unresolved"]
+        == [
+            "find_example_creatives: TOOL_RESULT_UNREADABLE",
+            "ingredient_ad_trend: GRAPH_UNAVAILABLE",
+        ]
+        for row in report["rows"]
+    )
+    assert SECRET not in json.dumps(report) and PROSE not in json.dumps(report)

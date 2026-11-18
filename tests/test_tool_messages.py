@@ -205,7 +205,7 @@ def test_external_instructions_remain_only_a_json_row_value(text):
     ],
 )
 def test_unknown_shapes_are_readable_fallbacks(value):
-    expected = {"tool": NAME, "summary": "결과를 읽을 수 없다"}
+    expected = {"tool": NAME, "failure": "TOOL_RESULT_UNREADABLE", "retryable": False}
     assert tool_result_payload(NAME, value) == expected
     assert json.loads(tool_message_content(NAME, value)) == expected
 
@@ -229,7 +229,8 @@ def test_malformed_fields_never_raise(updates):
     raw = {**result().model_dump(), **updates}
     assert tool_result_payload(NAME, raw) == {
         "tool": NAME,
-        "summary": "결과를 읽을 수 없다",
+        "failure": "TOOL_RESULT_UNREADABLE",
+        "retryable": False,
     }
     assert json.loads(tool_message_content(NAME, raw)) == tool_result_payload(NAME, raw)
 
@@ -241,7 +242,8 @@ def test_circular_row_value_never_raises():
     raw["top_rows"] = [{"circular": circular}]
     assert json.loads(tool_message_content(NAME, raw)) == {
         "tool": NAME,
-        "summary": "결과를 읽을 수 없다",
+        "failure": "TOOL_RESULT_UNREADABLE",
+        "retryable": False,
     }
 
 
@@ -263,3 +265,46 @@ def test_partial_result_instruction_contract():
         PARTIAL_RESULT_RULE
         == "결과 중 일부만 보여줄 때는 전체 건수와 표시 건수를 함께 말한다."
     )
+
+
+@pytest.mark.parametrize("shape", ["string", "list", "dict", "fields", "circular"])
+def test_unreadable_results_emit_explicit_code_and_only_safe_log(shape, caplog):
+    secret = "synthetic-sensitive-row-value"
+    circular = []
+    circular.append(circular)
+    value = {
+        "string": secret,
+        "list": [secret],
+        "dict": {"private-column": secret},
+        "fields": {**result().model_dump(), "row_count": secret},
+        "circular": {
+            **result().model_dump(),
+            "top_rows": [{"private-column": circular, "private-value": secret}],
+        },
+    }[shape]
+    with caplog.at_level("WARNING", logger="beautyads.agents.tool_messages"):
+        payload = json.loads(tool_message_content(NAME, value))
+    assert payload == {
+        "tool": NAME,
+        "failure": "TOOL_RESULT_UNREADABLE",
+        "retryable": False,
+    }
+    assert len(caplog.records) == 1
+    record = caplog.records[0]
+    assert record.name == "beautyads.agents.tool_messages"
+    assert record.levelname == "WARNING"
+    assert record.getMessage() == f"TOOL_RESULT_UNREADABLE tool={NAME}"
+    assert record.exc_info is None
+    assert secret not in caplog.text
+    assert "private-column" not in caplog.text and "private-value" not in caplog.text
+
+
+def test_actual_neo4j_value_without_boundary_conversion_is_explicitly_unreadable():
+    from neo4j.time import DateTime
+
+    value = result(top_rows=[{"published_at": DateTime(2026, 11, 18)}])
+    assert json.loads(tool_message_content(NAME, value)) == {
+        "tool": NAME,
+        "failure": "TOOL_RESULT_UNREADABLE",
+        "retryable": False,
+    }

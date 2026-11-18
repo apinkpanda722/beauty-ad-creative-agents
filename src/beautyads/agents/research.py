@@ -15,6 +15,7 @@ from beautyads.agents.tool_messages import (
     MAX_ROWS,
     PARTIAL_RESULT_RULE,
     TOOL_DATA_RULE,
+    TOOL_RESULT_UNREADABLE,
     tool_result_payload,
 )
 from beautyads.agents.tools import TOOLS, get_tool, tool_definitions
@@ -27,7 +28,7 @@ from beautyads.domain.research import (
     restrict_evidence_ids,
 )
 from beautyads.domain.tenant import validate_tenant_id
-from beautyads.domain.tools import ToolContext, ToolFailure, ToolKind
+from beautyads.domain.tools import ToolContext, ToolFailure, ToolKind, ToolResult
 from beautyads.llm.structured import StructuredGenerator, StructuredSpec
 
 RESEARCH_REASONING_EFFORT = "none"
@@ -168,15 +169,25 @@ def build_research_graph(
             if code is None:
                 result = tool_runner(name, arguments, ctx)
                 # Save the full result, including UI data, outside LangGraph.
-                raw = result.model_dump(mode="json")
-                if isinstance(result, ToolFailure):
-                    code = result.code.value
-                else:
-                    pool.update(result.evidence_ids)
+                raw = (
+                    result.model_dump(mode="json")
+                    if isinstance(result, (ToolResult, ToolFailure))
+                    else result
+                )
             else:
                 raw = {"code": code}
             ref = f"research:{uuid4().hex}"
             raw_store[ref] = deepcopy(raw)
+            if code is None:
+                if (
+                    tool_result_payload(name, raw_store[ref]).get("failure")
+                    == TOOL_RESULT_UNREADABLE
+                ):
+                    code = TOOL_RESULT_UNREADABLE
+                elif isinstance(result, ToolFailure):
+                    code = result.code.value
+                else:
+                    pool.update(result.evidence_ids)
             refs.append(ref)
             log.append(
                 {
