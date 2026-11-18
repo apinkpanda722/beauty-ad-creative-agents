@@ -267,3 +267,9 @@
 - **해결**: step 9b(상한은 설정값 한 곳, 상한 종류 `limit_detail`, 가드 테스트 FP-C16), step 9c(평가 입력·척도·기획 프롬프트·`checks_passed`/`final_passed`·보고용 `pattern_alignment`·`--show-rationale`).
 - **결과**: 수정은 9b·9c 완료 뒤 보고. 사용자가 image 구성과 official 구성을 다시 실행해 확인한다.
 - **근거**: `src/beautyads/api/assembly.py`, `src/beautyads/agents/evaluation.py`, `src/beautyads/agents/planning.py`, `phases/5-agents/step9b.md`, `phases/5-agents/step9c.md`.
+
+## 2026-11-18 step 9d·9e가 선점검에서 연달아 blocked됐다(허용 범위가 함수 단위인데 작업이 인접 식별자를 요구)
+- **문제**: 9d는 허용 범위가 `TraceStructured`만 가리키는데 작업이 `summarize_by_tenant` 합산도 요구했고, 9e는 허용 범위가 `_SYSTEM`·버전 상수만인데 작업이 `_CRITERIA.fit` 설명 개정을 요구했다(코드 변경 없음).
+- **원인**: 허용 범위를 함수·상수 단위로 좁히면서 작업 문장의 식별자를 그 범위와 대조하지 않았다(7d의 개수 대조 점검이 식별자 단위까지 확장되지 않았다).
+- **해결**: 허용 범위에 해당 함수·상수를 명시하고 `/harness` 원칙 9에 "작업 문장의 모든 함수·상수·칸 이름이 허용 범위 안에 있는지 대조"를 추가했다. 9e의 같은 계열 누락(`IMAGE_NO_TEXT_CLAUSE` 상수, `build_trace` 연결, 요약 합산)도 함께 정정했다.
+- **근거**: `phases/5-agents/step9d.md`, `phases/5-agents/step9e.md`, `.claude/commands/harness.md`.

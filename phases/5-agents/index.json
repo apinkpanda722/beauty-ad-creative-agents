@@ -411,16 +411,7 @@
     {
       "step": "9e",
       "name": "weak-contrast-image-prompt",
-      "status": "blocked",
-      "started_at": "2026-11-18T20:14:10+0900",
-      "blocked_reason": "선점검에서 수정 범위 충돌을 발견했습니다. 허용 범위는 “`src/beautyads/agents/evaluation.py`(`_SYSTEM` 개정·`EVALUATION_PROMPT_VERSION` 갱신에 한함, 점수 스키마·검사 순서 불변)”인데, 작업은 “**`fit`의 점수 단계 설명에 \"한국어 광고 카피로서 자연스러운가\"(번역투·설명조·어색한 일반 질문이면 감점, 짧은 구어체로 소비자 상황에 맞으면 가점)를 포함한다**.”라고 요구하여 `_CRITERIA` 수정이 필요합니다. `_CRITERIA.fit` 수정도 허용하도록 범위를 명확히 해주세요. 코드는 수정하지 않았습니다.",
-      "blocked_at": "2026-11-18T20:14:55+0900",
-      "usage": {
-        "input_tokens": 65260,
-        "cached_input_tokens": 42752,
-        "output_tokens": 599,
-        "attempts": 1
-      }
+      "status": "pending"
     },
     {
       "step": "9f",
