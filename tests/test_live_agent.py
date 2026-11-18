@@ -41,6 +41,57 @@ def test_tenant_is_required():
     assert error.value.code == 2
 
 
+@pytest.mark.parametrize(
+    "code",
+    ["MIGRATIONS_PENDING", "POSTGRES_UNREACHABLE", "ENV_MISSING:POSTGRES_PASSWORD"],
+)
+def test_migration_guidance_is_only_added_for_pending_migrations(code):
+    out = StringIO()
+    codes = [code]
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("failed preflight must not invoke app")
+
+    assert (
+        live_agent.main(
+            ["--tenant", "demo-a", "--message", "synthetic"],
+            out=out,
+            check=lambda: codes,
+            run=forbidden,
+        )
+        == 2
+    )
+    assert codes == [code]
+    assert out.getvalue().splitlines()[0] == f"PREFLIGHT_FAILED {code}"
+    assert ("make db-migrate" in out.getvalue()) == (code == "MIGRATIONS_PENDING")
+
+
+def test_pending_migration_preflight_codes_are_unchanged_by_guidance():
+    codes = live_agent.preflight(
+        environ=dict.fromkeys(
+            ["OPENAI_API_KEY", "NEO4J_PASSWORD", "POSTGRES_PASSWORD"],
+            "synthetic-placeholder",
+        ),
+        env_file=None,
+        docker_check=lambda: True,
+        container_check=lambda name: True,
+        tcp_check=lambda *args: True,
+        migration_check=lambda: False,
+    )
+    assert codes == ["MIGRATIONS_PENDING"]
+    out = StringIO()
+    assert (
+        live_agent.main(
+            ["--tenant", "demo-a", "--message", "synthetic"],
+            check=lambda: codes,
+            out=out,
+        )
+        == 2
+    )
+    assert codes == ["MIGRATIONS_PENDING"]
+    assert "make db-migrate" in out.getvalue()
+
+
 def test_budget_guard_stops_before_app(tmp_path):
     def forbidden(*args, **kwargs):
         pytest.fail("over budget must not start app")

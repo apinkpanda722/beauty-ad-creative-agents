@@ -2,6 +2,27 @@
 
 뷰티 광고 크리에이티브를 분석해 근거가 달린 기획안을 만드는 멀티에이전트 프로젝트.
 
+## db-migrate
+
+PostgreSQL이 준비되고 `POSTGRES_PASSWORD`를 기존 설정 방식으로 설정한 뒤
+사용자가 실행한다. 수집·분석 없이 기존 저장소의 미적용 마이그레이션만 적용한다.
+`live-agent`가 `MIGRATIONS_PENDING`으로 멈추면 이 명령을 실행한 뒤 다시 시도한다.
+
+```bash
+make db-migrate
+# 모듈을 직접 실행할 수도 있다.
+uv run python -m beautyads.pipeline.migrate
+```
+
+성공하면 `MIGRATIONS_APPLIED [4, 5, 6, 7]`처럼 이번에 적용된 정수 버전 목록만
+한 줄 출력하고 종료 코드 0으로 끝난다. 이미 모두 적용됐다면
+`MIGRATIONS_APPLIED []`를 출력하므로 반복 실행할 수 있다.
+설정 누락(빈 문자열·공백 포함)은
+`PREFLIGHT_FAILED ENV_MISSING:POSTGRES_PASSWORD`, 접속 실패는
+`PREFLIGHT_FAILED POSTGRES_UNREACHABLE`만 출력하며 종료 코드 2로 끝난다.
+접속 후 마이그레이션 오류는 호출자에게 전파하고 연결은 항상 닫는다.
+이 명령은 사용자가 직접 실행하며 `make verify`에는 포함되지 않는다.
+
 ## live-agent (P5 요청 뼈대)
 
 사용자가 PostgreSQL 마이그레이션·Neo4j 제품 그래프와 서비스를 준비하고 실행한다.

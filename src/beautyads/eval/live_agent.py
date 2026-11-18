@@ -221,6 +221,8 @@ def main(argv=None, *, out: TextIO | None = None, check=None, run=None, settings
         if problems:
             for code in problems:
                 print(f"PREFLIGHT_FAILED {code}", file=out)
+                if code == "MIGRATIONS_PENDING":
+                    print("make db-migrate를 실행하라", file=out)
             return 2
         settings = load_settings() if settings is None else settings
         if (
