@@ -243,14 +243,16 @@
     {
       "step": "6d",
       "name": "dev-compare",
-      "status": "pending",
+      "status": "completed",
       "started_at": "2026-11-18T14:58:31+0900",
       "usage": {
-        "input_tokens": 53184,
-        "cached_input_tokens": 23936,
-        "output_tokens": 476,
+        "input_tokens": 2144097,
+        "cached_input_tokens": 2040832,
+        "output_tokens": 23718,
         "attempts": 1
-      }
+      },
+      "summary": "live-compare 입력 생성·terra/sonnet 비교·사전 등록/해시/비용 가드·안전한 결과 저장과 합성 테스트 구현. make verify 통과(4,202 tests). 실제 서비스 호출·패키지 설치 없음.",
+      "completed_at": "2026-11-18T15:11:24+0900"
     },
     {
       "step": 7,
