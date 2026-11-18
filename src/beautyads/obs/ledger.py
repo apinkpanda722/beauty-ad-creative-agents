@@ -117,3 +117,16 @@ def check_purpose_cap(
     total = purpose_total(path, prefix)
     if total + additional_usd >= cap:
         raise CostCapExceeded(f"purpose:{prefix}", total, cap)
+
+
+def ledger_total(path: Path, *, exclude_purpose_prefix: str | None = None) -> float:
+    """Sum every provider, optionally excluding one exact purpose family."""
+    return fsum(
+        entry.cost_usd
+        for entry in read_entries(path).entries
+        if exclude_purpose_prefix is None
+        or not (
+            entry.purpose == exclude_purpose_prefix
+            or entry.purpose.startswith(exclude_purpose_prefix + "-")
+        )
+    )

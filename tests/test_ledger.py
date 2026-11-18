@@ -224,3 +224,24 @@ def test_purpose_totals_and_cap_boundaries(tmp_path, entry):
             check_purpose_cap(path, "image", cap)
     with pytest.raises(CostCapExceeded):
         check_purpose_cap(tmp_path / "absent", "image", 0)
+
+
+def test_ledger_total_all_providers_and_exact_purpose_boundary(tmp_path, entry):
+    from beautyads.obs.ledger import ledger_total
+
+    path = tmp_path / "costs.jsonl"
+    assert ledger_total(path) == 0.0
+    assert ledger_total(path, exclude_purpose_prefix="image") == 0.0
+    assert not path.exists()
+    for provider in ("gemini", "openai", "anthropic"):
+        for purpose in ("image", "image-plan", "image-probe", "imagery", "plan"):
+            append_entry(
+                path,
+                entry.model_copy(update={"provider": provider, "purpose": purpose}),
+            )
+    assert ledger_total(path) == 3.75
+    assert ledger_total(path, exclude_purpose_prefix="image") == 1.5
+    assert ledger_total(path, exclude_purpose_prefix="absent") == 3.75
+    with path.open("a") as stream:
+        stream.write("{malformed\n")
+    assert ledger_total(path) == 3.75
