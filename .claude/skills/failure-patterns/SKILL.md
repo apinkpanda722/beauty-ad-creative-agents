@@ -104,7 +104,7 @@ description: 이 프로젝트(beauty-ad-creative-agents)와 앞선 프로젝트 
 - **규칙**: 마이그레이션 버전·커밋 횟수·적용 완료 목록을 하드코딩한 단언은 새 버전을 추가하는 step의 수정 허용 목록에 **갱신 허용**으로 명시한다. 갱신할 줄(`apply_migrations` 반환 목록, 커밋 횟수, 적용 완료 픽스처)을 구체적으로 적고 갱신 뒤에도 정확 일치를 유지하며(`>=`·길이만 보는 단언으로 바꾸지 않는다) 그 밖의 단언은 약화하지 않는다.
 - **강제 수단**: /harness 설계 점검(`rg -n "apply_migrations|== \[[0-9, ]+\]|commits ==" tests/test_store.py`)과 /review 체크. `step_file_checks`의 소비자 경고(`apply_migrations` 심볼)가 신호다.
 - **출처**: 2026-11-17 P5 step 4 blocked, `phases/5-agents/index.json`, 이슈 #43
-- **추가 사례(2026-11-18, P5 step 5b)**: 등록 목록(도구·질의 표)을 닫힌 집합으로 단언하는 테스트(`test_registry_is_stable_described_and_closed`가 비표시 도구를 `QUESTION_IDS`·`EVIDENCE_INPUTS`에 있는 것으로 제한)도 같은 충돌을 냈다. 새 항목을 추가하는 step의 수정 허용 목록에는 그 테스트의 분류 표에 **새 항목을 추가하는 확장**을 명시한다(기존 항목의 검증 조건 불변, 약화·삭제 금지, 새 항목은 별도 분기로 실제 검증).
+- **추가 사례(2026-11-18, P5 step 5b)**: 등록 목록(도구·질의 표)을 닫힌 집합으로 단언하는 테스트(`test_registry_is_stable_described_and_closed`가 비표시 도구를 `QUESTION_IDS`·`EVIDENCE_INPUTS`에 있는 것으로 제한)도 같은 충돌을 냈다. 새 항목을 추가하는 step의 수정 허용 목록에는 그 테스트의 분류 표뿐 아니라 **그 표를 쓰는 헬퍼·매개변수화 목록까지**(예: `valid_inputs`, 입력 상수, `TOOLS`를 매개변수화한 테스트의 대상 목록) **새 항목을 추가하는 확장**을 명시한다(기존 항목의 검증 조건·입력 상수 값 불변, 약화·삭제 금지, 새 항목은 별도 분기로 실제 검증). P5 step 5b는 분류 표만 허용했다가 같은 파일에서 두 번 중단됐다.
 
 ### FP-C12 규칙이 요구하는 기록 항목이 step의 수정 허용 범위 밖의 스키마를 필요로 함
 - **증상**: P5 step 0이 구현 전에 `blocked`로 보고됐다. `AGENTS.md` CRITICAL은 "에이전트마다 `reasoning_effort`를 명시하고 비용 원장에 기록한다"고 요구하는데, step 파일은 `obs/ledger.py`를 "`cost_source` 값 추가와 목적 접두어 함수 추가에 한함"으로 제한했고 `LedgerEntry`는 `extra="forbid"`라 `reasoning_effort` 필드가 없었다. (FP-C11과 같은 종류의 선점검 충돌, 이번이 세 번째.)

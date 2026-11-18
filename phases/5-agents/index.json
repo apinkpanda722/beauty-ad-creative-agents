@@ -173,16 +173,14 @@
     {
       "step": "5b",
       "name": "certified-by-claim",
-      "status": "blocked",
+      "status": "pending",
       "started_at": "2026-11-18T14:10:05+0900",
       "usage": {
         "input_tokens": 225227,
         "cached_input_tokens": 159104,
         "output_tokens": 2934,
         "attempts": 1
-      },
-      "blocked_reason": "선점검에서 수정 범위 충돌을 발견했습니다. 요구사항: “도구 `certified_products_by_kind`(종류 `lookup`)를 **추가**한다.” 제한: “`tests/test_agent_tools.py`(케이스 추가와, `test_registry_is_stable_described_and_closed`의 도구 분류 표(`QUESTION_IDS`·`EVIDENCE_INPUTS`)에 새 도구를 위한 항목(분기)을 추가하는 확장에 한함.” 새 도구는 question_id=None이므로 기존 valid_inputs()에 분기가 없으면 QUESTIONS[None]에서 실패합니다. EVIDENCE_INPUTS에 추가하면 기존 근거 도구 테스트가 category_basis를 전달하여 새 입력의 extra=\"forbid\" 규칙과 충돌합니다. valid_inputs()와 관련 매개변수화의 확장도 허용하도록 수정 범위 조정이 필요합니다. 파일 수정·실제 서비스 접속·패키지 설치는 하지 않았습니다.",
-      "blocked_at": "2026-11-18T14:22:03+0900"
+      }
     },
     {
       "step": "5c",

@@ -212,3 +212,10 @@
 - **결과**: 코드 변경 없이 중단돼 되돌릴 것이 없었다. 재실행 결과는 step 5b 완료 뒤 보고한다.
 - **근거**: `phases/5-agents/step5b.md`, `tests/test_agent_tools.py`.
 
+## 2026-11-18 P5 step 5b가 같은 테스트 파일에서 두 번째로 blocked됐다
+- **문제**: 첫 수정(분류 표 `QUESTION_IDS`·`EVIDENCE_INPUTS`에 새 도구 분기 추가 허용) 뒤 재실행에서도 `blocked`됐다. 새 도구는 `question_id`가 `None`이라 `valid_inputs()`에 분기가 없으면 `QUESTIONS[None]`에서 실패하고, `EVIDENCE_INPUTS`에 넣으면 기존 근거 도구 테스트가 `category_basis`를 전달해 새 도구의 `extra="forbid"` 입력과 충돌했다.
+- **원인**: 첫 수정이 분류 표만 허용하고 그 표를 쓰는 헬퍼(`valid_inputs`)와 `TOOLS`를 매개변수화한 테스트의 대상 목록은 허용하지 않았다. 이 파일의 도구 순회 지점을 전부 확인하지 않고 허용 범위를 정했다.
+- **해결**: 허용 문구를 "도구 목록을 분류하거나 순회하는 테스트 구조 전체에 새 도구 항목을 추가하는 확장"으로 일반화했다(기존 검증 조건·입력 상수 값 불변, 약화·삭제 금지, `question_id`가 없는 도구를 동결 질의 전용 테스트에서 제외하는 곳은 이유 주석과 별도 검증). FP-C11 사례를 보강했다.
+- **결과**: 코드 변경 없이 중단돼 되돌릴 것이 없었다. 재실행 결과는 step 5b 완료 뒤 보고한다.
+- **근거**: `phases/5-agents/step5b.md`, `tests/test_agent_tools.py`.
+
