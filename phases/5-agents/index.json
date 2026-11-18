@@ -453,7 +453,16 @@
     {
       "step": "9h",
       "name": "no-band-product-line",
-      "status": "pending"
+      "status": "blocked",
+      "started_at": "2026-11-18T21:42:23+0900",
+      "blocked_reason": "선점검에서 요구사항과 수정 제한의 충돌을 확인했습니다. 요구사항은 “**`cta` 영역은 그 위로 올린다**(영역끼리 겹치지 않고 `headline` 영역은 그대로이며, 모든 영역은 이미지 경계·여백 안, `cta`·`product`는 높이 75% 아래에서 시작).”이고, 금지사항은 “허용 목록 밖의 기존 단언을 바꾸거나 새 상수 값을 테스트에 `== 0.03`처럼 굳히지 마라.”입니다. 그런데 test_png_dimensions_safe_regions_and_original_pixels의 변경 불허된 기존 단언은 CTA 상자를 이전 하단 영역(y=912~973)에 요구합니다. 새 제품 영역은 y=927~973이므로 CTA는 y=927 위에 있어야 하며, 기존 가짜 폰트의 CTA 글자 높이 26px는 남은 15px에 들어가지 않습니다. 이 테스트의 CTA 경계 단언도 layout_regions()[\"cta\"] 기준으로 수정하도록 허용해야 합니다. 코드 수정과 make verify는 수행하지 않았습니다.",
+      "blocked_at": "2026-11-18T21:43:51+0900",
+      "usage": {
+        "input_tokens": 199481,
+        "cached_input_tokens": 155136,
+        "output_tokens": 1928,
+        "attempts": 1
+      }
     }
   ],
   "created_at": "2026-11-17T22:15:36+0900"
