@@ -9,9 +9,11 @@ from beautyads.store.connection import (
 )
 from beautyads.store.repository import PostgresCreativeStore
 from beautyads.store.schema import apply_migrations
+from beautyads.store.tenant_repository import PostgresTenantRepository
 
 __all__ = [
     "PostgresCreativeStore",
+    "PostgresTenantRepository",
     "SqlConnection",
     "SqlCursor",
     "StoreConnectError",

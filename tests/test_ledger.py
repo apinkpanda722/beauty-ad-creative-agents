@@ -175,3 +175,73 @@ def test_ledger_functions_have_no_default_path(tmp_path):
     assert inspect.signature(check_cap).parameters["additional_usd"].kind == (
         inspect.Parameter.KEYWORD_ONLY
     )
+
+
+@pytest.mark.parametrize(
+    "source", ["response_cost", "computed", "missing", "price_table"]
+)
+@pytest.mark.parametrize("effort", [None, "none", "low", "medium", "high"])
+def test_chat_metadata_roundtrip(tmp_path, entry, source, effort):
+    item = LedgerEntry.model_validate(
+        {**entry.model_dump(), "cost_source": source, "reasoning_effort": effort}
+    )
+    path = tmp_path / "costs.jsonl"
+    append_entry(path, item)
+    assert read_entries(path).entries == [item]
+    assert read_entries(path).entries[0].reasoning_effort == effort
+
+
+def test_legacy_row_without_reasoning_effort(tmp_path, entry):
+    raw = entry.model_dump(mode="json")
+    raw.pop("reasoning_effort", None)
+    path = tmp_path / "legacy.jsonl"
+    path.write_text(json.dumps(raw) + "\n", encoding="utf-8")
+    assert read_entries(path).entries[0].reasoning_effort is None
+    assert read_entries(path).skipped_lines == 0
+
+
+@pytest.mark.parametrize("effort", [1, 1.0, [], {}, True])
+def test_reasoning_effort_rejects_non_strings(entry, effort):
+    with pytest.raises(ValidationError):
+        LedgerEntry.model_validate({**entry.model_dump(), "reasoning_effort": effort})
+
+
+def test_purpose_totals_and_cap_boundaries(tmp_path, entry):
+    from beautyads.obs import check_purpose_cap, purpose_total
+
+    path = tmp_path / "costs.jsonl"
+    assert purpose_total(path, "image") == 0
+    for purpose in ("image", "image-probe", "image-plan", "imagery", "probe-image"):
+        append_entry(path, entry.model_copy(update={"purpose": purpose}))
+    assert purpose_total(path, "image") == 0.75
+    check_purpose_cap(path, "image", 1.0, additional_usd=0.249)
+    for additional in (0.25, 0.26):
+        with pytest.raises(CostCapExceeded) as caught:
+            check_purpose_cap(path, "image", 1.0, additional_usd=additional)
+        assert caught.value.code == "COST_CAP:purpose:image"
+    for cap in (0.75, 0.5):
+        with pytest.raises(CostCapExceeded):
+            check_purpose_cap(path, "image", cap)
+    with pytest.raises(CostCapExceeded):
+        check_purpose_cap(tmp_path / "absent", "image", 0)
+
+
+def test_ledger_total_all_providers_and_exact_purpose_boundary(tmp_path, entry):
+    from beautyads.obs.ledger import ledger_total
+
+    path = tmp_path / "costs.jsonl"
+    assert ledger_total(path) == 0.0
+    assert ledger_total(path, exclude_purpose_prefix="image") == 0.0
+    assert not path.exists()
+    for provider in ("gemini", "openai", "anthropic"):
+        for purpose in ("image", "image-plan", "image-probe", "imagery", "plan"):
+            append_entry(
+                path,
+                entry.model_copy(update={"provider": provider, "purpose": purpose}),
+            )
+    assert ledger_total(path) == 3.75
+    assert ledger_total(path, exclude_purpose_prefix="image") == 1.5
+    assert ledger_total(path, exclude_purpose_prefix="absent") == 3.75
+    with path.open("a") as stream:
+        stream.write("{malformed\n")
+    assert ledger_total(path) == 3.75

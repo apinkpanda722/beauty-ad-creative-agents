@@ -7,7 +7,9 @@ from beautyads.obs.ledger import (
     Provider,
     append_entry,
     check_cap,
+    check_purpose_cap,
     provider_total,
+    purpose_total,
     read_entries,
 )
 
@@ -18,6 +20,8 @@ __all__ = [
     "Provider",
     "append_entry",
     "check_cap",
+    "check_purpose_cap",
     "provider_total",
+    "purpose_total",
     "read_entries",
 ]

@@ -2,6 +2,82 @@
 
 뷰티 광고 크리에이티브를 분석해 근거가 달린 기획안을 만드는 멀티에이전트 프로젝트.
 
+## db-migrate
+
+PostgreSQL이 준비되고 `POSTGRES_PASSWORD`를 기존 설정 방식으로 설정한 뒤
+사용자가 실행한다. 수집·분석 없이 기존 저장소의 미적용 마이그레이션만 적용한다.
+`live-agent`가 `MIGRATIONS_PENDING`으로 멈추면 이 명령을 실행한 뒤 다시 시도한다.
+
+```bash
+make db-migrate
+# 모듈을 직접 실행할 수도 있다.
+uv run python -m beautyads.pipeline.migrate
+```
+
+성공하면 `MIGRATIONS_APPLIED [4, 5, 6, 7]`처럼 이번에 적용된 정수 버전 목록만
+한 줄 출력하고 종료 코드 0으로 끝난다. 이미 모두 적용됐다면
+`MIGRATIONS_APPLIED []`를 출력하므로 반복 실행할 수 있다.
+설정 누락(빈 문자열·공백 포함)은
+`PREFLIGHT_FAILED ENV_MISSING:POSTGRES_PASSWORD`, 접속 실패는
+`PREFLIGHT_FAILED POSTGRES_UNREACHABLE`만 출력하며 종료 코드 2로 끝난다.
+접속 후 마이그레이션 오류는 호출자에게 전파하고 연결은 항상 닫는다.
+이 명령은 사용자가 직접 실행하며 `make verify`에는 포함되지 않는다.
+
+## live-agent (P5 요청 뼈대)
+
+사용자가 PostgreSQL 마이그레이션·Neo4j 제품 그래프와 서비스를 준비하고 실행한다.
+`OPENAI_API_KEY`, `NEO4J_PASSWORD`, `POSTGRES_PASSWORD`를 기존 설정 방식으로
+준비한다. 다음 명령은 개발·검증 과정에서 실행하지 않으며 `verify`에도 포함하지 않는다.
+
+```bash
+make live-agent ARGS='--tenant demo-a --message "기능성 인증에 연결된 제품을 알려줘" --max-usd 0.02'
+```
+
+`--tenant`와 `--message`는 필수다. 키 설정 여부(이름만), 컨테이너·포트·기존
+마이그레이션을 점검하고 실패하면 `PREFLIGHT_FAILED <이유 코드>`와 종료 코드 2로
+끝난다. 점검을 통과하면 앱 lifespan 안에서 체크포인터 풀을 열고 `setup()`한 뒤,
+프로세스 안에서 `/chat` 한 건을 호출하고 자원을 닫는다. SSE 이벤트 종류·최종 답·
+원장 비용 증가분을 출력한다. HTTP/SSE 실행 실패는 종료 코드 3이다.
+
+모델은 `gpt-6-luna`, `reasoning_effort="none"`이며 조회 도구는
+`lookup_certified_products` 하나다. 모델은 최대 두 번 호출한다.
+`--max-usd`(기본 $0.02)는 **모델 한 호출**의 예상 비용 상한이다. 호출마다
+UTF-8 입력 크기·가격표·출력 최대 1,024토큰으로 보수적으로 추정하고
+초과하면 호출 전에 멈춘다. 공급사 누적액 상한도 기존 원장으로 검사한다.
+
+데모 세션은 `X-Tenant-Id` 헤더이며 인증 기능은 아니다. 조립의 허용 목록과
+thread 소유권을 그래프 실행 전에 검사한다. `/chat` 본문은 `message`와 선택
+`thread_id`만 받는다. 새 thread는 `X-Thread-Id` 응답 헤더로 돌려준다.
+`step`·`tool_start`·`token` 이벤트를 보내며, 예외는 코드만 담은 `error`로 닫는다.
+`/healthz`는 의존 서비스를 조회하지 않는다. PostgreSQL 원본의 마지막 수집 시각을
+프롬프트에 넣고, 수집 기록이 없으면 unknown으로 표시한다.
+Supervisor·역할별 에이전트·화면 명령 생성은 이후 step의 범위다.
+
+## sync: 피드백 패턴 (P5)
+
+사용자가 PostgreSQL의 `tenant_feedback`과 Neo4j를 준비한 뒤 실행한다.
+
+```bash
+make sync ARGS='--layers 3'
+make sync ARGS='--layers 3 --limit 50'
+make sync ARGS='--layers 3 --full --verify'
+```
+
+`--layers 3`은 `(tenant_id, feedback_id)`로 Feedback을 MERGE하고,
+`plan_id`·`decision`·UTC ISO 문자열 `created_at`을 기록한다.
+`ABOUT`은 훅(Hook)과 효능(Efficacy)의 전체 집합으로 같은 트랜잭션에서
+교체한다. 반려 사유 원문과 기획안 본문은 PostgreSQL에만 남긴다.
+테넌트 ID나 훅·효능·승인/반려 값이 유효하지 않으면 해당 Feedback 전체를
+쓰지 않고 `FEEDBACK_VALUE_INVALID`로 보고한다. 요약에는 `read`·`loaded`·
+`rejected`·`errors`와 그래프 생성 수·워터마크가 나온다.
+
+전용 워터마크는 `tenant_feedback_layer3_v1`이다. PostgreSQL `updated_at`을
+기준으로 10분 겹쳐 읽고, 모든 적재와 선택적 검증 성공 뒤에만 읽은 행의
+최대 변경 시각으로 갱신한다. 거부한 행도 읽은 수와 워터마크에 포함되며,
+수정 후 다시 반영하려면 원본 `updated_at`도 갱신하거나 `--full`을 쓴다.
+`--verify`는 같은 입력을 재적재해 속성과 `ABOUT` 집합이 같은지 확인한다.
+`--sample`은 3층에서 사용할 수 없다. 모델 호출이나 다운로드는 없다.
+
 ## live-graph (P4)
 
 PostgreSQL 원본에서 Creative와 분류 축(Hook·Angle·Format·Talent·CtaType)을
@@ -1138,3 +1214,74 @@ YouTube 영상 주소 또는 Instagram permalink, 제품 이름)이 나온다. �
 지정한다. 시작 전 Gemini 키·Docker·PostgreSQL·Gemini 누적액을 점검하며 상한은
 $12다. 일일 한도·크레딧 소진·인증·비용 상한에 걸리면 남은 작업은 대기로 두고
 멈춘다. 원인을 해결한 뒤 같은 명령으로 재개하면 완료 작업은 제외된다.
+
+## 근거 도구 읽기 전용 점검 (`live-evidence`)
+
+그래프를 준비한 뒤 **사용자가 직접** `make live-evidence`를 실행한다.
+Neo4j 접속 설정·Docker·접속 가능 여부를 기존 `live-cq`와 같은 사전 점검으로
+확인한다. 모델 호출과 쓰기 작업은 없고 비용은 0이며 `make verify`에 포함하지 않는다.
+
+지원 카테고리 3종에 대해 같은 서버 기준일·출처(YouTube·Instagram)로 새 훅 질의의
+`product_link` 결과와 동결 CQ-06의 `(creative_id, hook)` 집합이 같은지 확인한다.
+다르면 차이 개수를 출력하고 즉시 종료 코드 3으로 멈춘다. 같으면 `creative_label`과
+`product_link`의 결과 건수, 소재 ID 교집합과 양쪽 차집합 개수를 출력한다.
+두 기준의 카테고리 출처가 다르므로 포함 관계를 가정하지 않는다.
+
+새 도구의 `category_basis` 기본값 `creative_label`은 **모델 라벨 기준(E1 채점 전)**이다.
+`product_link`는 **제품 연결 기준(연결된 소재만)**이며 제품 단위 성분 주장이 필요하면
+명시적으로 선택한다. 상위·하위 비교는 출처·브랜드를 채널 대용으로 쓰고 게시 14일
+이상 소재의 조회수 백분위를 따른다. TikTok에는 적용하지 않으며 기술적 비교는 인과를
+뜻하지 않는다. 표본이 한쪽이라도 10건 미만이면 표본 부족을 표시한다.
+
+성공은 종료 코드 0, 사전 점검·접속 오류는 이유 코드와 종료 코드 2다.
+설정 값·인증 정보·개별 소재 원문은 출력하지 않는다.
+
+## live-compare (P5 개발 비교)
+
+사용자가 Neo4j 제품·소재 그래프, 두 dev 제품의 단위당 정가와 기존 키 설정을
+준비하고 실행한다. `OPENAI_API_KEY`(inputs·terra), `ANTHROPIC_API_KEY`(sonnet),
+`NEO4J_PASSWORD`가 필요하다. 실제 호출은 `make verify`에 포함되지 않는다.
+
+```bash
+make live-compare ARGS='inputs'
+# 출력된 01.json ~ 05.json의 sha256을 사전 등록 파일 §7에 추가하고 커밋한다.
+make live-compare ARGS='terra'
+make live-compare ARGS='sonnet'
+```
+
+[사전 등록 기준](docs/results/p5_dev_compare_preregistration.md)이 커밋되지 않았거나
+작업 트리에서 수정됐으면 `PREREGISTRATION_NOT_COMMITTED`로 종료한다(코드 2).
+`inputs`는 고정 브리프 5건을 mixsoon 세럼·cosrx 선세럼의 개발 컨텍스트에서
+luna(`none`)로 리서치한다. 가격대는 그래프에 있는 우리 제품 단위당 정가 ±30%다.
+입력은 `data/interim/p5_compare/inputs/01.json` ~ `05.json`에 저장하며 기존 입력이
+하나라도 있으면 덮어쓰지 않는다. 해시는 §7에 다음 형식으로 5줄을 추가한다.
+
+```text
+01.json <출력된 64자리 sha256>
+```
+
+`terra`는 등록된 해시 5개를 모두 대조한 뒤 같은 입력·프롬프트로 terra의
+`none`·`low`·`medium`을 비교한다(15건, 단발 기획 1안씩, 구조화 보정 최대 1회).
+기획안은 `plans/01-none.json` 등의 로컬 파일에 `Plan` 필드만 저장한다.
+기존 기획안이 있으면 혼합 실행을 막기 위해 거부한다. 구조화 실패에는 기획안
+파일을 만들지 않는다. 쓸 수 있는 기획안 수 → 구조화 실패 수 → 노력 수준 순으로
+권고하며 모두 3/5 미만이면 **보류**한다.
+
+`sonnet`은 저장된 기획안의 파일 해시 오름차순 앞 6건을 코드 검사 결과와 무관하게
+선택한다(성공 기획안이 6건 미만이면 거부). sonnet 도구 방식(a) 6건과 네이티브
+방식(b) 6건을 각각 연속 호출해 첫 시도·재요청 뒤 실패율, 두 점수의 차이·일치율,
+토큰·비용과 호출별 캐시 읽기를 보고한다. 캐시 미적중만으로 무효화를 단정하지 않는다.
+(b)의 재요청 뒤 실패율이 엄격히 낮을 때만 (b)를 권고하고, 같으면 (a)를 유지한다.
+점수 차이 평균이 1.0을 넘으면 별도로 검토 표시(`review: true`)한다.
+
+이미지는 생성하지 않으며 `temperature`도 지정하지 않는다. 목적별 원장 누적액을
+호출 직전에 검사한다(inputs $0.02, terra $0.12, sonnet $0.10). 공급사 상한도 유지한다.
+상한 도달·입력 해시 불일치(`INPUT_HASH_MISMATCH`)는 호출 없이 코드 2로 종료하며,
+실행 오류는 코드 3이다. 실행 중 중단되면 완료한 행만 `complete: false`로 기록하고
+권고하지 않는다. 중간 파일은 자동으로 삭제하거나 덮어쓰지 않는다.
+
+실행 결과는 `data/interim/p5_compare/<UTC날짜시각>-<하위 명령>.json`과 표 한 개로
+출력한다. 보고서·터미널에는 해시·지표·토큰·비용·실행 조건만 남기며 기획안·모델
+응답 전문과 키는 남기지 않는다. 핸드오프와 기획안은 gitignore된 로컬 중간 파일이다.
+경쟁 소재에는 test 브랜드 소재가 검색될 수 있고 표본이 작아 통계적 근거가 아니다.
+권고는 출력만 하며 운영 기본값 변경은 결과 검토와 사용자 승인 뒤 별도로 진행한다.

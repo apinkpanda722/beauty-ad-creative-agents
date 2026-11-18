@@ -1,0 +1,674 @@
+{
+  "terra_effort_none": {
+    "ok": true,
+    "response_cost": 0.0,
+    "raw": {
+      "id": "chatcmpl-ElD6AVnLbqRKdauZMUPS8XwQzavlY",
+      "created": 1794920474,
+      "model": "gpt-6.1-terra",
+      "object": "chat.completion",
+      "system_fingerprint": null,
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "message": {
+            "content": "391",
+            "role": "assistant",
+            "tool_calls": null,
+            "function_call": null,
+            "provider_specific_fields": {
+              "refusal": null
+            },
+            "annotations": []
+          },
+          "provider_specific_fields": {}
+        }
+      ],
+      "usage": {
+        "completion_tokens": 4,
+        "prompt_tokens": 20,
+        "total_tokens": 24,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": 0,
+          "audio_tokens": 0,
+          "reasoning_tokens": 0,
+          "rejected_prediction_tokens": 0
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "cache_creation_tokens": 0
+        }
+      },
+      "moderation": null,
+      "service_tier": "default"
+    }
+  },
+  "terra_effort_low": {
+    "ok": true,
+    "response_cost": 0.0,
+    "raw": {
+      "id": "chatcmpl-ElD6Dtf8QSasQxsykY3gqcqiTiLNO",
+      "created": 1794920477,
+      "model": "gpt-6.1-terra",
+      "object": "chat.completion",
+      "system_fingerprint": null,
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "message": {
+            "content": "391",
+            "role": "assistant",
+            "tool_calls": null,
+            "function_call": null,
+            "provider_specific_fields": {
+              "refusal": null
+            },
+            "annotations": []
+          },
+          "provider_specific_fields": {}
+        }
+      ],
+      "usage": {
+        "completion_tokens": 4,
+        "prompt_tokens": 20,
+        "total_tokens": 24,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": 0,
+          "audio_tokens": 0,
+          "reasoning_tokens": 0,
+          "rejected_prediction_tokens": 0
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "cache_creation_tokens": 0
+        }
+      },
+      "moderation": null,
+      "service_tier": "default"
+    }
+  },
+  "terra_effort_medium": {
+    "ok": true,
+    "response_cost": 0.0,
+    "raw": {
+      "id": "chatcmpl-ElD6F9wQ9oVtrohZTHDYFybEHMHE1",
+      "created": 1794920479,
+      "model": "gpt-6.1-terra",
+      "object": "chat.completion",
+      "system_fingerprint": null,
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "message": {
+            "content": "391",
+            "role": "assistant",
+            "tool_calls": null,
+            "function_call": null,
+            "provider_specific_fields": {
+              "refusal": null
+            },
+            "annotations": []
+          },
+          "provider_specific_fields": {}
+        }
+      ],
+      "usage": {
+        "completion_tokens": 16,
+        "prompt_tokens": 20,
+        "total_tokens": 36,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": 0,
+          "audio_tokens": 0,
+          "reasoning_tokens": 6,
+          "rejected_prediction_tokens": 0
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "cache_creation_tokens": 0
+        }
+      },
+      "moderation": null,
+      "service_tier": "default"
+    }
+  },
+  "terra_effort_high": {
+    "ok": true,
+    "response_cost": 0.0,
+    "raw": {
+      "id": "chatcmpl-ElD6JVt9NqpyDYqN4XbMpiI1OmhMz",
+      "created": 1794920483,
+      "model": "gpt-6.1-terra",
+      "object": "chat.completion",
+      "system_fingerprint": null,
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "message": {
+            "content": "391",
+            "role": "assistant",
+            "tool_calls": null,
+            "function_call": null,
+            "provider_specific_fields": {
+              "refusal": null
+            },
+            "annotations": []
+          },
+          "provider_specific_fields": {}
+        }
+      ],
+      "usage": {
+        "completion_tokens": 4,
+        "prompt_tokens": 20,
+        "total_tokens": 24,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": 0,
+          "audio_tokens": 0,
+          "reasoning_tokens": 0,
+          "rejected_prediction_tokens": 0
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "cache_creation_tokens": 0
+        }
+      },
+      "moderation": null,
+      "service_tier": "default"
+    }
+  },
+  "terra_schema": {
+    "ok": true,
+    "response_cost": 0.0,
+    "raw": {
+      "id": "chatcmpl-ElD6Nbt2i8RtwCet8hmNFhlqNN9jx",
+      "created": 1794920487,
+      "model": "gpt-6.1-terra",
+      "object": "chat.completion",
+      "system_fingerprint": null,
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "message": {
+            "content": "{\"value\":391}",
+            "role": "assistant",
+            "tool_calls": null,
+            "function_call": null,
+            "provider_specific_fields": {
+              "refusal": null
+            },
+            "annotations": []
+          },
+          "provider_specific_fields": {}
+        }
+      ],
+      "usage": {
+        "completion_tokens": 11,
+        "prompt_tokens": 45,
+        "total_tokens": 56,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": 0,
+          "audio_tokens": 0,
+          "reasoning_tokens": 0,
+          "rejected_prediction_tokens": 0
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "cache_creation_tokens": 0
+        }
+      },
+      "moderation": null,
+      "service_tier": "default"
+    }
+  },
+  "haiku_plain": {
+    "ok": true,
+    "response_cost": 0.0,
+    "raw": {
+      "id": "chatcmpl-7ef3b587-a0f0-4af5-b707-96fe9c78ef92",
+      "created": 1794920490,
+      "model": "claude-haiku-5-5",
+      "object": "chat.completion",
+      "system_fingerprint": null,
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "message": {
+            "content": "17 × 23 = 391",
+            "role": "assistant",
+            "tool_calls": null,
+            "function_call": null,
+            "provider_specific_fields": {
+              "citations": null,
+              "thinking_blocks": null
+            }
+          }
+        }
+      ],
+      "usage": {
+        "completion_tokens": 11,
+        "prompt_tokens": 27,
+        "total_tokens": 38,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "text_tokens": 11
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "text_tokens": 27,
+          "image_tokens": null,
+          "video_tokens": null,
+          "cache_creation_tokens": 0,
+          "cache_creation_token_details": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 0
+          }
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "iterations": null,
+        "inference_geo": "global",
+        "speed": "standard",
+        "service_tier": "standard"
+      }
+    }
+  },
+  "haiku_reasoning_low": {
+    "ok": true,
+    "response_cost": 0.0,
+    "raw": {
+      "id": "chatcmpl-bc6fc473-c6b1-4a01-b89f-7245f71c6d70",
+      "created": 1794920491,
+      "model": "claude-haiku-5-5",
+      "object": "chat.completion",
+      "system_fingerprint": null,
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "message": {
+            "content": "391",
+            "role": "assistant",
+            "tool_calls": null,
+            "function_call": null,
+            "provider_specific_fields": {
+              "citations": null,
+              "thinking_blocks": null
+            }
+          }
+        }
+      ],
+      "usage": {
+        "completion_tokens": 3,
+        "prompt_tokens": 27,
+        "total_tokens": 30,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "text_tokens": 3
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "text_tokens": 27,
+          "image_tokens": null,
+          "video_tokens": null,
+          "cache_creation_tokens": 0,
+          "cache_creation_token_details": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 0
+          }
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "iterations": null,
+        "inference_geo": "global",
+        "speed": "standard",
+        "service_tier": "standard"
+      }
+    }
+  },
+  "haiku_thinking": {
+    "ok": true,
+    "response_cost": 0.0,
+    "raw": {
+      "id": "chatcmpl-ca127542-2eea-42a0-b2f5-186d1c430979",
+      "created": 1794920491,
+      "model": "claude-haiku-5-5",
+      "object": "chat.completion",
+      "system_fingerprint": null,
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "message": {
+            "content": "17 × 23 = 391",
+            "role": "assistant",
+            "tool_calls": null,
+            "function_call": null,
+            "provider_specific_fields": {
+              "citations": null,
+              "thinking_blocks": null
+            }
+          }
+        }
+      ],
+      "usage": {
+        "completion_tokens": 11,
+        "prompt_tokens": 27,
+        "total_tokens": 38,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "text_tokens": 11
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "text_tokens": 27,
+          "image_tokens": null,
+          "video_tokens": null,
+          "cache_creation_tokens": 0,
+          "cache_creation_token_details": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 0
+          }
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "iterations": null,
+        "inference_geo": "global",
+        "speed": "standard",
+        "service_tier": "standard"
+      }
+    }
+  },
+  "haiku_schema": {
+    "ok": true,
+    "response_cost": 0.0,
+    "raw": {
+      "id": "chatcmpl-4da18b0c-1d16-4a30-add0-5fab8d52fe1d",
+      "created": 1794920492,
+      "model": "claude-haiku-5-5",
+      "object": "chat.completion",
+      "system_fingerprint": null,
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "message": {
+            "content": "{\"value\": 391}",
+            "role": "assistant",
+            "tool_calls": null,
+            "function_call": null
+          }
+        }
+      ],
+      "usage": {
+        "completion_tokens": 32,
+        "prompt_tokens": 511,
+        "total_tokens": 543,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "text_tokens": 32
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "text_tokens": 511,
+          "image_tokens": null,
+          "video_tokens": null,
+          "cache_creation_tokens": 0,
+          "cache_creation_token_details": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 0
+          }
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "iterations": null,
+        "inference_geo": "global",
+        "speed": "standard",
+        "service_tier": "standard"
+      }
+    }
+  },
+  "sonnet_plain": {
+    "ok": true,
+    "response_cost": 0.0,
+    "raw": {
+      "id": "chatcmpl-81ea698e-6dbe-4307-bfd4-4b9bca3af82b",
+      "created": 1794920494,
+      "model": "claude-sonnet-5-5",
+      "object": "chat.completion",
+      "system_fingerprint": null,
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "message": {
+            "content": "391",
+            "role": "assistant",
+            "tool_calls": null,
+            "function_call": null,
+            "provider_specific_fields": {
+              "citations": null,
+              "thinking_blocks": null
+            }
+          }
+        }
+      ],
+      "usage": {
+        "completion_tokens": 3,
+        "prompt_tokens": 27,
+        "total_tokens": 30,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "text_tokens": 3
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "text_tokens": 27,
+          "image_tokens": null,
+          "video_tokens": null,
+          "cache_creation_tokens": 0,
+          "cache_creation_token_details": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 0
+          }
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "iterations": null,
+        "inference_geo": "global",
+        "speed": "standard",
+        "service_tier": "standard"
+      }
+    }
+  },
+  "sonnet_reasoning_low": {
+    "ok": true,
+    "response_cost": 0.0,
+    "raw": {
+      "id": "chatcmpl-77f5fe9f-ad68-4d83-97a2-4066a58559f1",
+      "created": 1794920495,
+      "model": "claude-sonnet-5-5",
+      "object": "chat.completion",
+      "system_fingerprint": null,
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "message": {
+            "content": "391",
+            "role": "assistant",
+            "tool_calls": null,
+            "function_call": null,
+            "provider_specific_fields": {
+              "citations": null,
+              "thinking_blocks": null
+            }
+          }
+        }
+      ],
+      "usage": {
+        "completion_tokens": 3,
+        "prompt_tokens": 27,
+        "total_tokens": 30,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "text_tokens": 3
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "text_tokens": 27,
+          "image_tokens": null,
+          "video_tokens": null,
+          "cache_creation_tokens": 0,
+          "cache_creation_token_details": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 0
+          }
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "iterations": null,
+        "inference_geo": "global",
+        "speed": "standard",
+        "service_tier": "standard"
+      }
+    }
+  },
+  "sonnet_thinking": {
+    "ok": true,
+    "response_cost": 0.0,
+    "raw": {
+      "id": "chatcmpl-f8cc2597-96c7-4002-8c53-665b0e51823b",
+      "created": 1794920496,
+      "model": "claude-sonnet-5-5",
+      "object": "chat.completion",
+      "system_fingerprint": null,
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "message": {
+            "content": "391",
+            "role": "assistant",
+            "tool_calls": null,
+            "function_call": null,
+            "provider_specific_fields": {
+              "citations": null,
+              "thinking_blocks": null
+            }
+          }
+        }
+      ],
+      "usage": {
+        "completion_tokens": 3,
+        "prompt_tokens": 27,
+        "total_tokens": 30,
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "text_tokens": 3
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "text_tokens": 27,
+          "image_tokens": null,
+          "video_tokens": null,
+          "cache_creation_tokens": 0,
+          "cache_creation_token_details": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 0
+          }
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "iterations": null,
+        "inference_geo": "global",
+        "speed": "standard",
+        "service_tier": "standard"
+      }
+    }
+  },
+  "sonnet_schema": {
+    "ok": false,
+    "error_type": "BadRequestError",
+    "status_code": 400,
+    "message": "litellm.BadRequestError: AnthropicException - {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"tool_choice: type \\\"tool\\\" and \\\"any\\\" are not supported for this model.\"},\"request_id\":\"req_011Ch8YW9VVShD4RQq6R7aRd\"}"
+  },
+  "gemini_models_with_image": [
+    {
+      "name": "models/gemini-2.5-flash-image",
+      "methods": [
+        "generateContent",
+        "countTokens",
+        "batchGenerateContent"
+      ]
+    },
+    {
+      "name": "models/gemini-3-pro-image-preview",
+      "methods": [
+        "generateContent",
+        "countTokens",
+        "batchGenerateContent"
+      ]
+    },
+    {
+      "name": "models/gemini-3-pro-image",
+      "methods": [
+        "generateContent",
+        "countTokens",
+        "batchGenerateContent"
+      ]
+    },
+    {
+      "name": "models/gemini-3.1-flash-image-preview",
+      "methods": [
+        "generateContent",
+        "countTokens",
+        "batchGenerateContent"
+      ]
+    },
+    {
+      "name": "models/gemini-3.1-flash-image",
+      "methods": [
+        "generateContent",
+        "countTokens",
+        "batchGenerateContent"
+      ]
+    },
+    {
+      "name": "models/gemini-3.1-flash-lite-image",
+      "methods": [
+        "generateContent",
+        "countTokens",
+        "batchGenerateContent"
+      ]
+    }
+  ]
+}

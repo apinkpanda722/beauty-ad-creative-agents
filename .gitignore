@@ -26,6 +26,8 @@ __pycache__/
 # local data (never committed)
 data/raw/
 data/interim/
+data/design/
 
 # harness execution lock (execute.py)
 .harness/
+data/manifest/traces.jsonl

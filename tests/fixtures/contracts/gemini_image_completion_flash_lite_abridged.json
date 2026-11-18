@@ -1,0 +1,73 @@
+{
+  "image_completion": {
+    "ok": true,
+    "response_cost": 0.0341885,
+    "raw": {
+      "id": "0FL8ar_jHKjQ1e8Py-imiAs",
+      "created": 1794921168,
+      "model": "gemini-3.1-flash-lite-image",
+      "object": "chat.completion",
+      "system_fingerprint": null,
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "message": {
+            "content": null,
+            "role": "assistant",
+            "tool_calls": null,
+            "function_call": null,
+            "images": [
+              {
+                "image_url": {
+                  "url": "<str len=578451>",
+                  "detail": "auto"
+                },
+                "index": 0,
+                "type": "image_url"
+              }
+            ],
+            "thinking_blocks": [],
+            "provider_specific_fields": {
+              "thought_signatures": [
+                "<str len=825064>"
+              ]
+            }
+          },
+          "provider_specific_fields": {
+            "native_finish_reason": "STOP"
+          }
+        }
+      ],
+      "usage": {
+        "completion_tokens": 1509,
+        "prompt_tokens": 20,
+        "total_tokens": 1529,
+        "completion_tokens_details": {
+          "text_tokens": 389,
+          "image_tokens": 1120
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cached_tokens": null,
+          "text_tokens": 20,
+          "image_tokens": null,
+          "video_tokens": null
+        },
+        "cache_read_input_tokens": null
+      },
+      "vertex_ai_grounding_metadata": [],
+      "vertex_ai_url_context_metadata": [],
+      "vertex_ai_safety_results": [
+        [
+          {
+            "category": "HARM_CATEGORY_HATE_SPEECH",
+            "probability": "NEGLIGIBLE"
+          }
+        ]
+      ],
+      "vertex_ai_citation_metadata": [],
+      "service_tier": "default"
+    }
+  }
+}

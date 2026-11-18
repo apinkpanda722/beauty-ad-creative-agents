@@ -1,0 +1,497 @@
+"""Stable high-level registry over the frozen CQ-v1 queries."""
+
+import json
+import re
+from collections.abc import Mapping
+from dataclasses import dataclass
+from typing import Annotated, Literal
+
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+
+from beautyads.domain.evidence import (
+    CategoryBasis,
+    CertificationKind,
+    EvidenceAxis,
+    EvidenceSource,
+    split_top_bottom,
+)
+from beautyads.domain.labels import Angle, Category, Claim, Format, HookType
+from beautyads.domain.skin import SkinConcern, SkinType
+from beautyads.domain.tools import (
+    EVIDENCE_ID_PATTERN,
+    EvidenceCategory,
+    GraphReader,
+    RankedEvidenceSource,
+    ToolContext,
+    ToolErrorCode,
+    ToolFailure,
+    ToolKind,
+    ToolResult,
+    UiCommand,
+)
+from beautyads.graph.connection import GraphError
+from beautyads.graph.evidence_queries import (
+    axis_count_query,
+    axis_rows_query,
+    certification_parameters,
+    certified_by_kind_query,
+    evidence_parameters,
+    example_query,
+)
+from beautyads.graph.queries import QUESTIONS, question_parameters
+from beautyads.graph.values import to_json_safe
+
+PROMOTES_QUESTION_IDS = frozenset(
+    {"CQ-04", "CQ-05", "CQ-06", "CQ-08", "CQ-13", "CQ-14", "CQ-15", "CQ-16"}
+)
+
+ProductCategory = Literal[Category.mask_pack, Category.serum_ampoule, Category.sun_care]
+EvidenceId = Annotated[str, StringConstraints(pattern=EVIDENCE_ID_PATTERN)]
+
+
+class EmptyInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class CertificationInput(EmptyInput):
+    certification: CertificationKind = Field(
+        description="brightening=미백, anti_aging=주름 개선, sun_protection=자외선 차단"
+    )
+
+
+class EfficacyInput(EmptyInput):
+    category: ProductCategory = Field(description="조회할 제품 카테고리")
+    claim: Claim = Field(description="제품 성분 근거와 연결할 효능 분류")
+
+
+class ConcernInput(EmptyInput):
+    category: ProductCategory = Field(description="조회할 제품 카테고리")
+    concern: SkinConcern = Field(description="제품 성분 근거와 연결할 피부 고민")
+
+
+class SkinTypeInput(EmptyInput):
+    skin_type: SkinType = Field(description="광고 앵글과 포맷을 집계할 피부 타입")
+
+
+class EvidenceInput(EmptyInput):
+    evidence_ids: list[EvidenceId] = Field(
+        max_length=20, description="화면에 표시할 근거 소재 식별자 목록"
+    )
+
+
+class DistributionInput(EvidenceInput):
+    axis: Literal["hook_type", "angle", "format", "claim", "category"] = Field(
+        description="근거 소재의 분포를 표시할 분류 축"
+    )
+
+
+class PlanInput(EmptyInput):
+    plan_id: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)] = (
+        Field(description="화면에 표시할 기획안 식별자")
+    )
+
+
+class AxisEvidenceInput(EmptyInput):
+    category: EvidenceCategory = Field(description="조회할 소재의 지원 카테고리")
+    source: EvidenceSource = Field(description="집계할 소재 출처")
+    axis: EvidenceAxis = Field(description="비교할 닫힌 분류 축")
+    category_basis: CategoryBasis = Field(
+        default=CategoryBasis.creative_label,
+        description="모델 소재 라벨 또는 제품 연결 기준",
+    )
+
+
+class RankedAxisEvidenceInput(AxisEvidenceInput):
+    source: RankedEvidenceSource = Field(
+        description="조회수가 있는 YouTube 또는 Instagram 출처"
+    )
+
+
+class ExampleCreativesInput(EmptyInput):
+    category: EvidenceCategory = Field(description="조회할 소재의 지원 카테고리")
+    source: EvidenceSource | None = Field(
+        default=None, description="소재 출처, 생략하면 전체"
+    )
+    hook_type: HookType | None = Field(
+        default=None, description="선택할 훅 분류, 생략하면 제한 없음"
+    )
+    angle: Angle | None = Field(
+        default=None, description="선택할 앵글 분류, 생략하면 제한 없음"
+    )
+    format: Format | None = Field(
+        default=None, description="선택할 포맷 분류, 생략하면 제한 없음"
+    )
+    claim: Claim | None = Field(
+        default=None, description="선택할 효능 분류, 생략하면 제한 없음"
+    )
+    category_basis: CategoryBasis = Field(
+        default=CategoryBasis.creative_label,
+        description="모델 소재 라벨 또는 제품 연결 기준",
+    )
+    limit: int = Field(
+        default=10, ge=1, le=20, strict=True, description="반환할 소재 수(1~20)"
+    )
+
+
+_EVIDENCE_CAUTION = (
+    "쓰지 않는 때: 제품 단위 주장(성분 연결)이 필요한데 기본값에 의존할 때. "
+    "category_basis 기본값 creative_label은 분석 모델이 소재에 붙인 category로 "
+    "E1 채점 전이라 정확도는 미확정이고 근거 소재가 많다. "
+    "product_link는 PROMOTES로 공식몰 제품에 연결된 소재만이라 정확하지만 적다. "
+    "제품 단위 주장에는 product_link를 명시한다."
+)
+_EVIDENCE_TOOL_NAMES = frozenset(
+    {
+        "compare_axis_by_category",
+        "top_vs_bottom_axis",
+        "find_example_creatives",
+    }
+)
+
+
+@dataclass(frozen=True)
+class ToolSpec:
+    name: str
+    kind: ToolKind
+    description: str
+    input_model: type[BaseModel]
+    question_id: str | None
+
+
+TOOLS: tuple[ToolSpec, ...] = (
+    ToolSpec(
+        "ad_angles_formats_by_skin_type",
+        ToolKind.aggregate,
+        "쓰는 때: 피부 타입에 맞는 제품의 연결 광고 앵글과 포맷을 집계할 때.\n"
+        "쓰지 않는 때: 개별 제품의 효능 근거가 필요할 때.",
+        SkinTypeInput,
+        "CQ-08",
+    ),
+    ToolSpec(
+        "certified_products_by_kind",
+        ToolKind.lookup,
+        "쓰는 때: 미백·주름 개선·자외선 차단 인증이 연결된 제품을 종류별로 찾을 때.\n"
+        '쓰지 않는 때: lookup_certified_products(입력 없음, 미백만)와 certification="brightening"은 '
+        "같은 제품 집합을 돌려준다(새 도구는 열이 두 개 더 있다). "
+        "미백만 필요하면 어느 쪽을 써도 되고, 다른 인증 종류가 필요하면 이 도구를 쓴다. "
+        "이 도구는 인증이 없다는 사실을 돌려주지 않는다. "
+        '연결 커버리지가 제한적이라 빈 결과는 "인증 없음"이 아니다.',
+        CertificationInput,
+        None,
+    ),
+    ToolSpec(
+        "compare_axis_by_category",
+        ToolKind.compare,
+        "쓰는 때: 카테고리의 축별 소재 수와 대표 근거 ID를 비교할 때.\n"
+        + _EVIDENCE_CAUTION,
+        AxisEvidenceInput,
+        None,
+    ),
+    ToolSpec(
+        "compare_competitor_claims",
+        ToolKind.compare,
+        "쓰는 때: 공개 기준 제품과 핵심 성분을 공유하는 경쟁 제품의 광고 효능을 비교할 때.\n"
+        "쓰지 않는 때: 작업 공간의 자사 제품을 지정한 비교가 필요할 때.",
+        EmptyInput,
+        "CQ-13",
+    ),
+    ToolSpec(
+        "compare_hooks_by_category",
+        ToolKind.compare,
+        "쓰는 때: 카테고리별 연결 광고의 훅과 조회수 자료를 비교할 때.\n"
+        "쓰지 않는 때: 출처가 다른 조회수를 직접 비교하거나 광고 성과의 인과를 판단할 때.",
+        EmptyInput,
+        "CQ-06",
+    ),
+    ToolSpec(
+        "compare_price_band_competitors",
+        ToolKind.compare,
+        "쓰는 때: 서버에 가격대가 정해져 있고 같은 단위당 정가의 경쟁 광고를 비교할 때.\n"
+        "쓰지 않는 때: 가격대가 없거나 할인 판매가 비교가 필요할 때.",
+        EmptyInput,
+        "CQ-16",
+    ),
+    ToolSpec(
+        "count_claim_supported_ads",
+        ToolKind.aggregate,
+        "쓰는 때: 효능 주장과 제품 성분 근거가 함께 연결된 광고 건수가 필요할 때.\n"
+        "쓰지 않는 때: 전체 광고의 효능이나 제품의 임상 효과를 판단할 때.",
+        EfficacyInput,
+        "CQ-04",
+    ),
+    ToolSpec(
+        "find_example_creatives",
+        ToolKind.lookup,
+        "쓰는 때: 닫힌 분류 조건에 맞는 근거 소재를 찾을 때.\n" + _EVIDENCE_CAUTION,
+        ExampleCreativesInput,
+        None,
+    ),
+    ToolSpec(
+        "ingredient_ad_trend",
+        ToolKind.aggregate,
+        "쓰는 때: 병풀 별칭을 경유한 연결 광고의 게시 자료로 최근 변화를 살필 때.\n"
+        "쓰지 않는 때: 표본이 적은 결과로 시장 전체 추세를 확정할 때.",
+        EmptyInput,
+        "CQ-15",
+    ),
+    ToolSpec(
+        "lookup_certified_products",
+        ToolKind.lookup,
+        "쓰는 때: 미백 기능성 인증이 연결된 제품을 찾을 때.\n"
+        "쓰지 않는 때: 연결되지 않은 제품의 인증 유무를 확정할 때.",
+        EmptyInput,
+        "CQ-03",
+    ),
+    ToolSpec(
+        "lookup_products_by_concern",
+        ToolKind.lookup,
+        "쓰는 때: 카테고리와 피부 고민에 성분 근거로 연결된 제품을 찾을 때.\n"
+        "쓰지 않는 때: 근거 연결이 없는 제품의 효능을 추정할 때.",
+        ConcernInput,
+        "CQ-02",
+    ),
+    ToolSpec(
+        "lookup_products_by_efficacy",
+        ToolKind.lookup,
+        "쓰는 때: 카테고리와 효능에 성분 근거로 연결된 제품을 찾을 때.\n"
+        "쓰지 않는 때: 성분 포함만으로 제품의 효능을 인정하거나 인증을 확정할 때.",
+        EfficacyInput,
+        "CQ-01",
+    ),
+    ToolSpec(
+        "show_distribution",
+        ToolKind.display,
+        "쓰는 때: 선택한 근거 소재의 분류 분포를 화면에 표시할 때.\n"
+        "쓰지 않는 때: 새 그래프 조회나 집계 결과가 필요할 때.",
+        DistributionInput,
+        None,
+    ),
+    ToolSpec(
+        "show_evidence_cards",
+        ToolKind.display,
+        "쓰는 때: 선택한 근거 소재를 카드로 화면에 표시할 때.\n"
+        "쓰지 않는 때: 새로운 근거 소재를 검색할 때.",
+        EvidenceInput,
+        None,
+    ),
+    ToolSpec(
+        "show_graph_fragment",
+        ToolKind.display,
+        "쓰는 때: 선택한 근거 소재의 관계를 화면에 표시할 때.\n"
+        "쓰지 않는 때: 새로운 그래프 경로를 조회할 때.",
+        EvidenceInput,
+        None,
+    ),
+    ToolSpec(
+        "show_plan",
+        ToolKind.display,
+        "쓰는 때: 이미 있는 기획안을 화면에 표시할 때.\n"
+        "쓰지 않는 때: 기획안을 새로 작성하거나 평가할 때.",
+        PlanInput,
+        None,
+    ),
+    ToolSpec(
+        "top_claims_of_ingredient_ads",
+        ToolKind.aggregate,
+        "쓰는 때: 병풀 별칭으로 연결된 제품 광고의 효능 주장 분포를 볼 때.\n"
+        "쓰지 않는 때: 모든 성분이나 전체 광고 시장의 순위가 필요할 때.",
+        EmptyInput,
+        "CQ-05",
+    ),
+    ToolSpec(
+        "top_vs_bottom_axis",
+        ToolKind.compare,
+        "쓰는 때: 같은 출처·브랜드 안 조회수 상위·하위 25%의 축 분포를 비교할 때.\n"
+        + _EVIDENCE_CAUTION,
+        RankedAxisEvidenceInput,
+        None,
+    ),
+    ToolSpec(
+        "unclaimed_efficacy_gaps",
+        ToolKind.compare,
+        "쓰는 때: 공개 제품의 성분·인증 근거와 연결된 경쟁 광고 효능의 차집합을 볼 때.\n"
+        "쓰지 않는 때: 미연결 경쟁 광고까지 포함한 시장 독점성을 확정할 때.",
+        EmptyInput,
+        "CQ-14",
+    ),
+)
+
+
+def tool_definitions() -> list[dict]:
+    return [
+        {
+            "name": tool.name,
+            "description": tool.description,
+            "parameters": tool.input_model.model_json_schema(),
+        }
+        for tool in TOOLS
+    ]
+
+
+def get_tool(name: str) -> ToolSpec | None:
+    return next((tool for tool in TOOLS if tool.name == name), None)
+
+
+def _failure(code: ToolErrorCode, message: str, *, retryable=False) -> ToolFailure:
+    return ToolFailure(code=code, retryable=retryable, message=message)
+
+
+def _evidence_ids(rows: list[dict]) -> list[str]:
+    found: set[str] = set()
+    for row in rows:
+        multiple = row.get("creative_ids")
+        if isinstance(multiple, list):
+            found.update(value for value in multiple if isinstance(value, str))
+        single = row.get("creative_id")
+        if isinstance(single, str):
+            found.add(single)
+    return sorted(found)[:50]
+
+
+def _tool_records(graph: GraphReader, query: str, params: dict) -> list[dict]:
+    """Normalize all graph result branches without changing other consumers."""
+    return [to_json_safe(row) for row in graph.run(query, params).records]
+
+
+def run_tool(
+    name: str,
+    arguments: Mapping | str,
+    ctx: ToolContext | None,
+    graph: GraphReader,
+) -> ToolResult | ToolFailure:
+    if ctx is None or not ctx.tenant_id.strip():
+        return _failure(
+            ToolErrorCode.TENANT_CONTEXT_MISSING, "실행 테넌트가 필요합니다."
+        )
+    try:
+        tool = get_tool(name)
+        if tool is None:
+            return _failure(ToolErrorCode.TOOL_UNKNOWN, "등록되지 않은 도구입니다.")
+        try:
+            parsed = json.loads(arguments) if isinstance(arguments, str) else arguments
+            if not isinstance(parsed, Mapping):
+                return _failure(ToolErrorCode.INPUT_INVALID, "입력은 객체여야 합니다.")
+            inputs = tool.input_model.model_validate(dict(parsed)).model_dump(
+                mode="json"
+            )
+        except (ValueError, TypeError):
+            return _failure(
+                ToolErrorCode.INPUT_INVALID, "도구 입력이 올바르지 않습니다."
+            )
+
+        if tool.kind == ToolKind.display:
+            return ToolResult(
+                tool=name,
+                kind=tool.kind,
+                summary="표시 명령을 보냈다.",
+                top_rows=[],
+                row_count=0,
+                evidence_ids=[],
+                no_evidence=False,
+                ui_command=UiCommand(kind=name, data=inputs),
+            )
+
+        if name in _EVIDENCE_TOOL_NAMES:
+            return _run_evidence_tool(tool, inputs, ctx, graph)
+
+        if name == "certified_products_by_kind":
+            params = certification_parameters(cert=inputs["certification"])
+            rows = _tool_records(graph, certified_by_kind_query(), params)
+            summary = f"조회 결과 {len(rows)}행." if rows else "근거 없음."
+            summary += (
+                " 식약처 보고 품목과 연결된 제품만 해당한다. "
+                "연결되지 않은 제품은 인증 없음이 아니라 알 수 없음이다."
+            )
+            return ToolResult(
+                tool=name,
+                kind=tool.kind,
+                summary=summary,
+                top_rows=rows[:5],
+                row_count=len(rows),
+                evidence_ids=[],
+                no_evidence=not rows,
+            )
+
+        context = {"tenant_id": ctx.tenant_id}
+        if tool.question_id == "CQ-16":
+            if ctx.price_band is None:
+                return _failure(
+                    ToolErrorCode.PRICE_BAND_MISSING, "가격대 컨텍스트가 필요합니다."
+                )
+            context.update(ctx.price_band.model_dump())
+        question = QUESTIONS[tool.question_id]
+        params = question_parameters(
+            question, as_of=ctx.as_of, inputs=inputs, context=context
+        )
+        rows = _tool_records(graph, question.cypher, params)
+        evidence_ids = _evidence_ids(rows)
+        linked = tool.question_id in PROMOTES_QUESTION_IDS
+        summary = f"조회 결과 {len(rows)}행." if rows else "근거 없음."
+        if linked:
+            summary += " 연결된 소재 기준."
+        return ToolResult(
+            tool=name,
+            kind=tool.kind,
+            summary=summary,
+            top_rows=rows[:5],
+            row_count=len(rows),
+            evidence_ids=evidence_ids,
+            no_evidence=not rows,
+            linked_creative_count=len(evidence_ids) if linked else None,
+        )
+    except GraphError as exc:
+        return _failure(
+            ToolErrorCode.GRAPH_UNAVAILABLE,
+            "그래프 조회를 완료하지 못했습니다.",
+            retryable=exc.code == "NEO4J_UNREACHABLE",
+        )
+    except Exception as exc:  # noqa: BLE001 -- tool boundary returns sanitized failures
+        return _failure(ToolErrorCode.TOOL_INTERNAL_ERROR, type(exc).__name__)
+
+
+def _run_evidence_tool(tool, inputs, ctx, graph) -> ToolResult:
+    basis = inputs["category_basis"]
+    axis = inputs.get("axis", EvidenceAxis.hook_type)
+    operation = {
+        "compare_axis_by_category": "count",
+        "top_vs_bottom_axis": "rows",
+        "find_example_creatives": "examples",
+    }[tool.name]
+    params = evidence_parameters(**inputs, as_of=ctx.as_of, operation=operation)
+    if operation == "examples":
+        query = example_query(basis)
+    elif operation == "count":
+        query = axis_count_query(axis, basis)
+    else:
+        query = axis_rows_query(axis, basis)
+    rows = _tool_records(graph, query, params)
+    band_summary = ""
+    if operation == "rows":
+        bands = split_top_bottom(rows, mature_before=params["mature_before"])
+        rows = [row.model_dump() for row in bands.rows]
+        band_summary = " " + bands.summary
+    evidence_ids = [
+        value
+        for value in _evidence_ids(rows)
+        if re.fullmatch(EVIDENCE_ID_PATTERN, value)
+    ]
+    label = (
+        "모델 라벨 기준(E1 채점 전)"
+        if basis == CategoryBasis.creative_label
+        else "제품 연결 기준(연결된 소재만)"
+    )
+    summary = f"조회 결과 {len(rows)}행." if rows else "근거 없음."
+    summary += f" category_basis={basis}: {label}." + band_summary
+    linked = basis == CategoryBasis.product_link
+    if linked:
+        summary += " 연결된 소재 기준."
+    return ToolResult(
+        tool=tool.name,
+        kind=tool.kind,
+        summary=summary,
+        top_rows=rows[:5],
+        row_count=len(rows),
+        evidence_ids=evidence_ids,
+        no_evidence=not rows,
+        linked_creative_count=len(evidence_ids) if linked else None,
+    )

@@ -1,0 +1,470 @@
+{
+  "project": "beauty-ad-creative-agents",
+  "phase": "5-agents",
+  "steps": [
+    {
+      "step": 2,
+      "name": "tool-registry",
+      "status": "completed",
+      "started_at": "2026-11-17T22:15:36+0900",
+      "summary": "CQ v1 기반 도구 등록 목록·도메인 계약·테넌트 검사·구조화된 실패·화면 명령과 합성 테스트 구현. make verify 통과(2,952 tests), 설치한 패키지 없음.",
+      "completed_at": "2026-11-17T22:21:12+0900",
+      "usage": {
+        "input_tokens": 1009923,
+        "cached_input_tokens": 938880,
+        "output_tokens": 11490,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 3,
+      "name": "checks",
+      "status": "completed",
+      "started_at": "2026-11-17T22:21:38+0900",
+      "summary": "기획안 도메인 계약·조회 Protocol·결정론 검사기와 합성 테스트 구현. unknown·규칙 0개 별도 노출, 아키텍처 검사 포함 make verify 통과(3,054 tests). 설치한 패키지 없음.",
+      "completed_at": "2026-11-17T22:30:53+0900",
+      "usage": {
+        "input_tokens": 1746982,
+        "cached_input_tokens": 1663360,
+        "output_tokens": 18158,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 4,
+      "name": "tenant-memory",
+      "status": "completed",
+      "started_at": "2026-11-17T22:31:00+0900",
+      "usage": {
+        "input_tokens": 935672,
+        "cached_input_tokens": 855040,
+        "output_tokens": 13571,
+        "attempts": 1
+      },
+      "summary": "테넌트 도메인 타입·PostgreSQL 저장소·v7 마이그레이션 구현, 격리·thread 소유권·피드백 원문 보존 검증. make verify 통과(3,193 tests), 설치한 패키지 없음.",
+      "completed_at": "2026-11-17T22:41:52+0900"
+    },
+    {
+      "step": "4b",
+      "name": "feedback-graph",
+      "status": "completed",
+      "started_at": "2026-11-17T22:42:00+0900",
+      "summary": "피드백 증분 동기화(--layers 3), 테넌트 복합 키 MERGE·ABOUT 원자적 교체·값 검증·전용 워터마크 구현. CQ-12·아키텍처 검사 포함 make verify 통과(3,228 tests). 설치한 패키지 없음.",
+      "completed_at": "2026-11-17T22:48:47+0900",
+      "usage": {
+        "input_tokens": 2000569,
+        "cached_input_tokens": 1877888,
+        "output_tokens": 12916,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 0,
+      "name": "llm-chat-models",
+      "status": "completed",
+      "started_at": "2026-11-17T22:54:34+0900",
+      "usage": {
+        "input_tokens": 1470799,
+        "cached_input_tokens": 1376512,
+        "output_tokens": 17477,
+        "attempts": 1
+      },
+      "summary": "OpenAI·Anthropic 채팅·스트리밍 래퍼, 가격표 기반 비용 계산, reasoning_effort 원장 기록, 목적별 상한·설정 구현. 아키텍처 검사 포함 make verify 통과(3,349 tests). 설치한 패키지 없음.",
+      "completed_at": "2026-11-17T23:05:39+0900"
+    },
+    {
+      "step": "0b",
+      "name": "structured-output",
+      "status": "completed",
+      "started_at": "2026-11-17T23:05:46+0900",
+      "summary": "구조화 출력 어댑터 4종·팩토리·최대 1회 재요청·통계·네이티브 비동기 연결 및 비용 검증 구현. 아키텍처 검사 포함 make verify 통과(3,437 tests). 설치한 패키지 없음.",
+      "completed_at": "2026-11-17T23:14:04+0900",
+      "usage": {
+        "input_tokens": 1394295,
+        "cached_input_tokens": 1315328,
+        "output_tokens": 18325,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 1,
+      "name": "agent-api-skeleton",
+      "status": "completed",
+      "started_at": "2026-11-17T23:14:11+0900",
+      "usage": {
+        "input_tokens": 1866876,
+        "cached_input_tokens": 1767680,
+        "output_tokens": 21210,
+        "attempts": 1
+      },
+      "summary": "테넌트 검사·체크포인터 기반 단일 노드/도구 그래프, /chat SSE, live-agent 사전점검·비용 제한 구현. make verify 통과(3,478 tests). 설치: langgraph 1.2.20, langgraph-checkpoint-postgres 3.2.0, psycopg-pool 3.3.3, fastapi 0.163.1, uvicorn 0.54.0.",
+      "completed_at": "2026-11-17T23:30:58+0900"
+    },
+    {
+      "step": "5a",
+      "name": "evidence-tools",
+      "status": "completed",
+      "started_at": "2026-11-17T23:31:07+0900",
+      "summary": "근거 확장 도구 3개·고정 Cypher·동결 백분위 정규화·live-evidence 점검 구현. 기존 15개 도구 보존, make verify 통과(3,580 tests). 실제 서비스 접속·패키지 설치 없음.",
+      "completed_at": "2026-11-17T23:39:13+0900",
+      "usage": {
+        "input_tokens": 1227515,
+        "cached_input_tokens": 1133824,
+        "output_tokens": 18468,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 5,
+      "name": "research-agent",
+      "status": "completed",
+      "started_at": "2026-11-17T23:39:21+0900",
+      "summary": "리서치 전용 LangGraph 하위 그래프·도메인 계약·근거 제한·원출력 분리·실패 처리와 합성 테스트 구현. 아키텍처 검사 포함 make verify 통과(3,618 tests). 실제 서비스 접속·패키지 설치 없음.",
+      "completed_at": "2026-11-17T23:46:49+0900",
+      "usage": {
+        "input_tokens": 1452049,
+        "cached_input_tokens": 1372416,
+        "output_tokens": 14610,
+        "attempts": 1
+      }
+    },
+    {
+      "step": "1b",
+      "name": "db-migrate",
+      "status": "completed",
+      "started_at": "2026-11-18T13:27:02+0900",
+      "summary": "db-migrate 명령·Make 타깃·README와 MIGRATIONS_PENDING 안내 구현. 합성 테스트로 비밀 값 미출력·예외 전파·연결 해제·멱등성 검증, 아키텍처 검사 포함 make verify 통과(3,635 tests). 실제 서비스 접속·패키지 설치 없음.",
+      "completed_at": "2026-11-18T13:30:11+0900",
+      "usage": {
+        "input_tokens": 666511,
+        "cached_input_tokens": 602752,
+        "output_tokens": 5438,
+        "attempts": 1
+      }
+    },
+    {
+      "step": "1c",
+      "name": "chat-param-compat",
+      "status": "completed",
+      "started_at": "2026-11-18T13:31:02+0900",
+      "summary": "OpenAI tool_choice 호환 인자·오프라인 회귀 가드·SSE/클라이언트/CLI의 안전한 오류 상세 전달 구현. 아키텍처 검사 포함 make verify 통과(3,887 tests). 실제 서비스 접속·패키지 설치 없음. 실제 OpenAI API 수락 여부는 미실측.",
+      "completed_at": "2026-11-18T13:35:21+0900",
+      "usage": {
+        "input_tokens": 1212371,
+        "cached_input_tokens": 1121408,
+        "output_tokens": 8672,
+        "attempts": 1
+      }
+    },
+    {
+      "step": "1d",
+      "name": "tool-result-message",
+      "status": "completed",
+      "started_at": "2026-11-18T13:50:11+0900",
+      "summary": "공용 도구 결과 JSON 변환·상한 표시·데이터 전용 지시를 skeleton/research에 적용하고 회귀 테스트 구현. 아키텍처 검사 포함 make verify 통과(3,941 tests). 실제 서비스 접속·패키지 설치 없음.",
+      "completed_at": "2026-11-18T13:54:44+0900",
+      "usage": {
+        "input_tokens": 745597,
+        "cached_input_tokens": 672640,
+        "output_tokens": 9861,
+        "attempts": 1
+      }
+    },
+    {
+      "step": "5b",
+      "name": "certified-by-claim",
+      "status": "completed",
+      "started_at": "2026-11-18T14:10:05+0900",
+      "usage": {
+        "input_tokens": 1245546,
+        "cached_input_tokens": 1170816,
+        "output_tokens": 8894,
+        "attempts": 1
+      },
+      "summary": "인증 종류별 조회 도구·닫힌 입력·고정 Cypher·unknown 안내 및 --certifications 집합 일치 점검 구현. 아키텍처 검사 포함 make verify 통과(3,982 tests). 실제 서비스 접속·패키지 설치 없음.",
+      "completed_at": "2026-11-18T14:28:22+0900"
+    },
+    {
+      "step": "5c",
+      "name": "handoff-counts",
+      "status": "completed",
+      "started_at": "2026-11-18T14:28:35+0900",
+      "usage": {
+        "input_tokens": 1126952,
+        "cached_input_tokens": 1042560,
+        "output_tokens": 6912,
+        "attempts": 1
+      },
+      "summary": "shown_count·부분 표시 지시·코드 기반 result_counts 핸드오프·count_label 구현 및 합성 테스트 추가. 아키텍처 검사 포함 make verify 통과(4,006 tests). 실제 서비스 접속·패키지 설치 없음.",
+      "completed_at": "2026-11-18T14:35:27+0900"
+    },
+    {
+      "step": "6a",
+      "name": "image-design",
+      "status": "completed",
+      "started_at": "2026-11-18T14:35:40+0900",
+      "summary": "텍스트 전용 이미지 생성 래퍼·이중 비용 상한·매직 바이트 검증·서명 비노출·원자적 로컬 저장 구현. FP-C13·아키텍처 검사 포함 make verify 통과(4,066 tests). 실제 서비스 호출·패키지 설치 없음.",
+      "completed_at": "2026-11-18T14:41:02+0900",
+      "usage": {
+        "input_tokens": 769809,
+        "cached_input_tokens": 716928,
+        "output_tokens": 11354,
+        "attempts": 1
+      }
+    },
+    {
+      "step": "6b",
+      "name": "planning-evaluation",
+      "status": "completed",
+      "started_at": "2026-11-18T14:41:13+0900",
+      "summary": "기획·평가 에이전트, 평가 도메인 계약, 그래프 조회 구현체·고정 질의와 FP-C13 가드 구현. 아키텍처 검사 포함 make verify 통과(4,137 tests). 실제 서비스 접속·패키지 설치 없음.",
+      "completed_at": "2026-11-18T14:48:44+0900",
+      "usage": {
+        "input_tokens": 1762575,
+        "cached_input_tokens": 1667968,
+        "output_tokens": 16027,
+        "attempts": 1
+      }
+    },
+    {
+      "step": "6c",
+      "name": "plan-eval-loop",
+      "status": "completed",
+      "started_at": "2026-11-18T14:48:51+0900",
+      "usage": {
+        "input_tokens": 1044345,
+        "cached_input_tokens": 967936,
+        "output_tokens": 12266,
+        "attempts": 1
+      },
+      "summary": "기획·평가 되돌림 하위 그래프(최대 2회), 전용 상태·사유 전달·최종 이미지 1회 생성·결과 집계 구현. 아키텍처 검사 포함 make verify 통과(4,164 tests). 실제 서비스 접속·패키지 설치 없음.",
+      "completed_at": "2026-11-18T14:58:25+0900"
+    },
+    {
+      "step": "6d",
+      "name": "dev-compare",
+      "status": "completed",
+      "started_at": "2026-11-18T14:58:31+0900",
+      "usage": {
+        "input_tokens": 2144097,
+        "cached_input_tokens": 2040832,
+        "output_tokens": 23718,
+        "attempts": 1
+      },
+      "summary": "live-compare 입력 생성·terra/sonnet 비교·사전 등록/해시/비용 가드·안전한 결과 저장과 합성 테스트 구현. make verify 통과(4,202 tests). 실제 서비스 호출·패키지 설치 없음.",
+      "completed_at": "2026-11-18T15:11:24+0900"
+    },
+    {
+      "step": "6e",
+      "name": "compare-diagnostics",
+      "status": "completed",
+      "started_at": "2026-11-18T15:27:59+0900",
+      "summary": "리서치 aggregates를 strict 호환 항목 목록으로 변경하고 최종 딕셔너리 계약 보존, compare 안전 오류 진단·오프라인 스키마/메시지 가드 구현. make verify 통과(4,258 tests), 실제 서비스 호출·패키지 설치 없음.",
+      "completed_at": "2026-11-18T15:33:47+0900",
+      "usage": {
+        "input_tokens": 1780765,
+        "cached_input_tokens": 1666432,
+        "output_tokens": 10570,
+        "attempts": 1
+      }
+    },
+    {
+      "step": "6f",
+      "name": "json-safe-records",
+      "status": "completed",
+      "started_at": "2026-11-18T15:39:20+0900",
+      "summary": "공통 도구 경계의 Neo4j 값 JSON 변환·TOOL_RESULT_UNREADABLE 오류 표지·리서치/compare unresolved 전달과 회귀 테스트 구현. 아키텍처 검사 포함 make verify 통과(4,319 tests). 실제 서비스 접속·패키지 설치 없음.",
+      "completed_at": "2026-11-18T15:46:36+0900",
+      "usage": {
+        "input_tokens": 1511988,
+        "cached_input_tokens": 1405952,
+        "output_tokens": 14427,
+        "attempts": 1
+      }
+    },
+    {
+      "step": "7a",
+      "name": "supervisor",
+      "status": "completed",
+      "started_at": "2026-11-18T16:14:55+0900",
+      "summary": "Supervisor 상위 그래프·strict 의도 계약·숫자 검증·비용/횟수/입력 한도·단계 이벤트와 FP 가드 구현. 아키텍처 검사 포함 make verify 통과(4,373 tests). 실제 서비스 접속·패키지 설치 없음.",
+      "completed_at": "2026-11-18T16:25:15+0900",
+      "usage": {
+        "input_tokens": 2460284,
+        "cached_input_tokens": 2366848,
+        "output_tokens": 21799,
+        "attempts": 1
+      }
+    },
+    {
+      "step": "7b",
+      "name": "workspace-feedback",
+      "status": "completed",
+      "started_at": "2026-11-18T16:25:25+0900",
+      "summary": "작업 공간 프로필 로더·단위 가격 조회·세션 기반 /feedback·기획용 피드백 요약과 합성 테스트 구현. 아키텍처 검사 포함 make verify 통과(4,431 tests). 실제 서비스 접속·패키지 설치 없음.",
+      "completed_at": "2026-11-18T16:31:40+0900",
+      "usage": {
+        "input_tokens": 1223397,
+        "cached_input_tokens": 1142016,
+        "output_tokens": 11107,
+        "attempts": 1
+      }
+    },
+    {
+      "step": "7c",
+      "name": "ask-sse",
+      "status": "completed",
+      "started_at": "2026-11-18T16:31:46+0900",
+      "summary": "/ask 실시간 SSE·화면 명령·기획안 저장·테넌트별 /design·클라이언트 구현. 이미지 연결 인덱스는 앱 수명 범위. 아키텍처 검사 포함 make verify 통과(4,470 tests). 실제 서비스 접속·패키지 설치 없음.",
+      "completed_at": "2026-11-18T16:39:57+0900",
+      "usage": {
+        "input_tokens": 1426460,
+        "cached_input_tokens": 1333760,
+        "output_tokens": 17324,
+        "attempts": 1
+      }
+    },
+    {
+      "step": "7d",
+      "name": "full-assembly",
+      "status": "completed",
+      "started_at": "2026-11-18T18:21:16+0900",
+      "summary": "assemble_full·이미지 제외 요청 비용 집계·자원 종료·그룹별 작업 공간·모델/이미지 조립 및 합성 테스트 구현. 아키텍처 검사 포함 make verify 통과(4,493 tests). 실제 서비스 접속·패키지 설치 없음.",
+      "completed_at": "2026-11-18T18:29:11+0900",
+      "usage": {
+        "input_tokens": 2188822,
+        "cached_input_tokens": 1965696,
+        "output_tokens": 16323,
+        "attempts": 1
+      }
+    },
+    {
+      "step": "8a",
+      "name": "trace-jsonl",
+      "status": "completed",
+      "started_at": "2026-11-18T18:42:29+0900",
+      "summary": "요청별 로컬 JSONL trace·테넌트별 집계·ask 관측 연결 및 합성 테스트 구현. 아키텍처 검사 포함 make verify 통과(4,532 tests). 실제 서비스 접속·패키지 설치 없음.",
+      "completed_at": "2026-11-18T18:49:19+0900",
+      "usage": {
+        "input_tokens": 1780804,
+        "cached_input_tokens": 1692544,
+        "output_tokens": 13785,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 9,
+      "name": "agents-live-target",
+      "status": "completed",
+      "started_at": "2026-11-18T18:49:25+0900",
+      "summary": "live-agents 도구·구성별 시나리오·재사용 예산 기준점·실패 처리·trace 요약과 합성 테스트 구현. 아키텍처 검사 포함 make verify 통과(4,578 tests). 실제 서비스 호출·패키지 설치 없음.",
+      "completed_at": "2026-11-18T18:58:04+0900",
+      "usage": {
+        "input_tokens": 2097140,
+        "cached_input_tokens": 2001152,
+        "output_tokens": 17369,
+        "attempts": 1
+      }
+    },
+    {
+      "step": "9b",
+      "name": "cap-config-follow",
+      "status": "completed",
+      "started_at": "2026-11-18T19:25:09+0900",
+      "summary": "설정 상한 추종·복사본 전달, 상한 종류별 limit_detail의 Supervisor·trace·요약 연결과 오프라인 가드 구현. 아키텍처 검사 포함 make verify 통과(4,634 tests). 실제 서비스 접속·패키지 설치 없음.",
+      "completed_at": "2026-11-18T19:31:35+0900",
+      "usage": {
+        "input_tokens": 2085511,
+        "cached_input_tokens": 1976704,
+        "output_tokens": 12055,
+        "attempts": 1
+      }
+    },
+    {
+      "step": "9c",
+      "name": "differentiation-efficacy",
+      "status": "completed",
+      "started_at": "2026-11-18T19:31:42+0900",
+      "summary": "평가 입력·척도 및 기획 프롬프트 개선, 프롬프트 버전 기록, checks_passed/final_passed 분리, 보고용 pattern_alignment·안전한 --show-rationale 구현. make verify 통과(4,649 tests). 실제 서비스 접속·패키지 설치 없음.",
+      "completed_at": "2026-11-18T19:40:35+0900",
+      "usage": {
+        "input_tokens": 2855777,
+        "cached_input_tokens": 2723072,
+        "output_tokens": 18073,
+        "attempts": 1
+      }
+    },
+    {
+      "step": "9d",
+      "name": "structured-failure-detail",
+      "status": "completed",
+      "started_at": "2026-11-18T20:08:02+0900",
+      "summary": "첫 시도 구조화 실패의 필드 경로·오류 종류 계측, 안전한 재요청 안내, 모델별 trace·요약 합산 및 합성 회귀 테스트 구현. make verify 통과(4,683 tests). 실제 서비스 호출·패키지 설치 없음.",
+      "completed_at": "2026-11-18T20:14:04+0900",
+      "usage": {
+        "input_tokens": 1122506,
+        "cached_input_tokens": 974848,
+        "output_tokens": 11476,
+        "attempts": 1
+      }
+    },
+    {
+      "step": "9e",
+      "name": "weak-contrast-image-prompt",
+      "status": "completed",
+      "started_at": "2026-11-18T20:26:20+0900",
+      "summary": "pattern_context·얇은 풀 고지·분포 계측, 기획/평가 프롬프트 v2, 이미지 메타·카피 제거와 제품 별도 표시 구현. make verify 통과(4,714 tests), 실제 서비스 호출·패키지 설치 없음.",
+      "completed_at": "2026-11-18T20:35:15+0900",
+      "usage": {
+        "input_tokens": 3142078,
+        "cached_input_tokens": 3015296,
+        "output_tokens": 18160,
+        "attempts": 1
+      }
+    },
+    {
+      "step": "9f",
+      "name": "image-compose",
+      "status": "completed",
+      "started_at": "2026-11-18T20:35:21+0900",
+      "summary": "카피 합성·폰트 다운로드 도구·원자적 저장·합성본 우선 서빙·실패 시 원본 유지 구현. make verify 통과(4,760 passed, 폰트 미다운로드 1 skipped). 실제 호출·다운로드·패키지 설치 없음, 기존 Pillow 13.0.0 사용.",
+      "completed_at": "2026-11-18T20:43:54+0900",
+      "usage": {
+        "input_tokens": 1806507,
+        "cached_input_tokens": 1718784,
+        "output_tokens": 18537,
+        "attempts": 1
+      }
+    },
+    {
+      "step": "9g",
+      "name": "single-cut-layout-efficacy",
+      "status": "completed",
+      "started_at": "2026-11-18T21:06:04+0900",
+      "summary": "단일 컷 이미지 프롬프트·따옴표 제거, 소형 상하단 합성 레이아웃, 코드 기반 available_efficacy 조회·전달 구현. 아키텍처 가드 포함 make verify 통과(4,798 tests). 실제 서비스 호출·다운로드·패키지 설치 없음.",
+      "completed_at": "2026-11-18T21:13:13+0900",
+      "usage": {
+        "input_tokens": 2439043,
+        "cached_input_tokens": 2318976,
+        "output_tokens": 13142,
+        "attempts": 1
+      }
+    },
+    {
+      "step": "9h",
+      "name": "no-band-product-line",
+      "status": "completed",
+      "started_at": "2026-11-18T21:50:32+0900",
+      "summary": "띠 제거·그림자와 대비 보정·CTA 기본 끔·공식 제품명 줄 합성 및 화면·trace 전달 구현. make verify 통과(4,883 tests). 실제 서비스 접속·패키지 설치 없음, 기존 Pillow 13.0.0 사용.",
+      "completed_at": "2026-11-18T22:00:48+0900",
+      "usage": {
+        "input_tokens": 2453131,
+        "cached_input_tokens": 2338816,
+        "output_tokens": 21039,
+        "attempts": 1
+      }
+    }
+  ],
+  "created_at": "2026-11-17T22:15:36+0900",
+  "completed_at": "2026-11-18T22:00:48+0900"
+}

@@ -123,8 +123,18 @@ def test_database_targets_and_shared_compose_command(makefile):
     )
     assert recipe(makefile, "db-up") == ["$(COMPOSE) up -d postgres neo4j"]
     assert recipe(makefile, "db-down") == ["$(COMPOSE) down"]
+    assert recipe(makefile, "db-migrate") == [
+        "uv run python -m beautyads.pipeline.migrate"
+    ]
     phony = set(re.findall(r"^\.PHONY:\s*([^\n]+)", makefile, re.MULTILINE)[0].split())
-    assert {"verify", "db-up", "db-down", "graph-reset"} <= phony
+    assert {
+        "verify",
+        "db-up",
+        "db-down",
+        "db-migrate",
+        "graph-reset",
+        "live-compare",
+    } <= phony
 
 
 def test_graph_reset_requires_confirmation_before_removing_only_graph(makefile):

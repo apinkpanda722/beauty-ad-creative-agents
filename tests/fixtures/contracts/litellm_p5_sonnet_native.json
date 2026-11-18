@@ -1,0 +1,47 @@
+{
+  "b2_native_acreate": {
+    "ok": true,
+    "tokens": [
+      216,
+      8
+    ],
+    "computed_cost": 0.000512,
+    "content_blocks": [
+      {
+        "type": "text",
+        "text": "{\"value\":391}"
+      }
+    ],
+    "stop_reason": "end_turn"
+  },
+  "c2_native_adaptive_acreate": {
+    "ok": true,
+    "tokens": [
+      216,
+      8
+    ],
+    "computed_cost": 0.000512,
+    "content_blocks": [
+      {
+        "type": "text",
+        "text": "{\"value\":391}"
+      }
+    ],
+    "stop_reason": "end_turn"
+  },
+  "c1_native_enabled_acreate": {
+    "ok": true,
+    "tokens": [
+      216,
+      8
+    ],
+    "computed_cost": 0.000512,
+    "content_blocks": [
+      {
+        "type": "text",
+        "text": "{\"value\":391}"
+      }
+    ],
+    "stop_reason": "end_turn"
+  }
+}

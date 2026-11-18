@@ -681,3 +681,124 @@ def test_explicit_layer2_preserves_existing_sample_mode():
     report = json.loads(out.getvalue())
     assert report["sample"] == 50 and report["graph_check"]["labeled_in_sample"] == 1
     assert source.sampled == [50] and source.writes == []
+
+
+class FeedbackSource(Layer1Source):
+    def __init__(self, dates=(), watermark=NOW):
+        from test_feedback_sync_domain import feedback
+
+        super().__init__((), watermark)
+        self.rows = [
+            feedback(feedback_id=str(i), updated_at=d) for i, d in enumerate(dates)
+        ]
+
+
+def test_feedback_overlap_checkpoint_uses_times_even_when_counters_are_zero():
+    from test_graph_feedback import Graph
+
+    from beautyads.pipeline.sync import run_feedback_sync
+
+    source = FeedbackSource(
+        [NOW - SYNC_OVERLAP, NOW - timedelta(minutes=1), NOW + timedelta(minutes=1)]
+    )
+    report = run_feedback_sync(SyncDeps(source, Graph()), limit=20)
+    assert source.since == [NOW - SYNC_OVERLAP]
+    assert report["read"] == report["loaded"] == 2 and report["rejected"] == 0
+    assert report["nodes_created"] == report["relationships_created"] == 0
+    assert source.writes == [NOW + timedelta(minutes=1)]
+
+
+def test_feedback_failure_and_empty_input_do_not_checkpoint():
+    from test_graph_feedback import Graph
+
+    from beautyads.pipeline.sync import run_feedback_sync
+
+    source = FeedbackSource([NOW + timedelta(seconds=1)])
+    graph = Graph()
+    graph.fail = True
+    with pytest.raises(RuntimeError):
+        run_feedback_sync(SyncDeps(source, graph))
+    assert source.writes == [] and source.watermark == NOW
+    empty = FeedbackSource()
+    report = run_feedback_sync(SyncDeps(empty, Graph()))
+    assert report["read"] == report["loaded"] == report["rejected"] == 0
+    assert empty.writes == []
+
+
+def test_feedback_cli_full_verify_counts_and_rejections_are_offline():
+    from test_feedback_sync_domain import feedback
+    from test_graph_feedback import Graph
+
+    source = FeedbackSource([NOW - timedelta(days=1)])
+    source.rows.append(feedback(decision="invalid", updated_at=NOW))
+    graph = Graph()
+    out = io.StringIO()
+    assert (
+        main(
+            ["--layers", "3", "--full", "--verify"],
+            environ=ENV,
+            out=out,
+            docker_check=lambda: True,
+            tcp_check=lambda *args: True,
+            deps_factory=lambda: SyncDeps(source, graph),
+        )
+        == 0
+    )
+    report = json.loads(out.getvalue())
+    assert report["layers"] == "3" and report["read"] == 2
+    assert report["loaded"] == report["rejected"] == 1
+    assert report["errors"][0]["code"] == "FEEDBACK_VALUE_INVALID"
+    assert report["verification"]["same_feedback"] is True
+    assert source.since == [None] and source.writes == [NOW]
+    assert not any(
+        ":Creative" in query
+        for query, _ in graph.calls
+        if not query.startswith("CREATE CONSTRAINT")
+    )
+
+
+def test_feedback_failed_semantic_replay_does_not_checkpoint():
+    from test_graph_feedback import Graph
+
+    from beautyads.graph.feedback import FEEDBACK_STATE
+    from beautyads.pipeline.sync import run_feedback_sync
+
+    class BadReplay(Graph):
+        def run(self, query, params=None):
+            result = super().run(query, params)
+            if query == FEEDBACK_STATE:
+                result.records.append({"unstable": len(self.calls)})
+            return result
+
+    source = FeedbackSource([NOW])
+    with pytest.raises(GraphError, match="GRAPH_VERIFY_FAILED"):
+        run_feedback_sync(SyncDeps(source, BadReplay()), verify=True)
+    assert source.writes == []
+
+
+def test_feedback_dependency_selection_cleanup_and_sample_rejection(monkeypatch):
+    from contextlib import ExitStack
+
+    from beautyads.pipeline.sync import _live_deps
+    from beautyads.store.feedback_source import PostgresFeedbackSource
+
+    connection, graph = Mock(), Mock()
+    monkeypatch.setattr("beautyads.pipeline.sync.connect", lambda *args: connection)
+    monkeypatch.setattr("beautyads.pipeline.sync.connect_graph", lambda **kwargs: graph)
+    with ExitStack() as stack:
+        deps = _live_deps(environ=ENV, env_file=None, stack=stack, layers="3")
+        assert isinstance(deps.source, PostgresFeedbackSource)
+        assert deps.source.conn is connection and deps.graph is graph
+    connection.close.assert_called_once_with()
+    graph.close.assert_called_once_with()
+    factory = Mock()
+    assert (
+        main(
+            ["--layers", "3", "--sample", "2"],
+            environ=ENV,
+            out=io.StringIO(),
+            deps_factory=factory,
+        )
+        == 2
+    )
+    factory.assert_not_called()

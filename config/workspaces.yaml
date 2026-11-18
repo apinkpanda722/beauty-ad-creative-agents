@@ -1,0 +1,33 @@
+# test 그룹은 최종 평가·시연 전에는 개발 반복에 쓰지 않는다
+- tenant_id: dev-mixsoon
+  display_name: 믹순 개발 작업 공간
+  brand: mixsoon
+  own_product_url: https://mixsoon.co.kr/product/detail.html?product_no=921
+  tone: 친근하고 간결한 말투
+  forbidden_terms: []
+  price_band_pct: 30
+  group: dev
+- tenant_id: dev-cosrx
+  display_name: 코스알엑스 개발 작업 공간
+  brand: cosrx
+  own_product_url: https://www.cosrx.co.kr/product/%EC%9A%B8%ED%8A%B8%EB%9D%BC-%EB%9D%BC%EC%9D%B4%ED%8A%B8-%EC%9D%B8%EB%B9%84%EC%A0%80%EB%B8%94-%EC%84%A0%EC%84%B8%EB%9F%BC-50ml/740/category/57/display/1/
+  tone: 명료하고 차분한 말투
+  forbidden_terms: []
+  price_band_pct: 30
+  group: dev
+- tenant_id: test-isntree
+  display_name: 이즈앤트리 평가 작업 공간
+  brand: isntree
+  own_product_url: https://www.isntree.com/product/%EC%B4%88%EC%A0%80%EB%B6%84%EC%9E%90-%ED%9E%88%EC%95%84%EB%A3%A8%EB%A1%A0%EC%82%B0-%EC%84%B8%EB%9F%BC-50ml/55/category/42/display/1/
+  tone: 부드럽고 간결한 말투
+  forbidden_terms: []
+  price_band_pct: 30
+  group: test
+- tenant_id: test-bojoseon
+  display_name: 조선미녀 평가 작업 공간
+  brand: beauty_of_joseon
+  own_product_url: https://beautyofjoseon.co.kr/product/%EC%9D%B8%EC%82%BC%EC%84%A0%EC%84%B8%EB%9F%BC-spf-50-pa/27/category/117/display/1/
+  tone: 정갈하고 차분한 말투
+  forbidden_terms: []
+  price_band_pct: 30
+  group: test
