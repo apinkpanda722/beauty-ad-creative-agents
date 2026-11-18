@@ -171,8 +171,33 @@
       }
     },
     {
-      "step": 6,
+      "step": "5b",
+      "name": "certified-by-claim",
+      "status": "pending"
+    },
+    {
+      "step": "5c",
+      "name": "handoff-counts",
+      "status": "pending"
+    },
+    {
+      "step": "6a",
+      "name": "image-design",
+      "status": "pending"
+    },
+    {
+      "step": "6b",
       "name": "planning-evaluation",
+      "status": "pending"
+    },
+    {
+      "step": "6c",
+      "name": "plan-eval-loop",
+      "status": "pending"
+    },
+    {
+      "step": "6d",
+      "name": "dev-compare",
       "status": "pending"
     },
     {
