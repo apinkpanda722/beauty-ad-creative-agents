@@ -215,7 +215,16 @@
     {
       "step": "6b",
       "name": "planning-evaluation",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-18T14:41:13+0900",
+      "summary": "기획·평가 에이전트, 평가 도메인 계약, 그래프 조회 구현체·고정 질의와 FP-C13 가드 구현. 아키텍처 검사 포함 make verify 통과(4,137 tests). 실제 서비스 접속·패키지 설치 없음.",
+      "completed_at": "2026-11-18T14:48:44+0900",
+      "usage": {
+        "input_tokens": 1762575,
+        "cached_input_tokens": 1667968,
+        "output_tokens": 16027,
+        "attempts": 1
+      }
     },
     {
       "step": "6c",
