@@ -25,7 +25,7 @@
 **`eval/p5_compare.py`**(`eval` 계층): `main(argv=None, *, environ=None, out=None, ...) -> int`, 하위 명령 `inputs`·`terra`·`sonnet`(인자 `ARGS='inputs'` 형태). 공통:
 - **사전 등록 검사(B-FP-043)**: 시작 전에 `docs/results/p5_dev_compare_preregistration.md`가 git에 **커밋돼 있고 작업 트리에서 수정되지 않았는지** 확인한다(`git log -1 -- <파일>`이 비어 있지 않고 `git status --porcelain -- <파일>`이 비어 있음. 점검 함수는 주입 가능). 아니면 `PREREGISTRATION_NOT_COMMITTED`를 출력하고 호출 없이 종료 코드 2.
 - 사전 점검: `cq_preflight`와 같은 방식(컨테이너·키 이름만, 값 출력 금지)과 이미지 끄기: 이 비교는 이미지를 쓰지 않는다. 호출 전 **목적별 상한**을 `check_purpose_cap`으로 검사한다(목적 접두어 `compare-inputs` $0.02, `compare-terra` $0.12, `compare-sonnet` $0.10, 사전 등록 파일의 값과 같은 상수). 상한 이상이면 호출 없이 멈춘다.
-- 결과: 실행마다 `data/interim/p5_compare/<날짜>-<하위 명령>.json`(gitignore)과 표 한 개를 출력한다. 출력·파일에 키·값·모델 전문(기획안 전문 포함)이 없다: 지표와 입력·출력 해시, 토큰·비용만.
+- 결과: 실행마다 `data/interim/p5_compare/<날짜>-<하위 명령>.json`(gitignore)과 표 한 개를 출력한다. **결과 파일·터미널 출력·표**에는 키·값·모델 전문(기획안 전문 포함)이 없다: 지표와 입력·출력 해시, 토큰·비용만. **예외(중간 입력 산출물)**: 비교에 필요한 `inputs/`의 핸드오프 5개와 `plans/`의 기획안 15개는 `data/interim/` 아래 로컬 gitignore 파일로 둔다. `plans/` 파일에는 모델이 만든 `Plan` 필드만 담고 호출 인자·원응답 전문·키·`thought_signatures` 같은 부가 필드는 담지 않는다. 결과 파일에는 이 중간 산출물의 내용이 들어가지 않는다.
 - **`inputs`**: dev workspace(사전 등록 파일의 `mixsoon` 세럼·`cosrx` 선세럼) 요청 5건(사전 등록 파일의 고정 브리프 5개)에 리서치 에이전트(luna, `reasoning_effort="none"`)를 한 번씩 돌려 `ResearchHandoff` 5개를 `data/interim/p5_compare/inputs/`에 저장하고 각 파일의 sha256을 출력한다(사용자가 사전 등록 파일에 해시를 추가 커밋한 뒤 `terra`를 실행한다). 장부 목적 `compare-inputs`. 이미 저장된 입력이 있으면 덮어쓰지 않고 거부한다.
 - **`terra`**: 저장된 입력 5개 × `reasoning_effort` `none`·`low`·`medium` = 15호출(한 호출에 기획안 1안, 같은 프롬프트·같은 입력). 입력 파일의 sha256이 사전 등록 파일에 적힌 값과 같지 않으면 호출 없이 `INPUT_HASH_MISMATCH`로 멈춘다. 각 기획안에 `checks.run_checks`(6b의 조회 구현체)를 돌려 지표를 계산한다: **쓸 수 있는 기획안 수**(= `passed`이고 `evidence_ids`가 1개 이상이며 전부 핸드오프 풀 안인 건), 구조화 실패 수(재요청 뒤 실패), 보고용 호출당 비용·추론 토큰. 판정(사전 등록 파일의 B-1): 쓸 수 있는 기획안 수가 가장 많은 값 → 동률이면 구조화 실패가 적은 값 → 그래도 같으면 낮은 비용 값(`none` < `low` < `medium`). **모든 값이 3/5 미만이면 결정을 보류**하고 "보류"를 출력한다(자동 선택 없음). 기획안 5×3개는 `data/interim/p5_compare/plans/`에 저장하고 각 sha256을 출력한다. 장부 목적 `compare-terra`.
 - **`sonnet`**: 위 기획안 중 **파일 해시 오름차순 앞 6건**(코드 검사 결과와 무관)을 `claude-sonnet-5-5`로 평가한다: 각 입력을 (a) `ToolCallStructured`와 (b) `NativeAnthropicStructured`로 1번씩 = 12호출(+재요청). 지표: 방식별 **첫 시도 구조화 실패율과 재요청 뒤 실패율**, 두 방식 점수 차이 절댓값 평균과 완전 일치 비율(보고용), 호출당 입력 토큰·비용(보고용), 캐시 읽기 토큰(같은 접두 연속 2호출에서 관찰, 보고용). 판정(사전 등록 파일의 B-2): **(b)의 재요청 뒤 구조화 실패율이 (a)보다 엄격히 낮을 때만** (b)를 기본으로 권고, 같거나 (a)가 낮으면 (a) 유지. 점수 차이 평균이 1.0(5점 척도)을 넘으면 판정과 별도로 "검토 표시". 장부 목적 `compare-sonnet`.
@@ -37,7 +37,7 @@
 - 목적 상한: `compare-terra` 합계가 상한 이상이면 호출 없이 멈춘다. 접두어가 정확히 맞는 목적만 합산된다.
 - `terra` 판정(순수 함수로 분리해 합성 입력으로 검증): 쓸 수 있는 기획안 수 최다 선택, 동률에서 구조화 실패가 적은 값, 그래도 같으면 낮은 비용 값(순서 `none` < `low` < `medium`), 모두 3/5 미만이면 "보류"이고 값을 고르지 않는다. 쓸 수 있는 기획안 수 정의(`passed`이고 `evidence_ids` 1개 이상이며 전부 풀 안)가 경계 케이스(근거 0개, 풀 밖 ID 하나, `passed`만 거짓)에서 맞다. 입력 해시 불일치는 호출 없이 `INPUT_HASH_MISMATCH`.
 - `sonnet` 판정(순수 함수): (b)가 엄격히 낮을 때만 (b) 권고, 같으면 (a), (a)가 낮으면 (a). 첫 시도 실패율과 재요청 뒤 실패율을 따로 계산한다. 점수 차이 평균 1.0 초과 검토 표시. 파일 해시 오름차순 앞 6건 선택이 입력 순서에 무관하다.
-- 출력·저장 파일에 키·기획안 전문이 없다(합성 비밀·합성 기획안 문자열을 넣어 확인). `inputs`가 기존 입력을 덮어쓰지 않는다.
+- **결과 json·터미널 출력·표**에 합성 비밀·합성 기획안 문자열이 없다(합성 값을 넣어 확인). **`plans/` 파일에는 `Plan` 필드만 있고 합성 비밀·호출 인자·부가 필드가 없다.** `data/interim/`이 `.gitignore`에 포함돼 있다(`.gitignore` 줄 확인). `inputs`가 기존 입력을 덮어쓰지 않는다.
 - `tests/test_architecture.py`가 통과한다(`eval`은 `fastapi`·`httpx`를 import하지 않는다).
 
 ## Acceptance Criteria
@@ -73,6 +73,6 @@ make verify   # lint + test 통과
 - 사전 등록 파일이 커밋돼 있지 않거나 수정됐는데 호출하지 마라. 이유: 기대값·판정 규칙은 실행 전에 정해 커밋하고 결과를 본 뒤 바꾸지 않는다(AGENTS.md CRITICAL, B-FP-043).
 - 판정 결과로 `PLANNING_REASONING_EFFORT`나 평가 기본 방식 상수를 이 도구에서 바꾸지 마라. 이유: 상수 변경은 결과 보고와 사용자 승인 뒤 별도 변경이다. 도구는 판정을 출력만 한다.
 - 사전 등록 파일의 값을 파싱해 동작을 정하지 마라. 이유: 구현은 상수이고 파일과 같다는 점검만 둔다(파일이 바뀌면 점검이 실패해 드러난다. B-FP-044).
-- 출력·저장 파일에 기획안 전문·모델 응답 전문·키를 남기지 마라. 이유: 해시·지표·비용만 남기고 `data/interim`은 커밋하지 않는다(AGENTS.md CRITICAL).
+- 결과 파일·터미널 출력·표에 기획안 전문·모델 응답 전문·키를 남기지 마라(해시·지표·비용만). 이유: 결과가 보고서와 대화로 퍼질 수 있다. 중간 입력 산출물(`inputs/`·`plans/`)은 `data/interim` 아래 로컬 gitignore 파일로만 허용하고 `plans/`에는 `Plan` 필드만 담는다(AGENTS.md: `data/interim`은 커밋하지 않는다).
 - `make live-compare`를 실행하거나 실제 서비스에 접속하는 테스트를 만들지 마라. 이유: 모델 호출은 사용자가 실행한다(AGENTS.md CRITICAL). 모든 호출 경로는 주입 함수로 테스트한다.
 - test 브랜드(isntree·beauty_of_joseon) 입력을 쓰지 마라. 이유: 개발 비교는 dev workspace 입력만 쓰고 test 브랜드는 최종 평가·시연에만 쓴다(P5 결정).

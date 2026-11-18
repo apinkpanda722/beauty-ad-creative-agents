@@ -233,3 +233,10 @@
 - **결과**: 코드 변경 없이 중단돼 되돌릴 것이 없었다. 재실행 결과는 step 6c 완료 뒤 보고한다.
 - **근거**: `phases/5-agents/step6c.md`, `src/beautyads/agents/research.py`, `src/beautyads/agents/state.py`.
 
+## 2026-11-18 P5 step 6d가 저장 요구와 저장 금지 문구의 모순으로 blocked됐다
+- **문제**: `dev-compare` step이 구현 전에 `blocked`로 보고됐다. "기획안 5×3개는 `data/interim/p5_compare/plans/`에 저장하고 각 sha256을 출력한다"와 "출력·저장 파일에 기획안 전문·모델 응답 전문·키를 남기지 마라"가 충돌했다. sonnet 비교가 저장된 기획안을 평가 입력으로 다시 읽어야 하는데 금지 문구가 저장 파일 전체를 막았다.
+- **원인**: 금지의 의도는 결과 보고 파일·출력·표에 전문과 키가 새지 않게 하는 것이었는데 저장 대상(결과 파일과 로컬 중간 산출물)을 구분하지 않고 썼다. 자체 점검의 "금지사항과 작업의 모순 대조"가 이 경우를 잡지 못했다.
+- **해결**: 금지를 "결과 파일·터미널 출력·표"로 한정하고 중간 입력 산출물(`inputs/`·`plans/`)은 `data/interim` 아래 로컬 gitignore 파일로 허용했다(`plans/`에는 `Plan` 필드만, 호출 인자·원응답·키·`thought_signatures` 제외, `data/interim`의 gitignore 포함을 테스트로 확인). `/harness` 원칙 9번에 저장 대상 구분을 보강했다.
+- **결과**: 코드 변경 없이 중단돼 되돌릴 것이 없었다. 재실행 결과는 step 6d 완료 뒤 보고한다.
+- **근거**: `phases/5-agents/step6d.md`.
+
