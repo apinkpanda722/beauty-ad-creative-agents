@@ -36,6 +36,21 @@ class Confidence(StrEnum):
     high = "high"
 
 
+class AggregateItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    value: str
+
+
+def aggregates_from_items(items: Iterable[AggregateItem]) -> dict[str, str]:
+    """Keep the first model-authored value for each name."""
+    aggregates = {}
+    for item in items:
+        aggregates.setdefault(item.name, item.value)
+    return aggregates
+
+
 class ResearchHandoffDraft(BaseModel):
     """Only these fields may be authored by the structured generator."""
 
@@ -43,7 +58,9 @@ class ResearchHandoffDraft(BaseModel):
 
     conclusion: str
     evidence_ids: list[str]
-    aggregates: dict[str, Any]
+    aggregates: list[AggregateItem] = Field(
+        description="모델이 작성한 값이며 검증된 수치가 아니다"
+    )
     confidence: Confidence
     unresolved: list[str]
 
@@ -62,6 +79,9 @@ class ResultCount(BaseModel):
 
 
 class ResearchHandoff(ResearchHandoffDraft):
+    aggregates: dict[str, Any] = Field(
+        description="모델이 작성한 값이며 검증된 수치가 아니다"
+    )
     status: ResearchStatus
     no_evidence_tools: list[str]
     basis_notes: list[str]

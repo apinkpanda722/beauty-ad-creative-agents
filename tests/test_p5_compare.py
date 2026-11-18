@@ -726,3 +726,48 @@ def test_failures_close_resources_without_exception_leaks(tmp_path):
     assert json.loads(report)["complete"] is False
     assert "decision" not in json.loads(report)
     assert SECRET not in output + report and PROSE not in output + report
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        None,
+        "SCHEMA_INVALID:400",
+        "A" * 64,
+        "A" * 65,
+        "",
+        "unsafe-code",
+        "bad\ncode",
+        400,
+        {"private": SECRET},
+    ],
+)
+def test_unexpected_failure_reports_only_safe_code_and_class(tmp_path, code):
+    class SyntheticFailure(Exception):
+        pass
+
+    def factory(*args):
+        error = SyntheticFailure(SECRET, {"private": PROSE})
+        if code is not None:
+            error.code = code
+        raise error from RuntimeError(SECRET, PROSE)
+
+    status, base, _, output = invocation(tmp_path, "terra", structured_factory=factory)
+    text = next(base.glob("*-terra.json")).read_text()
+    report = json.loads(text)
+    safe_code = (
+        code
+        if isinstance(code, str) and re.fullmatch(r"[A-Za-z0-9_:]{1,64}", code)
+        else None
+    )
+    assert status == 3 and report["complete"] is False
+    assert report["error"] == {"code": safe_code, "detail": "SyntheticFailure"}
+    first_line = output.splitlines()[0]
+    assert (
+        first_line
+        == "COMPARE_FAILED"
+        + (f" error_code={safe_code}" if safe_code is not None else "")
+        + " detail=SyntheticFailure"
+    )
+    assert SECRET not in output + text and PROSE not in output + text
+    assert "private" not in output + text

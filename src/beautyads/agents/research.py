@@ -23,6 +23,7 @@ from beautyads.domain.research import (
     ResearchHandoff,
     ResearchHandoffDraft,
     ResultCount,
+    aggregates_from_items,
     restrict_evidence_ids,
 )
 from beautyads.domain.tenant import validate_tenant_id
@@ -260,6 +261,7 @@ def build_research_graph(
                 handoff = ResearchHandoff(
                     **{
                         **draft.model_dump(mode="json"),
+                        "aggregates": aggregates_from_items(draft.aggregates),
                         "evidence_ids": allowed,
                         "unresolved": [
                             *unresolved,

@@ -82,7 +82,7 @@ def draft(ids=("yt:a",)):
     return {
         "conclusion": "synthetic conclusion",
         "evidence_ids": list(ids),
-        "aggregates": {"n": 1},
+        "aggregates": [{"name": "n", "value": "1"}],
         "confidence": "medium",
         "unresolved": [],
     }
@@ -501,7 +501,9 @@ def test_handoff_counts_come_from_tool_rows_even_when_draft_aggregates_disagree(
     )
     model_draft = draft()
     if model_counts is not None:
-        model_draft["aggregates"].update(model_counts)
+        model_draft["aggregates"].extend(
+            {"name": name, "value": str(value)} for name, value in model_counts.items()
+        )
     structured = Structured(model_draft)
     chat = Chat([reply([call()]), reply()])
     graph = build_research_graph(
@@ -576,6 +578,25 @@ def test_zero_evidence_result_has_zero_counts():
         {"tool": EXAMPLE, "row_count": 0, "shown_count": 0, "truncated": False}
     ]
     assert structured.calls == []
+
+
+def test_finalize_converts_aggregate_items_without_changing_counts_or_status():
+    value = draft()
+    value["aggregates"] += [
+        {"name": "n", "value": "later"},
+        {"name": "row_count", "value": "999"},
+    ]
+    output = execute(
+        Chat([reply([call()]), reply()]),
+        lambda *args: result(raw_size=7),
+        Structured(value),
+    )
+    assert output["aggregates"] == {"n": "1", "row_count": "999"}
+    assert output["status"] == "ok"
+    assert output["result_counts"] == [
+        {"tool": EXAMPLE, "row_count": 7, "shown_count": 1, "truncated": True}
+    ]
+    assert output["unresolved"] == []
 
 
 def test_failures_and_display_calls_have_no_result_counts():

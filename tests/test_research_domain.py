@@ -76,7 +76,7 @@ def test_draft_cannot_choose_code_owned_fields(field):
         ResearchHandoffDraft(
             conclusion="synthetic",
             evidence_ids=[],
-            aggregates={},
+            aggregates=[],
             confidence="low",
             unresolved=[],
             **{field: None},
@@ -126,7 +126,7 @@ def test_handoff_counts_default_is_independent_and_never_model_authored():
     draft = {
         "conclusion": "synthetic",
         "evidence_ids": [],
-        "aggregates": {},
+        "aggregates": [],
         "confidence": "low",
         "unresolved": [],
     }
@@ -135,7 +135,7 @@ def test_handoff_counts_default_is_independent_and_never_model_authored():
     with pytest.raises(ValidationError):
         ResearchHandoffDraft(**draft, result_counts=[])
     fields = dict(
-        **draft,
+        **{**draft, "aggregates": {}},
         status="no_evidence",
         no_evidence_tools=[],
         basis_notes=[],
@@ -144,3 +144,72 @@ def test_handoff_counts_default_is_independent_and_never_model_authored():
     first, second = ResearchHandoff(**fields), ResearchHandoff(**fields)
     assert first.result_counts == second.result_counts == []
     assert first.result_counts is not second.result_counts
+
+
+@pytest.mark.parametrize(
+    "values,expected",
+    [
+        ([], {}),
+        ([{"name": "n", "value": "1"}], {"n": "1"}),
+        (
+            [
+                {"name": "n", "value": "first"},
+                {"name": "n", "value": "later"},
+                {"name": "other", "value": "2"},
+            ],
+            {"n": "first", "other": "2"},
+        ),
+    ],
+)
+def test_aggregates_from_items_preserves_first_and_string_values(values, expected):
+    from beautyads.domain.research import AggregateItem, aggregates_from_items
+
+    items = [AggregateItem.model_validate(value) for value in values]
+    before = [item.model_dump() for item in items]
+    converted = aggregates_from_items(items)
+    assert converted == expected
+    assert all(isinstance(value, str) for value in converted.values())
+    assert [item.model_dump() for item in items] == before
+
+
+def test_aggregate_item_forbids_extra_fields_and_nonstring_values():
+    from beautyads.domain.research import AggregateItem
+
+    for value in ({"name": "n", "value": 1}, {"name": "n", "value": "1", "extra": "x"}):
+        with pytest.raises(ValidationError):
+            AggregateItem.model_validate(value)
+
+
+def test_draft_fields_remain_model_owned_and_aggregates_are_described():
+    from beautyads.domain.research import ResearchHandoff
+
+    assert set(ResearchHandoffDraft.model_fields) == {
+        "conclusion",
+        "evidence_ids",
+        "aggregates",
+        "confidence",
+        "unresolved",
+    }
+    for contract in (ResearchHandoffDraft, ResearchHandoff):
+        description = contract.model_fields["aggregates"].description
+        assert "모델이 작성한 값이며 검증된 수치가 아니다" in description
+
+
+def test_final_handoff_preserves_free_value_dictionary_contract():
+    from typing import Any
+
+    from beautyads.domain.research import ResearchHandoff
+
+    assert ResearchHandoff.model_fields["aggregates"].annotation == dict[str, Any]
+    value = ResearchHandoff(
+        conclusion="synthetic",
+        evidence_ids=[],
+        aggregates={"n": 1, "text": "1"},
+        confidence="low",
+        unresolved=[],
+        status="ok",
+        no_evidence_tools=[],
+        basis_notes=[],
+        structured_failure_rate=None,
+    )
+    assert value.aggregates == {"n": 1, "text": "1"}

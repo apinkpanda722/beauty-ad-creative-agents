@@ -752,8 +752,22 @@ def main(
     except (SettingError, CostCapExceeded):
         print("PREFLIGHT_FAILED COST_OR_SETTING", file=out)
         status = 2
-    except Exception:  # noqa: BLE001 -- model/graph/validation exceptions can contain secrets and full plans
-        print("COMPARE_FAILED", file=out)
+    except Exception as error:  # noqa: BLE001 -- model/graph/validation exceptions can contain secrets and full plans
+        code = getattr(error, "code", None)
+        code = (
+            code
+            if isinstance(code, str) and re.fullmatch(r"[A-Za-z0-9_:]{1,64}", code)
+            else None
+        )
+        detail = type(error).__name__
+        print(
+            "COMPARE_FAILED"
+            + (f" error_code={code}" if code is not None else "")
+            + f" detail={detail}",
+            file=out,
+        )
+        if report is not None:
+            report["error"] = {"code": code, "detail": detail}
         status = 3
     finally:
         if graph is not None:
