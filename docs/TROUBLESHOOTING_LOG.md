@@ -226,3 +226,10 @@
 - **결과**: 코드 변경 없이 중단돼 되돌릴 것이 없었다. 재실행 결과는 step 5c 완료 뒤 보고한다.
 - **근거**: `phases/5-agents/step5c.md`, `tests/test_tool_messages.py`, `tests/test_agent_skeleton.py`, `tests/test_research_agent.py`.
 
+## 2026-11-18 P5 step 6c가 상태 키 충돌로 blocked됐다
+- **문제**: `plan-eval-loop` step이 구현 전에 `blocked`로 보고됐다. 되돌림 하위 그래프 전용 상태 키(`brief`, `handoff`, `profile`, `feedback`, `plan`, `report`, `rework_count`, `rework_payload`, `attempts`, `image`, `status`)와 "부모 상태·리서치 하위 그래프 상태와 키를 하나도 공유하지 않는다"가 동시에 불가능했다. `ResearchState`에 이미 `brief`·`handoff`가 있다.
+- **원인**: step 6c를 설계할 때 새 상태 키 이름을 5에서 만든 `ResearchState`·`AgentState`의 실제 키와 대조하지 않았다.
+- **해결**: 6c 상태 키에 접두사 `pe_`를 붙이고(결과 dict 키는 그대로, `run_plan_eval`이 변환) 설계 점검(`/harness` 원칙 13번)에 "새 상태는 기존 상태 키 이름과 대조" 한 줄을 추가했다.
+- **결과**: 코드 변경 없이 중단돼 되돌릴 것이 없었다. 재실행 결과는 step 6c 완료 뒤 보고한다.
+- **근거**: `phases/5-agents/step6c.md`, `src/beautyads/agents/research.py`, `src/beautyads/agents/state.py`.
+
