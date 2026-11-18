@@ -173,14 +173,16 @@
     {
       "step": "5b",
       "name": "certified-by-claim",
-      "status": "pending",
+      "status": "completed",
       "started_at": "2026-11-18T14:10:05+0900",
       "usage": {
-        "input_tokens": 225227,
-        "cached_input_tokens": 159104,
-        "output_tokens": 2934,
+        "input_tokens": 1245546,
+        "cached_input_tokens": 1170816,
+        "output_tokens": 8894,
         "attempts": 1
-      }
+      },
+      "summary": "인증 종류별 조회 도구·닫힌 입력·고정 Cypher·unknown 안내 및 --certifications 집합 일치 점검 구현. 아키텍처 검사 포함 make verify 통과(3,982 tests). 실제 서비스 접속·패키지 설치 없음.",
+      "completed_at": "2026-11-18T14:28:22+0900"
     },
     {
       "step": "5c",
