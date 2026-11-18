@@ -439,7 +439,16 @@
     {
       "step": "9g",
       "name": "single-cut-layout-efficacy",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-18T21:06:04+0900",
+      "summary": "단일 컷 이미지 프롬프트·따옴표 제거, 소형 상하단 합성 레이아웃, 코드 기반 available_efficacy 조회·전달 구현. 아키텍처 가드 포함 make verify 통과(4,798 tests). 실제 서비스 호출·다운로드·패키지 설치 없음.",
+      "completed_at": "2026-11-18T21:13:13+0900",
+      "usage": {
+        "input_tokens": 2439043,
+        "cached_input_tokens": 2318976,
+        "output_tokens": 13142,
+        "attempts": 1
+      }
     }
   ],
   "created_at": "2026-11-17T22:15:36+0900"
