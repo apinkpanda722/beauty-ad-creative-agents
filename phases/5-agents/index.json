@@ -243,7 +243,16 @@
     {
       "step": "6d",
       "name": "dev-compare",
-      "status": "pending"
+      "status": "blocked",
+      "started_at": "2026-11-18T14:58:31+0900",
+      "blocked_reason": "선점검에서 충돌을 발견했습니다: “기획안 5×3개는 `data/interim/p5_compare/plans/`에 저장하고 각 sha256을 출력한다.”와 “출력·저장 파일에 기획안 전문·모델 응답 전문·키를 남기지 마라.”가 충돌합니다. sonnet이 저장된 기획안을 평가하려면 전문 저장 허용 여부 또는 대체 입력 전달 방식을 명확히 해야 합니다. 선점검 규칙에 따라 코드 작성·수정·실제 호출 없이 중단했습니다.",
+      "blocked_at": "2026-11-18T14:59:06+0900",
+      "usage": {
+        "input_tokens": 53184,
+        "cached_input_tokens": 23936,
+        "output_tokens": 476,
+        "attempts": 1
+      }
     },
     {
       "step": 7,
