@@ -229,14 +229,16 @@
     {
       "step": "6c",
       "name": "plan-eval-loop",
-      "status": "pending",
+      "status": "completed",
       "started_at": "2026-11-18T14:48:51+0900",
       "usage": {
-        "input_tokens": 93139,
-        "cached_input_tokens": 53120,
-        "output_tokens": 1006,
+        "input_tokens": 1044345,
+        "cached_input_tokens": 967936,
+        "output_tokens": 12266,
         "attempts": 1
-      }
+      },
+      "summary": "기획·평가 되돌림 하위 그래프(최대 2회), 전용 상태·사유 전달·최종 이미지 1회 생성·결과 집계 구현. 아키텍처 검사 포함 make verify 통과(4,164 tests). 실제 서비스 접속·패키지 설치 없음.",
+      "completed_at": "2026-11-18T14:58:25+0900"
     },
     {
       "step": "6d",
