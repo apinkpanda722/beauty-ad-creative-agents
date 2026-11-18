@@ -201,3 +201,10 @@ description: 이 프로젝트(beauty-ad-creative-agents)와 앞선 프로젝트 
 - `scripts/hooks/verify-before-stop.sh`: 실행 중에는 검증을 건너뛰고, 예외 경로만 바뀐 경우 건너뛴다.
 - `scripts/exempt_paths.json`: 검증 없이 넘어갈 수 있는 실행 산출물 경로(정확히 1개). B의 값(`data/manifest/costs.jsonl`, 비용 원장)을 그대로 뒀다. 이 프로젝트의 비용 기록 경로가 정해지면 맞춘다.
 - 린트 설정에서 `scripts`와 `phases`는 제외한다(B의 `extend-exclude`와 같게).
+
+### FP-C16 설정 상한을 하드코딩 상수가 깎아 승인된 설정이 조용히 무시됨
+- **증상**: P5 `make live-agents --config image`가 `limit_kinds ["image"]`·이미지 사용액 0.0으로 끝났다. 환경변수 `BEAUTYADS_CAP_GEMINI_USD=20.5`(승인)를 붙여도 막혔을 것이다. 조립(`api/assembly.py`)이 `min(하드코딩 $12, 설정값)`으로 설정 상한을 낮추기만 했다(장부 Gemini $16.66).
+- **원인**: "기본 상한 안에서만 동작"을 지키려는 안전장치를 설정을 우회하는 상수로 구현했다. 테스트가 기본 설정에서만 돌아 상한을 바꿔도 조립이 따라가는지는 한 번도 확인하지 않았다. 상한 오류가 공급사 상한인지 목적 상한인지도 버려 진단이 늦어졌다.
+- **규칙**: 상한은 `Settings`(승인된 환경변수) 한 곳이 출처다. 조립·도구가 `min(상수, 설정)`으로 깎거나 새 상한 리터럴을 만들지 않는다. 기본값 리터럴은 `settings.py`와 계층 규칙상 `settings`를 못 읽는 `agents/`의 대체값뿐이고 그 값은 `Settings` 기본값과 같음을 테스트가 지킨다. 상한 오류는 종류(공급사·목적)를 구분해 결과·trace·요약에 남긴다.
+- **강제 수단**: `tests/test_caps_guard.py`(P5 step 9b: 설정을 올리고 낮췄을 때 조립이 받은 `caps`가 따라가는지, 실제 `check_cap`으로 재현, AST 스캔으로 `min(caps)`·하드코딩 딕셔너리 금지). /review 체크(새 상한·비용 검사가 설정을 거치는가).
+- **출처**: 2026-11-18 P5 `make live-agents` image 구성, 이슈 #43

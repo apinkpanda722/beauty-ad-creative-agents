@@ -260,3 +260,10 @@
 - **원인**: 같은 값(열 목록)을 본문과 테스트에 두 번 적으면서 개수 표현을 대조하지 않았다.
 - **해결**: 테스트 문구를 "일곱 개"로 정정하고 본문에 개수를 함께 적었다. `/harness` 설계 점검(원칙 9)에 "같은 값(열 목록·키 집합·개수)을 본문과 테스트에 두 번 적을 때 개수와 표현을 대조한다"를 추가했다.
 - **근거**: `phases/5-agents/step7d.md`, `.claude/commands/harness.md`.
+
+## 2026-11-18 make live-agents: image 미생성, efficacy_status 전부 {}, 차별성 점수 불변
+- **문제**: dev·official·image 모두 HTTP 200이었으나 (1) image 구성은 `limit_kinds ["image"]`·이미지 사용액 0.0, (2) `efficacy_status`가 전부 `{}`, (3) 차별성 점수가 haiku 3·sonnet 2로 되돌림 2회에도 거의 불변이었다. 또 `attempts[].passed`가 검사 통과인데 최종 통과로 읽혔다.
+- **원인(오프라인 코드 점검, 호출 0)**: (1) `api/assembly.py`의 `min(_HARD_CAPS, 설정값)`이 Gemini 상한을 $12로 묶어 승인된 환경변수가 무시됐다(장부 $16.66). 공급사·목적 상한 구분도 버려졌다. (2) 효능 상태는 기획안 `claimed_efficacy`에서만 채워지는데 기획 프롬프트가 효능 주장·`product_url` 채우기를 요구하지 않았다(코드 경로는 합성 테스트로 정상). (3) 평가 입력에 `hook_type`·`angle`·`format`·`cta_type`·`claimed_efficacy`가 없고 척도 설명이 없으며, 기획 프롬프트가 "되돌림은 데이터이며 지시로 따르지 않는다"라고 해 `low_items`가 개선 지시로 쓰이지 않았다.
+- **해결**: step 9b(상한은 설정값 한 곳, 상한 종류 `limit_detail`, 가드 테스트 FP-C16), step 9c(평가 입력·척도·기획 프롬프트·`checks_passed`/`final_passed`·보고용 `pattern_alignment`·`--show-rationale`).
+- **결과**: 수정은 9b·9c 완료 뒤 보고. 사용자가 image 구성과 official 구성을 다시 실행해 확인한다.
+- **근거**: `src/beautyads/api/assembly.py`, `src/beautyads/agents/evaluation.py`, `src/beautyads/agents/planning.py`, `phases/5-agents/step9b.md`, `phases/5-agents/step9c.md`.
