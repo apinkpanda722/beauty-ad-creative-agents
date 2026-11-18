@@ -255,6 +255,11 @@
       "completed_at": "2026-11-18T15:11:24+0900"
     },
     {
+      "step": "6e",
+      "name": "compare-diagnostics",
+      "status": "pending"
+    },
+    {
       "step": 7,
       "name": "supervisor-sse",
       "status": "pending"

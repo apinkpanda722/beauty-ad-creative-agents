@@ -127,6 +127,13 @@ description: 이 프로젝트(beauty-ad-creative-agents)와 앞선 프로젝트 
 - **강제 수단**: `tests/test_tool_messages.py`와 skeleton·research 테스트의 `messages` 인자 검사(P5 step 1d), `/harness` 설계 원칙 14번, /review 체크.
 - **출처**: 2026-11-18 P5 첫 `make live-agent` 결과 진단, 이슈 #43
 
+### FP-C15 OpenAI 구조화 출력으로 보내는 스키마가 strict 규칙을 어김
+- **증상**: P5 `make live-compare ARGS='inputs'`가 `COMPARE_FAILED`로 실패했다(청구된 호출 1건, 오류 코드·예외 클래스 출력 없음). 오프라인 진단에서 리서치 `finalize`가 `ResearchHandoffDraft.model_json_schema()`를 그대로 보냈고 `aggregates`가 자유 형식 객체(`additionalProperties: true`, 속성 없음)라 OpenAI strict `json_schema` 규칙("`additionalProperties: false` must always be set", 모든 필드 `required`)에 어긋났다. 기획 스키마만 strict 변환을 거치고 있었다.
+- **원인**: 호출 전 litellm 검사(`get_optional_params`)는 스키마 내용을 보지 않는다. 구조화 스키마를 만드는 곳마다 따로 변환해 하나가 빠졌고, 가짜 `structured`로만 테스트해 실제 API의 스키마 규칙을 거치지 않았다. 실패 출력이 코드·클래스 없이 `COMPARE_FAILED` 하나였다.
+- **규칙**: OpenAI 구조화 출력으로 보내는 **모든 스키마**는 공식 문서(조회 날짜 기록)의 strict 규칙 검증기를 오프라인 테스트에서 통과한다. 실제 흐름에서 가짜 `structured`가 받은 `StructuredSpec`을 모아 검증하고 검사한 스펙이 0건이면 실패하며, 새 `StructuredSpec(` 호출 모듈이 가드 목록에 없으면 실패한다. 모델이 채우는 값에 자유 형식 딕셔너리를 쓰지 않고 `{name, value}` 항목 목록으로 받아 코드가 변환한다. 메시지 시퀀스(`tool_calls` 뒤 모든 `tool_call_id`에 tool 메시지, 고아 금지)도 같은 방식으로 검증한다. 실패 출력에는 오류 코드와 예외 클래스 이름을 남긴다(FP-C13).
+- **강제 수단**: `tests/test_schema_guard.py`(P5 step 6e). /review 체크(새 구조화 스펙이 가드 목록에 있는가).
+- **출처**: 2026-11-18 P5 `make live-compare inputs` 실패, 이슈 #43
+
 ---
 
 ## B에서 이식한 항목 (프로젝트 B `failure-patterns`의 번호)

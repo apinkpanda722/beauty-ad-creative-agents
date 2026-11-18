@@ -58,6 +58,7 @@
 | 45 | **P5 두 번째 live 진단과 step 1d·5b(2026-11-18, 조언 세션 검토)**: 두 번째 `make live-agent`는 성공했으나 최종 답이 "특정할 수 없다"였다. 읽기 전용 진단으로 도구는 정상(`row_count` 13)이고 skeleton이 도구 결과의 `summary`만 모델에 전달해 행을 보지 못한 것으로 확인했다. **step 1d `tool-result-message`** 추가(공용 함수, skeleton·research 공용, 외부 텍스트는 JSON 데이터 필드로만, 시스템 지시 한 줄, 테스트는 모델이 받은 `messages` 직접 검사). **step 5b `certified-by-claim`** 방향 승인(효능을 입력으로 받는 인증 제품 조회 도구, 5a 방식, 설계 파일은 조언 세션 검토 뒤). FP-C14와 설계 원칙 14번 추가. 순서 `1d → 5b → 6a`. | 사용자 결정(조언 세션 검토) |
 | 46 | **P5 live 확인 완료와 step 5b·5c·6a~6d 설계(2026-11-18, 조언 세션 검토)**: 세 번째 `make live-agent`(step 1d 뒤)가 성공했다(`status 200`, 이벤트 `step→tool_start→step→token`, `cost 0.000173`, 최종 답에 미백 인증 제품 이름 5개, 인증 근거 자료 없음을 밝힘). step 1·1c·1d를 live까지 확인한 완료로 본다. 남은 개선: 도구가 `row_count` 13을 돌려줬는데 모델에는 상위 5건만 전달돼 최종 답이 전체 건수를 밝히지 않았다 → **step 5c `handoff-counts`**(코드가 구조화 칸으로 `result_counts`를 싣고 화면용 "N건 중 M건 표시"를 코드가 만든다, 모델 지시문 한 줄 추가)를 추가하고 step 6·7에 반영한다. **step 5b `certified-by-claim`**·**6a~6d** 설계 파일과 사전 등록 파일(`docs/results/p5_dev_compare_preregistration.md`)을 추가했다. 사전 등록 파일에 B-1(쓸 수 있는 기획안 수)·B-2((b)가 엄격히 낮을 때만 교체)·상한(compare-inputs $0.02, compare-terra $0.12, compare-sonnet $0.10)·고정 입력 5건을 적었다. | 사용자 결정(조언 세션 검토) |
 | 47 | **P5 step 5b·5c·6a~6d 승인과 조건(2026-11-18, 조언 세션 검토)**: 실행 순서 `5b → 5c → 6a → 6b → 6c → 6d`(사용자 live: 5b 뒤 `make live-evidence`, 6d 뒤 `inputs`·`terra`·`sonnet` 비교). (1) `PASS_MIN_SCORE = 3`은 **잠정 개발값**이고 최종 평가(test 브랜드) 전에 동결한다(test 결과를 보고 바꾸지 않고, 개발 중 값을 바꾸면 이유와 날짜를 이 표에 기록, 코드 주석 "잠정값, 최종 평가 전 동결"). (2) 그래프 조회 구현체는 `unsupported`·`not_certified`를 만들지 않는다. 한계를 ARCHITECTURE "그라운딩 원칙"과 결과 문서에 쓴다: 이 버전의 효능 검사는 근거가 확인된 효능을 확인할 뿐 근거 없는 효능을 부당으로 판정하지 못하며 주 실패 검사는 금지 표현·근거 ID·분류 값이다. 6b 평가 보고와 6c 결과에 효능별 상태 칸(`efficacy_status`·`efficacy_summary`, `supported`·`unknown`)을 `passed`와 분리해 둔다. step 7 화면 데이터에도 같은 칸을 싣는다. (3) 사전 등록 파일(`docs/results/p5_dev_compare_preregistration.md`)은 이미 커밋돼 이후 변경은 정정 기록 방식으로만 한다. | 사용자 결정(조언 세션 검토) |
+| 48 | **P5 live-compare 실패 진단과 step 6e(2026-11-18, 조언 세션 검토)**: `make live-compare ARGS='inputs'`가 `COMPARE_FAILED`로 실패했다. 오프라인 진단으로 리서치 `finalize`의 `ResearchHandoffDraft.aggregates`가 자유 형식 객체라 OpenAI strict 규칙을 어김을 확인했다(오류 코드 출력 부재로 원인 전부 확정은 재실행 뒤). **step 6e `compare-diagnostics`** 추가(6d 뒤, P5 순서 `6d → 6e → 7`): 에러 가시성, `aggregates` 항목 목록 변환, 공식 문서(2026-11-18 조회) 기반 strict 검증기·스펙 가드·메시지 시퀀스 검증기. FP-C15·원칙 14 보강. **step 7 요구사항 추가**: `ResearchHandoff.aggregates`는 모델 작성값이며 검증된 수치가 아니므로 결과·화면에서 검증된 수치로 취급하지 않고, **도구 출력에 없는 수치를 `unresolved`로 옮기는 코드 검증을 step 7에서 한다**(6e에서는 하지 않음). 해시 커밋과 terra·sonnet 실행은 재실행 성공 전까지 보류. | 사용자 결정(조언 세션 검토) |
 
 ## 1. 전제와 일정
 
@@ -202,7 +203,7 @@ step 본문은 `phases/4-ontology/step*.md`가 원본이다. 구 번호와의 �
 
 **P4 착수 전 입력(2026-11-15 결정)**: 식약처 안내서 PDF 내려받기와 `claim_rules.yaml` 초안(완료), 공식몰 응답 원본 5쪽+robots.txt(완료), Gemini 이미지 입력 계약 실측 2회 $0.00183(완료), `SkinType`·`SkinConcern` 목록과 `ADDRESSES` 대응 초안(ADR-012 후속), 성분→효능 수기 표(step 7 live 뒤).
 
-### P5 agents (실행 중, 순서 2 → 3 → 4 → 4b → 0 → 0b → 1 → 5a → 5 → 1b → 1c → 1d → 5b → 5c → 6a → 6b → 6c → 6d → 7 → 8 → 9)
+### P5 agents (실행 중, 순서 … 6c → 6d → 6e → 7 → 8 → 9)
 
 | step | 이름 | 내용 |
 |---|---|---|
@@ -223,6 +224,7 @@ step 본문은 `phases/4-ontology/step*.md`가 원본이다. 구 번호와의 �
 | 6a | `image-design` | 이미지 시안 래퍼 `llm/image.py`(`gemini-3.1-flash-lite-image`, 텍스트 프롬프트만, 매직 바이트 확인 PNG·JPEG·WebP, 10MB 상한, base64·`thought_signatures` 폐기, 공급사·이미지 목적 상한 호출 전 검사)와 `agents/design_images.py`(`data/design/` 로컬 저장, gitignore), 호출 전 검증 가드 |
 | 6b | `planning-evaluation` | 기획(terra, 1안/호출)·평가(코드 검사 먼저, LLM은 차별성·요청 적합성만, haiku 개발·sonnet 공식), 그래프 조회 구현체(`unsupported`·`not_certified`는 돌려주지 않음), `PASS_MIN_SCORE = 3` |
 | 6c | `plan-eval-loop` | 되돌림 하위 그래프(전용 상태, 상태 카운터 최대 2회, 코드 검사 실패 사유와 LLM 낮은 항목 둘 다 전달), 이미지는 최종 기획안에 한 번, `unknown_count`·`result_counts`·`evidence_counts`를 별도 칸으로 노출 |
+| 6e | `compare-diagnostics` | `make live-compare inputs` 실패 진단 수정: `p5_compare` 실패 출력에 `error_code`·`detail`, `ResearchHandoffDraft.aggregates`를 `{name, value}` 항목 목록으로(결과 계약 불변, 모델 작성값 표시), OpenAI strict 스키마 규칙 검증기·스펙 가드·메시지 시퀀스 검증기 |
 | 6d | `dev-compare` | 사전 등록 비교 실행기 `make live-compare`(terra `reasoning_effort` none·low·medium, sonnet (a) 대 (b)), 사전 등록 파일 커밋 확인과 목적별 상한 검사, 입력 해시 확인 |
 | 7 | `supervisor-sse` | Supervisor, 한도, 기준일 고정, SSE 4종. **효능별 상태(`efficacy_status`·`efficacy_summary`)와 "N건 중 M건 표시"(`count_label`)를 화면 데이터에 `passed`와 분리해 싣는다.** **사용자 화면(기획안 카드·평가)과 보고에 "근거 연결 없음" 건수를 눈에 띄게 노출한다**(`passed`에 섞지 않는다) |
 | 8 | `obs-langfuse` | JSONL(기본), Langfuse(`obs` profile, `langfuse==3.15.0`, `cost_details` 전송) |

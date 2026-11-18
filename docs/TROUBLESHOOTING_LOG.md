@@ -240,3 +240,10 @@
 - **결과**: 코드 변경 없이 중단돼 되돌릴 것이 없었다. 재실행 결과는 step 6d 완료 뒤 보고한다.
 - **근거**: `phases/5-agents/step6d.md`.
 
+## 2026-11-18 make live-compare inputs가 COMPARE_FAILED로 실패했다(구조화 스키마 strict 위반)
+- **문제**: 사용자가 실행한 `make live-compare ARGS='inputs'`가 `COMPARE_FAILED`로 끝났다(litellm 예외, luna 1호출만 청구: 입력 2,446·출력 31토큰·$0.000321, 결과 파일 `complete:false`, 핸드오프 미저장). 오류 코드·예외 클래스가 출력에 없었다.
+- **원인(오프라인 진단, 확정 결함 1건)**: 리서치 `finalize`가 `ResearchHandoffDraft.model_json_schema()`를 그대로 보냈고 `aggregates`가 `dict[str, Any]`라 `{"type":"object","additionalProperties":true}`(자유 형식 객체)다. OpenAI strict 규칙 위반(공식 문서 2026-11-18 조회). 같은 오프라인 검증기에서 기획 스키마(`strict_plan_schema`)와 평가 점수 스키마는 위반이 없다. 이 결함이 live의 예외 7건 전부를 설명하는지는 오류 코드·클래스 출력이 생긴 뒤 확정한다.
+- **해결**: step 6e — `p5_compare` 실패 출력에 `error_code`·`detail`(예외 클래스 이름), `ResearchHandoffDraft.aggregates`를 `{name, value}` 항목 목록으로 바꾸고 코드가 딕셔너리로 변환(결과 계약 불변, 모델 작성값이며 검증된 수치가 아님을 필드 설명에 표시), 공식 문서의 strict 규칙 검증기·스펙 가드·메시지 시퀀스 검증기(`tests/test_schema_guard.py`). FP-C15와 `/harness` 원칙 14번 보강을 추가했다.
+- **결과**: 수정은 step 6e 완료 뒤 보고. 사용자가 `make live-compare ARGS='inputs'`를 다시 실행해 확인한다.
+- **근거**: `src/beautyads/agents/research.py`, `src/beautyads/domain/research.py`, `phases/5-agents/step6e.md`.
+
