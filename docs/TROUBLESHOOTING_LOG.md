@@ -205,3 +205,10 @@
 - **결과**: 수정은 step 1d 완료 뒤 보고. 사용자가 같은 `make live-agent`를 다시 실행해 최종 답에 제품 이름이 나오는지 확인한다. 별개로 `lookup_certified_products`가 입력이 없는 도구라 효능으로 거를 수 없는 문제는 step 5b로 다룬다.
 - **근거**: `src/beautyads/agents/skeleton.py`, `src/beautyads/agents/tools.py`, `phases/5-agents/step1d.md`.
 
+## 2026-11-18 P5 step 5b가 도구 등록 목록 단언과 충돌해 blocked됐다
+- **문제**: `certified-by-claim` step이 구현 전에 `blocked`로 보고됐다. step 파일은 `tests/test_agent_tools.py`를 "케이스 추가에 한함, 단언 약화 금지"로 제한했는데 기존 `test_registry_is_stable_described_and_closed`가 표시 도구가 아닌 도구를 `QUESTION_IDS`(동결 CQ 도구) 또는 `EVIDENCE_INPUTS`(5a 도구)에 있는 것으로 제한하고 후자는 `find_example_creatives` 외에는 `compare` 종류만 허용한다. 새 `lookup` 도구는 케이스 추가만으로 통과할 수 없었다.
+- **원인**: 설계 때 새 도구를 추가하는 step의 소비자 테스트 점검에서 등록 목록을 닫힌 집합으로 단언하는 테스트를 "추가에 한함"으로만 적고 확장 허용을 적지 않았다(FP-C11 인접).
+- **해결**: step 파일의 수정 허용 문구에 "도구 분류 표에 새 도구를 위한 분기를 추가하는 확장"을 넣고(기존 검증 조건 불변, 새 도구는 별도 분기로 실제 검증) `blocked`를 `pending`으로 되돌려 재실행한다. FP-C11에 추가 사례를 적었다.
+- **결과**: 코드 변경 없이 중단돼 되돌릴 것이 없었다. 재실행 결과는 step 5b 완료 뒤 보고한다.
+- **근거**: `phases/5-agents/step5b.md`, `tests/test_agent_tools.py`.
+
