@@ -187,14 +187,16 @@
     {
       "step": "5c",
       "name": "handoff-counts",
-      "status": "pending",
+      "status": "completed",
       "started_at": "2026-11-18T14:28:35+0900",
       "usage": {
-        "input_tokens": 97415,
-        "cached_input_tokens": 54656,
-        "output_tokens": 1097,
+        "input_tokens": 1126952,
+        "cached_input_tokens": 1042560,
+        "output_tokens": 6912,
         "attempts": 1
-      }
+      },
+      "summary": "shown_count·부분 표시 지시·코드 기반 result_counts 핸드오프·count_label 구현 및 합성 테스트 추가. 아키텍처 검사 포함 make verify 통과(4,006 tests). 실제 서비스 접속·패키지 설치 없음.",
+      "completed_at": "2026-11-18T14:35:27+0900"
     },
     {
       "step": "6a",
