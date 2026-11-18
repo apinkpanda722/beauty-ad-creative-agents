@@ -254,3 +254,9 @@
 - **결과**: 수정은 step 6f 완료 뒤 보고. 사용자가 `make live-compare ARGS='inputs'`를 다시 실행해 확인한다.
 - **근거**: `src/beautyads/agents/research.py`, `src/beautyads/agents/tool_messages.py`, `phases/5-agents/step6f.md`.
 
+
+## 2026-11-18 step 7d가 선점검에서 blocked됐다(같은 값의 개수 표현 모순)
+- **문제**: `step7d.md`가 `hydrate` 열 목록을 본문에서는 7개로, 테스트 항목에서는 "위 다섯 개뿐"으로 적었다. 선점검이 충돌로 중단했다(코드 변경 없음).
+- **원인**: 같은 값(열 목록)을 본문과 테스트에 두 번 적으면서 개수 표현을 대조하지 않았다.
+- **해결**: 테스트 문구를 "일곱 개"로 정정하고 본문에 개수를 함께 적었다. `/harness` 설계 점검(원칙 9)에 "같은 값(열 목록·키 집합·개수)을 본문과 테스트에 두 번 적을 때 개수와 표현을 대조한다"를 추가했다.
+- **근거**: `phases/5-agents/step7d.md`, `.claude/commands/harness.md`.
