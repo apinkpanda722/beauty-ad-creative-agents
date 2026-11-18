@@ -26,3 +26,14 @@ def resolve_session(header, thread_id, *, tenants, allowed_tenants):
     except TenantMismatch:
         raise HTTPException(403, "TENANT_MISMATCH") from None
     return tenant_id, thread_id
+
+
+def resolve_tenant(header, *, allowed_tenants) -> str:
+    """Resolve a header-only tenant without creating or accessing a thread."""
+    try:
+        tenant_id = validate_tenant_id(header)
+    except TenantContextMissing:
+        raise HTTPException(400, "TENANT_CONTEXT_MISSING") from None
+    if tenant_id not in allowed_tenants:
+        raise HTTPException(403, "TENANT_NOT_ALLOWED")
+    return tenant_id

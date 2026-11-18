@@ -4,9 +4,9 @@ import asyncio
 import inspect
 import os
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any
 
@@ -15,6 +15,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from beautyads.agents.skeleton import RECURSION_LIMIT
+from beautyads.api.feedback import register_feedback
 from beautyads.api.session import resolve_session
 from beautyads.api.sse import encode_event
 from beautyads.domain.tenant import TenantRepository
@@ -31,6 +32,8 @@ class Assembly:
     chat: Callable | None
     tool_runner: Callable | None
     close: Callable
+    workspaces: Mapping[str, dict] = field(default_factory=dict)
+    price_bands: Mapping[str, dict] = field(default_factory=dict)
 
 
 class ChatRequest(BaseModel):
@@ -55,6 +58,7 @@ def create_app(assemble: Callable[[], Assembly]) -> FastAPI:
                 await result
 
     app = FastAPI(lifespan=lifespan)
+    register_feedback(app)
 
     @app.get("/healthz")
     async def healthz():

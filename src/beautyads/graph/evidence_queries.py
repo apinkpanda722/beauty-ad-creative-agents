@@ -212,3 +212,20 @@ def product_support_parameters(*, product_url, claim) -> dict:
     if not isinstance(product_url, str) or not product_url.strip():
         raise ValueError("PRODUCT_SUPPORT_INPUT_INVALID")
     return {"product_url": product_url, "claim": Claim(claim).value}
+
+
+def product_unit_price_query() -> str:
+    """Resolve a workspace's exact product key for unit-price band calculation."""
+    return """
+        MATCH (p:Product)
+        WHERE p.brand = $brand AND p.source_url = $url
+        RETURN p.unit_list_price AS unit_list_price,
+               p.price_basis AS price_basis, p.volume_unit AS volume_unit
+    """
+
+
+def product_unit_price_parameters(*, brand, url) -> dict:
+    """Keep product identifiers as bound data, including any punctuation."""
+    if any(not isinstance(value, str) or not value.strip() for value in (brand, url)):
+        raise ValueError("PRODUCT_UNIT_PRICE_INPUT_INVALID")
+    return {"brand": brand, "url": url}

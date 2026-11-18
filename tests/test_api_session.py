@@ -64,3 +64,43 @@ def test_session_refuses_before_graph(headers, body, status, code):
     if code:
         assert response.json() == {"detail": code}
     assert graph.calls == []
+
+
+@pytest.mark.parametrize(
+    "header,status,code",
+    [
+        (None, 400, "TENANT_CONTEXT_MISSING"),
+        ("", 400, "TENANT_CONTEXT_MISSING"),
+        ("INVALID SPACE", 400, "TENANT_CONTEXT_MISSING"),
+        ("demo-a\n", 400, "TENANT_CONTEXT_MISSING"),
+        ("outside", 403, "TENANT_NOT_ALLOWED"),
+    ],
+)
+def test_resolve_tenant_fails_without_creating_thread(
+    monkeypatch, header, status, code
+):
+    from fastapi import HTTPException
+    from test_api_chat import Tenants
+
+    from beautyads.api import session
+
+    tenants = Tenants()
+    calls = []
+    monkeypatch.setattr(tenants, "register_thread", lambda *args: calls.append(args))
+    monkeypatch.setattr(
+        session, "make_thread_id", lambda *args: pytest.fail("created a thread")
+    )
+    with pytest.raises(HTTPException) as caught:
+        session.resolve_tenant(header, allowed_tenants={"demo-a"})
+    assert caught.value.status_code == status
+    assert caught.value.detail == code
+    assert calls == [] and tenants.threads == {}
+
+
+def test_resolve_tenant_returns_only_tenant_without_thread(monkeypatch):
+    from beautyads.api import session
+
+    monkeypatch.setattr(
+        session, "make_thread_id", lambda *args: pytest.fail("created a thread")
+    )
+    assert session.resolve_tenant("demo-a", allowed_tenants={"demo-a"}) == "demo-a"

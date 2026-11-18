@@ -208,3 +208,35 @@ def test_plan_lookup_claim_validation(claim):
 
     with pytest.raises((ValueError, TypeError)):
         product_support_parameters(product_url="https://example.invalid/p", claim=claim)
+
+
+def test_product_unit_price_is_fixed_read_only_and_bound():
+    from beautyads.graph.evidence_queries import (
+        product_unit_price_parameters,
+        product_unit_price_query,
+    )
+
+    query = product_unit_price_query()
+    brand, url = "synthetic' OR true", "https://example.invalid/' DELETE p"
+    params = product_unit_price_parameters(brand=brand, url=url)
+    assert params == {"brand": brand, "url": url}
+    assert set(re.findall(r"\$(\w+)", query)) == set(params)
+    assert not re.search(
+        r"\b(CREATE|MERGE|SET|DELETE|REMOVE|CALL)\b", query, re.IGNORECASE
+    )
+    assert "p.brand = $brand" in query and "p.source_url = $url" in query
+    for name in ("unit_list_price", "price_basis", "volume_unit"):
+        assert f"p.{name} AS {name}" in query
+    assert brand not in query and url not in query
+    assert product_unit_price_query() == query
+
+
+@pytest.mark.parametrize("value", [None, "", " \t", [], {}, 123, True])
+@pytest.mark.parametrize("field", ["brand", "url"])
+def test_product_unit_price_validates_inputs_without_values(field, value):
+    from beautyads.graph.evidence_queries import product_unit_price_parameters
+
+    with pytest.raises(ValueError, match="^PRODUCT_UNIT_PRICE_INPUT_INVALID$"):
+        product_unit_price_parameters(
+            **{"brand": "synthetic", "url": "https://example.invalid/p", field: value}
+        )
