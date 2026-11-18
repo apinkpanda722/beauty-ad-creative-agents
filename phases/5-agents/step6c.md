@@ -27,7 +27,7 @@
 - 노드: `plan`(→ 기획안 1안, 구조화 실패면 `status="failed"`로 끝), `evaluate`(→ `EvaluationReport`), `route`(통과면 `done`, 미통과이고 `rework_count < max_reworks`면 `rework_count += 1` 하고 `plan`으로 되돌림, 그렇지 않으면 `needs_review`로 끝). **되돌림 횟수는 상태 카운터로 세고** `recursion_limit`은 안전망으로만 설정한다(실제 노드 수에 맞춘 상수, 카운터로 먼저 끝난다). 최대 2회는 `max_reworks` 인자로 받되 2를 넘으면 `ValueError`.
 - `rework_payload`는 `{"check_issues": [{"code", "field", "detail"}…]}`(실패한 검사 항목과 사유, `fail` 심각도만, `unknown`은 포함하지 않는다)와 `{"low_items": [{"item", "score", "rationale"}…]}`(낮은 평가 항목)를 **둘 다** 담는다. 채점이 구조화 실패(`scoring_failed`)면 `low_items`는 비고 그 사실(`scoring_failed: true`)을 담는다. 이전 기획안의 본문·필드 값은 담지 않는다.
 - 이미지: `with_image=True`이고 최종 상태가 `done`·`needs_review`일 때 **한 번만**(되돌림마다 만들지 않는다) `image_fn(plan)`을 부른다. 실패는 예외가 아니라 `image: {"ok": False, "code": ...}`로 남고 기획 결과는 유지된다. `with_image=False`(기본)면 `image_fn`을 부르지 않는다.
-- 결과 dict: `{"status": "done"|"needs_review"|"failed", "plan", "report", "rework_count", "attempts", "image", "unknown_count", "unknown_codes", "result_counts", "evidence_counts", "disclaimer"}`. **`unknown_count`·`unknown_codes`는 `passed`와 분리된 별도 칸**이고(최종 평가 보고에서 복사), `disclaimer`는 `CLAIM_CHECK_DISCLAIMER` 그대로다. `result_counts`는 핸드오프의 값(리서치 도구 결과의 전체·표시 건수)을 복사하고, `evidence_counts`는 `{"in_plan": 기획안의 근거 ID 수, "in_pool": 핸드오프 근거 ID 수}`다(화면이 `domain.research.count_label`로 "N건 중 M건"을 만드는 데 쓴다. 이 step은 문구를 만들지 않는다).
+- 결과 dict: `{"status": "done"|"needs_review"|"failed", "plan", "report", "rework_count", "attempts", "image", "unknown_count", "unknown_codes", "efficacy_status", "efficacy_summary", "result_counts", "evidence_counts", "disclaimer"}`. **`unknown_count`·`unknown_codes`·`efficacy_status`·`efficacy_summary`는 `passed`와 분리된 별도 칸**이고(최종 평가 보고에서 복사. 효능별 상태는 `supported`·`unknown`으로 나눠 화면이 보여 줄 수 있게 둔다), `disclaimer`는 `CLAIM_CHECK_DISCLAIMER` 그대로다. `result_counts`는 핸드오프의 값(리서치 도구 결과의 전체·표시 건수)을 복사하고, `evidence_counts`는 `{"in_plan": 기획안의 근거 ID 수, "in_pool": 핸드오프 근거 ID 수}`다(화면이 `domain.research.count_label`로 "N건 중 M건"을 만드는 데 쓴다. 이 step은 문구를 만들지 않는다).
 - 피드백 메모리: `feedback`은 호출부가 `domain.tenant.summarize_feedback` 결과(dict)로 넘긴다. 이 모듈은 저장소를 부르지 않는다(주입만).
 
 **반드시 있어야 하는 테스트**(가짜 함수·합성 값, 모델 문장을 기대값으로 굳히지 않는다):
@@ -35,7 +35,7 @@
 - 되돌림 전달: 두 번째 `plan_fn` 호출 인자(`rework`)에 `check_issues`와 `low_items`가 **둘 다** 있고(`fail` 코드만 `check_issues`에, `unknown`은 없다), 이전 기획안의 합성 식별 문자열이 어디에도 없다. 채점 실패 시 `scoring_failed`가 전달된다.
 - 상태: 하위 그래프 상태의 모든 값이 dict·기본 타입이다. 상태 스키마 키 집합과 부모 상태·리서치 하위 그래프 상태의 키 집합의 교차가 비어 있다. 횟수는 상태 카운터이고(`recursion_limit`에 의존하지 않는다: 매우 낮은 안전망에서도 카운터로 끝나는 케이스와, 안전망을 넘기는 합성 루프가 예외 없이 `needs_review`나 `failed`로 끝나는 케이스).
 - 이미지: `with_image=False`(기본)에서 `image_fn`이 불리지 않는다. `with_image=True`에서 되돌림이 2번 있어도 `image_fn`이 **1번**만 불린다. `image_fn`이 실패를 돌려줘도 결과 `plan`·`report`가 유지되고 `image.ok`가 거짓이다. `plan_fn` 구조화 실패는 `status="failed"`이고 `image_fn`이 불리지 않는다.
-- 결과: `unknown_count`·`unknown_codes`가 평가 보고에서 복사된 별도 칸이고 `passed`가 거짓이든 참이든 같은 값이다. `disclaimer`가 있다. `result_counts`·`evidence_counts`가 핸드오프에서 온 값이다.
+- 결과: `unknown_count`·`unknown_codes`·`efficacy_status`·`efficacy_summary`가 평가 보고에서 복사된 별도 칸이고 `passed`가 거짓이든 참이든 같은 값이다. `disclaimer`가 있다. `result_counts`·`evidence_counts`가 핸드오프에서 온 값이다.
 - `tests/test_architecture.py`가 통과한다(`agents`는 허용 계층만).
 
 ## Acceptance Criteria
