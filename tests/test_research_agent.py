@@ -138,6 +138,17 @@ def primitive(value):
     return type(value) in (str, int, float, bool, type(None))
 
 
+def test_research_system_quotes_tool_numbers_without_calculating():
+    chat = Chat([reply([call()]), reply()])
+    structured = Structured()
+    execute(chat, lambda *args: result(), structured)
+    for options in [*chat.calls, *[options for _, options in structured.calls]]:
+        assert (
+            "수치는 도구 출력의 값을 그대로 인용하고 직접 계산하지 않는다"
+            in options["messages"][0]["content"]
+        )
+
+
 @pytest.mark.parametrize("inconsistent_pool", [False, True])
 def test_no_evidence_does_not_generate(inconsistent_pool):
     structured = Structured()

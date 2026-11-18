@@ -30,7 +30,12 @@ from beautyads.llm.structured import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-GUARDED_MODULES = {"agents/research.py", "agents/planning.py", "agents/evaluation.py"}
+GUARDED_MODULES = {
+    "agents/research.py",
+    "agents/planning.py",
+    "agents/evaluation.py",
+    "agents/supervisor.py",
+}
 FORBIDDEN = {
     "allOf",
     "not",
@@ -422,3 +427,12 @@ def test_actual_skeleton_chat_messages():
     assert len(chat.calls) == 2
     assert any(m.get("tool_calls") for m in chat.calls[1]["messages"])
     guard_messages(chat.calls)
+
+
+def test_actual_supervisor_specs_are_guarded():
+    from beautyads.agents.supervisor import decide
+    from beautyads.domain.supervisor import RequestLimits
+
+    generator = CaptureStructured("gpt-6-luna")
+    decide("synthetic", as_of=CTX.as_of, structured=generator, limits=RequestLimits())
+    assert guard_specs([generator]) == 1

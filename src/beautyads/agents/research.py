@@ -42,6 +42,7 @@ _SYSTEM = (
     "기존 조회 결과를 참고해 필요한 도구를 고르고, 충분하면 도구 호출을 끝낸다. "
     "원자료를 추측하지 않는다. 근거 ID는 결론 문장 대신 evidence_ids에 둔다. "
     "category_basis와 연결된 소재 기준의 한계를 보존한다."
+    "수치는 도구 출력의 값을 그대로 인용하고 직접 계산하지 않는다."
     "\n" + TOOL_DATA_RULE + "\n" + PARTIAL_RESULT_RULE
 )
 

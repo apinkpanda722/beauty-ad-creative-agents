@@ -289,3 +289,40 @@ def test_evaluation_single_auto_tool_shape(tmp_path, model):
         assert call["tools"][0]["function"]["parameters"] == spec.schema
         assert not {"reasoning_effort", "thinking", "temperature"} & call.keys()
     assert guard(calls) == len(calls)
+
+
+def test_supervisor_strict_decision_call_shape(tmp_path):
+    import json
+
+    from test_domain_supervisor import decision_data
+
+    from beautyads.agents.supervisor import SUPERVISOR_REASONING_EFFORT, decide
+    from beautyads.domain.supervisor import RequestLimits
+
+    calls = []
+    capture = capture_completion(calls)
+
+    def complete(**kwargs):
+        response = capture(**kwargs)
+        response["choices"][0]["message"]["content"] = json.dumps(decision_data())
+        return response
+
+    args = options(tmp_path, "gpt-6-luna", SUPERVISOR_REASONING_EFFORT)
+    args.pop("model")
+    args.pop("messages")
+    args.pop("reasoning_effort")
+    result = decide(
+        "synthetic",
+        as_of="2026-01-02",
+        structured=make_structured("gpt-6-luna"),
+        limits=RequestLimits(),
+        completion_fn=complete,
+        **args,
+    )
+    assert result.ok and len(calls) == 1
+    assert calls[0]["model"] == "openai/gpt-6-luna"
+    assert calls[0]["reasoning_effort"] == SUPERVISOR_REASONING_EFFORT == "none"
+    assert calls[0]["response_format"]["type"] == "json_schema"
+    assert calls[0]["response_format"]["json_schema"]["strict"] is True
+    assert "temperature" not in calls[0]
+    assert guard(calls) == 1
