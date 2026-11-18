@@ -271,7 +271,16 @@
     {
       "step": "6f",
       "name": "json-safe-records",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-18T15:39:20+0900",
+      "summary": "공통 도구 경계의 Neo4j 값 JSON 변환·TOOL_RESULT_UNREADABLE 오류 표지·리서치/compare unresolved 전달과 회귀 테스트 구현. 아키텍처 검사 포함 make verify 통과(4,319 tests). 실제 서비스 접속·패키지 설치 없음.",
+      "completed_at": "2026-11-18T15:46:36+0900",
+      "usage": {
+        "input_tokens": 1511988,
+        "cached_input_tokens": 1405952,
+        "output_tokens": 14427,
+        "attempts": 1
+      }
     },
     {
       "step": 7,
