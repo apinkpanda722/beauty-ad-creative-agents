@@ -257,7 +257,16 @@
     {
       "step": "6e",
       "name": "compare-diagnostics",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-18T15:27:59+0900",
+      "summary": "리서치 aggregates를 strict 호환 항목 목록으로 변경하고 최종 딕셔너리 계약 보존, compare 안전 오류 진단·오프라인 스키마/메시지 가드 구현. make verify 통과(4,258 tests), 실제 서비스 호출·패키지 설치 없음.",
+      "completed_at": "2026-11-18T15:33:47+0900",
+      "usage": {
+        "input_tokens": 1780765,
+        "cached_input_tokens": 1666432,
+        "output_tokens": 10570,
+        "attempts": 1
+      }
     },
     {
       "step": 7,
