@@ -285,3 +285,9 @@
 - **원인**: 새 칸이 여러 계층(domain 계산 → Supervisor 결과 → trace·요약)을 지나는데 "만드는 파일"과 "읽는 파일"을 따로 대조하지 않았다.
 - **해결**: Supervisor 허용에 `pattern_distribution`을 명시하고 원천·형식을 정의했으며 조립 경유 테스트용 `tests/test_api_assembly.py`(케이스 추가)를 허용 목록에 넣었다. `/harness` 원칙 9에 "칸 이름 → 만드는 파일 → 읽는 파일" 대응표 대조를 추가했다.
 - **근거**: `phases/5-agents/step9e.md`, `.claude/commands/harness.md`.
+
+## 2026-11-18 step 9h가 blocked됐다(영역 위치를 바꾸는 작업과 위치에서 파생된 기존 단언)
+- **문제**: 9h가 `cta` 영역을 제품명 영역 위로 올리는데 `test_png_dimensions_safe_regions_and_original_pixels`가 `1024 - margin - int(1024 * CTA_HEIGHT_RATIO)`처럼 **이전 위치에서 파생된 영역**으로 CTA 상자를 단언했다(허용 목록은 `with_cta=True`를 더하는 호출 한 곳뿐). 코드 변경 없음.
+- **원인**: 상수 값 grep에는 `0.28`·`0.12` 리터럴과 비율 상수 이름만 보고 **상수에서 파생한 영역 표현식**(상수를 조합한 좌표)은 찾지 않았다.
+- **해결**: 해당 블록을 `layout_regions(1024, 1024)["cta"]` 기준으로 바꾸는 줄 단위 허용을 명시했다. 영역·레이아웃 상수를 바꾸는 작업은 상수 이름뿐 아니라 그 상수를 조합한 좌표 표현식(`1024 - margin - int(…)`)을 `grep`하도록 점검 항목을 확장한다.
+- **근거**: `phases/5-agents/step9h.md`, `tests/test_design_compose.py`.
