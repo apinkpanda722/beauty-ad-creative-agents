@@ -191,3 +191,10 @@
 - **결과**: 코드 변경 없이 중단돼 되돌릴 것이 없었다. 재실행 결과는 step 1 완료 뒤 보고한다.
 - **근거**: `phases/5-agents/step1.md`, `tests/test_architecture.py`.
 
+## 2026-11-18 첫 make live-agent가 호출 전에 거부됐다(tool_choice)
+- **문제**: 사용자가 실행한 첫 `make live-agent`가 `status_code 200`, `events ["step","error"]`, `final_text ""`, `cost_usd 0.0`, 종료 코드 3으로 끝났다. 오류 코드가 출력에 없었다.
+- **원인**: 오프라인 재현으로 확인했다(`litellm==1.103.3`, `LITELLM_LOCAL_MODEL_COST_MAP=True`, 네트워크 없이 `litellm.get_optional_params`). skeleton 노드가 `gpt-6-luna`에 `tool_choice`(`auto`·`none`)를 보내는데 litellm이 `UnsupportedParamsError`로 호출 전에 거부한다. `reasoning_effort` 값과 무관하게 luna·terra 모두 같고 haiku·sonnet은 통과한다. 이유(litellm이 `tool_choice`를 모르는 까닭)는 미확인이다. 테스트가 가짜 `chat`만 써서 실제 litellm 검사를 거치지 않았고, 에러 이벤트가 코드 하나뿐이라 원인이 가려졌다.
+- **해결**: step 1c에서 OpenAI 모델의 `tool_choice`에 `allowed_openai_params=["tool_choice"]`를 추가하고, 실제 `litellm.get_optional_params`로 모델 4종 × 호출 모양을 검사하는 오프라인 가드(`tests/test_llm_param_guard.py`)와 에러 이벤트의 `detail`(예외 클래스 이름)·`error_code`를 추가한다. FP-C13을 추가했다. CONTRACTS의 "`tool_choice="required"`가 둘 다 동작"을 정정했다.
+- **결과**: 오프라인 재현·수정은 step 1c 완료 뒤 보고. 실제 API가 `allowed_openai_params`로 보낸 `tool_choice`를 받는지는 사용자 재실행으로 확인한다.
+- **근거**: `src/beautyads/llm/chat.py`, `src/beautyads/agents/skeleton.py`, `tests/test_llm_param_guard.py`.
+

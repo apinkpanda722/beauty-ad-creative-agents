@@ -143,6 +143,11 @@
       }
     },
     {
+      "step": "1c",
+      "name": "chat-param-compat",
+      "status": "pending"
+    },
+    {
       "step": 6,
       "name": "planning-evaluation",
       "status": "pending"

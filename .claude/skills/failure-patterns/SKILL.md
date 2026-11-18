@@ -112,6 +112,13 @@ description: 이 프로젝트(beauty-ad-creative-agents)와 앞선 프로젝트 
 - **강제 수단**: `/harness` 설계 원칙 13번과 `/review` 체크. 기계 검사는 아직 없다.
 - **출처**: 2026-11-17 P5 step 0 blocked, 이슈 #43
 
+### FP-C13 외부 SDK의 호출 전 검증을 가짜 호출 테스트가 통과시키지 못함
+- **증상**: P5 첫 `make live-agent`가 호출 전에 실패했다(`events ["step","error"]`, 비용 0). `gpt-6-luna`에 `tool_choice`를 보내면 litellm이 `UnsupportedParamsError`로 호출 전에 거부하는데, 그래프·노드 테스트는 가짜 `chat`만 써서 실제 litellm 파라미터 검사를 거치지 않았다. 에러 이벤트가 `AGENT_INTERNAL_ERROR` 하나뿐이라 원인도 출력에 없었다.
+- **원인**: 코드와 가짜가 같은 가정을 공유했다(B-FP-020). 모델·SDK 버전의 "호출 전 검증"(허용 파라미터 목록 등)은 네트워크 없이 로컬에서 돌릴 수 있는데 테스트가 그 함수를 부르지 않았다. 에러를 분류 없이 하나의 코드로 뭉개 원인을 숨겼다.
+- **규칙**: 외부 SDK 호출 래퍼는 **실제로 SDK에 넘기는 인자**를 SDK의 호출 전 검증 함수(예: `litellm.get_optional_params`)에 넣어 예외가 없음을 오프라인 테스트로 확인한다(모델 × 호출 모양 전부, 검사한 조합 수 0은 실패). 새 호출 경로(이미지, 구조화, 도구)를 만드는 step은 이 가드에 조합을 추가한다. 오류 이벤트·보고에는 코드와 예외 클래스 이름을 남기되 메시지·값·키는 남기지 않는다.
+- **강제 수단**: `tests/test_llm_param_guard.py`(P5 step 1c). /review 체크(새 모델 호출 경로가 가드 조합에 들어 있는가).
+- **출처**: 2026-11-18 P5 첫 `make live-agent`, 이슈 #43
+
 ---
 
 ## B에서 이식한 항목 (프로젝트 B `failure-patterns`의 번호)
