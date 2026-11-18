@@ -1,4 +1,4 @@
-.PHONY: verify db-up db-down db-migrate graph-reset live-slice live-collect live-pilot pilot-compare cost-recalc e1-stage1 e1-stage2 live-analyze e1-score live-tiktok live-tiktok-analyze sync live-graph live-products live-ingredient-catalog live-cert-recheck live-cq
+.PHONY: verify db-up db-down db-migrate graph-reset live-slice live-collect live-pilot pilot-compare cost-recalc e1-stage1 e1-stage2 live-analyze e1-score live-tiktok live-tiktok-analyze sync live-graph live-products live-ingredient-catalog live-cert-recheck live-cq live-compare
 
 # 하네스의 단일 검증 진입점. Stop hook, scripts/execute.py, step AC가 모두 이 타깃을 호출한다.
 # 키·네트워크·실제 서비스 없이 통과해야 한다. 실제 호출용 타깃(live-*)은 verify에 넣지 않는다.
@@ -87,3 +87,6 @@ live-agent:
 .PHONY: live-evidence
 live-evidence:
 	uv run python -m beautyads.eval.evidence_check $(ARGS)
+
+live-compare:
+	uv run python -m beautyads.eval.p5_compare $(ARGS)
