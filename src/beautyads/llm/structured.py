@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 import litellm
+from pydantic import ValidationError
 
 from beautyads.obs import CostCapExceeded
 from beautyads.settings import require_setting
@@ -69,6 +70,7 @@ class StructuredStats:
     first_attempt_failures: dict[StructuredFailure, int] = field(
         default_factory=lambda: dict.fromkeys(StructuredFailure, 0)
     )
+    first_attempt_failure_details: dict[str, int] = field(default_factory=dict)
 
     @property
     def failure_rate(self) -> float | None:
@@ -83,6 +85,12 @@ class StructuredStats:
                 kind: self.first_attempt_failures.get(kind, 0)
                 + other.first_attempt_failures.get(kind, 0)
                 for kind in StructuredFailure
+            },
+            first_attempt_failure_details={
+                key: self.first_attempt_failure_details.get(key, 0)
+                + other.first_attempt_failure_details.get(key, 0)
+                for key in self.first_attempt_failure_details
+                | other.first_attempt_failure_details
             },
         )
 
@@ -156,7 +164,7 @@ class _StructuredBase:
 
     def _parse(
         self, spec: StructuredSpec, result: ChatResult
-    ) -> tuple[Any, StructuredFailure | None]:
+    ) -> tuple[Any, StructuredFailure | None, list[tuple[str, str]]]:
         text = result.text
         if isinstance(text, str):
             fenced = re.fullmatch(
@@ -167,7 +175,7 @@ class _StructuredBase:
         try:
             value = json.loads(text)
         except (TypeError, ValueError):
-            return None, StructuredFailure.PARSE_FAILED
+            return None, StructuredFailure.PARSE_FAILED, [("-", "parse_failed")]
         return _validate(spec, value)
 
     def generate(
@@ -231,6 +239,7 @@ class _StructuredBase:
         ]
         calls = []
         first_failure = None
+        first_details = []
         for attempt in (1, 2):
             response = self._complete(spec, request, options)
             calls.append(
@@ -238,7 +247,7 @@ class _StructuredBase:
                     text=None, tool_calls=[], raw={}, usage=deepcopy(response.usage)
                 )
             )
-            value, failure = self._parse(spec, response)
+            value, failure, details = self._parse(spec, response)
             if failure is None or attempt == 2:
                 result = StructuredResult(
                     ok=failure is None,
@@ -253,28 +262,62 @@ class _StructuredBase:
                 if first_failure is not None:
                     counts = self.stats.first_attempt_failures
                     counts[first_failure] = counts.get(first_failure, 0) + 1
+                    detail_counts = self.stats.first_attempt_failure_details
+                    for path, kind in first_details:
+                        key = _safe_detail(f"{spec.name}|{path}|{kind}")
+                        detail_counts[key] = detail_counts.get(key, 0) + 1
                 return result
             first_failure = failure
-            # Only safe reason codes are repeated, never raw output or validator errors.
+            first_details = details
+            # Only locations and types are repeated, never values or error prose.
+            detail_message = (
+                " (" + "; ".join(f"{path}: {kind}" for path, kind in details[:3]) + ")"
+                if failure == StructuredFailure.SCHEMA_VIOLATION and details
+                else ""
+            )
             request = [
                 *request,
                 {
                     "role": "user",
-                    "content": f"Previous submission failed: {failure.value}. Correct it and submit again.\n{self._instruction(spec)}",
+                    "content": f"Previous submission failed: {failure.value}{detail_message}. Correct it and submit again.\n{self._instruction(spec)}",
                 },
             ]
         raise AssertionError("unreachable")
 
 
-def _validate(spec: StructuredSpec, value: Any) -> tuple[Any, StructuredFailure | None]:
+def _safe_detail(value: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_.*:|-]", "_", value)[:120]
+
+
+def _validate(
+    spec: StructuredSpec, value: Any
+) -> tuple[Any, StructuredFailure | None, list[tuple[str, str]]]:
     if not isinstance(value, dict):
-        return None, StructuredFailure.SCHEMA_VIOLATION
+        return None, StructuredFailure.SCHEMA_VIOLATION, [("-", "not_object")]
     try:
-        return spec.validate(value), None
+        return spec.validate(value), None, []
     except (LlmCallError, CostCapExceeded):
         raise
-    except Exception:  # noqa: BLE001 -- a caller-supplied validator signals invalid output by raising
-        return None, StructuredFailure.SCHEMA_VIOLATION
+    except ValidationError as exc:
+        details = []
+        for error in exc.errors(
+            include_url=False, include_context=False, include_input=False
+        )[:5]:
+            path = (
+                ".".join(
+                    "*" if isinstance(part, int) else str(part)
+                    for part in error.get("loc", ())
+                )
+                or "-"
+            )
+            details.append((_safe_detail(path), _safe_detail(error.get("type", "-"))))
+        return None, StructuredFailure.SCHEMA_VIOLATION, details
+    except Exception as exc:  # noqa: BLE001 -- a caller-supplied validator signals invalid output by raising
+        return (
+            None,
+            StructuredFailure.SCHEMA_VIOLATION,
+            [("-", _safe_detail(f"exception:{type(exc).__name__}"))],
+        )
 
 
 class ToolCallStructured(_StructuredBase):
@@ -302,14 +345,14 @@ class ToolCallStructured(_StructuredBase):
 
     def _parse(
         self, spec: StructuredSpec, result: ChatResult
-    ) -> tuple[Any, StructuredFailure | None]:
+    ) -> tuple[Any, StructuredFailure | None, list[tuple[str, str]]]:
         call = next(
             (call for call in result.tool_calls if call.name == spec.name), None
         )
         if call is None:
-            return None, StructuredFailure.TOOL_NOT_CALLED
+            return None, StructuredFailure.TOOL_NOT_CALLED, [("-", "tool_not_called")]
         if call.arguments_error is not None or call.arguments is None:
-            return None, StructuredFailure.PARSE_FAILED
+            return None, StructuredFailure.PARSE_FAILED, [("-", "parse_failed")]
         return _validate(spec, call.arguments)
 
 

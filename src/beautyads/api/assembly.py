@@ -414,6 +414,7 @@ async def assemble_full(
                                     "calls": 0,
                                     "failed_after_retry": 0,
                                     "first_attempt_failures": {},
+                                    "first_attempt_failure_details": {},
                                 },
                             )
                             totals["calls"] += stats.calls
@@ -421,6 +422,12 @@ async def assemble_full(
                             for kind, count in stats.first_attempt_failures.items():
                                 failures = totals["first_attempt_failures"]
                                 failures[kind] = failures.get(kind, 0) + count
+                            for (
+                                key,
+                                count,
+                            ) in stats.first_attempt_failure_details.items():
+                                details = totals["first_attempt_failure_details"]
+                                details[key] = details.get(key, 0) + count
                         # Timestamp windows may overlap for concurrent requests.
                         # The demo is single-user; the ledger has no request ID.
                         entries = [

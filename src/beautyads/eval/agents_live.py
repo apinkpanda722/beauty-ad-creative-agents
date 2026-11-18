@@ -200,23 +200,35 @@ def _structured(records):
         for model, stats in record.structured.items():
             target = by_model.setdefault(
                 model,
-                {"calls": 0, "failed_after_retry": 0, "first_attempt_failures": {}},
+                {
+                    "calls": 0,
+                    "failed_after_retry": 0,
+                    "first_attempt_failures": {},
+                    "first_attempt_failure_details": {},
+                },
             )
             target["calls"] += stats.calls
             target["failed_after_retry"] += stats.failed_after_retry
             for kind, count in stats.first_attempt_failures.items():
                 failures = target["first_attempt_failures"]
                 failures[kind] = failures.get(kind, 0) + count
+            for key, count in stats.first_attempt_failure_details.items():
+                details = target["first_attempt_failure_details"]
+                details[key] = details.get(key, 0) + count
     calls = sum(stats["calls"] for stats in by_model.values())
     failures = {}
+    details = {}
     for stats in by_model.values():
         for kind, count in stats["first_attempt_failures"].items():
             failures[kind] = failures.get(kind, 0) + count
+        for key, count in stats["first_attempt_failure_details"].items():
+            details[key] = details.get(key, 0) + count
     return {
         "by_model": by_model,
         "calls": calls,
         "failed_after_retry": sum(s["failed_after_retry"] for s in by_model.values()),
         "first_attempt_failures": failures,
+        "first_attempt_failure_details": details,
         "sample_too_small": calls < 20,
     }
 

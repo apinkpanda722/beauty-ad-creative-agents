@@ -402,3 +402,56 @@ def test_trace_new_metadata_cannot_carry_prose_or_key_shaped_values():
         "same_count": 0,
         "skipped": 0,
     }
+
+
+def test_failure_details_roundtrip_and_sum_by_tenant_without_values(tmp_path):
+    key = "evaluation_scores|rationale|string_too_long"
+    other = "plan|scenes.*|string_type"
+    records = [
+        make_trace(
+            tenant_id=tenant,
+            structured={
+                "model_a": {"calls": 2, "first_attempt_failure_details": {key: 1}},
+                "model_b": {
+                    "calls": 1,
+                    "first_attempt_failure_details": {key: 2, other: 1},
+                },
+            },
+        )
+        for tenant in ("tenant_a", "tenant_b", "tenant_a")
+    ]
+    path = tmp_path / "traces.jsonl"
+    for record in records:
+        append_trace(path, record)
+    assert read_traces(path).records == records
+    assert records[0].structured["model_a"].model_dump()[
+        "first_attempt_failure_details"
+    ] == {key: 1}
+    summary = summarize_by_tenant(read_traces(path).records)
+    assert summary["tenant_a"]["first_attempt_failure_details"] == {key: 6, other: 2}
+    assert summary["tenant_b"]["first_attempt_failure_details"] == {key: 3, other: 1}
+    assert SECRET not in path.read_text() + json.dumps(summary)
+
+
+@pytest.mark.parametrize("key", ["", "bad/key", "bad key", "x" * 121, "bad\n"])
+def test_failure_detail_trace_key_contract(key):
+    from beautyads.obs.trace import TraceStructured
+
+    with pytest.raises(ValidationError):
+        TraceStructured(first_attempt_failure_details={key: 1})
+
+
+@pytest.mark.parametrize("count", [-1, True, "1", 1.5])
+def test_failure_detail_trace_count_contract(count):
+    from beautyads.obs.trace import TraceStructured
+
+    with pytest.raises(ValidationError):
+        TraceStructured(first_attempt_failure_details={"spec|-|parse_failed": count})
+
+
+def test_legacy_trace_failure_details_default_is_independent():
+    from beautyads.obs.trace import TraceStructured
+
+    first, second = TraceStructured(), TraceStructured()
+    first.first_attempt_failure_details["spec|-|parse_failed"] = 1
+    assert second.first_attempt_failure_details == {}

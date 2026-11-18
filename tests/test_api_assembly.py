@@ -675,6 +675,60 @@ def test_trace_merges_failure_kinds_without_sharing_requests(rig, monkeypatch):
     asyncio.run(run())
 
 
+def test_assembly_merges_failure_details_by_model_per_request(rig, monkeypatch):
+    from beautyads.obs.trace import read_traces, summarize_by_tenant
+
+    key = "evaluation_scores|rationale|string_too_long"
+
+    class Generator:
+        def __init__(self, model):
+            self.model = model
+            self.stats = StructuredStats(
+                calls=1, first_attempt_failure_details={key: 1}
+            )
+
+        def generate(self, *args, **kwargs):
+            return SimpleNamespace(cost_usd=0.01)
+
+    def request(**options):
+        options["decide_fn"]("synthetic")
+        options["research_fn"]({}, {})
+        return {}
+
+    def decision(text, *, structured, **kwargs):
+        structured.generate(None)
+        return SimpleNamespace(ok=True, decision={})
+
+    def research(*args, structured, **kwargs):
+        structured.generate(None)
+        return {}
+
+    monkeypatch.setattr(assembly, "run_request", request)
+    monkeypatch.setattr(assembly, "decide", decision)
+    monkeypatch.setattr(assembly, "run_research", research)
+
+    async def run():
+        services = await rig.start(models={"structured": Generator})
+        try:
+            invoke(services)
+            invoke(services)
+            path = rig.settings.ledger_path.with_name("traces.jsonl")
+            records = read_traces(path).records
+            assert len(records) == 2
+            assert all(
+                r.structured["gpt-6-luna"].first_attempt_failure_details == {key: 2}
+                for r in records
+            )
+            assert next(iter(summarize_by_tenant(records).values()))[
+                "first_attempt_failure_details"
+            ] == {key: 4}
+            assert "SYNTHETIC-SECRET-" not in path.read_text()
+        finally:
+            await services.close()
+
+    asyncio.run(run())
+
+
 def test_trace_preserves_original_model_exception(rig, monkeypatch):
     from beautyads.obs.trace import read_traces
 

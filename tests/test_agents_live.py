@@ -577,6 +577,46 @@ def test_makefile_adds_only_separate_target_and_phony():
     assert "live-" not in verify
 
 
+@pytest.mark.parametrize("calls", [19, 20])
+def test_failure_detail_summary_sums_models_and_saved_output(rig, calls):
+    key = "evaluation_scores|rationale|string_too_long"
+    other = "research_handoff|aggregates.*.name|missing"
+    records = []
+
+    def run(**kwargs):
+        record = trace(
+            rig,
+            kwargs["tenant_id"],
+            structured={
+                "model_a": {
+                    "calls": calls if not records else 0,
+                    "first_attempt_failure_details": {key: 1},
+                },
+                "model_b": {"first_attempt_failure_details": {key: 2, other: 1}},
+            },
+        )
+        records.append(record)
+        append_trace(rig.settings.ledger_path.with_name("traces.jsonl"), record)
+        return outcome()
+
+    rig.behavior = run
+    code, summary, text = rig.invoke()
+    assert code == 0
+    stats = summary["structured"]
+    n = len(records)
+    assert n > 0
+    assert stats["first_attempt_failure_details"] == {key: 3 * n, other: n}
+    assert stats["by_model"]["model_a"]["first_attempt_failure_details"] == {key: n}
+    assert stats["by_model"]["model_b"]["first_attempt_failure_details"] == {
+        key: 2 * n,
+        other: n,
+    }
+    assert stats["sample_too_small"] is (calls < 20)
+    saved = rig.root / f"{summary['run_id']}.json"
+    assert json.loads(saved.read_text())["structured"] == stats
+    assert SECRET not in saved.read_text() + text
+
+
 @pytest.mark.parametrize("show", [False, True])
 def test_show_rationale_is_sanitized_terminal_only_and_summary_keeps_safe_alignment(
     rig, show

@@ -553,6 +553,45 @@ def test_stats_merge_sums_without_mutation():
     assert "20호출 미만" in StructuredStats.__doc__
 
 
+def test_failure_detail_merge_sums_union_and_keeps_sources_independent():
+    key = "evaluation_scores|rationale|string_too_long"
+    other_key = "plan|scenes.*|string_type"
+    first = StructuredStats(first_attempt_failure_details={key: 2})
+    second = StructuredStats(first_attempt_failure_details={key: 1, other_key: 3})
+    merged = first.merge(second)
+    assert merged.first_attempt_failure_details == {key: 3, other_key: 3}
+    merged.first_attempt_failure_details[key] = 99
+    assert first.first_attempt_failure_details == {key: 2}
+    assert second.first_attempt_failure_details == {key: 1, other_key: 3}
+    assert StructuredStats().first_attempt_failure_details == {}
+
+
+@pytest.mark.parametrize("cls", ADAPTERS)
+def test_failure_details_cover_each_adapter_and_leave_success_empty(
+    args, spec, cls, monkeypatch
+):
+    adapter = setup_adapter(cls, args)
+    first = (
+        tool_payload({"value": "SYNTHETIC-SECRET-invalid"})
+        if cls is ToolCallStructured
+        else chat_result('{"value":"SYNTHETIC-SECRET-invalid"}')
+    )
+    good = (
+        tool_payload({"value": 1})
+        if cls is ToolCallStructured
+        else chat_result('{"value":1}')
+    )
+    inject_results(monkeypatch, cls, [first, good, good])
+    assert adapter.generate(spec, **args).ok
+    assert adapter.stats.first_attempt_failure_details == {"answer|value|int_type": 1}
+    before = deepcopy(adapter.stats)
+    assert adapter.generate(spec, **args).attempts == 1
+    assert (
+        adapter.stats.first_attempt_failure_details
+        == before.first_attempt_failure_details
+    )
+
+
 @pytest.mark.parametrize(
     ("model", "style", "expected"),
     [

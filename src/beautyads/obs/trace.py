@@ -24,6 +24,7 @@ _trace_lock = Lock()
 # Supervisor's default decide budget. Custom budgets also appear in input_trims.
 _DECIDE_MAX_CHARS = 2000
 Token = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9_.:-]{1,128}$")]
+DetailKey = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9_.*:|-]{1,120}$")]
 Count = Annotated[int, Field(strict=True, ge=0)]
 
 
@@ -107,6 +108,10 @@ class TraceStructured(_TraceModel):
     calls: Count = 0
     failed_after_retry: Count = 0
     first_attempt_failures: dict[Token, Count] = Field(default_factory=dict)
+    # Keep legacy successful/empty trace serialization unchanged.
+    first_attempt_failure_details: dict[DetailKey, Count] = Field(
+        default_factory=dict, exclude_if=lambda value: not value
+    )
 
 
 class TraceRecord(_TraceModel):
@@ -322,6 +327,7 @@ def summarize_by_tenant(records: list[TraceRecord]) -> dict[str, dict]:
     for tenant, traces in grouped.items():
         purposes = defaultdict(list)
         failures = defaultdict(int)
+        details = defaultdict(int)
         structured_calls = 0
         for trace in traces:
             for purpose, cost in trace.cost_by_purpose.items():
@@ -330,6 +336,8 @@ def summarize_by_tenant(records: list[TraceRecord]) -> dict[str, dict]:
                 structured_calls += stats.calls
                 for kind, count in stats.first_attempt_failures.items():
                     failures[kind] += count
+                for key, count in stats.first_attempt_failure_details.items():
+                    details[key] += count
         summaries[tenant] = {
             "requests": len(traces),
             "errors": sum(trace.outcome == "error" for trace in traces),
@@ -340,5 +348,6 @@ def summarize_by_tenant(records: list[TraceRecord]) -> dict[str, dict]:
             },
             "first_attempt_failures": dict(failures),
             "structured_calls": structured_calls,
+            **({"first_attempt_failure_details": dict(details)} if details else {}),
         }
     return summaries
