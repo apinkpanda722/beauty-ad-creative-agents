@@ -229,7 +229,16 @@
     {
       "step": "6c",
       "name": "plan-eval-loop",
-      "status": "pending"
+      "status": "blocked",
+      "started_at": "2026-11-18T14:48:51+0900",
+      "blocked_reason": "상태 키 요구가 충돌합니다. “전용 상태 스키마(`TypedDict`, dict·기본 타입만): `brief`, `handoff`, `profile`, `feedback`, `plan`, `report`, `rework_count`, `rework_payload`, `attempts`(시도별 요약 dict 목록: 시도 번호, 코드 검사 `passed`, 점수, 낮은 항목, 실패한 검사 코드 목록, 비용), `image`, `status`.”와 “부모 상태(`agents/state.py`)·리서치 하위 그래프 상태(`agents/research.py`)와 키를 하나도 공유하지 않는다”를 동시에 만족할 수 없습니다. 기존 ResearchState에 이미 brief·handoff가 있습니다. 새 상태에 접두사를 붙인 키를 사용해도 되는지 명세 조정이 필요합니다. 선점검 규칙에 따라 파일 수정과 구현을 시작하지 않았습니다.",
+      "blocked_at": "2026-11-18T14:49:42+0900",
+      "usage": {
+        "input_tokens": 93139,
+        "cached_input_tokens": 53120,
+        "output_tokens": 1006,
+        "attempts": 1
+      }
     },
     {
       "step": "6d",
