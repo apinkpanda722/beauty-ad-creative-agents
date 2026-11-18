@@ -397,20 +397,16 @@
     {
       "step": "9d",
       "name": "structured-failure-detail",
-      "status": "blocked",
-      "started_at": "2026-11-18T20:00:41+0900",
-      "blocked_reason": "선점검에서 수정 범위 충돌을 확인했습니다. 허용 범위는 「src/beautyads/obs/trace.py(`TraceStructured`에 칸 추가에 한함)」이지만, 작업은 「`trace.summarize_by_tenant`와 `eval/agents_live.py` 요약의 `structured`도 같은 칸을 종류별 합으로 싣는다」를 요구합니다. summarize_by_tenant 함수 수정은 전자의 제한을 벗어납니다. 해당 함수의 합산 로직 추가도 허용하도록 범위를 명시해야 합니다. 코드 수정·패키지 설치·실제 서비스 호출은 하지 않았습니다.",
-      "blocked_at": "2026-11-18T20:01:46+0900",
-      "usage": {
-        "input_tokens": 162910,
-        "cached_input_tokens": 108416,
-        "output_tokens": 1160,
-        "attempts": 1
-      }
+      "status": "pending"
     },
     {
       "step": "9e",
       "name": "weak-contrast-image-prompt",
+      "status": "pending"
+    },
+    {
+      "step": "9f",
+      "name": "image-compose",
       "status": "pending"
     }
   ],
