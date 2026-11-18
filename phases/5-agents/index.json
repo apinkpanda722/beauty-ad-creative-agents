@@ -159,7 +159,16 @@
     {
       "step": "1d",
       "name": "tool-result-message",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-18T13:50:11+0900",
+      "summary": "공용 도구 결과 JSON 변환·상한 표시·데이터 전용 지시를 skeleton/research에 적용하고 회귀 테스트 구현. 아키텍처 검사 포함 make verify 통과(3,941 tests). 실제 서비스 접속·패키지 설치 없음.",
+      "completed_at": "2026-11-18T13:54:44+0900",
+      "usage": {
+        "input_tokens": 745597,
+        "cached_input_tokens": 672640,
+        "output_tokens": 9861,
+        "attempts": 1
+      }
     },
     {
       "step": 6,
