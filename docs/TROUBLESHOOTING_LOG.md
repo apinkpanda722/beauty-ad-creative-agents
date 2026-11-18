@@ -279,3 +279,9 @@
 - **원인**: 상수 값을 바꾸는 작업의 소비자 단언을 `grep`으로 찾지 않았다(9c에서 같은 상수를 만들었음에도 놓침, 원칙 9 정확 일치 스캔 누락).
 - **해결**: 두 단언 줄을 허용 목록에 줄 단위로 명시했다. `/harness` 원칙 9에 "상수 값을 바꾸는 작업은 그 상수를 단언하는 기존 테스트를 `grep`으로 찾아 줄 단위로 허용한다"를 추가했다.
 - **근거**: `phases/5-agents/step9e.md`, `.claude/commands/harness.md`.
+
+## 2026-11-18 step 9e가 네 번째로 blocked됐다(새 결과 칸을 만드는 파일이 허용 범위에 없음)
+- **문제**: 9e가 trace·요약에 `pattern_distribution`을 싣게 하면서 그 원천인 Supervisor 결과 칸을 만드는 허용이 없었다(허용은 `product_display`만). 코드 변경 없음.
+- **원인**: 새 칸이 여러 계층(domain 계산 → Supervisor 결과 → trace·요약)을 지나는데 "만드는 파일"과 "읽는 파일"을 따로 대조하지 않았다.
+- **해결**: Supervisor 허용에 `pattern_distribution`을 명시하고 원천·형식을 정의했으며 조립 경유 테스트용 `tests/test_api_assembly.py`(케이스 추가)를 허용 목록에 넣었다. `/harness` 원칙 9에 "칸 이름 → 만드는 파일 → 읽는 파일" 대응표 대조를 추가했다.
+- **근거**: `phases/5-agents/step9e.md`, `.claude/commands/harness.md`.

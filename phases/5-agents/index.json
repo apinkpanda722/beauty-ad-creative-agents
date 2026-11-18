@@ -411,16 +411,7 @@
     {
       "step": "9e",
       "name": "weak-contrast-image-prompt",
-      "status": "blocked",
-      "started_at": "2026-11-18T20:23:19+0900",
-      "blocked_reason": "Supervisor 수정 범위가 충돌합니다. 허용 범위는 \"리서치 뒤 핸드오프에 `pattern_context`와 얇은 풀 노트를 더하고 결과에 `product_display`를 더하는 데 한함, 상태 키·흐름·한도 불변\"이지만, 필수 테스트는 \"Supervisor 결과와 trace의 `pattern_distribution`(축별 `axis`·`total`·`top_share`·`second_share`, 값 이름 없음)·`agents_live` 요약이 그 값을 그대로 싣는다\"를 요구합니다. Supervisor 결과에 `pattern_distribution`을 추가해도 되는지 범위 확정이 필요합니다. 선점검 규칙에 따라 코드 수정 없이 중단했습니다.",
-      "blocked_at": "2026-11-18T20:24:59+0900",
-      "usage": {
-        "input_tokens": 497405,
-        "cached_input_tokens": 405376,
-        "output_tokens": 2405,
-        "attempts": 1
-      }
+      "status": "pending"
     },
     {
       "step": "9f",
