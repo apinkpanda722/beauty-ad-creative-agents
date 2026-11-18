@@ -219,3 +219,10 @@
 - **결과**: 코드 변경 없이 중단돼 되돌릴 것이 없었다. 재실행 결과는 step 5b 완료 뒤 보고한다.
 - **근거**: `phases/5-agents/step5b.md`, `tests/test_agent_tools.py`.
 
+## 2026-11-18 P5 step 5c가 shown_count 추가와 정확 일치 단언의 충돌로 blocked됐다
+- **문제**: `handoff-counts` step이 구현 전에 `blocked`로 보고됐다(세 번째 연속 중단: step 4 마이그레이션 버전, 5b 도구 목록, 5c). "`tool_result_payload`에 `shown_count` 필드를 추가한다"와 "`tests/test_tool_messages.py`는 케이스 추가에 한함"이 충돌했다. 기존 `test_constants_and_rows_reach_model_payload`는 `shown_count` 없는 dict와 완전 일치를, `SUCCESS_KEYS`는 기존 키만으로 완전 일치를 검사한다.
+- **원인**: 새 필드를 만드는 step을 설계할 때 그 필드가 들어가는 객체를 정확 일치로 단언하는 소비자 테스트를 스캔하지 않았다. 스캔하니 `test_tool_messages`(49·186·228·240행 부근), `test_agent_skeleton`(111·235행), `test_research_agent`(316·438·440·476행)에 같은 단언이 있었다.
+- **해결**: 세 파일의 허용 문구를 "`shown_count`(와 새 시스템 지시) 추가에 필요한 기대값 갱신과 케이스 추가에 한함, 갱신한 줄은 기존 기대값에 새 키 하나만 더하고 부분 비교로 바꾸지 않음, 약화·삭제 금지"로 바꿨다. FP-C11 보강과 `/harness` 설계 원칙 9번에 정확 일치 스캔을 추가했다. 이후 step 7·8·9 설계 전에 같은 스캔을 적용한다.
+- **결과**: 코드 변경 없이 중단돼 되돌릴 것이 없었다. 재실행 결과는 step 5c 완료 뒤 보고한다.
+- **근거**: `phases/5-agents/step5c.md`, `tests/test_tool_messages.py`, `tests/test_agent_skeleton.py`, `tests/test_research_agent.py`.
+

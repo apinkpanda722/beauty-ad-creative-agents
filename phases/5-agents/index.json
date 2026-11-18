@@ -187,10 +187,8 @@
     {
       "step": "5c",
       "name": "handoff-counts",
-      "status": "blocked",
+      "status": "pending",
       "started_at": "2026-11-18T14:28:35+0900",
-      "blocked_reason": "선점검에서 지시 충돌을 발견했습니다. “`tool_result_payload`에 `shown_count`(= 실제로 `rows`에 담은 행 수, `row_count`와 별도 필드)를 추가한다(기존 `row_count`·`rows`·`truncated` 필드·상한은 그대로).”와 “`tests/test_tool_messages.py`(케이스 추가에 한함, 단언 약화 금지)”가 충돌합니다. 기존 test_constants_and_rows_reach_model_payload는 shown_count 없는 dict와 완전 일치를 검사하고, SUCCESS_KEYS도 기존 키만으로 완전 일치를 검사합니다. 새 필드를 추가하면 기존 테스트가 실패하므로 두 기대값에 shown_count를 추가하는 수정 허용이 필요합니다. 코드 수정과 검증 실행 없이 중단했습니다.",
-      "blocked_at": "2026-11-18T14:29:23+0900",
       "usage": {
         "input_tokens": 97415,
         "cached_input_tokens": 54656,
