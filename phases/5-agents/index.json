@@ -313,7 +313,16 @@
     {
       "step": "7c",
       "name": "ask-sse",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-18T16:31:46+0900",
+      "summary": "/ask 실시간 SSE·화면 명령·기획안 저장·테넌트별 /design·클라이언트 구현. 이미지 연결 인덱스는 앱 수명 범위. 아키텍처 검사 포함 make verify 통과(4,470 tests). 실제 서비스 접속·패키지 설치 없음.",
+      "completed_at": "2026-11-18T16:39:57+0900",
+      "usage": {
+        "input_tokens": 1426460,
+        "cached_input_tokens": 1333760,
+        "output_tokens": 17324,
+        "attempts": 1
+      }
     },
     {
       "step": "7d",
