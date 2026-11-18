@@ -83,3 +83,28 @@ def save_design_image(
         if temporary is not None:
             temporary.unlink(missing_ok=True)
     return SavedImage(path, outcome.sha256, outcome.size, outcome.mime)
+
+
+def save_composed_design(
+    png_bytes: bytes,
+    *,
+    request_key: str,
+    index: int,
+    base_dir: Path = Path("data/design"),
+) -> SavedImage:
+    """Atomically store a composed PNG beside its unmodified generated original."""
+    if type(index) is not int or index < 0:
+        raise ValueError("IMAGE_INDEX_INVALID")
+    directory = base_dir / sha256(request_key.encode("utf-8")).hexdigest()[:16]
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f"{index:02d}_composed.png"
+    temporary = None
+    try:
+        with NamedTemporaryFile(dir=directory, delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(png_bytes)
+        temporary.replace(path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+    return SavedImage(path, sha256(png_bytes).hexdigest(), len(png_bytes), "image/png")

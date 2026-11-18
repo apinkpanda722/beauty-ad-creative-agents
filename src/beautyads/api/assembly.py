@@ -8,7 +8,12 @@ from pathlib import Path
 from time import monotonic
 from uuid import uuid4
 
-from beautyads.agents.design_images import image_prompt, save_design_image
+from beautyads.agents.design_compose import FontMissing, compose_design, cta_label
+from beautyads.agents.design_images import (
+    image_prompt,
+    save_composed_design,
+    save_design_image,
+)
 from beautyads.agents.evaluation import evaluate_plan
 from beautyads.agents.lookups import (
     GraphCertLookup,
@@ -365,7 +370,7 @@ async def assemble_full(
                                 index=index,
                                 base_dir=_DESIGN_DIR,
                             )
-                            return {
+                            reference = {
                                 "ok": True,
                                 "request_key": request_key,
                                 "index": index,
@@ -373,6 +378,28 @@ async def assemble_full(
                                 "size": saved.size,
                                 "sha256": saved.sha256,
                             }
+                            try:
+                                composed = compose_design(
+                                    outcome.image_bytes,
+                                    headline=plan["hook_text"],
+                                    cta=cta_label(plan["cta_type"]) or "",
+                                )
+                                saved_composed = save_composed_design(
+                                    composed.png_bytes,
+                                    request_key=request_key,
+                                    index=index,
+                                    base_dir=_DESIGN_DIR,
+                                )
+                                reference["composed"] = {
+                                    "mime": saved_composed.mime,
+                                    "size": saved_composed.size,
+                                    "sha256": saved_composed.sha256,
+                                }
+                            except FontMissing:
+                                reference["compose_error"] = "FONT_MISSING"
+                            except Exception:  # noqa: BLE001 -- composition never invalidates the original
+                                reference["compose_error"] = "COMPOSE_FAILED"
+                            return reference
 
                     def plan_eval_fn(brief, handoff, profile, feedback, *, max_reworks):
                         return run_plan_eval(

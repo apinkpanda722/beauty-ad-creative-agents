@@ -94,3 +94,7 @@ live-evidence:
 
 live-compare:
 	uv run python -m beautyads.eval.p5_compare $(ARGS)
+
+.PHONY: fetch-font
+fetch-font:
+	uv run python scripts/fetch_design_font.py $(ARGS)

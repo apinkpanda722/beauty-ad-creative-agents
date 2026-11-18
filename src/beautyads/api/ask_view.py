@@ -1,6 +1,7 @@
 """Pure screen projection of Supervisor results, without replaying model UI data."""
 
 import json
+import re
 from dataclasses import dataclass
 from datetime import date, datetime
 
@@ -63,7 +64,20 @@ def image_reference(image) -> dict | None:
         or not isinstance(image.get("sha256"), str)
     ):
         return None
-    return {key: image[key] for key in _IMAGE_FIELDS}
+    reference = {key: image[key] for key in _IMAGE_FIELDS}
+    composed = image.get("composed")
+    if (
+        isinstance(composed, dict)
+        and composed.get("mime") == "image/png"
+        and type(composed.get("size")) is int
+        and composed["size"] >= 0
+        and isinstance(composed.get("sha256"), str)
+        and re.fullmatch(r"[a-fA-F0-9]{64}", composed["sha256"])
+    ):
+        reference["composed"] = {
+            key: composed[key] for key in ("mime", "size", "sha256")
+        }
+    return reference
 
 
 def _counts(counts):

@@ -176,3 +176,52 @@ def test_prompt_nested_comments_and_length_reserve_no_text_clause():
     )
     assert "남은주석" not in prompt and "바깥" not in prompt and "안쪽" not in prompt
     assert len(prompt) == 2000 and prompt.endswith(IMAGE_NO_TEXT_CLAUSE)
+
+
+def test_composed_saved_atomically_beside_untouched_original(tmp_path, monkeypatch):
+    from beautyads.agents.design_images import save_composed_design
+
+    raw = save_design_image(
+        outcome(), request_key="../../request", index=2, base_dir=tmp_path
+    )
+    payload = b"\x89PNG\r\n\x1a\nsynthetic-composed"
+    replace = Path.replace
+    observed = []
+
+    def atomic(source, target):
+        assert source.parent == target.parent == raw.path.parent
+        assert source.read_bytes() == payload
+        assert source != target and not target.exists()
+        observed.append(target)
+        return replace(source, target)
+
+    monkeypatch.setattr(Path, "replace", atomic)
+    composed = save_composed_design(
+        payload, request_key="../../request", index=2, base_dir=tmp_path
+    )
+    assert composed.path == raw.path.with_name("02_composed.png")
+    assert observed == [composed.path]
+    assert composed.path.read_bytes() == payload
+    assert (composed.mime, composed.size, composed.sha256) == (
+        "image/png",
+        len(payload),
+        sha256(payload).hexdigest(),
+    )
+    assert raw.path.read_bytes() == outcome().image_bytes
+    monkeypatch.setattr(Path, "replace", Mock(side_effect=OSError("synthetic")))
+    with pytest.raises(OSError):
+        save_composed_design(
+            payload, request_key="../../request", index=3, base_dir=tmp_path
+        )
+    assert set(raw.path.parent.iterdir()) == {raw.path, composed.path}
+
+
+@pytest.mark.parametrize("index", [-1, True, 1.5])
+def test_composed_rejects_invalid_index_without_writing(tmp_path, index):
+    from beautyads.agents.design_images import save_composed_design
+
+    with pytest.raises(ValueError, match="IMAGE_INDEX_INVALID"):
+        save_composed_design(
+            b"synthetic", request_key="request", index=index, base_dir=tmp_path
+        )
+    assert list(tmp_path.iterdir()) == []

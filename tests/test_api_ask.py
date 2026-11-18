@@ -493,3 +493,68 @@ def test_design_never_reads_outside_root_even_for_authorized_reference(tmp_path)
             "/design/..%2Foutside/0", headers={"X-Tenant-Id": "demo-a"}
         )
         assert response.status_code == 404 and b"private" not in response.content
+
+
+@pytest.mark.parametrize("has_composed", [False, True])
+def test_design_prefers_composed_png_and_preserves_safe_payload(tmp_path, has_composed):
+    raw = result()
+    image = raw["plans"][0]["image"]
+    image["mime"] = "image/jpeg"
+    directory = tmp_path / sha256(b"request").hexdigest()[:16]
+    directory.mkdir()
+    (directory / "00.jpg").write_bytes(b"synthetic-original")
+    if has_composed:
+        (directory / "00_composed.png").write_bytes(b"synthetic-composed")
+        image["composed"] = {
+            "mime": "image/png",
+            "size": 18,
+            "sha256": "b" * 64,
+            "path": "/synthetic/private",
+            "base64": "private-body",
+        }
+    initial = services(lambda *a, **kw: raw)
+    initial.design_dir = tmp_path
+    with TestClient(create_app(lambda: initial)) as client:
+        response = post(client)
+        assert "private" not in response.text and "base64" not in response.text
+        record = initial.tenants.saved[0][1]
+        encoded = json.dumps(record.payload)
+        assert (
+            str(tmp_path) not in encoded
+            and "private" not in encoded
+            and "base64" not in encoded
+        )
+        assert ("composed" in record.payload["image"]) is has_composed
+        url = "/design/request/0"
+        rendered = client.get(url, headers={"X-Tenant-Id": "demo-a"})
+        assert rendered.status_code == 200
+        assert rendered.content == (
+            b"synthetic-composed" if has_composed else b"synthetic-original"
+        )
+        assert rendered.headers["content-type"] == (
+            "image/png" if has_composed else "image/jpeg"
+        )
+        assert rendered.headers["cache-control"] == "no-store"
+        assert client.get(url).status_code == 400
+        assert client.get(url, headers={"X-Tenant-Id": "demo-b"}).status_code == 404
+
+
+def test_design_composed_symlink_cannot_escape_root(tmp_path):
+    raw = result()
+    raw["plans"][0]["image"]["composed"] = {
+        "mime": "image/png",
+        "size": 1,
+        "sha256": "b" * 64,
+    }
+    outside = tmp_path / "outside.png"
+    outside.write_bytes(b"synthetic-private")
+    root = tmp_path / "design"
+    directory = root / sha256(b"request").hexdigest()[:16]
+    directory.mkdir(parents=True)
+    (directory / "00_composed.png").symlink_to(outside)
+    initial = services(lambda *a, **kw: raw)
+    initial.design_dir = root
+    with TestClient(create_app(lambda: initial)) as client:
+        post(client)
+        response = client.get("/design/request/0", headers={"X-Tenant-Id": "demo-a"})
+        assert response.status_code == 404 and b"private" not in response.content

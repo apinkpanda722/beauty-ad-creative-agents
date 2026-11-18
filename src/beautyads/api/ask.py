@@ -200,9 +200,13 @@ def register_ask(app: FastAPI) -> None:
             raise HTTPException(404, "DESIGN_NOT_FOUND")
         directory = sha256(image["request_key"].encode("utf-8")).hexdigest()[:16]
         root = services.design_dir.resolve()
-        path = (
-            root / directory / f"{image['index']:02d}.{IMAGE_MIMES[image['mime']]}"
-        ).resolve()
+        composed = image.get("composed")
+        filename = (
+            f"{image['index']:02d}_composed.png"
+            if composed is not None
+            else f"{image['index']:02d}.{IMAGE_MIMES[image['mime']]}"
+        )
+        path = (root / directory / filename).resolve()
         if not path.is_relative_to(root):
             raise HTTPException(404, "DESIGN_NOT_FOUND")
         try:
@@ -210,7 +214,9 @@ def register_ask(app: FastAPI) -> None:
         except (OSError, ValueError):
             raise HTTPException(404, "DESIGN_NOT_FOUND") from None
         return Response(
-            content, media_type=image["mime"], headers={"Cache-Control": "no-store"}
+            content,
+            media_type=composed["mime"] if composed is not None else image["mime"],
+            headers={"Cache-Control": "no-store"},
         )
 
     app.include_router(router)

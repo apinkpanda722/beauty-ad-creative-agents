@@ -1016,3 +1016,104 @@ def test_image_failed_contract_stays_unchanged(rig, raises):
             await services.close()
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("failure", [None, "font", "compose", "save"])
+def test_composed_image_reference_and_safe_original_fallback(
+    rig, monkeypatch, failure, caplog, capsys
+):
+    from io import BytesIO
+
+    from PIL import Image
+
+    from beautyads.agents.design_compose import FontMissing
+    from beautyads.agents.design_images import save_composed_design
+    from beautyads.api.ask_view import build_view
+
+    stream = BytesIO()
+    Image.new("RGB", (256, 256), "blue").save(stream, format="PNG")
+    source = stream.getvalue()
+    stream = BytesIO()
+    Image.new("RGB", (256, 256), "white").save(stream, format="PNG")
+    composed = stream.getvalue()
+    directory = rig.tmp_path / "design"
+    monkeypatch.setattr(assembly, "_DESIGN_DIR", directory)
+    original_plan = synthetic_plan
+    monkeypatch.setitem(
+        globals(), "synthetic_plan", lambda: {**original_plan(), "cta_type": "shop_now"}
+    )
+    calls = []
+
+    def image(**options):
+        calls.append(options)
+        return ImageOutcome(
+            True,
+            source,
+            "image/png",
+            len(source),
+            sha256(source).hexdigest(),
+            0.04,
+            "synthetic",
+            None,
+        )
+
+    def compose(value, *, headline, cta):
+        assert value == source
+        assert headline == synthetic_plan()["hook_text"]
+        assert cta == "지금 만나보기"
+        # Composition starts only after the original has been saved.
+        assert len(list(directory.glob("*/*.png"))) >= 1
+        if failure == "font":
+            raise FontMissing()
+        if failure == "compose":
+            raise RuntimeError("synthetic-private-path-and-value")
+        return SimpleNamespace(png_bytes=composed)
+
+    def save(*args, **kwargs):
+        if failure == "save":
+            raise OSError("synthetic-private-path-and-value")
+        return save_composed_design(*args, **kwargs)
+
+    monkeypatch.setattr(assembly, "compose_design", compose)
+    monkeypatch.setattr(assembly, "save_composed_design", save)
+
+    async def run():
+        services = await rig.start(with_image_enabled=True, models={"image": image})
+        try:
+            result = invoke(services, with_image=True)
+            ref = result["plans"][0]["image"]
+            assert ref["ok"] is True
+            root = directory / sha256(ref["request_key"].encode()).hexdigest()[:16]
+            assert (root / "00.png").read_bytes() == source
+            if failure is None:
+                assert ref["composed"] == {
+                    "mime": "image/png",
+                    "size": len(composed),
+                    "sha256": sha256(composed).hexdigest(),
+                }
+                assert (root / "00_composed.png").read_bytes() == composed
+                assert "compose_error" not in ref
+            else:
+                assert ref["compose_error"] == (
+                    "FONT_MISSING" if failure == "font" else "COMPOSE_FAILED"
+                )
+                assert "composed" not in ref and list(root.iterdir()) == [
+                    root / "00.png"
+                ]
+            view = build_view(result, plan_ids=["id"], hydrate=None)
+            for encoded in (json.dumps(result), json.dumps(view.ui_commands)):
+                assert str(directory) not in encoded and "base64" not in encoded
+                assert "synthetic-private" not in encoded
+            assert len(calls) == 1
+            assert set(calls[0]) == {
+                "prompt",
+                "ledger_path",
+                "caps",
+                "purpose_caps",
+                "api_key",
+            }
+        finally:
+            await services.close()
+
+    asyncio.run(run())
+    assert "synthetic-private" not in caplog.text + str(capsys.readouterr())

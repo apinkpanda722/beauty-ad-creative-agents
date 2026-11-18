@@ -271,3 +271,48 @@ def test_plan_has_fixed_image_disclaimer_and_separate_product_display(
     )
     assert data["product_display"] == (display or {"brand": None, "display_name": None})
     json.dumps(data, allow_nan=False)
+
+
+def test_composed_reference_passes_only_safe_metadata_without_mutation():
+    from beautyads.api.ask_view import image_reference
+
+    raw = result()
+    image = raw["plans"][0]["image"]
+    image["composed"] = {
+        "mime": "image/png",
+        "size": 123,
+        "sha256": "b" * 64,
+        "path": "/synthetic/private.png",
+        "base64": "private-image",
+    }
+    expected = {"mime": "image/png", "size": 123, "sha256": "b" * 64}
+    original = deepcopy(raw)
+    assert image_reference(image)["composed"] == expected
+    card = command(build_view(raw, plan_ids=["id"], hydrate=None), "show_plan")
+    assert card["image"]["composed"] == expected
+    assert "private" not in json.dumps(card) and "base64" not in json.dumps(card)
+    assert raw == original
+    card["image"]["composed"]["size"] = 999
+    assert image["composed"]["size"] == 123
+
+
+@pytest.mark.parametrize(
+    "invalid",
+    [
+        None,
+        [],
+        {},
+        {"mime": "image/jpeg", "size": 1, "sha256": "b" * 64},
+        {"mime": "image/png", "size": True, "sha256": "b" * 64},
+        {"mime": "image/png", "size": -1, "sha256": "b" * 64},
+        {"mime": "image/png", "size": 1, "sha256": "private/base64"},
+        {"mime": "image/png", "size": 1, "sha256": None},
+    ],
+)
+def test_invalid_composed_metadata_is_dropped_but_original_stays_valid(invalid):
+    from beautyads.api.ask_view import image_reference
+
+    image = result()["plans"][0]["image"]
+    expected = image_reference(image)
+    image["composed"] = invalid
+    assert image_reference(image) == expected
