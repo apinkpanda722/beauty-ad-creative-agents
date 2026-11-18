@@ -56,3 +56,12 @@
 
 ## 7. 입력 해시 기록 (비교 1 실행 전에 추가한다)
 (비어 있음 — `make live-compare ARGS='inputs'` 실행 뒤 사용자가 출력된 sha256 5개를 아래에 추가 커밋한다.)
+
+입력 해시 (2026-11-18 추가, `make live-compare ARGS='inputs'` 성공 뒤: `complete: true`, 장부 `compare-inputs`·`openai`·`reasoning_effort` `none`, 합계 $0.00660485, 입력별 `unresolved` 목록은 5건 모두 비어 있음). 아래는 `data/interim/p5_compare/inputs/`의 실제 핸드오프 파일 sha256이다(커밋 전에 파일 해시와 같음을 확인했다). 이 절의 값은 이후 고치지 않는다.
+
+- `01.json`: `ea394fe8c54db54f645bdac974f03d3d198d13e473830f01333afb810a39a2db`
+- `02.json`: `c935238a096c68636d3ba0cd7cd4779894afc417b22474f882f7547d88cb187a`
+- `03.json`: `4ad481f9d8881c4883c693f9bf2152d527cbb9e52fbeefefc39bd3705ac0058d`
+- `04.json`: `79a6a4b6fcac89bf0ceae9357ffffb579071ea7c340b6c7078032c80708741fc`
+- `05.json`: `5aabd7316dcc0689a5d7ef349236260d3904d29c966065c69d0ccb5a1a5489b6`
+
