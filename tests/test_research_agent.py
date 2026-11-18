@@ -15,6 +15,7 @@ from beautyads.agents.research import (
     run_research,
 )
 from beautyads.agents.state import AgentState
+from beautyads.agents.tool_messages import TOOL_DATA_RULE, tool_result_payload
 from beautyads.agents.tools import TOOLS
 from beautyads.domain.research import ResearchHandoff, ResearchHandoffDraft
 from beautyads.domain.tenant import TenantContextMissing
@@ -310,8 +311,10 @@ def test_isolated_primitive_state_and_raw_storage():
         serialized = json.dumps(snapshots)
         assert "raw-only-" not in serialized
         assert "raw-only-" not in str(chat.calls) + str(structured.calls)
-        assert "synthetic-preview" in str(chat.calls[1])
-        assert "synthetic-preview" in str(structured.calls)
+        for options in [chat.calls[1], structured.calls[0][1]]:
+            observations = json.loads(options["messages"][1]["content"])["observations"]
+            assert observations == [{"tool": EXAMPLE, "summary": "synthetic summary"}]
+            assert "synthetic-preview" not in str(options)
         sizes.append(len(serialized))
     assert sizes[1] < sizes[0] + 100
 
@@ -410,3 +413,72 @@ def test_basis_annotation_without_category_prefix_is_copied(note):
         Structured(),
     )
     assert output["basis_notes"] == [note]
+
+
+def test_model_observations_use_shared_bounded_payload_from_raw_store():
+    value = ToolResult(
+        tool=EXAMPLE,
+        kind="lookup",
+        summary="synthetic summary",
+        top_rows=[
+            {"title": f"synthetic-row-{i}", "caption": "가" * 201, "count": i}
+            for i in range(5)
+        ],
+        row_count=13,
+        evidence_ids=[f"yt:{i}" for i in range(13)],
+        no_evidence=False,
+    )
+    chat, structured, store = Chat([reply([call()]), reply()]), Structured(), {}
+    output = execute(chat, lambda *args: value, structured, raw_store=store)
+    raw = next(iter(store.values()))
+    assert raw == value.model_dump(mode="json")
+    expected = tool_result_payload(EXAMPLE, raw)
+    for options in [chat.calls[1], structured.calls[0][1]]:
+        observations = json.loads(options["messages"][1]["content"])["observations"]
+        assert observations == [expected]
+        assert len(observations[0]["rows"]) == 5
+        assert observations[0]["rows"][0] == {
+            "title": "synthetic-row-0",
+            "caption": "가" * 200 + "…",
+            "count": "0",
+        }
+        assert observations[0]["truncated"] == {
+            "rows": True,
+            "values": 5,
+            "evidence_ids": True,
+        }
+        # Bounded observations must not reduce the independent evidence pool.
+        assert json.loads(options["messages"][1]["content"])["evidence_pool"] == sorted(
+            value.evidence_ids
+        )
+    for options in [*chat.calls, structured.calls[0][1]]:
+        assert options["messages"][0]["role"] == "system"
+        assert TOOL_DATA_RULE in options["messages"][0]["content"].splitlines()
+    assert output["status"] == "ok"
+    assert output["evidence_ids"] == []  # The draft's yt:a lies outside this pool.
+
+
+@pytest.mark.parametrize(
+    "tool_call,code",
+    [
+        (call(), "GRAPH_UNAVAILABLE"),
+        (call("show_plan"), "TOOL_UNKNOWN"),
+        (ToolCall("x", EXAMPLE, None, "invalid"), "INPUT_INVALID"),
+    ],
+)
+def test_failure_observations_are_structured_without_diagnostics(tool_call, code):
+    failure = ToolFailure(
+        code="GRAPH_UNAVAILABLE", retryable=True, message="synthetic private diagnostic"
+    )
+    chat = Chat([reply([tool_call]), reply()])
+    output = execute(chat, lambda *args: failure, Structured())
+    observations = json.loads(chat.calls[1]["messages"][1]["content"])["observations"]
+    assert observations == [
+        {
+            "tool": EXAMPLE if code != "TOOL_UNKNOWN" else "unknown",
+            "failure": code,
+            "retryable": code == "GRAPH_UNAVAILABLE",
+        }
+    ]
+    assert "synthetic private diagnostic" not in str(chat.calls)
+    assert output["status"] == "no_evidence"

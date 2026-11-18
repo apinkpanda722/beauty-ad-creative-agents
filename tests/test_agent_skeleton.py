@@ -1,6 +1,7 @@
 """One-node graph contracts, with synthetic chat responses only."""
 
 import asyncio
+import json
 from copy import deepcopy
 from datetime import date
 
@@ -8,6 +9,7 @@ import pytest
 from langgraph.checkpoint.memory import InMemorySaver
 
 from beautyads.agents.skeleton import build_graph
+from beautyads.agents.tool_messages import TOOL_DATA_RULE
 from beautyads.domain.tools import ToolContext, ToolErrorCode, ToolFailure, ToolResult
 from beautyads.llm.chat import ChatResult, ToolCall
 
@@ -104,12 +106,18 @@ def test_one_tool_two_calls_and_primitive_checkpoint(failure):
     )
     tool_message = calls[1]["messages"][-1]
     assert tool_message["role"] == "tool"
-    assert "private_raw" not in str(calls) and "private diagnostic" not in str(calls)
+    assert "private diagnostic" not in str(calls)
     if failure:
-        assert (
-            "도구가 실패했다" in tool_message["content"]
-            and "GRAPH_UNAVAILABLE" in tool_message["content"]
-        )
+        assert json.loads(tool_message["content"]) == {
+            "tool": "lookup_certified_products",
+            "failure": "GRAPH_UNAVAILABLE",
+            "retryable": True,
+        }
+        assert "private_raw" not in str(calls)
+    else:
+        assert json.loads(tool_message["content"])["rows"] == [
+            {"private_raw": "hidden"}
+        ]
     assert primitive(
         saver.get_tuple({"configurable": {"thread_id": "demo-a:thread"}}).checkpoint[
             "channel_values"
@@ -154,3 +162,81 @@ def test_invalid_or_unadvertised_tool_does_not_run():
             initial(),
         )
         assert state["tool_trace"][0]["code"] in {"INPUT_INVALID", "TOOL_UNKNOWN"}
+
+
+def test_chat_receives_tool_rows_and_call_only_system_rule():
+    calls = []
+    responses = iter(
+        [
+            reply(calls=[ToolCall("c", "lookup_certified_products", {}, None)]),
+            reply("synthetic answer"),
+        ]
+    )
+
+    def chat(**kwargs):
+        calls.append(deepcopy(kwargs))
+        return next(responses)
+
+    tool_result = ToolResult(
+        tool="lookup_certified_products",
+        kind="lookup",
+        summary="synthetic summary",
+        top_rows=[{"product": "synthetic-product", "count": 13}],
+        row_count=13,
+        evidence_ids=["product:synthetic"],
+        no_evidence=False,
+    )
+    state = run(
+        build_graph(
+            chat=chat, tool_runner=lambda *args: tool_result, checkpointer=None
+        ),
+        initial(),
+    )
+    tool_message = next(m for m in calls[1]["messages"] if m["role"] == "tool")
+    assert "synthetic-product" in tool_message["content"], (
+        "tool 메시지에 top_rows 값이 없다"
+    )
+    payload = json.loads(tool_message["content"])
+    assert payload["rows"] == [{"product": "synthetic-product", "count": "13"}]
+    assert payload["row_count"] == 13
+    assert payload["evidence_ids"] == ["product:synthetic"]
+    assert payload["truncated"]["rows"] is True
+    for options in calls:
+        assert options["messages"][0] == {
+            "role": "system",
+            "content": TOOL_DATA_RULE,
+        }
+        assert sum(m["role"] == "system" for m in options["messages"]) == 1
+    assert all(m["role"] != "system" for m in state["messages"])
+
+
+@pytest.mark.parametrize(
+    "tool_call,code",
+    [
+        (ToolCall("c", "show_plan", {}, None), "TOOL_UNKNOWN"),
+        (ToolCall("c", "lookup_certified_products", None, "invalid"), "INPUT_INVALID"),
+    ],
+)
+def test_invalid_calls_return_structured_tool_messages(tool_call, code):
+    calls = []
+    responses = iter([reply(calls=[tool_call]), reply("synthetic answer")])
+
+    def chat(**kwargs):
+        calls.append(deepcopy(kwargs))
+        return next(responses)
+
+    def forbidden(*args):
+        pytest.fail("invalid call must not dispatch")
+
+    state = run(
+        build_graph(chat=chat, tool_runner=forbidden, checkpointer=None), initial()
+    )
+    message = next(m for m in calls[1]["messages"] if m["role"] == "tool")
+    assert json.loads(message["content"]) == {
+        "tool": "lookup_certified_products",
+        "failure": code,
+        "retryable": False,
+    }
+    assert state["tool_trace"][0]["code"] == code
+    assert all(options["messages"][0]["content"] == TOOL_DATA_RULE for options in calls)
+    assert all(m["role"] != "system" for m in state["messages"])

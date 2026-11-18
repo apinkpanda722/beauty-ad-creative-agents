@@ -11,6 +11,7 @@ from uuid import uuid4
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command
 
+from beautyads.agents.tool_messages import TOOL_DATA_RULE, tool_result_payload
 from beautyads.agents.tools import TOOLS, get_tool, tool_definitions
 from beautyads.domain.research import (
     ResearchBrief,
@@ -33,6 +34,7 @@ _SYSTEM = (
     "기존 조회 결과를 참고해 필요한 도구를 고르고, 충분하면 도구 호출을 끝낸다. "
     "원자료를 추측하지 않는다. 근거 ID는 결론 문장 대신 evidence_ids에 둔다. "
     "category_basis와 연결된 소재 기준의 한계를 보존한다."
+    "\n" + TOOL_DATA_RULE
 )
 
 
@@ -105,13 +107,7 @@ def build_research_graph(
         observations = []
         for entry, ref in zip(state["tool_log"], state["raw_refs"], strict=True):
             raw = raw_store[ref]
-            observations.append(
-                {
-                    "tool": entry["name"],
-                    "summary": entry["summary"],
-                    "top_rows": raw.get("top_rows", []),
-                }
-            )
+            observations.append(tool_result_payload(entry["name"], raw))
         return [
             {"role": "system", "content": _SYSTEM},
             {

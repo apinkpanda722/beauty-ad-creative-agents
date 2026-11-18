@@ -10,6 +10,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.runtime import Runtime
 
 from beautyads.agents.state import AgentState
+from beautyads.agents.tool_messages import TOOL_DATA_RULE, tool_message_content
 from beautyads.agents.tools import tool_definitions
 from beautyads.domain.tenant import TenantMismatch, validate_tenant_id
 from beautyads.domain.tools import ToolFailure
@@ -64,7 +65,10 @@ def build_graph(*, chat, tool_runner, checkpointer, max_steps=MAX_STEPS):
                 chat,
                 model="gpt-6-luna",
                 reasoning_effort="none",
-                messages=deepcopy(messages),
+                messages=[
+                    {"role": "system", "content": TOOL_DATA_RULE},
+                    *deepcopy(messages),
+                ],
                 tools=skeleton_tools(),
                 tool_choice="none" if final else "auto",
             )
@@ -104,8 +108,10 @@ def build_graph(*, chat, tool_runner, checkpointer, max_steps=MAX_STEPS):
             code = None
             if call.name != TOOL_NAME:
                 code = "TOOL_UNKNOWN"
+                result = ToolFailure(code=code, retryable=False, message="")
             elif call.arguments_error is not None or call.arguments is None:
                 code = "INPUT_INVALID"
+                result = ToolFailure(code=code, retryable=False, message="")
             else:
                 get_stream_writer()(
                     {"type": "tool_start", "name": TOOL_NAME, "kind": "lookup"}
@@ -131,7 +137,7 @@ def build_graph(*, chat, tool_runner, checkpointer, max_steps=MAX_STEPS):
                 {
                     "role": "tool",
                     "tool_call_id": call.id or f"call-{index}",
-                    "content": summary,
+                    "content": tool_message_content(TOOL_NAME, result),
                 }
             )
         if count >= max_steps:
