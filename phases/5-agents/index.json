@@ -131,7 +131,16 @@
     {
       "step": "1b",
       "name": "db-migrate",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-18T13:27:02+0900",
+      "summary": "db-migrate 명령·Make 타깃·README와 MIGRATIONS_PENDING 안내 구현. 합성 테스트로 비밀 값 미출력·예외 전파·연결 해제·멱등성 검증, 아키텍처 검사 포함 make verify 통과(3,635 tests). 실제 서비스 접속·패키지 설치 없음.",
+      "completed_at": "2026-11-18T13:30:11+0900",
+      "usage": {
+        "input_tokens": 666511,
+        "cached_input_tokens": 602752,
+        "output_tokens": 5438,
+        "attempts": 1
+      }
     },
     {
       "step": 6,
