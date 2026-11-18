@@ -218,3 +218,74 @@ def test_image_parameter_shape(tmp_path):
     assert calls[0].get("model") == "gemini/gemini-3.1-flash-lite-image"
     assert calls[0].get("modalities") == ["image", "text"]
     assert guard(calls) == 1
+
+
+@pytest.mark.parametrize("effort", EFFORTS)
+def test_planning_strict_plan_shape(tmp_path, effort):
+    import json
+
+    from test_plan_checks import plan_data
+
+    from beautyads.agents.planning import strict_plan_schema
+    from beautyads.domain.plan import Plan
+
+    calls = []
+    args = options(tmp_path, "gpt-6.1-terra", effort)
+    args.pop("model")
+    spec = StructuredSpec(
+        "plan", "Synthetic plan", strict_plan_schema(), Plan.model_validate
+    )
+    capture = capture_completion(calls)
+
+    def complete(**kwargs):
+        response = capture(**kwargs)
+        response["choices"][0]["message"]["content"] = json.dumps(
+            Plan.model_validate(plan_data()).model_dump(mode="json")
+        )
+        return response
+
+    result = make_structured("gpt-6.1-terra").generate(
+        spec, **args, completion_fn=complete
+    )
+    assert result.ok and len(calls) == 1
+    for call in calls:
+        assert call["reasoning_effort"] == effort
+        assert call["response_format"]["json_schema"]["strict"] is True
+        assert call["response_format"]["json_schema"]["schema"] == strict_plan_schema()
+        assert "temperature" not in call
+    assert guard(calls) == len(calls)
+
+
+@pytest.mark.parametrize("model", MODELS[2:])
+def test_evaluation_single_auto_tool_shape(tmp_path, model):
+    import json
+
+    from beautyads.domain.evaluation import EvaluationScores
+
+    calls = []
+    args = options(tmp_path, model, None)
+    args.pop("model")
+    spec = StructuredSpec(
+        "evaluation_scores",
+        "Synthetic scores",
+        EvaluationScores.model_json_schema(),
+        EvaluationScores.model_validate,
+    )
+    capture = capture_completion(calls)
+
+    def complete(**kwargs):
+        response = capture(**kwargs)
+        function = response["choices"][0]["message"]["tool_calls"][0]["function"]
+        function["name"] = spec.name
+        function["arguments"] = json.dumps(
+            {"differentiation": 3, "fit": 3, "rationale": "synthetic"}
+        )
+        return response
+
+    result = make_structured(model).generate(spec, **args, completion_fn=complete)
+    assert result.ok and len(calls) == 1
+    for call in calls:
+        assert len(call["tools"]) == 1 and call["tool_choice"] == "auto"
+        assert call["tools"][0]["function"]["parameters"] == spec.schema
+        assert not {"reasoning_effort", "thinking", "temperature"} & call.keys()
+    assert guard(calls) == len(calls)

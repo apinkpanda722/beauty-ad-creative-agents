@@ -163,3 +163,48 @@ def test_certification_query_is_fixed_read_only_and_parameterized(kind):
 def test_certification_parameters_reject_unlisted_values(cert):
     with pytest.raises((ValueError, TypeError)):
         certification_parameters(cert=cert)
+
+
+def test_plan_lookup_queries_are_fixed_read_only_and_bound():
+    from beautyads.graph.evidence_queries import (
+        existing_creatives_query,
+        product_support_parameters,
+        product_support_query,
+    )
+
+    queries = [
+        (existing_creatives_query(), {"ids"}),
+        (product_support_query(), {"product_url", "claim"}),
+    ]
+    for query, params in queries:
+        assert set(re.findall(r"\$(\w+)", query)) == params
+        assert not re.search(
+            r"\b(CREATE|MERGE|SET|DELETE|REMOVE|CALL)\b", query, re.IGNORECASE
+        )
+    query = product_support_query()
+    for fragment in (
+        "CONTAINS",
+        "HAS_EFFICACY",
+        "CERTIFIED_AS",
+        "ingredient_count",
+        "supporting_count",
+        "certifications",
+        "DISTINCT",
+    ):
+        assert fragment in query
+    assert "OPTIONAL MATCH" in query
+    url = "https://example.invalid/' DELETE p"
+    assert product_support_parameters(product_url=url, claim="hydration") == {
+        "product_url": url,
+        "claim": "hydration",
+    }
+    assert url not in query and "hydration" not in query
+    assert "c.source + ':' + c.source_id" in existing_creatives_query()
+
+
+@pytest.mark.parametrize("claim", ["invented", "' DELETE p", None, [], {}])
+def test_plan_lookup_claim_validation(claim):
+    from beautyads.graph.evidence_queries import product_support_parameters
+
+    with pytest.raises((ValueError, TypeError)):
+        product_support_parameters(product_url="https://example.invalid/p", claim=claim)

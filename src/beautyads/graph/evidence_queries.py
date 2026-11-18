@@ -180,3 +180,35 @@ def certified_by_kind_query() -> str:
 def certification_parameters(*, cert) -> dict:
     """Accept only official functional-certification kinds as a bound value."""
     return {"cert": CertificationKind(cert).value}
+
+
+def existing_creatives_query() -> str:
+    """Resolve only the requested public creative keys."""
+    return """
+        MATCH (c:Creative)
+        WHERE c.source + ':' + c.source_id IN $ids
+        RETURN DISTINCT c.source + ':' + c.source_id AS creative_id
+    """
+
+
+def product_support_query() -> str:
+    """Count ingredients independently from optional efficacy and cert links."""
+    return """
+        MATCH (p:Product)
+        WHERE p.source_url = $product_url
+        OPTIONAL MATCH (p)-[:CONTAINS]->(i:Ingredient)
+        OPTIONAL MATCH (i)-[:HAS_EFFICACY]->(e:Efficacy)
+        WHERE e.value = $claim
+        WITH p, count(DISTINCT i) AS ingredient_count,
+             count(DISTINCT CASE WHEN e IS NOT NULL THEN i END) AS supporting_count
+        OPTIONAL MATCH (p)-[:CERTIFIED_AS]->(f:FunctionalCert)
+        RETURN ingredient_count, supporting_count,
+               collect(DISTINCT f.value) AS certifications
+    """
+
+
+def product_support_parameters(*, product_url, claim) -> dict:
+    """The product key is bound data; the efficacy is a closed taxonomy value."""
+    if not isinstance(product_url, str) or not product_url.strip():
+        raise ValueError("PRODUCT_SUPPORT_INPUT_INVALID")
+    return {"product_url": product_url, "claim": Claim(claim).value}
