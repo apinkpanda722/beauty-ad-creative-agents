@@ -285,7 +285,16 @@
     {
       "step": "7a",
       "name": "supervisor",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-18T16:14:55+0900",
+      "summary": "Supervisor 상위 그래프·strict 의도 계약·숫자 검증·비용/횟수/입력 한도·단계 이벤트와 FP 가드 구현. 아키텍처 검사 포함 make verify 통과(4,373 tests). 실제 서비스 접속·패키지 설치 없음.",
+      "completed_at": "2026-11-18T16:25:15+0900",
+      "usage": {
+        "input_tokens": 2460284,
+        "cached_input_tokens": 2366848,
+        "output_tokens": 21799,
+        "attempts": 1
+      }
     },
     {
       "step": "7b",
