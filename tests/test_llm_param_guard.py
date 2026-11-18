@@ -200,3 +200,21 @@ def test_guard_rejects_openai_tool_choice_without_allowance(model, effort, choic
 def test_guard_rejects_empty_capture():
     with pytest.raises(AssertionError, match="No captured combinations"):
         guard([])
+
+
+def test_image_parameter_shape(tmp_path):
+    from beautyads.llm import generate_image
+
+    calls = []
+    generate_image(
+        prompt="synthetic image brief",
+        ledger_path=tmp_path / "costs.jsonl",
+        caps={"gemini": 12.0},
+        purpose_caps={"image": 3.5},
+        api_key=uuid4().hex,
+        completion_fn=capture_completion(calls),
+    )
+    assert len(calls) == 1
+    assert calls[0].get("model") == "gemini/gemini-3.1-flash-lite-image"
+    assert calls[0].get("modalities") == ["image", "text"]
+    assert guard(calls) == 1

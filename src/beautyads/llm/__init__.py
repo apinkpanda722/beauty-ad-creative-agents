@@ -43,6 +43,7 @@ from .gemini import (
     usage_from_response,
     video_part,
 )
+from .image import ImageOutcome, generate_image
 from .prices import (
     PRICE_TABLE_CHECKED_ON,
     ModelPrice,
@@ -73,6 +74,7 @@ __all__ = [
     "ErrorKind",
     "FileError",
     "GeminiInteractionsFn",
+    "ImageOutcome",
     "InstructionJsonStructured",
     "InteractionResult",
     "JsonSchemaStructured",
@@ -100,6 +102,7 @@ __all__ = [
     "extract_output_text",
     "file_error_code",
     "gemini_interact",
+    "generate_image",
     "json_schema_format",
     "make_structured",
     "parse_json_output",
