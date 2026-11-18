@@ -81,7 +81,7 @@ def test_build_projects_only_metadata_and_integer_scores(kind):
                 "attempts": [
                     {
                         "attempt": 1,
-                        "passed": False,
+                        "checks_passed": False,
                         "scores": {
                             "differentiation": 2,
                             "fit": 3,
@@ -94,7 +94,7 @@ def test_build_projects_only_metadata_and_integer_scores(kind):
                         "cost_usd": 0.02,
                         "planning_failure": SECRET,
                     },
-                    {"attempt": 2, "passed": True, "scores": None},
+                    {"attempt": 2, "checks_passed": True, "scores": None},
                 ],
                 "report": {"rationale": SECRET},
             }
@@ -135,7 +135,7 @@ def test_build_projects_only_metadata_and_integer_scores(kind):
     assert plan.attempts[0].scores == {"differentiation": 2, "fit": 3}
     assert plan.attempts[0].failed_check_codes == ["EVIDENCE_MISSING"]
     assert plan.attempts[0].cost_usd == 0.02
-    assert plan.attempts[1].attempt == 2 and plan.attempts[1].passed is True
+    assert plan.attempts[1].attempt == 2 and plan.attempts[1].checks_passed is True
     assert plan.attempts[1].scores is None
     assert record.limit_hit and record.limit_kinds == ["text", "steps"]
     assert record.input_trims[0].model_dump() == result["input_trims"][0]
@@ -329,3 +329,76 @@ def test_limit_detail_kind_must_pass_trace_token_pattern():
         make_trace(
             result={"limit_detail": [{"kind": "invalid kind/", "cap": "unknown"}]}
         )
+
+
+def test_trace_records_only_alignment_counts_prompt_versions_and_distinct_passes(
+    tmp_path,
+):
+    versions = {"planning": "2026-11-18-1", "evaluation": "2026-11-18-1"}
+    result = {
+        "prompt_versions": versions,
+        "plans": [
+            {
+                "pattern_alignment": {
+                    "compared": 2,
+                    "same_count": 1,
+                    "skipped": 3,
+                    "axes": {"hook_type": {"plan": SECRET, "dominant": [SECRET]}},
+                    "detail": SECRET,
+                },
+                "attempts": [
+                    {
+                        "attempt": 1,
+                        "checks_passed": True,
+                        "final_passed": False,
+                        "scores": {"fit": 2, "rationale": SECRET},
+                    }
+                ],
+            }
+        ],
+    }
+    record = make_trace(
+        result=result, failure={"class": "SyntheticError", "message": SECRET}
+    )
+    assert record.prompt_versions == versions
+    assert record.plans[0].alignment.model_dump() == {
+        "compared": 2,
+        "same_count": 1,
+        "skipped": 3,
+    }
+    attempt = record.plans[0].attempts[0].model_dump()
+    assert attempt["checks_passed"] is True and attempt["final_passed"] is False
+    assert "passed" not in attempt
+    path = tmp_path / "trace.jsonl"
+    append_trace(path, record)
+    assert read_traces(path).records == [record]
+    assert SECRET not in path.read_text()
+
+
+def test_trace_new_metadata_cannot_carry_prose_or_key_shaped_values():
+    record = make_trace(
+        result={
+            "prompt_versions": {
+                "planning": SECRET,
+                "evaluation": "2026-11-18-1",
+                "extra": SECRET,
+            },
+            "plans": [
+                {
+                    "pattern_alignment": {
+                        "compared": SECRET,
+                        "same_count": True,
+                        "skipped": 0,
+                        "axes": {SECRET: SECRET},
+                    }
+                }
+            ],
+        }
+    )
+    assert SECRET not in record.model_dump_json()
+    assert record.prompt_versions == {"evaluation": "2026-11-18-1"}
+    assert record.plans[0].alignment.model_dump() == {
+        "compared": 0,
+        "same_count": 0,
+        "skipped": 0,
+    }

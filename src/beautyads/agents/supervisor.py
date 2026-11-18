@@ -12,6 +12,8 @@ from langgraph.errors import GraphRecursionError
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command
 
+from beautyads.agents.evaluation import EVALUATION_PROMPT_VERSION
+from beautyads.agents.planning import PLANNING_PROMPT_VERSION
 from beautyads.agents.tool_messages import TOOL_DATA_RULE
 from beautyads.agents.tools import get_tool
 from beautyads.domain.claims import CLAIM_CHECK_DISCLAIMER
@@ -26,6 +28,7 @@ from beautyads.domain.supervisor import (
     SupervisorDecision,
     cost_exceeded,
     numbers_in_results,
+    pattern_alignment,
     trim_handoff,
     trim_message,
     verify_aggregates,
@@ -500,7 +503,19 @@ def run_request(
             "handoff": state["sv_handoff"],
             "aggregates_label": AGGREGATES_LABEL,
             "aggregates_removed": status["aggregates_removed"],
-            "plans": state["sv_results"],
+            "plans": [
+                {
+                    **item,
+                    "pattern_alignment": pattern_alignment(
+                        item.get("plan") or {}, state["sv_tool_outputs"]
+                    ),
+                }
+                for item in state["sv_results"]
+            ],
+            "prompt_versions": {
+                "planning": PLANNING_PROMPT_VERSION,
+                "evaluation": EVALUATION_PROMPT_VERSION,
+            },
             "limit_hit": bool(status["limit_kinds"]),
             "limit_kinds": sorted(status["limit_kinds"]),
             "limit_detail": status["limit_detail"],

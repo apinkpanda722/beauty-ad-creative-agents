@@ -5,6 +5,7 @@ import json
 import math
 import re
 import sys
+import unicodedata
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
@@ -13,6 +14,7 @@ from uuid import uuid4
 from beautyads.api.app import create_app
 from beautyads.api.assembly import assemble_full
 from beautyads.api.chat_client import run_ask_once
+from beautyads.domain.labels import Angle, Format, HookType
 from beautyads.domain.supervisor import RequestLimits
 from beautyads.eval.live_agent import preflight
 from beautyads.obs.ledger import provider_total, purpose_total
@@ -173,6 +175,7 @@ def _trace_fields(record):
         costs[provider] = math.fsum((costs.get(provider, 0), call.cost_usd))
     return {
         "trace_id": record.trace_id,
+        "prompt_versions": record.prompt_versions,
         "plans": [
             plan.model_dump(exclude={"attempts"})
             | {
@@ -218,7 +221,74 @@ def _structured(records):
     }
 
 
-def _request(scenario, *, run, app, with_image):
+def _alignment(value):
+    """Forward only closed pattern values and numeric reporting fields."""
+    if not isinstance(value, dict):
+        return None
+    axes = value.get("axes")
+    axes = axes if isinstance(axes, dict) else {}
+    safe_axes = {}
+    for axis, enum in (("hook_type", HookType), ("angle", Angle), ("format", Format)):
+        allowed = {item.value for item in enum}
+        item = axes.get(axis)
+        item = item if isinstance(item, dict) else {}
+        plan, dominant, share = (
+            item.get("plan"),
+            item.get("dominant"),
+            item.get("share"),
+        )
+        safe_axes[axis] = {
+            "plan": plan if isinstance(plan, str) and plan in allowed else None,
+            "dominant": [v for v in dominant if isinstance(v, str) and v in allowed]
+            if isinstance(dominant, list)
+            else [],
+            "same": item.get("same") if type(item.get("same")) is bool else None,
+            "share": share
+            if type(share) in (int, float) and math.isfinite(share) and share >= 0
+            else None,
+        }
+    return {
+        "axes": safe_axes,
+        **{
+            key: value.get(key)
+            if type(value.get(key)) is int and value.get(key) >= 0
+            else 0
+            for key in ("compared", "same_count", "skipped")
+        },
+    }
+
+
+def _print_rationales(scenario_id, data, out):
+    """Print scorer prose once to the terminal; never return it to a summary."""
+    token = re.compile(
+        r"\b(?:sk-[A-Za-z0-9_-]+|AIza[A-Za-z0-9_-]+|Bearer\s+[A-Za-z0-9._~+/=-]+)",
+        re.IGNORECASE,
+    )
+    for attempt in data.get("attempts", []):
+        if not isinstance(attempt, dict):
+            continue
+        scores = attempt.get("scores")
+        if not isinstance(scores, dict) or not isinstance(scores.get("rationale"), str):
+            continue
+        number, differentiation, fit = (
+            attempt.get("attempt"),
+            scores.get("differentiation"),
+            scores.get("fit"),
+        )
+        if not all(type(value) is int for value in (number, differentiation, fit)):
+            continue
+        reason = token.sub("[redacted]", scores.get("rationale"))
+        reason = "".join(
+            c for c in reason if not unicodedata.category(c).startswith("C")
+        )
+        reason = token.sub("[redacted]", reason)[:200]
+        print(
+            f"RATIONALE {scenario_id} attempt {number} differentiation={differentiation} fit={fit}: {reason}",
+            file=out,
+        )
+
+
+def _request(scenario, *, run, app, with_image, show_rationale=False, out=None):
     row = {key: scenario[key] for key in ("id", "tenant_id", "kind")}
     row.update(
         status_code=None,
@@ -248,6 +318,18 @@ def _request(scenario, *, run, app, with_image):
         if outcome.status_code != 200:
             row["error_code"] = f"HTTP_{outcome.status_code}"
         else:
+            for command in outcome.ui_commands:
+                if not isinstance(command, dict) or command.get("kind") != "show_plan":
+                    continue
+                data = command.get("data")
+                if not isinstance(data, dict):
+                    continue
+                alignment = _alignment(data.get("pattern_alignment"))
+                row["plans"].append(
+                    {"pattern_alignment": alignment} if alignment is not None else {}
+                )
+                if show_rationale:
+                    _print_rationales(scenario["id"], data, out)
             error = next(
                 (body for name, body in outcome.events if name == "error"), None
             )
@@ -283,6 +365,7 @@ def main(
     parser.add_argument("--config", choices=tuple(_CONFIGS), required=True)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--reset-baseline", action="store_true")
+    parser.add_argument("--show-rationale", action="store_true")
     parser.add_argument("--only", action="append", default=[])
     try:
         args = parser.parse_args(argv)
@@ -354,7 +437,14 @@ def main(
                     limits=limits,
                 )
             )
-            row = _request(scenario, run=run, app=app, with_image=with_image)
+            row = _request(
+                scenario,
+                run=run,
+                app=app,
+                with_image=with_image,
+                show_rationale=args.show_rationale,
+                out=out,
+            )
             ended_at = now()
             row["duration_ms"] = max(
                 0, int((ended_at - request_started).total_seconds() * 1000)
@@ -373,7 +463,16 @@ def main(
                 record = candidates[0]
                 seen.add(record.trace_id)
                 records.append(record)
-                row.update(_trace_fields(record))
+                fields = _trace_fields(record)
+                for plan_index, plan in enumerate(fields["plans"]):
+                    if (
+                        plan_index < len(row["plans"])
+                        and "pattern_alignment" in row["plans"][plan_index]
+                    ):
+                        plan["pattern_alignment"] = row["plans"][plan_index][
+                            "pattern_alignment"
+                        ]
+                row.update(fields)
                 if record.outcome == "error":
                     row["error_code"] = (
                         _code(record.error_code)

@@ -489,3 +489,58 @@ def test_limit_detail_covers_other_request_limits(limits, expected):
     output = supervisor.run_request(**Fakes().args(limits=limits))
     assert output["limit_detail"] == expected
     assert output["limit_kinds"] == [item["kind"] for item in expected]
+
+
+def test_report_alignment_and_prompt_versions_do_not_change_any_decisions():
+    from test_domain_supervisor import comparison_rows
+    from test_plan_eval import Planner, report
+
+    from beautyads.agents.evaluation import EVALUATION_PROMPT_VERSION
+    from beautyads.agents.plan_eval import run_plan_eval
+    from beautyads.agents.planning import PLANNING_PROMPT_VERSION
+
+    def planning(brief, handoff, profile, feedback, **kwargs):
+        return run_plan_eval(
+            brief=brief,
+            handoff=handoff,
+            profile=profile,
+            feedback=feedback,
+            plan_fn=Planner(),
+            evaluate_fn=lambda **kw: report(low=True),
+            **kwargs,
+        )
+
+    f = Fakes(decision=decision_data(plan_count=1))
+    research = f.research
+
+    def with_comparison(brief, raw_store):
+        result = research(brief, raw_store)
+        raw_store["comparison"] = {
+            **comparison_rows(("question", 3), total=3),
+            "row_count": 1,
+            "top_rows": [{"value": "question", "creatives": 3, "total": 3}],
+        }
+        return result
+
+    plain = supervisor.run_request(**f.args(plan_eval_fn=planning))
+    aligned = supervisor.run_request(
+        **f.args(plan_eval_fn=planning, research_fn=with_comparison)
+    )
+    assert plain["kind"] == aligned["kind"] == "plan"
+    a, b = plain["plans"][0], aligned["plans"][0]
+    for field in ("status", "rework_count", "attempts", "report"):
+        assert a[field] == b[field]
+    assert [x["final_passed"] for x in a["attempts"]] == [
+        x["final_passed"] for x in b["attempts"]
+    ]
+    assert a["pattern_alignment"]["compared"] == 0
+    assert b["pattern_alignment"]["axes"]["hook_type"]["same"] is True
+    assert (
+        aligned["prompt_versions"]
+        == plain["prompt_versions"]
+        == {
+            "planning": PLANNING_PROMPT_VERSION,
+            "evaluation": EVALUATION_PROMPT_VERSION,
+        }
+    )
+    json.dumps(aligned, allow_nan=False)

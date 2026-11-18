@@ -482,13 +482,13 @@ def test_trace_projection_aggregation_order_and_secret_exclusion(
                 "attempts": [
                     {
                         "attempt": 1,
-                        "passed": False,
+                        "checks_passed": False,
                         "scores": {"fit": 2, "rationale": SECRET},
                         "failed_check_codes": ["EVIDENCE_MISSING"],
                     },
                     {
                         "attempt": 2,
-                        "passed": True,
+                        "checks_passed": True,
                         "scores": {"fit": 4},
                         "failed_check_codes": [],
                     },
@@ -575,3 +575,101 @@ def test_makefile_adds_only_separate_target_and_phony():
     )
     verify = text.split("\nverify:\n", 1)[1].split("\n\n", 1)[0]
     assert "live-" not in verify
+
+
+@pytest.mark.parametrize("show", [False, True])
+def test_show_rationale_is_sanitized_terminal_only_and_summary_keeps_safe_alignment(
+    rig, show
+):
+    from test_domain_supervisor import comparison_rows
+
+    from beautyads.domain.supervisor import pattern_alignment
+
+    tokens = [
+        "sk-" + "SYNTHETICKEY123456789",
+        "Bearer " + "SYNTHETIC123456789",
+        "AIza" + "SYNTHETIC123456789",
+    ]
+    rationale = "synthetic reason " + " ".join(tokens) + "\x00\n\t" + "가" * 240
+    alignment = pattern_alignment(
+        {"hook_type": "question"}, [comparison_rows(("question", 2), total=2)]
+    )
+    versions = {"planning": "2026-11-18-1", "evaluation": "2026-11-18-1"}
+    path = rig.settings.ledger_path.with_name("traces.jsonl")
+
+    def run(**kw):
+        private_alignment = {**alignment, "diagnostic": SECRET}
+        private_alignment["axes"] = {
+            **alignment["axes"],
+            "angle": {
+                "plan": SECRET,
+                "dominant": [SECRET],
+                "same": None,
+                "share": None,
+            },
+        }
+        attempts = [
+            {
+                "attempt": 1,
+                "checks_passed": True,
+                "final_passed": False,
+                "scores": {"differentiation": 2, "fit": 3, "rationale": rationale},
+            }
+        ]
+        append_trace(
+            path,
+            trace(
+                rig,
+                kw["tenant_id"],
+                result={
+                    "prompt_versions": versions,
+                    "plans": [
+                        {"pattern_alignment": private_alignment, "attempts": attempts}
+                    ],
+                },
+                failure={"message": SECRET},
+            ),
+        )
+        return AskOutcome(
+            events=[("step", {"detail": SECRET})],
+            ui_commands=[
+                {
+                    "kind": "show_plan",
+                    "data": {
+                        "pattern_alignment": private_alignment,
+                        "attempts": attempts,
+                    },
+                }
+            ],
+            final_text=SECRET,
+            status_code=200,
+        )
+
+    rig.behavior = run
+    args = ["--config", "image"] + (["--show-rationale"] if show else [])
+    code, summary, output = rig.invoke(*args)
+    assert code == 3
+    lines = output.splitlines()
+    rationale_lines = [line for line in lines if line.startswith("RATIONALE ")]
+    assert len(rationale_lines) == int(show)
+    if show:
+        prefix = "RATIONALE serum-plan attempt 1 differentiation=2 fit=3: "
+        assert rationale_lines[0].startswith(prefix)
+        displayed = rationale_lines[0][len(prefix) :]
+        assert len(displayed) == 200 and displayed.count("[redacted]") == 3
+        assert not any(ord(c) < 32 or 127 <= ord(c) <= 159 for c in displayed)
+    else:
+        assert len(lines) == 1
+    row = summary["scenarios"][0]
+    assert row["prompt_versions"] == versions
+    metric = row["plans"][0]["pattern_alignment"]
+    assert metric["compared"] == alignment["compared"]
+    assert metric["axes"]["hook_type"] == alignment["axes"]["hook_type"]
+    attempt = row["plans"][0]["attempts"][0]
+    assert attempt["checks_passed"] is True and attempt["final_passed"] is False
+    assert "passed" not in attempt
+    saved = rig.root / f"{summary['run_id']}.json"
+    persisted = saved.read_text() + path.read_text() + lines[-1]
+    assert "synthetic reason" not in persisted
+    assert SECRET not in persisted + output
+    assert all(token not in persisted + output for token in tokens)

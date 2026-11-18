@@ -414,7 +414,7 @@ def test_attempt_summaries_and_injected_feedback_without_mutating_inputs():
     assert all(call["feedback"] == source["feedback"] for call in planner.calls)
     for index, attempt in enumerate(output["attempts"]):
         assert attempt["attempt"] == index + 1
-        assert attempt["passed"] is reports[index].check_report["passed"]
+        assert attempt["checks_passed"] is reports[index].check_report["passed"]
         assert attempt["scores"] == reports[index].scores
         assert attempt["low_items"] == reports[index].low_items
         assert attempt["failed_check_codes"] == (
@@ -459,3 +459,32 @@ def test_cost_not_available_from_evaluation_report_is_not_reported_as_zero():
     assert output["attempts"][0]["cost_usd"] is None
     assert output["attempts"][0]["plan_cost_usd"] == 0.1
     assert output["attempts"][0]["evaluation_cost_usd"] is None
+
+
+@pytest.mark.parametrize(
+    "low,fail,scoring_failed",
+    [
+        (False, False, False),
+        (True, False, False),
+        (False, False, True),
+        (False, True, False),
+    ],
+)
+def test_attempt_distinguishes_checks_from_final_pass(low, fail, scoring_failed):
+    value = report(low=low, fail=fail, scoring_failed=scoring_failed)
+    result = run_plan_eval(
+        **inputs(), plan_fn=Planner(), evaluate_fn=lambda **kw: value, max_reworks=0
+    )
+    attempt = result["attempts"][0]
+    assert "passed" not in attempt
+    assert attempt["checks_passed"] is (not fail)
+    assert attempt["final_passed"] is value.passed
+
+
+def test_unevaluated_attempt_has_two_unknown_pass_fields():
+    result = run_plan_eval(
+        **inputs(), plan_fn=Planner(fail_at=1), evaluate_fn=forbidden
+    )
+    attempt = result["attempts"][0]
+    assert "passed" not in attempt
+    assert attempt["checks_passed"] is attempt["final_passed"] is None

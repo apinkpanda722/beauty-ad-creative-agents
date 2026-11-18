@@ -104,6 +104,12 @@ def test_checks_before_scoring_and_scoring_has_only_two_criteria(
         "scenes",
         "copy_lines",
         "image_brief",
+        "hook_type",
+        "angle",
+        "format",
+        "cta_type",
+        "claimed_efficacy",
+        "category",
     }
     assert payload["brief"]["goal"] == "synthetic goal"
     assert payload["research"]["conclusion"] == "synthetic comparison"
@@ -182,3 +188,36 @@ def test_default_factory_uses_haiku(monkeypatch):
         structured=None,
     )
     assert seen == ["claude-haiku-5-5"] and report.passed
+
+
+def test_fp_c14_evaluation_receives_closed_plan_values_and_anchored_scale():
+    fake = Scorer("claude-haiku-5-5")
+    source = plan_data()
+    run(fake, source)
+    _, options = fake.calls[0]
+    system, user = options["messages"]
+    payload = json.loads(user["content"])
+    fields = {
+        "hook_type",
+        "angle",
+        "format",
+        "cta_type",
+        "claimed_efficacy",
+        "category",
+    }
+    for field in fields:
+        assert payload["plan"][field] == source[field]
+    assert set(payload["criteria"]) == {"differentiation", "fit"}
+    for scale in payload["criteria"].values():
+        assert all(f"{stage}점" in scale for stage in range(1, 6))
+    assert "지배 패턴" in system["content"]
+    assert all(
+        f"plan.{field}" in system["content"]
+        for field in ("hook_type", "angle", "format")
+    )
+    assert "내용 추측" in system["content"]
+    assert (
+        not {"evidence_exists", "forbidden_terms", "efficacy_status"}
+        & payload["plan"].keys()
+    )
+    assert evaluation.EVALUATION_PROMPT_VERSION == "2026-11-18-1"

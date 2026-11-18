@@ -45,10 +45,17 @@ class TraceTool(_TraceModel):
 
 class TraceAttempt(_TraceModel):
     attempt: Count = 0
-    passed: bool | None = None
+    checks_passed: bool | None = None
+    final_passed: bool | None = None
     scores: dict[Token, Annotated[int, Field(strict=True)]] | None = None
     failed_check_codes: list[Token] = Field(default_factory=list)
     cost_usd: float | None = None
+
+
+class TraceAlignment(_TraceModel):
+    compared: Count = 0
+    same_count: Count = 0
+    skipped: Count = 0
 
 
 class TracePlan(_TraceModel):
@@ -57,6 +64,7 @@ class TracePlan(_TraceModel):
     unknown_count: Count = 0
     efficacy_status: dict[Token, Token] = Field(default_factory=dict)
     attempts: list[TraceAttempt] = Field(default_factory=list)
+    alignment: TraceAlignment = Field(default_factory=TraceAlignment)
 
 
 class TraceInputTrim(_TraceModel):
@@ -120,6 +128,9 @@ class TraceRecord(_TraceModel):
     steps: list[TraceStep] = Field(default_factory=list)
     tools: list[TraceTool] = Field(default_factory=list)
     plans: list[TracePlan] = Field(default_factory=list)
+    prompt_versions: dict[Literal["planning", "evaluation"], str] = Field(
+        default_factory=dict
+    )
     limit_hit: bool = False
     limit_kinds: list[Token] = Field(default_factory=list)
     limit_detail: list[TraceLimitDetail] = Field(default_factory=list)
@@ -130,6 +141,21 @@ class TraceRecord(_TraceModel):
     cost_total_usd: float = 0.0
     cost_by_purpose: dict[Token, float] = Field(default_factory=dict)
     structured: dict[Token, TraceStructured] = Field(default_factory=dict)
+
+    @field_validator("prompt_versions", mode="before")
+    @classmethod
+    def safe_prompt_versions(cls, value):
+        return (
+            {
+                key: version
+                for key, version in value.items()
+                if key in {"planning", "evaluation"}
+                and isinstance(version, str)
+                and re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{1,6}", version)
+            }
+            if isinstance(value, dict)
+            else {}
+        )
 
     @field_validator("error_class", "error_code", mode="before")
     @classmethod
@@ -172,6 +198,8 @@ def build_trace(
     result = result or {}
     plans = []
     for plan in result.get("plans", []):
+        alignment = plan.get("pattern_alignment")
+        alignment = alignment if isinstance(alignment, dict) else {}
         attempts = []
         for attempt in plan.get("attempts", []):
             scores = attempt.get("scores")
@@ -199,6 +227,13 @@ def build_trace(
                         if isinstance(value, str)
                     },
                     "attempts": attempts,
+                    "alignment": {
+                        key: value
+                        for key, value in alignment.items()
+                        if key in TraceAlignment.model_fields
+                        and type(value) is int
+                        and value >= 0
+                    },
                 }
             )
         )
@@ -232,6 +267,7 @@ def build_trace(
             for tool in result.get("handoff", {}).get("result_counts", [])
         ],
         plans=plans,
+        prompt_versions=result.get("prompt_versions", {}),
         limit_hit=result.get("limit_hit", False),
         limit_kinds=result.get("limit_kinds", []),
         limit_detail=[

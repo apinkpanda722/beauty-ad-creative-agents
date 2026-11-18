@@ -152,3 +152,73 @@ def verify_aggregates(
         else:
             verified[name] = value
     return verified, unresolved
+
+
+def pattern_alignment(plan: dict, tool_outputs: list[dict]) -> dict:
+    """Report agreement with observed dominant patterns; never decide plan quality.
+
+    Infer the axis from every value in one output, including shared ``other``.
+    A query repeats its population total on each row, so count it once per
+    output. Separate outputs contribute their counts and populations additively.
+    """
+    closed = {
+        "hook_type": {item.value for item in HookType},
+        "angle": {item.value for item in Angle},
+        "format": {item.value for item in Format},
+    }
+    counts = {axis: {} for axis in closed}
+    totals = dict.fromkeys(closed, 0)
+    skipped = 0
+    for output in tool_outputs:
+        if (
+            not isinstance(output, dict)
+            or output.get("tool") != "compare_axis_by_category"
+        ):
+            continue
+        rows = output.get("rows")
+        if (
+            not isinstance(rows, list)
+            or not rows
+            or not all(
+                isinstance(row, dict) and isinstance(row.get("value"), str)
+                for row in rows
+            )
+        ):
+            skipped += 1
+            continue
+        values = {row.get("value") for row in rows}
+        matches = [axis for axis, allowed in closed.items() if values <= allowed]
+        if len(matches) != 1 or not all(
+            type(row.get("creatives")) is int and row.get("creatives") >= 0
+            for row in rows
+        ):
+            skipped += 1
+            continue
+        axis = matches[0]
+        for row in rows:
+            value = row.get("value")
+            counts[axis][value] = counts[axis].get(value, 0) + row.get("creatives")
+        total = rows[0].get("total")
+        if type(total) is int and total >= 0:
+            totals[axis] += total
+    axes = {}
+    for axis, observed in counts.items():
+        value = plan.get(axis)
+        value = value if isinstance(value, str) else None
+        dominant = sorted(
+            key for key, count in observed.items() if count == max(observed.values())
+        )
+        axes[axis] = {
+            "plan": value,
+            "dominant": dominant,
+            "same": value in dominant if observed else None,
+            "share": observed[value] / totals[axis]
+            if value in observed and totals[axis] > 0
+            else None,
+        }
+    return {
+        "axes": axes,
+        "compared": sum(item["same"] is not None for item in axes.values()),
+        "same_count": sum(item["same"] is True for item in axes.values()),
+        "skipped": skipped,
+    }

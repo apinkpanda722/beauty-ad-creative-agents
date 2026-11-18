@@ -169,3 +169,37 @@ def test_factory_and_structured_failure(monkeypatch):
     assert seen == ["gpt-6.1-terra"]
     assert not result.ok and result.plan is None
     assert result.failure == "SCHEMA_VIOLATION" and result.cost_usd == 0.125
+
+
+def test_planning_prompt_distinguishes_internal_rework_from_external_data():
+    fake = Structured()
+    rework = {
+        "low_items": [{"item": "differentiation", "rationale": "synthetic repair"}],
+        "check_issues": [{"code": "EVIDENCE_MISSING"}],
+    }
+    make_plan(
+        brief={}, handoff={}, profile={}, feedback=None, rework=rework, structured=fake
+    )
+    spec, options = fake.calls[0]
+    system, user = options["messages"]
+    for phrase in (
+        "지배 패턴",
+        "뚜렷이 다른 조합",
+        "own_product_url",
+        "확인된 효능",
+        "빈 목록",
+        "low_items",
+        "check_issues",
+        "대상이 아니다",
+        "덮어쓰지 않는다",
+        "근거 ID 제한",
+        "분류 값 목록",
+    ):
+        assert phrase in system["content"]
+    assert TOOL_DATA_RULE in system["content"]
+    assert PARTIAL_RESULT_RULE in system["content"]
+    assert json.loads(user["content"])["rework"] == rework
+    assert fake.model == "gpt-6.1-terra"
+    assert options["reasoning_effort"] == "low"
+    assert spec.schema == strict_plan_schema()
+    assert planning.PLANNING_PROMPT_VERSION == "2026-11-18-1"

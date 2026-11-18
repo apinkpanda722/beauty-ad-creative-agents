@@ -159,7 +159,8 @@ def build_plan_eval_graph(*, plan_fn, evaluate_fn, max_reworks: int = 2):
         )
         attempt = {
             "attempt": len(state["pe_attempts"]) + 1,
-            "passed": None,
+            "checks_passed": None,
+            "final_passed": None,
             "scores": None,
             "low_items": [],
             "failed_check_codes": [],
@@ -204,7 +205,8 @@ def build_plan_eval_graph(*, plan_fn, evaluate_fn, max_reworks: int = 2):
         evaluation_cost = _cost(result)
         plan_cost = attempt["plan_cost_usd"]
         attempt.update(
-            passed=bool(report["check_report"].get("passed")),
+            checks_passed=bool(report["check_report"].get("passed")),
+            final_passed=report["passed"],
             scores=report["scores"],
             low_items=report["low_items"],
             failed_check_codes=list(

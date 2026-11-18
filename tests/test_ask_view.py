@@ -47,7 +47,7 @@ def result():
                         "attempt": 1,
                         "scores": {"differentiation": 2, "fit": 3},
                         "low_items": ["differentiation"],
-                        "passed": False,
+                        "checks_passed": False,
                     }
                 ],
                 "evidence_counts": {"in_plan": 1, "in_pool": 3},
@@ -226,3 +226,24 @@ def test_json_timestamps_and_report_fallback():
         == "2026-01-01T00:00:00+00:00"
     )
     json.dumps(view.ui_commands, allow_nan=False)
+
+
+def test_plan_displays_alignment_separately_from_scores_and_final_pass():
+    raw = result()
+    alignment = {
+        "axes": {"hook_type": {"same": True}},
+        "compared": 1,
+        "same_count": 1,
+        "skipped": 0,
+    }
+    raw["plans"][0]["pattern_alignment"] = alignment
+    raw["plans"][0]["attempts"][0]["final_passed"] = False
+    view = build_view(raw, plan_ids=["id"], hydrate=None)
+    data = command(view, "show_plan")
+    assert data["pattern_alignment"] == alignment
+    assert data["pattern_alignment_label"] == "코드 계산, 판정 아님"
+    assert data["passed"] is True
+    assert "pattern_alignment" not in data["attempts"][0]["scores"]
+    assert "passed" not in data["attempts"][0]
+    data["pattern_alignment"]["axes"].clear()
+    assert raw["plans"][0]["pattern_alignment"] == alignment

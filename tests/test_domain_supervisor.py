@@ -168,3 +168,84 @@ def test_numbers_support_multiple_thousands_and_require_all_tokens():
     )
     assert kept == {"a": "-1,234,567.0"}
     assert len(removed) == 1
+
+
+def comparison_rows(*pairs, total):
+    return {
+        "tool": "compare_axis_by_category",
+        "rows": [
+            {
+                "value": value,
+                "creatives": count,
+                "creative_ids": ["yt:synthetic"],
+                "total": total,
+            }
+            for value, count in pairs
+        ],
+    }
+
+
+def test_pattern_alignment_combines_counts_ties_shares_and_preserves_inputs():
+    from beautyads.domain.supervisor import pattern_alignment
+
+    plan = {"hook_type": "question", "angle": "how_to", "format": "demo"}
+    outputs = [
+        comparison_rows(("question", 2), ("problem", 4), total=6),
+        comparison_rows(("question", 3), ("problem", 1), total=4),
+        comparison_rows(("how_to", 1), ("desire", 3), total=4),
+    ]
+    before = deepcopy((plan, outputs))
+    result = pattern_alignment(plan, outputs)
+    assert result == {
+        "axes": {
+            "hook_type": {
+                "plan": "question",
+                "dominant": ["problem", "question"],
+                "same": True,
+                "share": 0.5,
+            },
+            "angle": {
+                "plan": "how_to",
+                "dominant": ["desire"],
+                "same": False,
+                "share": 0.25,
+            },
+            "format": {"plan": "demo", "dominant": [], "same": None, "share": None},
+        },
+        "compared": 2,
+        "same_count": 1,
+        "skipped": 0,
+    }
+    assert (plan, outputs) == before
+    result["axes"]["hook_type"]["dominant"].append("changed")
+    assert (plan, outputs) == before
+
+
+def test_pattern_alignment_infers_only_one_closed_axis_and_counts_skips():
+    from beautyads.domain.supervisor import pattern_alignment
+
+    outputs = [
+        comparison_rows(("other", 7), total=7),
+        comparison_rows(("question", 1), ("demo", 1), total=2),
+        comparison_rows(("unknown", 1), total=1),
+        comparison_rows(total=0),
+        comparison_rows(("question", 2), ("other", 3), total=5),
+        comparison_rows(("demo", 0), total=0),
+        {"tool": "other_tool", "rows": [{"value": "question", "creatives": 99}]},
+    ]
+    result = pattern_alignment(
+        {"hook_type": "other", "angle": "desire", "format": "static_image"}, outputs
+    )
+    assert result["skipped"] == 4
+    assert result["compared"] == 2 and result["same_count"] == 1
+    assert result["axes"]["hook_type"] == {
+        "plan": "other",
+        "dominant": ["other"],
+        "same": True,
+        "share": 0.6,
+    }
+    assert result["axes"]["angle"]["same"] is None
+    assert result["axes"]["format"]["same"] is False
+    assert result["axes"]["format"]["share"] is None
+    present_zero = pattern_alignment({"format": "demo"}, [outputs[5]])
+    assert present_zero["axes"]["format"]["share"] is None

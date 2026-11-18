@@ -155,6 +155,8 @@ def build_view(result, *, plan_ids, hydrate) -> View:
             "evidence_counts": item.get("evidence_counts", {}),
             "status": item.get("status", "failed"),
             "attempts": item.get("attempts", []),
+            "pattern_alignment": item.get("pattern_alignment", {}),
+            "pattern_alignment_label": "코드 계산, 판정 아님",
             "disclaimer": CLAIM_CHECK_DISCLAIMER,
             "image": image_reference(item.get("image")),
         }
