@@ -369,7 +369,16 @@
     {
       "step": "9b",
       "name": "cap-config-follow",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-18T19:25:09+0900",
+      "summary": "설정 상한 추종·복사본 전달, 상한 종류별 limit_detail의 Supervisor·trace·요약 연결과 오프라인 가드 구현. 아키텍처 검사 포함 make verify 통과(4,634 tests). 실제 서비스 접속·패키지 설치 없음.",
+      "completed_at": "2026-11-18T19:31:35+0900",
+      "usage": {
+        "input_tokens": 2085511,
+        "cached_input_tokens": 1976704,
+        "output_tokens": 12055,
+        "attempts": 1
+      }
     },
     {
       "step": "9c",
