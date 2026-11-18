@@ -25,6 +25,12 @@ class EvidenceSource(StrEnum):
     tiktok = "tiktok"
 
 
+class CertificationKind(StrEnum):
+    brightening = "brightening"
+    anti_aging = "anti_aging"
+    sun_protection = "sun_protection"
+
+
 MIN_BAND_N = 10
 BAND_NOTE = "기술적 비교이며 인과를 뜻하지 않는다. 조회수에는 광고비 효과가 섞여 있다."
 

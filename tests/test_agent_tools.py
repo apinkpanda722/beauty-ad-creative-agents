@@ -1,6 +1,7 @@
 """Tool contracts tested with synthetic records and no service connections."""
 
 import ast
+import hashlib
 import json
 from dataclasses import FrozenInstanceError
 from datetime import date
@@ -11,6 +12,7 @@ import pytest
 from pydantic import ValidationError
 
 from beautyads.agents.tools import TOOLS, get_tool, run_tool, tool_definitions
+from beautyads.domain.evidence import CertificationKind
 from beautyads.domain.labels import Category, Claim
 from beautyads.domain.skin import SkinConcern, SkinType
 from beautyads.domain.tools import (
@@ -22,6 +24,7 @@ from beautyads.domain.tools import (
     ToolResult,
 )
 from beautyads.graph.connection import GraphConnection, GraphError, GraphResult
+from beautyads.graph.evidence_queries import certified_by_kind_query
 from beautyads.graph.queries import QUESTIONS, question_parameters
 
 QUESTION_IDS = {
@@ -56,6 +59,10 @@ DISPLAY_INPUTS = {
     },
     "show_plan": {"plan_id": "synthetic-plan"},
 }
+CERTIFICATION_INPUTS = {
+    "certified_products_by_kind": {"certification": "brightening"},
+}
+CERTIFICATION_FIELDS = {"certified_products_by_kind": {"certification"}}
 
 
 class FakeGraph:
@@ -87,6 +94,8 @@ def ctx():
 
 
 def valid_inputs(tool):
+    if tool.name in CERTIFICATION_INPUTS:
+        return CERTIFICATION_INPUTS[tool.name]
     if tool.name in EVIDENCE_INPUTS:
         return EVIDENCE_INPUTS[tool.name]
     values = {
@@ -130,6 +139,11 @@ def test_registry_is_stable_described_and_closed():
         for name, field in schema.get("properties", {}).items():
             assert field.get("description")
             assert not forbidden.intersection(name.split("_"))
+        if tool.name in CERTIFICATION_INPUTS:
+            assert tool.question_id is None
+            assert set(schema["properties"]) == CERTIFICATION_FIELDS[tool.name]
+            assert tool.kind == ToolKind.lookup
+            continue
         if tool.name in EVIDENCE_INPUTS:
             assert tool.question_id is None
             assert set(schema["properties"]) == EVIDENCE_FIELDS[tool.name]
@@ -212,6 +226,8 @@ def test_unknown_tool(ctx):
     )
 
 
+# Certification tools have no frozen question_id; dedicated certification tests
+# below verify their query, input contract, and result processing instead.
 @pytest.mark.parametrize(
     "tool", [t for t in TOOLS if t.question_id], ids=lambda t: t.name
 )
@@ -268,6 +284,8 @@ def test_evidence_is_taken_from_all_rows_sorted_deduplicated_and_capped(ctx):
     assert result.linked_creative_count == len(result.evidence_ids)
 
 
+# The certification query is separate from frozen CQ v1; its empty-result
+# semantics are covered by test_certification_tool_empty_is_unknown below.
 @pytest.mark.parametrize(
     "tool", [t for t in TOOLS if t.question_id], ids=lambda t: t.name
 )
@@ -577,3 +595,132 @@ def test_top_bottom_rejects_tiktok_and_examples_validate_closed_filters(ctx):
             ),
             ToolErrorCode.INPUT_INVALID,
         )
+
+
+def test_existing_registry_inputs_and_frozen_query_file_are_unchanged():
+    assert {tool.name for tool in TOOLS} == (
+        set(QUESTION_IDS)
+        | set(DISPLAY_INPUTS)
+        | set(EVIDENCE_INPUTS)
+        | set(CERTIFICATION_INPUTS)
+    )
+    expected = {name: set() for name in QUESTION_IDS}
+    expected.update(
+        lookup_products_by_efficacy={"category", "claim"},
+        lookup_products_by_concern={"category", "concern"},
+        count_claim_supported_ads={"category", "claim"},
+        ad_angles_formats_by_skin_type={"skin_type"},
+    )
+    expected.update({name: set(inputs) for name, inputs in DISPLAY_INPUTS.items()})
+    expected.update(EVIDENCE_FIELDS)
+    for name, fields in expected.items():
+        assert set(get_tool(name).input_model.model_fields) == fields
+    assert hashlib.sha256(
+        Path("src/beautyads/graph/queries.py").read_bytes()
+    ).hexdigest() == (
+        "5e40a63e0f43bd18b4ed4d6208ce41ff2317715edc18a9ae19231500b3eb5ae6"
+    )
+
+
+def test_certification_tool_contract_and_when_not_to_use():
+    tool = get_tool("certified_products_by_kind")
+    assert tool.kind == ToolKind.lookup and tool.question_id is None
+    assert set(tool.input_model.model_fields) == {"certification"}
+    schema = tool.input_model.model_json_schema()
+    assert set(schema["$defs"]["CertificationKind"]["enum"]) == {
+        kind.value for kind in CertificationKind
+    }
+    description = schema["properties"]["certification"]["description"]
+    assert (
+        "brightening=미백, anti_aging=주름 개선, sun_protection=자외선 차단"
+        in description
+    )
+    caution = tool.description.split("쓰지 않는 때:")[1]
+    for phrase in (
+        "lookup_certified_products",
+        "입력 없음",
+        "미백만",
+        'certification="brightening"',
+        "같은 제품 집합",
+        "열이 두 개 더",
+        "어느 쪽",
+        "다른 인증 종류",
+        "이 도구",
+        "인증이 없다는 사실을 돌려주지 않는다",
+        "커버리지",
+        '빈 결과는 "인증 없음"이 아니다',
+    ):
+        assert phrase in caution
+
+
+@pytest.mark.parametrize("kind", CertificationKind)
+def test_certification_tool_uses_fixed_query_and_bounds_all_product_rows(kind, ctx):
+    rows = [
+        {
+            "product": f"https://synthetic.invalid/p/{i}",
+            "certification": kind.value,
+            "brand": "synthetic",
+            "product_name": f"제품 {i}",
+        }
+        for i in range(8)
+    ]
+    graph = FakeGraph(rows)
+    result = run_tool(
+        "certified_products_by_kind", {"certification": kind.value}, ctx, graph
+    )
+    assert isinstance(result, ToolResult)
+    assert (
+        result.kind == ToolKind.lookup and result.tool == "certified_products_by_kind"
+    )
+    assert result.top_rows == rows[:5] and result.row_count == len(rows)
+    assert not result.evidence_ids and result.linked_creative_count is None
+    assert not result.no_evidence
+    assert "식약처 보고 품목과 연결된 제품만 해당한다." in result.summary
+    assert "연결되지 않은 제품은 인증 없음이 아니라 알 수 없음이다." in result.summary
+    assert graph.calls == [(certified_by_kind_query(), {"cert": kind.value})]
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        {},
+        {"certification": "unknown"},
+        {"certification": "hydration"},
+        {"certification": "' DELETE p"},
+        {"certification": None},
+        {"certification": []},
+        {"certification": "미백"},
+    ],
+)
+def test_certification_tool_invalid_inputs_never_query(arguments, ctx):
+    assert_failure(
+        run_tool("certified_products_by_kind", arguments, ctx, ForbiddenGraph()),
+        ToolErrorCode.INPUT_INVALID,
+    )
+
+
+def test_certification_tool_empty_is_unknown(ctx):
+    result = run_tool(
+        "certified_products_by_kind", {"certification": "anti_aging"}, ctx, FakeGraph()
+    )
+    assert isinstance(result, ToolResult)
+    assert result.no_evidence and result.row_count == 0
+    assert not result.top_rows and not result.evidence_ids
+    assert "인증 없음이 아니라 알 수 없음" in result.summary
+
+
+@pytest.mark.parametrize(
+    "code,retryable",
+    [
+        ("NEO4J_UNREACHABLE", True),
+        ("NEO4J_CONSTRAINT_VIOLATION", False),
+    ],
+)
+def test_certification_tool_graph_failure_is_not_no_evidence(code, retryable, ctx):
+    result = run_tool(
+        "certified_products_by_kind",
+        {"certification": "sun_protection"},
+        ctx,
+        FakeGraph(error=GraphError(code)),
+    )
+    assert_failure(result, ToolErrorCode.GRAPH_UNAVAILABLE, retryable=retryable)

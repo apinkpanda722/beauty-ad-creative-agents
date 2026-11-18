@@ -8,8 +8,9 @@ from types import SimpleNamespace
 
 import pytest
 
+from beautyads.domain.evidence import CertificationKind
 from beautyads.eval.evidence_check import main
-from beautyads.graph.evidence_queries import axis_rows_query
+from beautyads.graph.evidence_queries import axis_rows_query, certified_by_kind_query
 from beautyads.graph.queries import QUESTIONS, question_parameters
 
 AS_OF = date(2026, 11, 17)
@@ -145,3 +146,105 @@ def test_live_target_is_explicit_and_verify_stays_offline():
         if line.startswith(".PHONY:")
     )
     assert "live-" not in makefile.split("verify:\n")[1].split("\n\n")[0]
+
+
+class CertificationGraph(FakeGraph):
+    def __init__(self, *, mismatch_kind=None, empty=False, cert_error=None):
+        super().__init__()
+        self.mismatch_kind = mismatch_kind
+        self.empty = empty
+        self.cert_error = cert_error
+
+    def run(self, query, params):
+        if query not in {QUESTIONS["CQ-03"].cypher, certified_by_kind_query()}:
+            return super().run(query, params)
+        self.calls.append((query, params))
+        if self.cert_error:
+            raise self.cert_error
+        kind = params["cert"]
+        rows = [
+            {"product": f"https://synthetic.invalid/{kind}/{i}", "certification": kind}
+            for i in range(list(CertificationKind).index(CertificationKind(kind)) + 1)
+        ]
+        if self.empty:
+            rows = []
+        if query == certified_by_kind_query():
+            rows = [
+                dict(row, brand="synthetic-private-brand", product_name="합성 제품")
+                for row in rows
+            ]
+            if kind == self.mismatch_kind:
+                rows = [dict(rows[0], product="synthetic-private-product")]
+            else:
+                # Parity compares sets, ignoring extra columns, order and duplicates.
+                rows = list(reversed(rows)) * 2
+        return SimpleNamespace(records=rows)
+
+
+def invoke_certifications(graph):
+    out = io.StringIO()
+    code = main(
+        ["--certifications"],
+        environ={"NEO4J_PASSWORD": "test-placeholder"},
+        out=out,
+        docker_check=lambda: True,
+        tcp_check=lambda *a: True,
+        graph_factory=lambda: graph,
+        as_of=AS_OF,
+    )
+    return code, out.getvalue()
+
+
+@pytest.mark.parametrize("empty", [False, True])
+def test_certification_sets_match_for_every_kind_and_report_only_counts(empty):
+    graph = CertificationGraph(empty=empty)
+    code, output = invoke_certifications(graph)
+    assert code == 0 and graph.closed
+    reports = [json.loads(line) for line in output.splitlines()]
+    certs = [r for r in reports if "certification" in r]
+    assert [r["certification"] for r in certs] == [
+        kind.value for kind in CertificationKind
+    ]
+    assert len([r for r in reports if "category" in r]) == 3
+    for i, report in enumerate(certs):
+        assert report["code"] == "OK" and report["cost_usd"] == 0
+        assert report["cq_count"] == report["query_count"] == (0 if empty else i + 1)
+        assert report["cq_only_count"] == report["query_only_count"] == 0
+    calls = [(q, p) for q, p in graph.calls if "cert" in p]
+    assert len(calls) == 2 * len(CertificationKind)
+    for i, kind in enumerate(CertificationKind):
+        assert calls[2 * i : 2 * i + 2] == [
+            (QUESTIONS["CQ-03"].cypher, {"cert": kind.value}),
+            (certified_by_kind_query(), {"cert": kind.value}),
+        ]
+    for secret in (
+        "test-placeholder",
+        "synthetic-private-brand",
+        "합성 제품",
+        "https://synthetic.invalid",
+        "NEO4J_PASSWORD",
+    ):
+        assert secret not in output
+
+
+@pytest.mark.parametrize("kind", CertificationKind)
+def test_certification_mismatch_returns_three_and_both_difference_counts(kind):
+    graph = CertificationGraph(mismatch_kind=kind.value)
+    code, output = invoke_certifications(graph)
+    assert code == 3 and graph.closed
+    report = json.loads(output.splitlines()[-1])
+    assert report["code"] == "CQ03_MISMATCH"
+    assert report["certification"] == kind.value
+    assert report["cq_only_count"] == list(CertificationKind).index(kind) + 1
+    assert report["query_only_count"] == 1
+    assert report["cq_count"] == report["cq_only_count"]
+    assert report["query_count"] == 1
+    assert "synthetic-private-product" not in output
+
+
+def test_certification_graph_error_keeps_existing_sanitized_exit_code():
+    graph = CertificationGraph(cert_error=RuntimeError("synthetic-private-detail"))
+    code, output = invoke_certifications(graph)
+    assert code == 2 and graph.closed
+    assert "CQ_EXECUTION_ERROR" in output
+    assert "synthetic-private-detail" not in output

@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from beautyads.domain.evidence import (
     CategoryBasis,
+    CertificationKind,
     EvidenceAxis,
     EvidenceSource,
     split_top_bottom,
@@ -32,6 +33,8 @@ from beautyads.graph.connection import GraphError
 from beautyads.graph.evidence_queries import (
     axis_count_query,
     axis_rows_query,
+    certification_parameters,
+    certified_by_kind_query,
     evidence_parameters,
     example_query,
 )
@@ -47,6 +50,12 @@ EvidenceId = Annotated[str, StringConstraints(pattern=EVIDENCE_ID_PATTERN)]
 
 class EmptyInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+class CertificationInput(EmptyInput):
+    certification: CertificationKind = Field(
+        description="brightening=미백, anti_aging=주름 개선, sun_protection=자외선 차단"
+    )
 
 
 class EfficacyInput(EmptyInput):
@@ -156,6 +165,18 @@ TOOLS: tuple[ToolSpec, ...] = (
         "쓰지 않는 때: 개별 제품의 효능 근거가 필요할 때.",
         SkinTypeInput,
         "CQ-08",
+    ),
+    ToolSpec(
+        "certified_products_by_kind",
+        ToolKind.lookup,
+        "쓰는 때: 미백·주름 개선·자외선 차단 인증이 연결된 제품을 종류별로 찾을 때.\n"
+        '쓰지 않는 때: lookup_certified_products(입력 없음, 미백만)와 certification="brightening"은 '
+        "같은 제품 집합을 돌려준다(새 도구는 열이 두 개 더 있다). "
+        "미백만 필요하면 어느 쪽을 써도 되고, 다른 인증 종류가 필요하면 이 도구를 쓴다. "
+        "이 도구는 인증이 없다는 사실을 돌려주지 않는다. "
+        '연결 커버리지가 제한적이라 빈 결과는 "인증 없음"이 아니다.',
+        CertificationInput,
+        None,
     ),
     ToolSpec(
         "compare_axis_by_category",
@@ -366,6 +387,24 @@ def run_tool(
 
         if name in _EVIDENCE_TOOL_NAMES:
             return _run_evidence_tool(tool, inputs, ctx, graph)
+
+        if name == "certified_products_by_kind":
+            params = certification_parameters(cert=inputs["certification"])
+            rows = graph.run(certified_by_kind_query(), params).records
+            summary = f"조회 결과 {len(rows)}행." if rows else "근거 없음."
+            summary += (
+                " 식약처 보고 품목과 연결된 제품만 해당한다. "
+                "연결되지 않은 제품은 인증 없음이 아니라 알 수 없음이다."
+            )
+            return ToolResult(
+                tool=name,
+                kind=tool.kind,
+                summary=summary,
+                top_rows=rows[:5],
+                row_count=len(rows),
+                evidence_ids=[],
+                no_evidence=not rows,
+            )
 
         context = {"tenant_id": ctx.tenant_id}
         if tool.question_id == "CQ-16":

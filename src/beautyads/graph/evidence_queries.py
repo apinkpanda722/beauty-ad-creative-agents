@@ -3,7 +3,12 @@
 from datetime import date, timedelta
 from types import MappingProxyType
 
-from beautyads.domain.evidence import CategoryBasis, EvidenceAxis, EvidenceSource
+from beautyads.domain.evidence import (
+    CategoryBasis,
+    CertificationKind,
+    EvidenceAxis,
+    EvidenceSource,
+)
 from beautyads.domain.labels import Angle, Category, Claim, Format, HookType
 
 _AXES = MappingProxyType(
@@ -159,3 +164,19 @@ def evidence_parameters(
             hook_type=hook_type, angle=angle, format=format, claim=claim, limit=limit
         )
     return params
+
+
+def certified_by_kind_query() -> str:
+    """Frozen CQ-03 product set, with readable product metadata added."""
+    return """
+        MATCH (p:Product)-[:CERTIFIED_AS]->(f:FunctionalCert)
+        WHERE f.value = $cert
+        RETURN DISTINCT p.source_url AS product, f.value AS certification,
+               p.brand AS brand, p.name_ko AS product_name
+        ORDER BY p.brand, p.source_url
+    """
+
+
+def certification_parameters(*, cert) -> dict:
+    """Accept only official functional-certification kinds as a bound value."""
+    return {"cert": CertificationKind(cert).value}

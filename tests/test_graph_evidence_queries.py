@@ -6,14 +6,16 @@ from itertools import product
 
 import pytest
 
-from beautyads.domain.evidence import CategoryBasis, EvidenceAxis
+from beautyads.domain.evidence import CategoryBasis, CertificationKind, EvidenceAxis
 from beautyads.graph.evidence_queries import (
     axis_count_query,
     axis_rows_query,
+    certification_parameters,
+    certified_by_kind_query,
     evidence_parameters,
     example_query,
 )
-from beautyads.graph.queries import QUESTIONS, question_parameters
+from beautyads.graph.queries import _CERT_CLAIMS, QUESTIONS, question_parameters
 
 AS_OF = date(2026, 11, 17)
 
@@ -129,3 +131,35 @@ def test_invalid_parameters_rejected(changes):
 def test_query_builders_reject_unlisted_identifiers(builder, args):
     with pytest.raises(ValueError):
         builder(*args)
+
+
+def test_certification_vocabulary_and_frozen_cq03_pattern_and_columns():
+    assert {kind.value for kind in CertificationKind} == set(_CERT_CLAIMS)
+    frozen = normalized(QUESTIONS["CQ-03"].cypher)
+    query = normalized(certified_by_kind_query())
+    assert frozen.split(" WHERE ")[0] in query
+    assert frozen.split(" WHERE ")[1].split(" RETURN ")[0] in query
+    assert set(re.findall(r"AS (\w+)", frozen)) <= set(re.findall(r"AS (\w+)", query))
+    assert "p.source_url AS product, f.value AS certification" in query
+    assert "p.brand AS brand" in query and "p.name_ko AS product_name" in query
+    assert query.endswith("ORDER BY p.brand, p.source_url")
+    assert "RETURN DISTINCT" in query
+
+
+@pytest.mark.parametrize("kind", CertificationKind)
+def test_certification_query_is_fixed_read_only_and_parameterized(kind):
+    query = certified_by_kind_query()
+    params = certification_parameters(cert=kind)
+    assert params == {"cert": kind.value}
+    assert certification_parameters(cert=kind.value) == params
+    assert set(re.findall(r"\$(\w+)", query)) == set(params)
+    assert not re.search(r"\b(CREATE|MERGE|SET|DELETE)\b", query, re.IGNORECASE)
+    assert kind.value not in query
+
+
+@pytest.mark.parametrize(
+    "cert", ["unknown", "hydration", "' DELETE p", "", None, [], {}, 1]
+)
+def test_certification_parameters_reject_unlisted_values(cert):
+    with pytest.raises((ValueError, TypeError)):
+        certification_parameters(cert=cert)

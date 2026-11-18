@@ -6,11 +6,17 @@ import sys
 from datetime import UTC, date, datetime
 from typing import TextIO
 
+from beautyads.domain.evidence import CertificationKind
 from beautyads.domain.labels import Category
 from beautyads.domain.tools import GraphReader
 from beautyads.eval.cq_verify import cq_preflight, error_code
 from beautyads.graph.connection import connect_graph
-from beautyads.graph.evidence_queries import axis_rows_query, evidence_parameters
+from beautyads.graph.evidence_queries import (
+    axis_rows_query,
+    certification_parameters,
+    certified_by_kind_query,
+    evidence_parameters,
+)
 from beautyads.graph.queries import QUESTIONS, question_parameters
 from beautyads.pipeline.preflight import docker_running, tcp_reachable
 from beautyads.settings import DEFAULT_ENV_FILE
@@ -61,6 +67,30 @@ def run_check(graph: GraphReader, *, as_of: date, out: TextIO) -> int:
     return 0
 
 
+def run_certification_check(graph: GraphReader, *, out: TextIO) -> int:
+    """Compare product/certification sets; never print product data or diagnostics."""
+    for kind in CertificationKind:
+        params = certification_parameters(cert=kind)
+        cq_rows = graph.run(QUESTIONS["CQ-03"].cypher, params).records
+        rows = graph.run(certified_by_kind_query(), params).records
+        expected = {(row.get("product"), row.get("certification")) for row in cq_rows}
+        actual = {(row.get("product"), row.get("certification")) for row in rows}
+        mismatch = expected != actual
+        report = {
+            "certification": kind.value,
+            "code": "CQ03_MISMATCH" if mismatch else "OK",
+            "cost_usd": 0,
+            "cq_count": len(expected),
+            "query_count": len(actual),
+            "cq_only_count": len(expected - actual),
+            "query_only_count": len(actual - expected),
+        }
+        print(json.dumps(report, ensure_ascii=False), file=out)
+        if mismatch:
+            return 3
+    return 0
+
+
 def main(
     argv=None,
     *,
@@ -71,7 +101,13 @@ def main(
     graph_factory=None,
     as_of=None,
 ) -> int:
-    argparse.ArgumentParser(description=__doc__).parse_args(argv)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--certifications",
+        action="store_true",
+        help="기존 점검 뒤 세 인증 종류의 CQ-03 제품 집합 일치를 추가 점검",
+    )
+    args = parser.parse_args(argv)
     out = sys.stdout if out is None else out
     env_file = DEFAULT_ENV_FILE if environ is None else None
     problem = cq_preflight(
@@ -90,7 +126,10 @@ def main(
             if graph_factory
             else connect_graph(environ=environ, env_file=env_file)
         )
-        return run_check(graph, as_of=as_of or datetime.now(UTC).date(), out=out)
+        code = run_check(graph, as_of=as_of or datetime.now(UTC).date(), out=out)
+        if code == 0 and args.certifications:
+            return run_certification_check(graph, out=out)
+        return code
     except Exception as error:  # noqa: BLE001 -- never print connection diagnostics
         print(f"PREFLIGHT_FAILED {error_code(error)}", file=out)
         return 2
