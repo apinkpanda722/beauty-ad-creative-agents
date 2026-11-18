@@ -247,3 +247,10 @@
 - **결과**: 수정은 step 6e 완료 뒤 보고. 사용자가 `make live-compare ARGS='inputs'`를 다시 실행해 확인한다.
 - **근거**: `src/beautyads/agents/research.py`, `src/beautyads/domain/research.py`, `phases/5-agents/step6e.md`.
 
+## 2026-11-18 make live-compare inputs가 두 번째로 실패했다(neo4j.time.DateTime 직렬화)
+- **문제**: step 6e 뒤 재실행에서 `COMPARE_FAILED detail=PydanticSerializationError`(`error.code` null, ledger $0.000364)로 실패했다. 6e의 strict 변환 뒤 실패 지점이 바뀌었다.
+- **원인(오프라인 재현, 실제 Neo4j 읽기 전용 조회)**: `find_example_creatives`와 `ingredient_ad_trend`의 결과 행에 `published_at`이 `neo4j.time.DateTime` 객체로 들어 있고, `ToolResult.model_dump(mode="json")`(`agents/research.py` 171행, 원출력 저장)가 `PydanticSerializationError`로 실패한다. `json.dumps`도 `TypeError`. 같은 원인으로 `tool_message_content`가 예외 없이 "결과를 읽을 수 없다"로 조용히 대체했다(skeleton 경로의 은폐 결함). 다른 도구의 열은 전부 `str`·`int`·`float`·`list[str]`이다. 1d·6e 테스트는 합성 문자열 값만 썼다.
+- **해결**: step 6f — `graph/values.py`의 `to_json_safe`(neo4j 시간·공간·그래프 타입을 JSON 안전 값으로, 알 수 없는 타입은 값 노출 없는 `<unserializable:타입>` 표지)를 도구 반환 경계 한 곳에서 적용, `tool_message_content`의 조용한 대체를 `TOOL_RESULT_UNREADABLE` 명시적 오류 표지와 코드만의 로그로 교체, 실제 `neo4j.time` 객체를 쓰는 전 경로 회귀 테스트. FP-C03 사례 추가.
+- **결과**: 수정은 step 6f 완료 뒤 보고. 사용자가 `make live-compare ARGS='inputs'`를 다시 실행해 확인한다.
+- **근거**: `src/beautyads/agents/research.py`, `src/beautyads/agents/tool_messages.py`, `phases/5-agents/step6f.md`.
+
