@@ -10,7 +10,11 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.runtime import Runtime
 
 from beautyads.agents.state import AgentState
-from beautyads.agents.tool_messages import TOOL_DATA_RULE, tool_message_content
+from beautyads.agents.tool_messages import (
+    PARTIAL_RESULT_RULE,
+    TOOL_DATA_RULE,
+    tool_message_content,
+)
 from beautyads.agents.tools import tool_definitions
 from beautyads.domain.tenant import TenantMismatch, validate_tenant_id
 from beautyads.domain.tools import ToolFailure
@@ -66,7 +70,10 @@ def build_graph(*, chat, tool_runner, checkpointer, max_steps=MAX_STEPS):
                 model="gpt-6-luna",
                 reasoning_effort="none",
                 messages=[
-                    {"role": "system", "content": TOOL_DATA_RULE},
+                    {
+                        "role": "system",
+                        "content": TOOL_DATA_RULE + "\n" + PARTIAL_RESULT_RULE,
+                    },
                     *deepcopy(messages),
                 ],
                 tools=skeleton_tools(),

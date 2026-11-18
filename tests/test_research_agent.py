@@ -15,7 +15,11 @@ from beautyads.agents.research import (
     run_research,
 )
 from beautyads.agents.state import AgentState
-from beautyads.agents.tool_messages import TOOL_DATA_RULE, tool_result_payload
+from beautyads.agents.tool_messages import (
+    PARTIAL_RESULT_RULE,
+    TOOL_DATA_RULE,
+    tool_result_payload,
+)
 from beautyads.agents.tools import TOOLS
 from beautyads.domain.research import ResearchHandoff, ResearchHandoffDraft
 from beautyads.domain.tenant import TenantContextMissing
@@ -454,6 +458,7 @@ def test_model_observations_use_shared_bounded_payload_from_raw_store():
     for options in [*chat.calls, structured.calls[0][1]]:
         assert options["messages"][0]["role"] == "system"
         assert TOOL_DATA_RULE in options["messages"][0]["content"].splitlines()
+        assert PARTIAL_RESULT_RULE in options["messages"][0]["content"].splitlines()
     assert output["status"] == "ok"
     assert output["evidence_ids"] == []  # The draft's yt:a lies outside this pool.
 
@@ -482,3 +487,128 @@ def test_failure_observations_are_structured_without_diagnostics(tool_call, code
     ]
     assert "synthetic private diagnostic" not in str(chat.calls)
     assert output["status"] == "no_evidence"
+
+
+@pytest.mark.parametrize("model_counts", [None, {"row_count": 999, "shown_count": 999}])
+def test_handoff_counts_come_from_tool_rows_even_when_draft_aggregates_disagree(
+    model_counts,
+):
+    from beautyads.domain.research import ResultCount
+
+    value = result(raw_size=7).model_copy(
+        # Deliberately supply unbounded synthetic rows at the injected boundary.
+        update={"top_rows": [{"index": i} for i in range(7)], "ui_command": None}
+    )
+    model_draft = draft()
+    if model_counts is not None:
+        model_draft["aggregates"].update(model_counts)
+    structured = Structured(model_draft)
+    chat = Chat([reply([call()]), reply()])
+    graph = build_research_graph(
+        ctx=CTX, chat=chat, tool_runner=lambda *args: value, structured=structured
+    )
+    snapshots = list(
+        graph.stream(initial_research_state(brief()), stream_mode="values")
+    )
+    state = snapshots[-1]
+    assert ResearchHandoff.model_validate(state["handoff"]).result_counts == [
+        ResultCount(tool=EXAMPLE, row_count=7, shown_count=5, truncated=True)
+    ]
+    assert state["tool_log"] == [
+        {
+            "name": EXAMPLE,
+            "summary": value.summary,
+            "id_count": 1,
+            "code": None,
+            "no_evidence": False,
+            "row_count": 7,
+            "shown_count": 5,
+        }
+    ]
+    assert set(state) == {
+        "brief",
+        "tool_log",
+        "evidence_pool",
+        "raw_refs",
+        "research_step_count",
+        "handoff",
+    }
+    assert all(primitive(snapshot) for snapshot in snapshots)
+    assert PARTIAL_RESULT_RULE not in json.dumps(snapshots, ensure_ascii=False)
+    assert "result_counts" not in structured.calls[0][0].schema["properties"]
+    for options in [*chat.calls, structured.calls[0][1]]:
+        assert PARTIAL_RESULT_RULE in options["messages"][0]["content"].splitlines()
+    for options in [chat.calls[1], structured.calls[0][1]]:
+        observation = json.loads(options["messages"][1]["content"])["observations"][0]
+        assert observation["row_count"] == 7
+        assert observation["shown_count"] == len(observation["rows"]) == 5
+
+
+def test_result_counts_preserve_repeated_call_order_and_actual_available_rows():
+    values = iter(
+        [
+            result(raw_size=13).model_copy(
+                update={"top_rows": [{"index": 0}, {"index": 1}]}
+            ),
+            result(raw_size=3).model_copy(
+                update={"top_rows": [{"index": i} for i in range(3)]}
+            ),
+        ]
+    )
+    output = execute(
+        Chat([reply([call(), call()])]),
+        lambda *args: next(values),
+        Structured(),
+        limit=2,
+    )
+    assert output["result_counts"] == [
+        {"tool": EXAMPLE, "row_count": 13, "shown_count": 2, "truncated": True},
+        {"tool": EXAMPLE, "row_count": 3, "shown_count": 3, "truncated": False},
+    ]
+
+
+def test_zero_evidence_result_has_zero_counts():
+    value = result(ids=(), empty=True, raw_size=0).model_copy(update={"top_rows": []})
+    structured = Structured()
+    output = execute(Chat([reply([call()]), reply()]), lambda *args: value, structured)
+    assert output["status"] == "no_evidence"
+    assert output["result_counts"] == [
+        {"tool": EXAMPLE, "row_count": 0, "shown_count": 0, "truncated": False}
+    ]
+    assert structured.calls == []
+
+
+def test_failures_and_display_calls_have_no_result_counts():
+    seen = []
+
+    def runner(*args):
+        seen.append(args)
+        return ToolFailure(
+            code="GRAPH_UNAVAILABLE", retryable=True, message="synthetic"
+        )
+
+    output = execute(
+        Chat([reply([call(), call("show_plan")]), reply()]), runner, Structured()
+    )
+    assert len(seen) == 1
+    assert output["result_counts"] == []
+
+
+def test_display_result_is_excluded_even_if_injected_for_lookup():
+    value = result().model_copy(update={"kind": "display"})
+    output = execute(
+        Chat([reply([call()]), reply()]), lambda *args: value, Structured()
+    )
+    assert output["result_counts"] == []
+
+
+def test_structured_failure_still_preserves_successful_tool_counts():
+    output = execute(
+        Chat([reply([call()]), reply()]),
+        lambda *args: result(raw_size=7),
+        Structured(ok=False),
+    )
+    assert output["status"] == "failed"
+    assert output["result_counts"] == [
+        {"tool": EXAMPLE, "row_count": 7, "shown_count": 1, "truncated": True}
+    ]

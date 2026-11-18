@@ -11,12 +11,18 @@ from uuid import uuid4
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command
 
-from beautyads.agents.tool_messages import TOOL_DATA_RULE, tool_result_payload
+from beautyads.agents.tool_messages import (
+    MAX_ROWS,
+    PARTIAL_RESULT_RULE,
+    TOOL_DATA_RULE,
+    tool_result_payload,
+)
 from beautyads.agents.tools import TOOLS, get_tool, tool_definitions
 from beautyads.domain.research import (
     ResearchBrief,
     ResearchHandoff,
     ResearchHandoffDraft,
+    ResultCount,
     restrict_evidence_ids,
 )
 from beautyads.domain.tenant import validate_tenant_id
@@ -34,7 +40,7 @@ _SYSTEM = (
     "기존 조회 결과를 참고해 필요한 도구를 고르고, 충분하면 도구 호출을 끝낸다. "
     "원자료를 추측하지 않는다. 근거 ID는 결론 문장 대신 evidence_ids에 둔다. "
     "category_basis와 연결된 소재 기준의 한계를 보존한다."
-    "\n" + TOOL_DATA_RULE
+    "\n" + TOOL_DATA_RULE + "\n" + PARTIAL_RESULT_RULE
 )
 
 
@@ -180,6 +186,11 @@ def build_research_graph(
                     "no_evidence": False if code else result.no_evidence,
                 }
             )
+            if code is None and result.kind != ToolKind.display:
+                log[-1].update(
+                    row_count=result.row_count,
+                    shown_count=min(result.row_count, MAX_ROWS, len(result.top_rows)),
+                )
         return Command(
             update={
                 "tool_log": log,
@@ -204,7 +215,19 @@ def build_research_graph(
             for note in _basis_notes(entry["summary"]):
                 if note not in notes:
                     notes.append(note)
-        common = {"no_evidence_tools": no_evidence_tools, "basis_notes": notes}
+        common = {
+            "no_evidence_tools": no_evidence_tools,
+            "basis_notes": notes,
+            "result_counts": [
+                ResultCount(
+                    tool=entry["name"],
+                    row_count=entry["row_count"],
+                    shown_count=entry["shown_count"],
+                ).model_dump(mode="json")
+                for entry in successes
+                if "row_count" in entry
+            ],
+        }
         if not state["evidence_pool"] or (
             successes and all(entry["no_evidence"] for entry in successes)
         ):

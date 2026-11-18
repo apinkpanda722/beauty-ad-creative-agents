@@ -9,7 +9,7 @@ import pytest
 from langgraph.checkpoint.memory import InMemorySaver
 
 from beautyads.agents.skeleton import build_graph
-from beautyads.agents.tool_messages import TOOL_DATA_RULE
+from beautyads.agents.tool_messages import PARTIAL_RESULT_RULE, TOOL_DATA_RULE
 from beautyads.domain.tools import ToolContext, ToolErrorCode, ToolFailure, ToolResult
 from beautyads.llm.chat import ChatResult, ToolCall
 
@@ -199,12 +199,13 @@ def test_chat_receives_tool_rows_and_call_only_system_rule():
     payload = json.loads(tool_message["content"])
     assert payload["rows"] == [{"product": "synthetic-product", "count": "13"}]
     assert payload["row_count"] == 13
+    assert payload["shown_count"] == 1
     assert payload["evidence_ids"] == ["product:synthetic"]
     assert payload["truncated"]["rows"] is True
     for options in calls:
         assert options["messages"][0] == {
             "role": "system",
-            "content": TOOL_DATA_RULE,
+            "content": TOOL_DATA_RULE + "\n" + PARTIAL_RESULT_RULE,
         }
         assert sum(m["role"] == "system" for m in options["messages"]) == 1
     assert all(m["role"] != "system" for m in state["messages"])
@@ -238,5 +239,8 @@ def test_invalid_calls_return_structured_tool_messages(tool_call, code):
         "retryable": False,
     }
     assert state["tool_trace"][0]["code"] == code
-    assert all(options["messages"][0]["content"] == TOOL_DATA_RULE for options in calls)
+    assert all(
+        options["messages"][0]["content"] == TOOL_DATA_RULE + "\n" + PARTIAL_RESULT_RULE
+        for options in calls
+    )
     assert all(m["role"] != "system" for m in state["messages"])

@@ -19,6 +19,7 @@ NAME = "synthetic_tool"
 SUCCESS_KEYS = {
     "tool",
     "row_count",
+    "shown_count",
     "summary",
     "no_evidence",
     "rows",
@@ -49,6 +50,7 @@ def test_constants_and_rows_reach_model_payload():
     assert payload == {
         "tool": NAME,
         "row_count": 1,
+        "shown_count": 1,
         "summary": "synthetic summary",
         "no_evidence": False,
         "rows": [{"title": "synthetic title"}],
@@ -241,3 +243,23 @@ def test_circular_row_value_never_raises():
         "tool": NAME,
         "summary": "결과를 읽을 수 없다",
     }
+
+
+@pytest.mark.parametrize(
+    "total,available,shown", [(13, 13, 5), (13, 2, 2), (3, 3, 3), (0, 0, 0)]
+)
+def test_shown_count_is_actual_retained_rows(total, available, shown):
+    raw = result().model_dump()
+    raw.update(row_count=total, top_rows=[{"index": i} for i in range(available)])
+    payload = tool_result_payload(NAME, raw)
+    assert payload["shown_count"] == len(payload["rows"]) == shown
+    assert payload["row_count"] == total
+
+
+def test_partial_result_instruction_contract():
+    from beautyads.agents.tool_messages import PARTIAL_RESULT_RULE
+
+    assert (
+        PARTIAL_RESULT_RULE
+        == "결과 중 일부만 보여줄 때는 전체 건수와 표시 건수를 함께 말한다."
+    )

@@ -81,3 +81,66 @@ def test_draft_cannot_choose_code_owned_fields(field):
             unresolved=[],
             **{field: None},
         )
+
+
+@pytest.mark.parametrize(
+    "total,shown,label",
+    [
+        (13, 5, "13건 중 5건 표시"),
+        (3, 3, "3건"),
+        (0, 0, "0건"),
+        (4, 0, "4건 중 0건 표시"),
+    ],
+)
+def test_count_label_contract(total, shown, label):
+    from beautyads.domain.research import count_label
+
+    assert count_label(total, shown) == label
+
+
+@pytest.mark.parametrize("total,shown", [(-1, 0), (1, -1), (-1, -1), (3, 4)])
+def test_count_label_rejects_invalid_counts(total, shown):
+    from beautyads.domain.research import count_label
+
+    with pytest.raises(ValueError):
+        count_label(total, shown)
+
+
+@pytest.mark.parametrize("total,shown", [(13, 5), (3, 3), (0, 0)])
+def test_result_count_derives_truncation_and_roundtrips(total, shown):
+    from beautyads.domain.research import ResultCount
+
+    count = ResultCount(tool="synthetic", row_count=total, shown_count=shown)
+    assert count.model_dump(mode="json") == {
+        "tool": "synthetic",
+        "row_count": total,
+        "shown_count": shown,
+        "truncated": shown < total,
+    }
+    assert ResultCount.model_validate(count.model_dump(mode="json")) == count
+
+
+def test_handoff_counts_default_is_independent_and_never_model_authored():
+    from beautyads.domain.research import ResearchHandoff
+
+    draft = {
+        "conclusion": "synthetic",
+        "evidence_ids": [],
+        "aggregates": {},
+        "confidence": "low",
+        "unresolved": [],
+    }
+    assert "result_counts" not in ResearchHandoffDraft.model_fields
+    assert "result_counts" not in ResearchHandoffDraft.model_json_schema()["properties"]
+    with pytest.raises(ValidationError):
+        ResearchHandoffDraft(**draft, result_counts=[])
+    fields = dict(
+        **draft,
+        status="no_evidence",
+        no_evidence_tools=[],
+        basis_notes=[],
+        structured_failure_rate=None,
+    )
+    first, second = ResearchHandoff(**fields), ResearchHandoff(**fields)
+    assert first.result_counts == second.result_counts == []
+    assert first.result_counts is not second.result_counts
