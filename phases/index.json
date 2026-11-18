@@ -23,9 +23,9 @@
     },
     {
       "dir": "5-agents",
-      "status": "blocked",
+      "status": "completed",
       "blocked_at": "2026-11-18T21:43:51+0900",
-      "completed_at": "2026-11-18T21:13:13+0900"
+      "completed_at": "2026-11-18T22:00:48+0900"
     }
   ]
 }
