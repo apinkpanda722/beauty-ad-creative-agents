@@ -327,7 +327,16 @@
     {
       "step": "7d",
       "name": "full-assembly",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-18T18:21:16+0900",
+      "summary": "assemble_full·이미지 제외 요청 비용 집계·자원 종료·그룹별 작업 공간·모델/이미지 조립 및 합성 테스트 구현. 아키텍처 검사 포함 make verify 통과(4,493 tests). 실제 서비스 접속·패키지 설치 없음.",
+      "completed_at": "2026-11-18T18:29:11+0900",
+      "usage": {
+        "input_tokens": 2188822,
+        "cached_input_tokens": 1965696,
+        "output_tokens": 16323,
+        "attempts": 1
+      }
     },
     {
       "step": 8,
