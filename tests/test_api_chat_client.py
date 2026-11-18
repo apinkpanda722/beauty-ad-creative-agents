@@ -77,3 +77,61 @@ def test_client_success_has_no_error_fields():
         create_app(lambda: assembly()), tenant_id="demo-a", message="synthetic"
     )
     assert outcome.final_text and outcome.detail is None and outcome.error_code is None
+
+
+def test_ask_client_parses_commands_text_and_request_options():
+    from fastapi import Request
+
+    from beautyads.api.chat_client import run_ask_once
+
+    app = FastAPI()
+    seen = []
+
+    @app.post("/ask")
+    async def ask(request: Request):
+        seen.append((await request.json(), request.headers.get("X-Tenant-Id")))
+        return StreamingResponse(
+            iter(
+                [
+                    encode_event(
+                        "step",
+                        {"agent": "supervisor", "phase": "start", "status": "running"},
+                    ),
+                    encode_event(
+                        "ui_command",
+                        {"kind": "show_graph_fragment", "data": {"evidence_ids": []}},
+                    ),
+                    encode_event("token", {"text": "a"}),
+                    encode_event("token", {"text": "b"}),
+                ]
+            )
+        )
+
+    outcome = run_ask_once(
+        app,
+        tenant_id="demo-a",
+        message="synthetic",
+        with_image=True,
+        thread_id="demo-a:thread",
+    )
+    assert outcome.status_code == 200 and outcome.final_text == "ab"
+    assert outcome.ui_commands == [
+        {"kind": "show_graph_fragment", "data": {"evidence_ids": []}}
+    ]
+    assert seen == [
+        (
+            {"message": "synthetic", "with_image": True, "thread_id": "demo-a:thread"},
+            "demo-a",
+        )
+    ]
+    assert len(outcome.events) == 4
+
+
+def test_ask_client_rejection_and_lifespan():
+    from beautyads.api.chat_client import run_ask_once
+
+    outcome = run_ask_once(
+        create_app(lambda: assembly()), tenant_id="outside", message="synthetic"
+    )
+    assert outcome.status_code == 403 and outcome.events == []
+    assert outcome.final_text == "" and outcome.ui_commands == []

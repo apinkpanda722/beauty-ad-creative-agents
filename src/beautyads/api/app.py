@@ -8,6 +8,7 @@ from collections.abc import Callable, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import date, datetime
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -15,6 +16,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from beautyads.agents.skeleton import RECURSION_LIMIT
+from beautyads.api.ask import register_ask
 from beautyads.api.feedback import register_feedback
 from beautyads.api.session import resolve_session
 from beautyads.api.sse import encode_event
@@ -34,6 +36,10 @@ class Assembly:
     close: Callable
     workspaces: Mapping[str, dict] = field(default_factory=dict)
     price_bands: Mapping[str, dict] = field(default_factory=dict)
+    ask: Callable | None = None
+    hydrate: Callable | None = None
+    design_dir: Path = Path("data/design")
+    image_enabled: bool = False
 
 
 class ChatRequest(BaseModel):
@@ -59,6 +65,7 @@ def create_app(assemble: Callable[[], Assembly]) -> FastAPI:
 
     app = FastAPI(lifespan=lifespan)
     register_feedback(app)
+    register_ask(app)
 
     @app.get("/healthz")
     async def healthz():

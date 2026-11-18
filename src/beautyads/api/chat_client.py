@@ -51,3 +51,30 @@ def run_chat_once(app, *, tenant_id, message, thread_id=None) -> ChatOutcome:
             detail=error.get("detail"),
             error_code=error.get("error_code"),
         )
+
+
+@dataclass(frozen=True)
+class AskOutcome:
+    events: list[tuple[str, dict]]
+    ui_commands: list[dict]
+    final_text: str
+    status_code: int
+
+
+def run_ask_once(
+    app, *, tenant_id, message, with_image=False, thread_id=None
+) -> AskOutcome:
+    body = {"message": message, "with_image": with_image}
+    if thread_id is not None:
+        body["thread_id"] = thread_id
+    with TestClient(app) as client:
+        response = client.post("/ask", headers={"X-Tenant-Id": tenant_id}, json=body)
+        events = parse_sse(response.text) if response.status_code == 200 else []
+        return AskOutcome(
+            events=events,
+            ui_commands=[body for name, body in events if name == "ui_command"],
+            final_text="".join(
+                body.get("text", "") for name, body in events if name == "token"
+            ),
+            status_code=response.status_code,
+        )
