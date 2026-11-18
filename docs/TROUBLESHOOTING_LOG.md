@@ -273,3 +273,9 @@
 - **원인**: 허용 범위를 함수·상수 단위로 좁히면서 작업 문장의 식별자를 그 범위와 대조하지 않았다(7d의 개수 대조 점검이 식별자 단위까지 확장되지 않았다).
 - **해결**: 허용 범위에 해당 함수·상수를 명시하고 `/harness` 원칙 9에 "작업 문장의 모든 함수·상수·칸 이름이 허용 범위 안에 있는지 대조"를 추가했다. 9e의 같은 계열 누락(`IMAGE_NO_TEXT_CLAUSE` 상수, `build_trace` 연결, 요약 합산)도 함께 정정했다.
 - **근거**: `phases/5-agents/step9d.md`, `phases/5-agents/step9e.md`, `.claude/commands/harness.md`.
+
+## 2026-11-18 step 9e가 세 번째로 blocked됐다(상수 값 변경과 기존 단언의 충돌)
+- **문제**: 9e가 `PLANNING_PROMPT_VERSION`·`EVALUATION_PROMPT_VERSION`을 `2026-11-18-2`로 올리라고 하는데 `tests/test_planning.py:205`·`tests/test_evaluation.py:223`이 이전 버전을 단언하고 허용 목록은 "기존 단언 변경 0줄"이었다(코드 변경 없음).
+- **원인**: 상수 값을 바꾸는 작업의 소비자 단언을 `grep`으로 찾지 않았다(9c에서 같은 상수를 만들었음에도 놓침, 원칙 9 정확 일치 스캔 누락).
+- **해결**: 두 단언 줄을 허용 목록에 줄 단위로 명시했다. `/harness` 원칙 9에 "상수 값을 바꾸는 작업은 그 상수를 단언하는 기존 테스트를 `grep`으로 찾아 줄 단위로 허용한다"를 추가했다.
+- **근거**: `phases/5-agents/step9e.md`, `.claude/commands/harness.md`.

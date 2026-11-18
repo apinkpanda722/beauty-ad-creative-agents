@@ -411,16 +411,7 @@
     {
       "step": "9e",
       "name": "weak-contrast-image-prompt",
-      "status": "blocked",
-      "started_at": "2026-11-18T20:19:02+0900",
-      "blocked_reason": "선점검에서 기존 테스트 보존 조건과 버전 갱신 요구의 충돌을 확인해 코드 수정 없이 중단했습니다. 요구: 'EVALUATION_PROMPT_VERSION = \"2026-11-18-2\".' 제한: '`tests/test_research_agent.py`·`tests/test_trace.py`·`tests/test_agents_live.py`·`tests/test_domain_supervisor.py`·`tests/test_supervisor.py`·`tests/test_evaluation.py`·`tests/test_ask_view.py`(케이스 추가에 한함, 기존 단언 변경 0줄)'. tests/test_evaluation.py:223은 기존 버전 \"2026-11-18-1\"을 단언하므로 두 조건을 지키면서 make verify를 통과할 수 없습니다. tests/test_planning.py:205에도 같은 충돌이 있습니다. 두 기존 버전 단언을 \"2026-11-18-2\"로 갱신하도록 수정 허용 범위의 예외가 필요합니다.",
-      "blocked_at": "2026-11-18T20:20:17+0900",
-      "usage": {
-        "input_tokens": 314359,
-        "cached_input_tokens": 244224,
-        "output_tokens": 1282,
-        "attempts": 1
-      }
+      "status": "pending"
     },
     {
       "step": "9f",
