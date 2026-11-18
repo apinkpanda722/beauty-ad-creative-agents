@@ -220,4 +220,32 @@ def test_fp_c14_evaluation_receives_closed_plan_values_and_anchored_scale():
         not {"evidence_exists", "forbidden_terms", "efficacy_status"}
         & payload["plan"].keys()
     )
-    assert evaluation.EVALUATION_PROMPT_VERSION == "2026-11-18-1"
+    assert evaluation.EVALUATION_PROMPT_VERSION == "2026-11-18-2"
+
+
+def test_fp_c14_evaluation_context_and_korean_copy_are_in_actual_messages():
+    from beautyads.domain.supervisor import pattern_context
+
+    context = pattern_context([], ["yt:a"])
+    fake = Scorer("claude-haiku-5-5")
+    evaluate_plan(
+        plan=plan_data(),
+        brief={},
+        handoff={
+            "evidence_ids": plan_data()["evidence_ids"],
+            "pattern_context": context,
+        },
+        rules=[],
+        evidence_index=FakeEvidence(),
+        support=Support(),
+        certs=FakeCerts(),
+        structured=fake,
+    )
+    _, options = fake.calls[0]
+    system, user = options["messages"]
+    payload = json.loads(user["content"])
+    assert payload["research"]["pattern_context"] == context
+    for phrase in ("thin_pool", "dominant_axes", "200자", "극단 점수"):
+        assert phrase in system["content"]
+    for phrase in ("한국어 광고 카피", "번역투", "설명조", "실제 상황", "구어체"):
+        assert phrase in payload["criteria"]["fit"]

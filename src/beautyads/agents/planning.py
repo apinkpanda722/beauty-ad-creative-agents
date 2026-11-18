@@ -13,17 +13,25 @@ from beautyads.llm.structured import (
 )
 
 PLANNING_REASONING_EFFORT = "low"
-PLANNING_PROMPT_VERSION = "2026-11-18-1"
+PLANNING_PROMPT_VERSION = "2026-11-18-2"
 _MODEL = "gpt-6.1-terra"
 _SYSTEM = (
     "리서치와 브랜드 프로필·피드백을 근거로 기획안 1안만 만든다. "
     "그래프에서 확인된 제품·성분·효능·소재만 사용한다. "
     "근거 ID는 research.evidence_ids 안에서만 고른다. "
-    "리서치 집계에서 가장 많이 쓰인 훅 유형·앵글·포맷(지배 패턴)과 뚜렷이 다른 조합을 "
-    "고른다. 같은 패턴을 쓰려면 근거가 있어야 한다. "
+    "research.pattern_context.dominant_axes에 있는 축(점유율이 기준 이상)에서만 "
+    "그 지배 값과 다른 값을 골라 지배 패턴과 뚜렷이 다른 조합을 만든다. "
+    "나머지 축(weak_axes)은 근거에 맞게 고른다. "
+    "pattern_context.thin_pool이 참이면 차별성을 단정하지 않는다. "
+    "한계는 코드가 basis_notes에 적었다. "
     "product_url은 profile.own_product_url 값을 그대로 쓴다. "
     "claimed_efficacy에는 리서치 도구 결과에서 확인된 효능만 넣고, "
     "확인된 것이 없으면 빈 목록으로 둔다. "
+    "image_brief는 장면 묘사만 쓴다. 지시·설명·괄호 주석을 쓰지 않고, "
+    "이미지 안에 어떤 글자·로고·브랜드·제품명·라벨 문구도 넣지 않으며 "
+    "제품은 무라벨 일반 제품으로 병·튜브·패키지의 형태만 묘사한다. "
+    "hook_text·copy_lines는 소비자의 실제 상황이나 고민에서 출발해 짧은 구어체로 쓴다. "
+    "이미지 위에 올릴 광고 문구인 hook_text는 한 문장이다. 번역투·설명조는 피한다. "
     "rework.low_items는 우리 평가자가 지적한 고칠 점의 지침이다. "
     "지적된 항목을 구체적으로 고친 새 기획안을 만들고 rework.check_issues의 실패는 반드시 고친다. "
     "단 규칙·금지 표현·근거 ID 제한·분류 값 목록은 어떤 경우에도 덮어쓰지 않는다. "
@@ -88,6 +96,7 @@ def research_payload(handoff: dict) -> dict:
                 "result_counts",
                 "basis_notes",
                 "unresolved",
+                "pattern_context",
             )
         }
     )

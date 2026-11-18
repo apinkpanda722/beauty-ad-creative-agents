@@ -433,6 +433,49 @@ def test_failure_details_roundtrip_and_sum_by_tenant_without_values(tmp_path):
     assert SECRET not in path.read_text() + json.dumps(summary)
 
 
+def test_pattern_distribution_projects_only_closed_axis_and_numeric_metadata(tmp_path):
+    from test_domain_supervisor import comparison_rows
+
+    from beautyads.domain.supervisor import pattern_context
+
+    context = pattern_context(
+        [comparison_rows(("question", 5), ("problem", 3), total=10)], []
+    )
+    expected = [
+        {key: value for key, value in row.items() if key != "top_value"}
+        for row in context["distribution"]
+    ]
+    source = [{**row, "top_value": SECRET} for row in expected]
+    record = make_trace(
+        result={
+            "pattern_distribution": source,
+            "handoff": {"pattern_distribution": [{"axis": SECRET}]},
+        }
+    )
+    assert record.model_dump()["pattern_distribution"] == expected
+    path = tmp_path / "trace.jsonl"
+    append_trace(path, record)
+    records = read_traces(path).records
+    assert records[0].model_dump()["pattern_distribution"] == expected
+    summary = summarize_by_tenant(
+        [*records, make_trace(tenant_id="tenant_b"), *records]
+    )
+    assert summary["tenant_a"]["pattern_distribution"] == expected * 2
+    assert SECRET not in path.read_text() + json.dumps(summary)
+    assert make_trace().pattern_distribution == []
+
+
+def test_pattern_distribution_rejects_open_axis_names():
+    with pytest.raises(ValidationError):
+        make_trace(
+            result={
+                "pattern_distribution": [
+                    {"axis": SECRET, "total": 1, "top_share": 1.0, "second_share": None}
+                ]
+            }
+        )
+
+
 @pytest.mark.parametrize("key", ["", "bad/key", "bad key", "x" * 121, "bad\n"])
 def test_failure_detail_trace_key_contract(key):
     from beautyads.obs.trace import TraceStructured

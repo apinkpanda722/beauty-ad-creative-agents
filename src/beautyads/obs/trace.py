@@ -59,6 +59,13 @@ class TraceAlignment(_TraceModel):
     skipped: Count = 0
 
 
+class TracePatternDistribution(_TraceModel):
+    axis: Literal["hook_type", "angle", "format"]
+    total: Count | None = None
+    top_share: Annotated[float, Field(ge=0)] | None = None
+    second_share: Annotated[float, Field(ge=0)] | None = None
+
+
 class TracePlan(_TraceModel):
     status: Token | None = None
     rework_count: Count = 0
@@ -133,6 +140,7 @@ class TraceRecord(_TraceModel):
     steps: list[TraceStep] = Field(default_factory=list)
     tools: list[TraceTool] = Field(default_factory=list)
     plans: list[TracePlan] = Field(default_factory=list)
+    pattern_distribution: list[TracePatternDistribution] = Field(default_factory=list)
     prompt_versions: dict[Literal["planning", "evaluation"], str] = Field(
         default_factory=dict
     )
@@ -272,6 +280,10 @@ def build_trace(
             for tool in result.get("handoff", {}).get("result_counts", [])
         ],
         plans=plans,
+        pattern_distribution=[
+            TracePatternDistribution(**_project(TracePatternDistribution, row))
+            for row in result.get("pattern_distribution", [])
+        ],
         prompt_versions=result.get("prompt_versions", {}),
         limit_hit=result.get("limit_hit", False),
         limit_kinds=result.get("limit_kinds", []),
@@ -329,7 +341,9 @@ def summarize_by_tenant(records: list[TraceRecord]) -> dict[str, dict]:
         failures = defaultdict(int)
         details = defaultdict(int)
         structured_calls = 0
+        distribution = []
         for trace in traces:
+            distribution.extend(row.model_dump() for row in trace.pattern_distribution)
             for purpose, cost in trace.cost_by_purpose.items():
                 purposes[purpose].append(cost)
             for stats in trace.structured.values():
@@ -348,6 +362,7 @@ def summarize_by_tenant(records: list[TraceRecord]) -> dict[str, dict]:
             },
             "first_attempt_failures": dict(failures),
             "structured_calls": structured_calls,
+            **({"pattern_distribution": distribution} if distribution else {}),
             **({"first_attempt_failure_details": dict(details)} if details else {}),
         }
     return summaries

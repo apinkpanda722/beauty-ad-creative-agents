@@ -136,6 +136,7 @@ def test_planning_messages_and_options(rework):
         "result_counts",
         "basis_notes",
         "unresolved",
+        "pattern_context",
     }
     assert payload["profile"] == {k: v for k, v in profile.items() if k != "tenant_id"}
     assert payload["feedback"] == feedback
@@ -202,4 +203,35 @@ def test_planning_prompt_distinguishes_internal_rework_from_external_data():
     assert fake.model == "gpt-6.1-terra"
     assert options["reasoning_effort"] == "low"
     assert spec.schema == strict_plan_schema()
-    assert planning.PLANNING_PROMPT_VERSION == "2026-11-18-1"
+    assert planning.PLANNING_PROMPT_VERSION == "2026-11-18-2"
+
+
+def test_fp_c14_planning_receives_pattern_context_and_scene_copy_instructions():
+    from beautyads.domain.supervisor import pattern_context
+
+    context = pattern_context([], ["yt:a"])
+    fake = Structured()
+    make_plan(
+        brief={},
+        handoff={"pattern_context": context},
+        profile={},
+        feedback=None,
+        rework=None,
+        structured=fake,
+    )
+    _, options = fake.calls[0]
+    system, user = options["messages"]
+    assert json.loads(user["content"])["research"]["pattern_context"] == context
+    for phrase in (
+        "dominant_axes",
+        "weak_axes",
+        "thin_pool",
+        "장면 묘사",
+        "own_product_url",
+        "실제 상황",
+        "구어체",
+        "한 문장",
+        "무라벨",
+        "글자",
+    ):
+        assert phrase in system["content"]

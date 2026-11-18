@@ -37,7 +37,8 @@ def test_prompt_includes_only_plan_text():
     value = plan()
     prompt = image_prompt(value)
     assert isinstance(prompt, str)
-    for text in [value.image_brief, value.hook_text, *value.scenes]:
+    assert value.hook_text not in prompt
+    for text in [value.image_brief, *value.scenes]:
         assert text in prompt
     assert value.product_url not in prompt and value.evidence_ids[0] not in prompt
     assert len(prompt) <= 2000
@@ -131,3 +132,47 @@ def test_design_default_and_gitignore():
         "data/design/"
         in (Path(__file__).parents[1] / ".gitignore").read_text().splitlines()
     )
+
+
+@pytest.mark.parametrize(
+    "brief",
+    [
+        None,
+        "창가의 병 (메타1) [메타2] （메타3） <메타4>\n※ 메타5\n참고: 메타6\n주의: 메타7\n설명: 메타8\n지시: 메타9\nNote: meta10\n물방울 https://example.invalid/meta11",
+    ],
+)
+def test_prompt_removes_meta_copy_and_always_ends_with_no_text_clause(brief):
+    from beautyads.agents.design_images import IMAGE_NO_TEXT_CLAUSE
+
+    prompt = image_prompt(
+        plan(
+            image_brief=brief,
+            hook_text="COPY_ONLY_SENTINEL",
+            scenes=["빛나는 표면 (장면주석)\nNote: scene-meta"],
+        )
+    )
+    assert prompt.endswith(IMAGE_NO_TEXT_CLAUSE)
+    assert "빛나는 표면" in prompt
+    if brief is not None:
+        assert "창가의 병" in prompt and "물방울" in prompt
+    for marker in (
+        "메타",
+        "meta",
+        "COPY_ONLY_SENTINEL",
+        "장면주석",
+        "Note:",
+        "https://",
+        "※",
+    ):
+        assert marker not in prompt
+    assert len(prompt) <= 2000
+
+
+def test_prompt_nested_comments_and_length_reserve_no_text_clause():
+    from beautyads.agents.design_images import IMAGE_NO_TEXT_CLAUSE
+
+    prompt = image_prompt(
+        plan(image_brief="장면 (바깥 [안쪽] 남은주석)\n" + "가" * 3000)
+    )
+    assert "남은주석" not in prompt and "바깥" not in prompt and "안쪽" not in prompt
+    assert len(prompt) == 2000 and prompt.endswith(IMAGE_NO_TEXT_CLAUSE)

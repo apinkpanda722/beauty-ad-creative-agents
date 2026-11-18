@@ -16,6 +16,11 @@ AGGREGATES_LABEL = "모델 작성값, 검증되지 않음"
 OUT_OF_SCOPE_TEXT = "지원 범위 밖이거나 요청 조건을 판단할 수 없다."
 NO_EVIDENCE_TEXT = "조건에 맞는 근거가 없다. 근거를 지어내지 않는다."
 LIMIT_REACHED_TEXT = "요청 한도에 도달해 현재까지의 결과를 미완료로 반환한다."
+# 잠정값, 사용자 승인 전. 이유·날짜는 docs/PROMPT_CHANGELOG.md
+MIN_DOMINANT_SHARE = 0.4
+THIN_POOL_MAX = 10
+THIN_POOL_NOTE = "근거 소재가 {n}건으로 얇아 차별성 판단에 한계가 있다"
+DESIGN_IMAGE_DISCLAIMER = "생성 시안은 참고용이며 라벨 글자가 부정확할 수 있다"
 
 
 class Intent(StrEnum):
@@ -152,6 +157,96 @@ def verify_aggregates(
         else:
             verified[name] = value
     return verified, unresolved
+
+
+def pattern_context(tool_outputs: list[dict], evidence_ids: list[str]) -> dict:
+    """Describe observed populations and dominant axes without judging a plan.
+
+    Axis inference, additive counts and repeated totals follow pattern_alignment.
+    Tied values all rank first; the second share is the next distinct rank.
+    Distribution is observation only, independent of the provisional threshold.
+    """
+    closed = {
+        "hook_type": {item.value for item in HookType},
+        "angle": {item.value for item in Angle},
+        "format": {item.value for item in Format},
+    }
+    counts = {axis: {} for axis in closed}
+    totals = dict.fromkeys(closed, None)
+    populations = []
+    for output in tool_outputs:
+        if (
+            not isinstance(output, dict)
+            or output.get("tool") != "compare_axis_by_category"
+        ):
+            continue
+        rows = output.get("rows")
+        if (
+            not isinstance(rows, list)
+            or not rows
+            or not all(
+                isinstance(row, dict) and isinstance(row.get("value"), str)
+                for row in rows
+            )
+        ):
+            continue
+        values = {row.get("value") for row in rows}
+        matches = [axis for axis, allowed in closed.items() if values <= allowed]
+        if len(matches) != 1 or not all(
+            type(row.get("creatives")) is int and row.get("creatives") >= 0
+            for row in rows
+        ):
+            continue
+        axis = matches[0]
+        for row in rows:
+            value = row.get("value")
+            counts[axis][value] = counts[axis].get(value, 0) + row.get("creatives")
+        total = rows[0].get("total")
+        if type(total) is int and total >= 0:
+            totals[axis] = (totals[axis] or 0) + total
+            populations.append(total)
+    dominant_axes, weak_axes, distribution = [], [], []
+    for axis, observed in counts.items():
+        if not observed:
+            continue
+        ranks = sorted(set(observed.values()), reverse=True)
+        dominant = sorted(
+            value for value, count in observed.items() if count == ranks[0]
+        )
+        total = totals[axis]
+        top_share = ranks[0] / total if total else None
+        share = sum(observed[value] for value in dominant) / total if total else None
+        if share is not None and share >= MIN_DOMINANT_SHARE:
+            dominant_axes.append({"axis": axis, "values": dominant, "share": share})
+        else:
+            weak_axes.append(axis)
+        distribution.append(
+            {
+                "axis": axis,
+                "total": total,
+                "top_share": top_share,
+                "second_share": ranks[1] / total if len(ranks) > 1 and total else None,
+                "top_value": dominant[0],
+            }
+        )
+    compared = any(counts.values())
+    pool_size = (
+        max(populations)
+        if populations
+        else None
+        if compared
+        else len(set(evidence_ids))
+    )
+    return {
+        "pool_size": pool_size,
+        "pool_basis": "axis_total" if compared else "evidence_ids",
+        "thin_pool": pool_size is not None and pool_size < THIN_POOL_MAX,
+        "min_dominant_share": MIN_DOMINANT_SHARE,
+        "thin_pool_max": THIN_POOL_MAX,
+        "dominant_axes": dominant_axes,
+        "weak_axes": weak_axes,
+        "distribution": distribution,
+    }
 
 
 def pattern_alignment(plan: dict, tool_outputs: list[dict]) -> dict:

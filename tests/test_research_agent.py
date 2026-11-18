@@ -149,6 +149,20 @@ def test_research_system_quotes_tool_numbers_without_calculating():
         )
 
 
+def test_research_prioritizes_category_tools_in_actual_calls():
+    chat = Chat([reply([call()]), reply()])
+    structured = Structured()
+    execute(chat, lambda *args: result(), structured)
+    for options in [*chat.calls, *[options for _, options in structured.calls]]:
+        system = options["messages"][0]["content"]
+        for phrase in (
+            "compare_axis_by_category",
+            "top_vs_bottom_axis",
+            "제품을 특정한",
+        ):
+            assert phrase in system
+
+
 @pytest.mark.parametrize("inconsistent_pool", [False, True])
 def test_no_evidence_does_not_generate(inconsistent_pool):
     structured = Structured()

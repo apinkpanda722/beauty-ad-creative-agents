@@ -23,12 +23,14 @@ from beautyads.domain.supervisor import (
     LIMIT_REACHED_TEXT,
     NO_EVIDENCE_TEXT,
     OUT_OF_SCOPE_TEXT,
+    THIN_POOL_NOTE,
     Intent,
     RequestLimits,
     SupervisorDecision,
     cost_exceeded,
     numbers_in_results,
     pattern_alignment,
+    pattern_context,
     trim_handoff,
     trim_message,
     verify_aggregates,
@@ -358,8 +360,17 @@ def build_supervisor_graph(
             ]
             handoff["aggregates"] = verified
             handoff["unresolved"].extend(unresolved)
-            state["sv_handoff"] = _copy_json(handoff)
             state["sv_tool_outputs"] = _tool_outputs(raw_store)
+            handoff["pattern_context"] = pattern_context(
+                state["sv_tool_outputs"], handoff["evidence_ids"]
+            )
+            context = handoff["pattern_context"]
+            if context["thin_pool"]:
+                note = THIN_POOL_NOTE.format(n=context["pool_size"])
+                handoff["basis_notes"] = [
+                    existing for existing in handoff["basis_notes"] if existing != note
+                ] + [note]
+            state["sv_handoff"] = _copy_json(handoff)
             _step(state, on_event, "research", "end", handoff["status"])
             # Research exposes tool names only after it finishes. These tool_start
             # events are deliberately batched here in result_counts call order.
@@ -501,6 +512,18 @@ def run_request(
             "intent": state["sv_decision"].get("intent"),
             "brief": state["sv_brief"],
             "handoff": state["sv_handoff"],
+            "product_display": {
+                key: profile.get(key) for key in ("brand", "display_name")
+            },
+            "pattern_distribution": [
+                {
+                    key: row.get(key)
+                    for key in ("axis", "total", "top_share", "second_share")
+                }
+                for row in state["sv_handoff"]
+                .get("pattern_context", {})
+                .get("distribution", [])
+            ],
             "aggregates_label": AGGREGATES_LABEL,
             "aggregates_removed": status["aggregates_removed"],
             "plans": [

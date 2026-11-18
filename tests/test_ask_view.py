@@ -247,3 +247,27 @@ def test_plan_displays_alignment_separately_from_scores_and_final_pass():
     assert "passed" not in data["attempts"][0]
     data["pattern_alignment"]["axes"].clear()
     assert raw["plans"][0]["pattern_alignment"] == alignment
+
+
+@pytest.mark.parametrize("with_image", [False, True])
+@pytest.mark.parametrize(
+    "display", [None, {"brand": "synthetic brand", "display_name": "synthetic product"}]
+)
+def test_plan_has_fixed_image_disclaimer_and_separate_product_display(
+    with_image, display
+):
+    from beautyads.domain.supervisor import DESIGN_IMAGE_DISCLAIMER
+
+    raw = result()
+    if not with_image:
+        raw["plans"][0]["image"] = None
+    if display is not None:
+        raw["product_display"] = display
+    raw["plans"][0]["design_disclaimer"] = "model-authored-disclaimer"
+    raw["plans"][0]["product_display"] = {"brand": "model-authored-brand"}
+    data = command(build_view(raw, plan_ids=["id"], hydrate=None), "show_plan")
+    assert data["design_disclaimer"] == (
+        DESIGN_IMAGE_DISCLAIMER if with_image else None
+    )
+    assert data["product_display"] == (display or {"brand": None, "display_name": None})
+    json.dumps(data, allow_nan=False)

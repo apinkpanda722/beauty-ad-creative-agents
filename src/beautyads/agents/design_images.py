@@ -11,12 +11,37 @@ from beautyads.llm import ImageOutcome
 
 _URL = re.compile(r"\b(?:[a-z][a-z0-9+.-]*://|data:|www\.)\S+", re.IGNORECASE)
 _EXTENSIONS = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}
+IMAGE_NO_TEXT_CLAUSE = (
+    "이미지에는 글자·카피·로고·브랜드·제품명·라벨 문구를 넣지 않는다. "
+    "제품은 무라벨 일반 병·튜브·패키지의 형태로만 묘사한다."
+)
 
 
 def image_prompt(plan: Plan) -> str:
-    """Use selected plan text only; references and product URLs stay out of prompts."""
-    parts = [plan.image_brief or "", plan.hook_text, *plan.scenes]
-    return "\n".join(_URL.sub("", part) for part in parts)[:2000]
+    """Keep scene text, remove annotations locally, and reserve the no-text suffix."""
+    parts = [plan.image_brief or "", *plan.scenes]
+    cleaned = []
+    for part in parts:
+        text = "\n".join(
+            line
+            for line in part.splitlines()
+            if not line.lstrip().startswith(
+                ("※", "참고:", "주의:", "설명:", "지시:", "Note:")
+            )
+        )
+        # Remove inner comments first, including mixed nested bracket styles.
+        while True:
+            stripped = re.sub(
+                r"\([^()]*\)|\[[^\[\]]*\]|（[^（）]*）|<[^<>]*>", "", text
+            )
+            if stripped == text:
+                break
+            text = stripped
+        cleaned.extend(
+            line.strip() for line in _URL.sub("", text).splitlines() if line.strip()
+        )
+    scene = "\n".join(cleaned)[: 2000 - len(IMAGE_NO_TEXT_CLAUSE) - 1].rstrip()
+    return (scene + "\n" if scene else "") + IMAGE_NO_TEXT_CLAUSE
 
 
 @dataclass(frozen=True)

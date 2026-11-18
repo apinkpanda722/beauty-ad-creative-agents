@@ -544,3 +544,116 @@ def test_report_alignment_and_prompt_versions_do_not_change_any_decisions():
         }
     )
     json.dumps(aligned, allow_nan=False)
+
+
+@pytest.mark.parametrize("repeated", [False, True])
+def test_fp_c14_context_note_is_in_handoff_once_across_repeated_requests(repeated):
+    from test_domain_supervisor import comparison_rows
+
+    from beautyads.domain.supervisor import (
+        THIN_POOL_MAX,
+        THIN_POOL_NOTE,
+        pattern_context,
+    )
+
+    n = THIN_POOL_MAX - 1
+    note = THIN_POOL_NOTE.format(n=n)
+    notes = [note, "synthetic basis", note] if repeated else ["synthetic basis", note]
+    f = Fakes(research=handoff(basis_notes=notes))
+    original = f.research
+    output = comparison_rows(("question", n), total=n)
+
+    def research(brief, raw_store):
+        result = original(brief, raw_store)
+        raw_store["comparison"] = {
+            "tool": output["tool"],
+            "row_count": 1,
+            "top_rows": output["rows"],
+        }
+        return result
+
+    expected = pattern_context([output], f.handoff["evidence_ids"])
+    for _ in range(2):
+        result = supervisor.run_request(**f.args(research_fn=research))
+        assert result["handoff"]["pattern_context"] == expected
+        assert result["handoff"]["basis_notes"][-1] == note
+        assert result["handoff"]["basis_notes"].count(note) == 1
+        for call in f.plan_calls:
+            assert call["handoff"]["pattern_context"] == expected
+            assert call["handoff"]["basis_notes"].count(note) == 1
+        assert result["pattern_distribution"] == [
+            {"axis": "hook_type", "total": n, "top_share": 1.0, "second_share": None}
+        ]
+    assert f.handoff["basis_notes"] == notes
+
+
+def test_fp_c14_thin_pool_note_is_appended_and_survives_trim():
+    from beautyads.domain.supervisor import THIN_POOL_NOTE
+
+    f = Fakes(research=handoff(basis_notes=["synthetic basis"]))
+    result = supervisor.run_request(
+        **f.args(limits=RequestLimits(handoff_max_aggregates=0))
+    )
+    expected = ["synthetic basis", THIN_POOL_NOTE.format(n=1)]
+    assert result["handoff"]["basis_notes"] == expected
+    assert all(call["handoff"]["basis_notes"] == expected for call in f.plan_calls)
+
+
+def test_fp_c14_context_is_reporting_only_for_final_pass_and_reworks(monkeypatch):
+    from test_plan_eval import Planner, report
+
+    from beautyads.agents.plan_eval import run_plan_eval
+
+    def planning(brief, handoff, profile, feedback, **kwargs):
+        return run_plan_eval(
+            brief=brief,
+            handoff=handoff,
+            profile=profile,
+            feedback=feedback,
+            plan_fn=Planner(),
+            evaluate_fn=lambda **kw: report(low=True),
+            **kwargs,
+        )
+
+    f = Fakes(decision=decision_data(plan_count=1))
+    first = supervisor.run_request(**f.args(plan_eval_fn=planning))
+    original = supervisor.pattern_context
+
+    def changed(*args):
+        value = original(*args)
+        value.update(
+            thin_pool=False,
+            pool_size=100,
+            dominant_axes=[{"axis": "hook_type", "values": ["problem"], "share": 1.0}],
+        )
+        return value
+
+    monkeypatch.setattr(supervisor, "pattern_context", changed)
+    second = supervisor.run_request(**f.args(plan_eval_fn=planning))
+    assert first["handoff"]["pattern_context"] != second["handoff"]["pattern_context"]
+    assert first["plans"] == second["plans"]
+    assert first["kind"] == second["kind"]
+    assert first["limit_kinds"] == second["limit_kinds"]
+
+
+@pytest.mark.parametrize(
+    "profile",
+    [
+        {},
+        {
+            "brand": "synthetic brand",
+            "display_name": "synthetic product",
+            "tone": "synthetic",
+        },
+    ],
+)
+def test_product_display_is_server_profile_only_and_no_handoff_distribution_is_empty(
+    profile,
+):
+    f = Fakes(decision=decision_data(intent="boundary"))
+    result = supervisor.run_request(**f.args(profile=profile))
+    assert result["product_display"] == {
+        key: profile.get(key) for key in ("brand", "display_name")
+    }
+    assert result["pattern_distribution"] == []
+    json.dumps(result, allow_nan=False)

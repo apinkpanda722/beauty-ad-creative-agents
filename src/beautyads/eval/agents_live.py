@@ -176,6 +176,9 @@ def _trace_fields(record):
     return {
         "trace_id": record.trace_id,
         "prompt_versions": record.prompt_versions,
+        "pattern_distribution": [
+            row.model_dump() for row in record.pattern_distribution
+        ],
         "plans": [
             plan.model_dump(exclude={"attempts"})
             | {
@@ -308,6 +311,7 @@ def _request(scenario, *, run, app, with_image, show_rationale=False, out=None):
         error_code=None,
         trace_id=None,
         plans=[],
+        pattern_distribution=[],
         limit_hit=False,
         limit_kinds=[],
         limit_detail=[],

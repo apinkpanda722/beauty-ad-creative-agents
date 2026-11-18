@@ -249,3 +249,141 @@ def test_pattern_alignment_infers_only_one_closed_axis_and_counts_skips():
     assert result["axes"]["format"]["share"] is None
     present_zero = pattern_alignment({"format": "demo"}, [outputs[5]])
     assert present_zero["axes"]["format"]["share"] is None
+
+
+def test_pattern_context_thresholds_pool_and_alignment_are_pure():
+    import json
+    from fractions import Fraction
+
+    from beautyads.domain.labels import Angle
+    from beautyads.domain.supervisor import (
+        MIN_DOMINANT_SHARE,
+        THIN_POOL_MAX,
+        pattern_alignment,
+        pattern_context,
+    )
+
+    boundary = Fraction(str(MIN_DOMINANT_SHARE))
+    outputs = [
+        comparison_rows(("question", boundary.numerator), total=boundary.denominator),
+        comparison_rows(*[(value.value, 1) for value in Angle], total=100),
+        comparison_rows(("demo", 5), total=8),
+        comparison_rows(("demo", 1), total=2),
+    ]
+    before = deepcopy(outputs)
+    context = pattern_context(outputs, ["yt:a", "yt:a"])
+    assert context["pool_size"] == 100 and context["pool_basis"] == "axis_total"
+    assert context["min_dominant_share"] == MIN_DOMINANT_SHARE
+    assert context["thin_pool_max"] == THIN_POOL_MAX
+    assert not context["thin_pool"]
+    assert context["weak_axes"] == ["angle"]
+    assert context["dominant_axes"] == [
+        {"axis": "hook_type", "values": ["question"], "share": MIN_DOMINANT_SHARE},
+        {"axis": "format", "values": ["demo"], "share": 0.6},
+    ]
+    alignment = pattern_alignment({}, outputs)
+    for item in context["dominant_axes"]:
+        assert item["values"] == alignment["axes"][item["axis"]]["dominant"]
+    assert outputs == before
+    json.dumps(context, allow_nan=False)
+
+
+@pytest.mark.parametrize("delta", [-1, 0])
+def test_pattern_context_thin_pool_boundary_and_evidence_fallback(delta):
+    from beautyads.domain.supervisor import THIN_POOL_MAX, pattern_context
+
+    n = THIN_POOL_MAX + delta
+    for outputs, basis in (
+        ([], "evidence_ids"),
+        ([comparison_rows(("demo", n), total=n)], "axis_total"),
+    ):
+        context = pattern_context(outputs, [*[f"yt:{i}" for i in range(n)], "yt:0"])
+        assert context["pool_size"] == n and context["pool_basis"] == basis
+        assert context["thin_pool"] is (delta < 0)
+
+
+@pytest.mark.parametrize(
+    "pairs,total,top,second,value",
+    [
+        ([("question", 5), ("problem", 3), ("other", 2)], 10, 0.5, 0.3, "question"),
+        ([("question", 4), ("problem", 4), ("other", 2)], 10, 0.4, 0.2, "problem"),
+        ([("question", 5)], 5, 1.0, None, "question"),
+        ([("question", 0), ("problem", 0)], 0, None, None, "problem"),
+        ([("question", 1)], None, None, None, "question"),
+    ],
+)
+def test_pattern_context_distribution_ranks_and_unknown_totals(
+    pairs, total, top, second, value
+):
+    from beautyads.domain.supervisor import MIN_DOMINANT_SHARE, pattern_context
+
+    context = pattern_context([comparison_rows(*pairs, total=total)], [])
+    assert context["distribution"] == [
+        {
+            "axis": "hook_type",
+            "total": total,
+            "top_share": top,
+            "second_share": second,
+            "top_value": value,
+        }
+    ]
+    dominant_share = (
+        sum(count for _, count in pairs if count == max(n for _, n in pairs)) / total
+        if total
+        else None
+    )
+    assert bool(context["dominant_axes"]) is (
+        dominant_share is not None and dominant_share >= MIN_DOMINANT_SHARE
+    )
+
+
+def test_pattern_context_skips_ambiguous_invalid_and_unrelated_outputs():
+    from beautyads.domain.supervisor import pattern_context
+
+    outputs = [
+        comparison_rows(("other", 5), total=5),
+        comparison_rows(("question", 1), ("demo", 1), total=2),
+        comparison_rows(("SYNTHETIC-private-value", 1), total=1000),
+        comparison_rows(("question", -1), total=1),
+        comparison_rows(total=0),
+        {
+            "tool": "top_vs_bottom_axis",
+            "rows": [{"value": "question", "creatives": 7, "total": 7}],
+        },
+        None,
+    ]
+    context = pattern_context(outputs, ["yt:a", "yt:a", "yt:b"])
+    assert (
+        context["distribution"]
+        == context["dominant_axes"]
+        == context["weak_axes"]
+        == []
+    )
+    assert context["pool_size"] == 2 and context["pool_basis"] == "evidence_ids"
+
+
+def test_pattern_context_combines_same_axis_counts_and_repeated_totals_once():
+    from beautyads.domain.supervisor import pattern_alignment, pattern_context
+
+    outputs = [
+        comparison_rows(("question", 2), ("problem", 4), total=6),
+        comparison_rows(("question", 3), ("problem", 1), total=4),
+    ]
+    context = pattern_context(outputs, [])
+    assert context["pool_size"] == 6
+    assert context["distribution"] == [
+        {
+            "axis": "hook_type",
+            "total": 10,
+            "top_share": 0.5,
+            "second_share": None,
+            "top_value": "problem",
+        }
+    ]
+    assert context["dominant_axes"] == [
+        {
+            "axis": "hook_type",
+            "values": pattern_alignment({}, outputs)["axes"]["hook_type"]["dominant"],
+            "share": 1.0,
+        }
+    ]

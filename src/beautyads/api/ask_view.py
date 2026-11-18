@@ -10,6 +10,7 @@ from beautyads.domain.plan import Plan
 from beautyads.domain.research import count_label
 from beautyads.domain.supervisor import (
     AGGREGATES_LABEL,
+    DESIGN_IMAGE_DISCLAIMER,
     LIMIT_REACHED_TEXT,
     NO_EVIDENCE_TEXT,
     OUT_OF_SCOPE_TEXT,
@@ -159,6 +160,11 @@ def build_view(result, *, plan_ids, hydrate) -> View:
             "pattern_alignment_label": "코드 계산, 판정 아님",
             "disclaimer": CLAIM_CHECK_DISCLAIMER,
             "image": image_reference(item.get("image")),
+            "design_disclaimer": DESIGN_IMAGE_DISCLAIMER
+            if image_reference(item.get("image")) is not None
+            else None,
+            "product_display": result.get("product_display")
+            or {"brand": None, "display_name": None},
         }
         commands.append({"kind": "show_plan", "data": data})
 

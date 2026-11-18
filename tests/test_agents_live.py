@@ -20,6 +20,34 @@ START = datetime(2026, 11, 18, tzinfo=UTC)
 SECRET = "SYNTHETIC-SECRET-private-message-and-diagnostic"
 
 
+def test_live_summary_keeps_distribution_from_trace_without_value_names(rig):
+    expected = [
+        {"axis": "hook_type", "total": 10, "top_share": 0.5, "second_share": 0.3}
+    ]
+
+    def run(**kwargs):
+        record = build_trace(
+            tenant_id=kwargs["tenant_id"],
+            started_at=rig.now,
+            duration_ms=1,
+            message=SECRET,
+            result={"pattern_distribution": [{**expected[0], "top_value": SECRET}]},
+            failure=None,
+            ledger_entries=[],
+            structured={},
+        )
+        append_trace(rig.settings.ledger_path.with_name("traces.jsonl"), record)
+        return outcome()
+
+    rig.behavior = run
+    code, summary, output = rig.invoke("--config", "image")
+    assert code == 0
+    assert summary["scenarios"][0]["pattern_distribution"] == expected
+    saved = rig.root / f"{summary['run_id']}.json"
+    assert json.loads(saved.read_text()) == summary
+    assert SECRET not in saved.read_text() + output
+
+
 def outcome(*, status=200, code=None):
     return AskOutcome(
         events=[("error", {"error_code": code, "detail": SECRET})]

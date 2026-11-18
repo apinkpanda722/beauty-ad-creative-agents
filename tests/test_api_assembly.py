@@ -59,6 +59,127 @@ def synthetic_plan():
     }
 
 
+@pytest.mark.parametrize(
+    "image_brief",
+    [
+        None,
+        "햇빛 속 병 (META_A) [META_B] （META_C） <META_D>\n※ META_E\n지시: META_F\n물방울 https://example.invalid/META_G",
+    ],
+)
+def test_fp_c14_assembled_image_call_is_scene_only_and_carries_context(
+    rig, monkeypatch, image_brief
+):
+    from beautyads.agents.design_images import IMAGE_NO_TEXT_CLAUSE
+    from beautyads.api.ask_view import build_view
+    from beautyads.domain.supervisor import DESIGN_IMAGE_DISCLAIMER
+    from beautyads.obs.trace import read_traces
+
+    original = synthetic_plan
+    monkeypatch.setitem(
+        globals(),
+        "synthetic_plan",
+        lambda: {
+            **original(),
+            "hook_text": "COPY_SENTINEL",
+            "image_brief": image_brief,
+            "scenes": ["투명한 물결 (META_SCENE)"],
+        },
+    )
+    monkeypatch.setattr(
+        assembly,
+        "save_design_image",
+        lambda value, **kw: SimpleNamespace(
+            mime=value.mime, size=value.size, sha256=value.sha256
+        ),
+    )
+
+    def chat(**options):
+        payload = json.loads(options["messages"][-1]["content"])
+        calls = (
+            []
+            if payload.get("observations")
+            else [
+                ToolCall(
+                    "call",
+                    "compare_axis_by_category",
+                    {"category": "mask_pack", "axis": "hook_type", "source": "youtube"},
+                    None,
+                )
+            ]
+        )
+        return ChatResult(None, calls, "stop", {}, 0, "price_table", {})
+
+    def comparison(name, arguments, ctx, *, graph):
+        return ToolResult(
+            tool=name,
+            kind="compare",
+            summary="synthetic",
+            top_rows=[
+                {"value": "question", "creatives": 5, "total": 10},
+                {"value": "problem", "creatives": 3, "total": 10},
+            ],
+            row_count=2,
+            evidence_ids=[EID],
+            no_evidence=False,
+        )
+
+    monkeypatch.setattr(assembly, "run_tool", comparison)
+
+    async def run():
+        services = await rig.start(with_image_enabled=True, models={"chat": chat})
+        try:
+            result = invoke(services, with_image=True)
+            prompts = [
+                options["prompt"] for name, options in rig.calls if name == "image"
+            ]
+            assert len(prompts) == 1
+            prompt = prompts[0]
+            assert prompt.endswith(IMAGE_NO_TEXT_CLAUSE)
+            assert "투명한 물결" in prompt
+            assert all(
+                marker not in prompt
+                for marker in ("META_", "COPY_SENTINEL", "https://", "※")
+            )
+            for name, options in rig.calls:
+                if name in {"plan", "evaluation_scores"}:
+                    payload = json.loads(options["messages"][-1]["content"])
+                    assert (
+                        payload["research"]["pattern_context"]
+                        == result["handoff"]["pattern_context"]
+                    )
+            profile = services.workspaces[next(iter(services.allowed_tenants))]
+            assert result["product_display"] == {
+                key: profile.get(key) for key in ("brand", "display_name")
+            }
+            view = build_view(result, plan_ids=["id"], hydrate=None)
+            data = next(
+                command["data"]
+                for command in view.ui_commands
+                if command["kind"] == "show_plan"
+            )
+            assert data["product_display"] == result["product_display"]
+            assert data["design_disclaimer"] == DESIGN_IMAGE_DISCLAIMER
+            record = read_traces(
+                rig.settings.ledger_path.with_name("traces.jsonl")
+            ).records[0]
+            assert (
+                record.model_dump()["pattern_distribution"]
+                == result["pattern_distribution"]
+                == [
+                    {
+                        "axis": "hook_type",
+                        "total": 10,
+                        "top_share": 0.5,
+                        "second_share": 0.3,
+                    }
+                ]
+            )
+        finally:
+            await services.close()
+
+    asyncio.run(run())
+
+
 @pytest.fixture
 def rig(monkeypatch, tmp_path):
     seen, calls, queries, profiles, seeds = [], [], [], {}, []
