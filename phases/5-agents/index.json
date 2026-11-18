@@ -339,8 +339,8 @@
       }
     },
     {
-      "step": 8,
-      "name": "obs-langfuse",
+      "step": "8a",
+      "name": "trace-jsonl",
       "status": "pending"
     },
     {

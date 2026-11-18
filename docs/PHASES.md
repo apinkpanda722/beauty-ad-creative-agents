@@ -234,8 +234,8 @@ step 본문은 `phases/4-ontology/step*.md`가 원본이다. 구 번호와의 �
 | 7b | `workspace-feedback` | `config/workspaces.yaml`(dev 2·test 2)와 로더, 우리 제품 단위당 정가 질의, `POST /feedback`(훅·효능은 저장된 기획안에서 서버가 꺼냄, 다른 테넌트 plan_id는 404), 피드백 요약, `resolve_tenant` |
 | 7c | `ask-sse` | `POST /ask`(SSE: step·tool_start·ui_command·token·error), 화면 명령 `show_evidence_cards`·`show_plan`(unknown·효능별 상태 별도 칸, `count_label`, 되돌림 경로, disclaimer)·최소 형태 `show_distribution`·`show_graph_fragment`, `aggregates` 검증 표시, `GET /design`(테넌트 검사), `run_ask_once` |
 | 7d | `full-assembly` | `api/assembly.py` `assemble_full`(연결·작업 공간 시드·가격대·모델 서비스·`ledger_total` 비용 가드, 기본 `group=dev`, 평가 기본 haiku), step 9 live 도구의 조립 |
-| 8a | `trace-jsonl` | 요청 1건=trace 1개 JSONL(단계·도구·모델 호출·구조화 실패 종류·한도·입력 예산 자름·unknown_count, 값·키 없음), 테넌트별 집계. Langfuse(8b)는 P7로 이월 |
-| 9 | `agents-live-target` | `make live-agents` |
+| 8a | `trace-jsonl` | 요청 1건=trace 1줄 JSONL(`obs/trace.py`: 단계·도구·모델 호출(원장 구간)·구조화 실패 종류·한도·입력 예산 자름·되돌림 점수(정수만)·unknown_count, 메시지·사유·모델 문장·키 없음), `summarize_by_tenant`, `assemble_full`의 `ask` 래퍼에서 기록(실패가 요청을 바꾸지 않음), `data/manifest/traces.jsonl`은 gitignore. Langfuse(8b)는 P7로 이월 |
+| 9 | `agents-live-target` | `make live-agents`(사용자 실행): dev 작업 공간 2개·시나리오 5종(패턴·관계·기획 2·범위 밖), 구성 `dev`(평가 haiku)·`official`(평가 sonnet, 기획만)·`image`(이미지, 기획 1건), 세션 상한 $1.0(OpenAI $0.5·Anthropic $0.4·이미지 $0.1, 기준점 파일 재사용), `--dry-run`, 요약에 구조화 실패 종류별 집계(20호출 미만이면 `sample_too_small`)·되돌림 점수 경로·`unknown_count`·한도 |
 
 ### P6·P7
 P6: E2, E3(벡터 구성은 실측 뒤), E5, 격리 검사 200건, (E4), (E1 타사 모델 라벨링 — 결정에 따라), 결과 문서, 사전 등록. P7: `web/` 골격, 화면, verify의 pnpm 단계, k3d, README. 상세는 P5 착수 시점에 쓴다.
