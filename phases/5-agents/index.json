@@ -129,6 +129,11 @@
       }
     },
     {
+      "step": "1b",
+      "name": "db-migrate",
+      "status": "pending"
+    },
+    {
       "step": 6,
       "name": "planning-evaluation",
       "status": "pending"
