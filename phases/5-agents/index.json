@@ -355,7 +355,16 @@
     {
       "step": 9,
       "name": "agents-live-target",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-18T18:49:25+0900",
+      "summary": "live-agents 도구·구성별 시나리오·재사용 예산 기준점·실패 처리·trace 요약과 합성 테스트 구현. 아키텍처 검사 포함 make verify 통과(4,578 tests). 실제 서비스 호출·패키지 설치 없음.",
+      "completed_at": "2026-11-18T18:58:04+0900",
+      "usage": {
+        "input_tokens": 2097140,
+        "cached_input_tokens": 2001152,
+        "output_tokens": 17369,
+        "attempts": 1
+      }
     }
   ],
   "created_at": "2026-11-17T22:15:36+0900"
