@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from beautyads.agents.tool_messages import PARTIAL_RESULT_RULE, TOOL_DATA_RULE
+from beautyads.domain.labels import Claim
 from beautyads.domain.plan import Plan
 from beautyads.llm.structured import (
     StructuredFailure,
@@ -13,7 +14,7 @@ from beautyads.llm.structured import (
 )
 
 PLANNING_REASONING_EFFORT = "low"
-PLANNING_PROMPT_VERSION = "2026-11-18-2"
+PLANNING_PROMPT_VERSION = "2026-11-18-3"
 _MODEL = "gpt-6.1-terra"
 _SYSTEM = (
     "리서치와 브랜드 프로필·피드백을 근거로 기획안 1안만 만든다. "
@@ -25,9 +26,13 @@ _SYSTEM = (
     "pattern_context.thin_pool이 참이면 차별성을 단정하지 않는다. "
     "한계는 코드가 basis_notes에 적었다. "
     "product_url은 profile.own_product_url 값을 그대로 쓴다. "
-    "claimed_efficacy에는 리서치 도구 결과에서 확인된 효능만 넣고, "
-    "확인된 것이 없으면 빈 목록으로 둔다. "
-    "image_brief는 장면 묘사만 쓴다. 지시·설명·괄호 주석을 쓰지 않고, "
+    "claimed_efficacy에는 입력의 available_efficacy(코드가 확인한 효능)에 있는 값만 넣는다. "
+    "확인된 효능이 목록에 없으면 주장하지 않고 빈 목록으로 둔다. "
+    "목록이 비어 있으면 빈 목록이다. "
+    "image_brief는 하나의 핵심 장면(단일 컷)의 장면 묘사만 쓴다. "
+    "여러 장면·콜라주·자막·문구·따옴표 문장을 쓰지 않는다. "
+    "scenes는 영상 장면 목록이며 이미지에는 쓰이지 않는다. "
+    "지시·설명·괄호 주석을 쓰지 않고, "
     "이미지 안에 어떤 글자·로고·브랜드·제품명·라벨 문구도 넣지 않으며 "
     "제품은 무라벨 일반 제품으로 병·튜브·패키지의 형태만 묘사한다. "
     "hook_text·copy_lines는 소비자의 실제 상황이나 고민에서 출발해 짧은 구어체로 쓴다. "
@@ -127,6 +132,12 @@ def make_plan(
     payload = {
         "brief": _text_data(brief),
         "research": research_payload(handoff),
+        "available_efficacy": [
+            value
+            for value in (handoff.get("available_efficacy") or [])
+            if isinstance(value, str)
+            and value in {claim.value for claim in Claim if claim != Claim.other}
+        ],
         "profile": {
             key: profile.get(key)
             for key in ("brand", "tone", "forbidden_terms", "own_product_url")

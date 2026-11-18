@@ -48,11 +48,22 @@ def test_png_dimensions_safe_regions_and_original_pixels(fonts, mode):
     assert (value.width, value.height) == (1024, 1024)
     margin = int(1024 * compose.MARGIN_RATIO)
     inside(
-        value.headline_box, (margin, margin, 1024 - margin, margin + int(1024 * 0.28))
+        value.headline_box,
+        (
+            margin,
+            margin,
+            1024 - margin,
+            margin + int(1024 * compose.HEADLINE_HEIGHT_RATIO),
+        ),
     )
     inside(
         value.cta_box,
-        (margin, 1024 - margin - int(1024 * 0.12), 1024 - margin, 1024 - margin),
+        (
+            margin,
+            1024 - margin - int(1024 * compose.CTA_HEIGHT_RATIO),
+            1024 - margin,
+            1024 - margin,
+        ),
     )
     with (
         Image.open(BytesIO(value.png_bytes)) as rendered,
@@ -82,9 +93,9 @@ def test_wraps_and_shrinks_with_at_most_three_lines(fonts, headline):
     long = compose.compose_design(
         pixels(), headline=headline, cta="", font_dir=directory
     )
-    assert 1 < len(long.lines) <= 3
+    assert 1 < len(long.lines) <= compose.MAX_HEADLINE_LINES
     assert compose.MIN_FONT_PX <= long.headline_size < short.headline_size
-    inside(long.headline_box, (51, 51, 973, 337))
+    inside(long.headline_box, compose.layout_regions(1024, 1024)["headline"])
     assert short.headline_size > compose.MIN_FONT_PX
 
 
@@ -94,9 +105,11 @@ def test_minimum_font_ellipsizes_headline_and_single_line_cta(fonts):
         pixels((100, 1024)), headline="W" * 800, cta="W" * 800, font_dir=directory
     )
     assert value.headline_size == value.cta_size == compose.MIN_FONT_PX
-    assert len(value.lines) <= 3 and value.lines[-1].endswith("…")
-    inside(value.headline_box, (5, 5, 95, 291))
-    inside(value.cta_box, (5, 897, 95, 1019))
+    assert len(value.lines) <= compose.MAX_HEADLINE_LINES and value.lines[-1].endswith(
+        "…"
+    )
+    inside(value.headline_box, compose.layout_regions(100, 1024)["headline"])
+    inside(value.cta_box, compose.layout_regions(100, 1024)["cta"])
     # CTA has no returned line list; ensure the actually rendered text is elided.
 
 
@@ -200,7 +213,9 @@ def test_wrapping_prefers_spaces_and_only_splits_oversized_words(fonts):
 def test_short_headline_keeps_starting_font_and_is_centered(fonts):
     directory, _ = fonts
     value = compose.compose_design(pixels(), headline="Hi", cta="", font_dir=directory)
-    assert value.headline_size == int(int(1024 * compose.HEADLINE_HEIGHT_RATIO) * 0.75)
+    assert value.headline_size == max(
+        compose.MIN_FONT_PX, int(1024 * compose.HEADLINE_FONT_RATIO)
+    )
     assert len(value.lines) == 1 and value.cta_box is None
     left, _, right, _ = value.headline_box
     assert abs((left + right) / 2 - 512) <= 1
@@ -225,3 +240,49 @@ def test_korean_with_fetched_fonts_when_available():
             r > 200 and g > 200 and b > 200
             for r, g, b in rendered.crop(value.headline_box).getdata()
         )
+
+
+@pytest.mark.parametrize("size", [(1024, 1024), (512, 1024), (2048, 64), (8, 256)])
+def test_layout_regions_are_bounded_small_separate_edge_bands(size):
+    width, height = size
+    regions = compose.layout_regions(width, height)
+    assert set(regions) == {"headline", "cta"}
+    horizontal = int(width * compose.MARGIN_RATIO)
+    vertical = min(horizontal, int(height * compose.MARGIN_RATIO))
+    for region in regions.values():
+        inside(region, (horizontal, vertical, width - horizontal, height - vertical))
+    headline, cta = regions["headline"], regions["cta"]
+    area = lambda box: (box[2] - box[0]) * (box[3] - box[1])
+    assert area(headline) <= width * height * compose.BAND_AREA_MAX_RATIO
+    assert area(cta) < area(headline)
+    assert headline[3] <= cta[1]
+    assert 0.05 <= compose.HEADLINE_FONT_RATIO <= 0.06
+    assert compose.CTA_FONT_RATIO < compose.HEADLINE_FONT_RATIO
+    assert compose.MAX_HEADLINE_LINES <= 2
+
+
+@pytest.mark.parametrize("size", [(1024, 1024), (512, 1024)])
+def test_compose_uses_image_height_fonts_and_preserves_entire_center(fonts, size):
+    directory, _ = fonts
+    source = pixels(size)
+    value = compose.compose_design(source, headline="Hi", cta="Go", font_dir=directory)
+    width, height = size
+    assert value.headline_size == max(
+        compose.MIN_FONT_PX, int(height * compose.HEADLINE_FONT_RATIO)
+    )
+    assert value.cta_size == max(
+        compose.MIN_FONT_PX, int(height * compose.CTA_FONT_RATIO)
+    )
+    assert value.cta_size < value.headline_size
+    assert len(value.lines) <= compose.MAX_HEADLINE_LINES <= 2
+    regions = compose.layout_regions(*size)
+    inside(value.headline_box, regions["headline"])
+    inside(value.cta_box, regions["cta"])
+    center = (0, int(height * 0.25), width, int(height * 0.75))
+    assert regions["headline"][3] <= center[1]
+    assert regions["cta"][1] >= center[3]
+    with (
+        Image.open(BytesIO(source)) as before,
+        Image.open(BytesIO(value.png_bytes)) as after,
+    ):
+        assert before.crop(center).tobytes() == after.crop(center).tobytes()

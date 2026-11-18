@@ -657,3 +657,76 @@ def test_product_display_is_server_profile_only_and_no_handoff_distribution_is_e
     }
     assert result["pattern_distribution"] == []
     json.dumps(result, allow_nan=False)
+
+
+@pytest.mark.parametrize(
+    "case", ["plan", "pattern", "relation", "out_of_scope", "no_evidence"]
+)
+def test_claims_lookup_only_runs_once_for_plan_with_evidence(case):
+    calls = []
+    profile = {"tone": "synthetic", "own_product_url": "https://example.invalid/own"}
+    decision = decision_data(
+        intent="boundary"
+        if case == "out_of_scope"
+        else "plan"
+        if case == "no_evidence"
+        else case
+    )
+    f = Fakes(
+        decision=decision,
+        research=handoff(status="no_evidence", evidence_ids=[])
+        if case == "no_evidence"
+        else None,
+    )
+
+    def claims(value):
+        calls.append(deepcopy(value))
+        return ["hydration", "bogus", "other", "hydration", "soothing"], "ok"
+
+    result = supervisor.run_request(**f.args(profile=profile, claims_fn=claims))
+    expected = ["hydration", "soothing"] if case == "plan" else []
+    assert calls == ([profile] if case == "plan" else [])
+    assert result["available_efficacy"] == expected
+    assert result["available_efficacy_status"] == (
+        "ok" if case == "plan" else "skipped"
+    )
+    for call in f.plan_calls:
+        assert call["handoff"]["available_efficacy"] == expected
+    if case != "out_of_scope":
+        assert result["handoff"]["available_efficacy"] == expected
+
+
+@pytest.mark.parametrize("mode", ["none", "exception", "failed", "skipped", "ok"])
+def test_claims_status_is_safe_and_never_changes_evaluation_decisions(mode):
+    from test_plan_eval import Planner, report
+
+    from beautyads.agents.plan_eval import run_plan_eval
+
+    def planning(brief, handoff, profile, feedback, **kwargs):
+        return run_plan_eval(
+            brief=brief,
+            handoff=handoff,
+            profile=profile,
+            feedback=feedback,
+            plan_fn=Planner(),
+            evaluate_fn=lambda **kw: report(low=True),
+            **kwargs,
+        )
+
+    def claims(profile):
+        if mode == "exception":
+            raise RuntimeError("SYNTH_PRIVATE_CLAIMS_DIAGNOSTIC")
+        return ["hydration"], mode
+
+    f = Fakes(decision=decision_data(plan_count=1))
+    base = supervisor.run_request(**f.args(plan_eval_fn=planning))
+    result = supervisor.run_request(
+        **f.args(plan_eval_fn=planning, claims_fn=None if mode == "none" else claims)
+    )
+    status = "failed" if mode == "exception" else "skipped" if mode == "none" else mode
+    assert result["available_efficacy_status"] == status
+    assert result["available_efficacy"] == (["hydration"] if mode == "ok" else [])
+    assert "SYNTH_PRIVATE_CLAIMS_DIAGNOSTIC" not in json.dumps(result)
+    for field in ("status", "rework_count", "attempts"):
+        assert result["plans"][0][field] == base["plans"][0][field]
+    assert result["kind"] == base["kind"]

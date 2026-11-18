@@ -12,14 +12,15 @@ from beautyads.llm import ImageOutcome
 _URL = re.compile(r"\b(?:[a-z][a-z0-9+.-]*://|data:|www\.)\S+", re.IGNORECASE)
 _EXTENSIONS = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp"}
 IMAGE_NO_TEXT_CLAUSE = (
-    "이미지에는 글자·카피·로고·브랜드·제품명·라벨 문구를 넣지 않는다. "
+    "하나의 구도로 단일 컷만 그린다(콜라주·그리드·스토리보드·여러 컷 금지). "
+    "이미지에는 글자·자막·카피·로고·브랜드·제품명·라벨 문구를 넣지 않는다. "
     "제품은 무라벨 일반 병·튜브·패키지의 형태로만 묘사한다."
 )
 
 
 def image_prompt(plan: Plan) -> str:
     """Keep scene text, remove annotations locally, and reserve the no-text suffix."""
-    parts = [plan.image_brief or "", *plan.scenes]
+    parts = [plan.image_brief or ""]
     cleaned = []
     for part in parts:
         text = "\n".join(
@@ -37,6 +38,18 @@ def image_prompt(plan: Plan) -> str:
             if stripped == text:
                 break
             text = stripped
+        # Ignore quote markers in removed annotations; discard nested quoted copy.
+        pairs = {'"': '"', "“": "”", "‘": "’", "'": "'", "「": "」", "『": "』"}
+        stack = []
+        unquoted = []
+        for char in text:
+            if stack and char == stack[-1]:
+                stack.pop()
+            elif char in pairs:
+                stack.append(pairs[char])
+            elif not stack:
+                unquoted.append(char)
+        text = "".join(unquoted)
         cleaned.extend(
             line.strip() for line in _URL.sub("", text).splitlines() if line.strip()
         )

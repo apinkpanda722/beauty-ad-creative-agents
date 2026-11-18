@@ -203,7 +203,7 @@ def test_planning_prompt_distinguishes_internal_rework_from_external_data():
     assert fake.model == "gpt-6.1-terra"
     assert options["reasoning_effort"] == "low"
     assert spec.schema == strict_plan_schema()
-    assert planning.PLANNING_PROMPT_VERSION == "2026-11-18-2"
+    assert planning.PLANNING_PROMPT_VERSION == "2026-11-18-3"
 
 
 def test_fp_c14_planning_receives_pattern_context_and_scene_copy_instructions():
@@ -235,3 +235,59 @@ def test_fp_c14_planning_receives_pattern_context_and_scene_copy_instructions():
         "글자",
     ):
         assert phrase in system["content"]
+
+
+@pytest.mark.parametrize(
+    "available,expected",
+    [
+        (None, []),
+        (["hydration", "bogus", "other", "soothing"], ["hydration", "soothing"]),
+        ([], []),
+    ],
+)
+def test_single_cut_and_code_confirmed_efficacy_are_top_level_planning_input(
+    available, expected
+):
+    fake = Structured()
+    handoff = {} if available is None else {"available_efficacy": available}
+    original = deepcopy(handoff)
+    make_plan(
+        brief={},
+        handoff=handoff,
+        profile={},
+        feedback=None,
+        rework=None,
+        structured=fake,
+    )
+    spec, options = fake.calls[0]
+    system, user = options["messages"]
+    for phrase in (
+        "단일 컷",
+        "콜라주",
+        "장면 묘사",
+        "무라벨",
+        "글자",
+        "available_efficacy",
+        "확인된 효능",
+        "빈 목록",
+        "지배 패턴",
+        "own_product_url",
+        "low_items",
+    ):
+        assert phrase in system["content"]
+    payload = json.loads(user["content"])
+    assert payload["available_efficacy"] == expected
+    assert set(payload["research"]) == {
+        "conclusion",
+        "evidence_ids",
+        "aggregates",
+        "result_counts",
+        "basis_notes",
+        "unresolved",
+        "pattern_context",
+    }
+    assert handoff == original
+    assert options["reasoning_effort"] == "low"
+    assert fake.model == "gpt-6.1-terra"
+    assert spec.schema == strict_plan_schema()
+    assert planning.PLANNING_PROMPT_VERSION == "2026-11-18-3"

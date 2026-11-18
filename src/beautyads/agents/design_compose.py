@@ -11,13 +11,16 @@ from PIL import Image, ImageDraw, ImageFont
 from beautyads.domain.labels import CtaType
 
 MARGIN_RATIO = 0.05
-HEADLINE_HEIGHT_RATIO = 0.28
-CTA_HEIGHT_RATIO = 0.12
+HEADLINE_HEIGHT_RATIO = 0.16
+CTA_HEIGHT_RATIO = 0.06
+HEADLINE_FONT_RATIO = 0.055
+CTA_FONT_RATIO = 0.035
+BAND_AREA_MAX_RATIO = 0.20
 BAND_RGBA = (0, 0, 0, round(255 * 0.45))
 TEXT_COLOR = "white"
 MIN_FONT_PX = 18
 MAX_HEADLINE_CHARS = 80
-MAX_HEADLINE_LINES = 3
+MAX_HEADLINE_LINES = 2
 CTA_LABELS: dict[CtaType, str] = {
     CtaType.shop_now: "지금 만나보기",
     CtaType.learn_more: "자세히 보기",
@@ -118,9 +121,30 @@ def _ellipsis(text, font, width):
     return text + "…" if _width(text + "…", font) <= width else ""
 
 
-def _fit(text, *, directory, filename, region, max_lines):
+def layout_regions(width: int, height: int) -> dict[str, tuple[int, int, int, int]]:
+    """Keep bands at the edges, clamping vertical margins for wide images."""
+    margin = int(width * MARGIN_RATIO)
+    vertical_margin = min(margin, int(height * MARGIN_RATIO))
+    top, bottom = vertical_margin, height - vertical_margin
+    return {
+        "headline": (
+            margin,
+            top,
+            width - margin,
+            min(bottom, top + int(height * HEADLINE_HEIGHT_RATIO)),
+        ),
+        "cta": (
+            margin,
+            max(top, bottom - int(height * CTA_HEIGHT_RATIO)),
+            width - margin,
+            bottom,
+        ),
+    }
+
+
+def _fit(text, *, directory, filename, region, max_lines, image_height, font_ratio):
     width, height = region[2] - region[0], region[3] - region[1]
-    start = max(MIN_FONT_PX, int(height * 0.75))
+    start = max(MIN_FONT_PX, int(image_height * font_ratio))
     sizes = list(range(start, MIN_FONT_PX, -2)) + [MIN_FONT_PX]
     for size in sizes:
         font = _load_font(directory, filename, size)
@@ -154,6 +178,8 @@ def _draw(image, *, text, region, filename, directory, max_lines):
         filename=filename,
         region=region,
         max_lines=max_lines,
+        image_height=image.height,
+        font_ratio=HEADLINE_FONT_RATIO if filename == _BOLD else CTA_FONT_RATIO,
     )
     if not lines:
         return None, size, ()
@@ -194,19 +220,7 @@ def compose_design(
     with Image.open(BytesIO(image_bytes)) as source:
         image = source.convert("RGB")
     width, height = image.size
-    margin = int(width * MARGIN_RATIO)
-    headline_region = (
-        margin,
-        margin,
-        width - margin,
-        min(height - margin, margin + int(height * HEADLINE_HEIGHT_RATIO)),
-    )
-    cta_region = (
-        margin,
-        max(margin, height - margin - int(height * CTA_HEIGHT_RATIO)),
-        width - margin,
-        height - margin,
-    )
+    regions = layout_regions(width, height)
     headline = _clean(headline)[:MAX_HEADLINE_CHARS].rstrip()
     cta = _clean(cta)
     headline_box = cta_box = headline_size = cta_size = None
@@ -215,7 +229,7 @@ def compose_design(
         headline_box, headline_size, lines = _draw(
             image,
             text=headline,
-            region=headline_region,
+            region=regions["headline"],
             filename=_BOLD,
             directory=font_dir,
             max_lines=MAX_HEADLINE_LINES,
@@ -224,7 +238,7 @@ def compose_design(
         cta_box, cta_size, _ = _draw(
             image,
             text=cta,
-            region=cta_region,
+            region=regions["cta"],
             filename=_SEMIBOLD,
             directory=font_dir,
             max_lines=1,

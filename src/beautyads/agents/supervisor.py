@@ -17,6 +17,7 @@ from beautyads.agents.planning import PLANNING_PROMPT_VERSION
 from beautyads.agents.tool_messages import TOOL_DATA_RULE
 from beautyads.agents.tools import get_tool
 from beautyads.domain.claims import CLAIM_CHECK_DISCLAIMER
+from beautyads.domain.labels import Claim
 from beautyads.domain.research import ResearchBrief, ResearchHandoff
 from beautyads.domain.supervisor import (
     AGGREGATES_LABEL,
@@ -270,6 +271,7 @@ def build_supervisor_graph(
     spent_fn,
     limits=_DEFAULT_LIMITS,
     on_event=None,
+    claims_fn=None,
 ):
     """Inject service adapters; plan_eval_fn accepts max_reworks like 6c.
 
@@ -370,6 +372,35 @@ def build_supervisor_graph(
                 handoff["basis_notes"] = [
                     existing for existing in handoff["basis_notes"] if existing != note
                 ] + [note]
+            available, efficacy_status = [], "skipped"
+            if (
+                state["sv_decision"]["intent"] == "plan"
+                and handoff["status"] == "ok"
+                and handoff["evidence_ids"]
+                and claims_fn is not None
+            ):
+                try:
+                    values, efficacy_status = claims_fn(deepcopy(profile))
+                    if efficacy_status not in {"ok", "failed", "skipped"}:
+                        raise ValueError("CLAIMS_STATUS_INVALID")
+                    if efficacy_status == "ok":
+                        available = list(
+                            dict.fromkeys(
+                                value
+                                for value in values
+                                if isinstance(value, str)
+                                and value
+                                in {
+                                    claim.value
+                                    for claim in Claim
+                                    if claim != Claim.other
+                                }
+                            )
+                        )
+                except Exception:  # noqa: BLE001 -- lookup diagnostics never enter results
+                    available, efficacy_status = [], "failed"
+            handoff["available_efficacy"] = available
+            handoff["available_efficacy_status"] = efficacy_status
             state["sv_handoff"] = _copy_json(handoff)
             _step(state, on_event, "research", "end", handoff["status"])
             # Research exposes tool names only after it finishes. These tool_start
@@ -474,6 +505,7 @@ def run_request(
     spent_fn,
     limits=_DEFAULT_LIMITS,
     on_event=None,
+    claims_fn=None,
 ) -> dict:
     """Run one request, accounting for 텍스트 모델 비용, 이미지 제외."""
     state = initial_supervisor_state(message, limits)
@@ -487,6 +519,7 @@ def run_request(
         spent_fn=spent_fn,
         limits=limits,
         on_event=on_event,
+        claims_fn=claims_fn,
     )
     try:
         for snapshot in graph.stream(
@@ -512,6 +545,10 @@ def run_request(
             "intent": state["sv_decision"].get("intent"),
             "brief": state["sv_brief"],
             "handoff": state["sv_handoff"],
+            "available_efficacy": state["sv_handoff"].get("available_efficacy", []),
+            "available_efficacy_status": state["sv_handoff"].get(
+                "available_efficacy_status", "skipped"
+            ),
             "product_display": {
                 key: profile.get(key) for key in ("brand", "display_name")
             },

@@ -34,6 +34,8 @@ from beautyads.api.checkpointer import (
     setup_checkpointer,
 )
 from beautyads.domain.creative import Source
+from beautyads.domain.labels import Claim
+from beautyads.domain.lookups import SupportStatus
 from beautyads.domain.plan import Plan
 from beautyads.domain.supervisor import RequestLimits, cost_exceeded
 from beautyads.domain.tenant import WorkspaceProfile, price_band
@@ -309,6 +311,22 @@ async def assemble_full(
                             raw_store=raw_store,
                         )
 
+                    def claims_fn(profile: dict) -> tuple[list[str], str]:
+                        product_url = profile.get("own_product_url")
+                        if not product_url or not product_url.strip():
+                            return [], "skipped"
+                        support = GraphEfficacySupport(graph_connection)
+                        available, failed = [], False
+                        for claim in Claim:
+                            if claim == Claim.other:
+                                continue
+                            status = support.efficacy_support(product_url, claim)
+                            if support.last_error is not None:
+                                failed = True
+                            if status == SupportStatus.supported:
+                                available.append(claim.value)
+                        return ([], "failed") if failed else (available, "ok")
+
                     def plan_fn(**options):
                         return make_plan(
                             **options, structured=structured("gpt-6.1-terra")
@@ -425,6 +443,7 @@ async def assemble_full(
                         spent_fn=spent_fn,
                         limits=limits,
                         on_event=on_event,
+                        claims_fn=claims_fn,
                     )
                     return result
                 except BaseException as exc:

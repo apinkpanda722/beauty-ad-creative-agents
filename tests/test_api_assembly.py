@@ -135,7 +135,9 @@ def test_fp_c14_assembled_image_call_is_scene_only_and_carries_context(
             assert len(prompts) == 1
             prompt = prompts[0]
             assert prompt.endswith(IMAGE_NO_TEXT_CLAUSE)
-            assert "투명한 물결" in prompt
+            assert "투명한 물결" not in prompt
+            if image_brief is not None:
+                assert "햇빛 속 병" in prompt and "물방울" in prompt
             assert all(
                 marker not in prompt
                 for marker in ("META_", "COPY_SENTINEL", "https://", "※")
@@ -1117,3 +1119,107 @@ def test_composed_image_reference_and_safe_original_fallback(
 
     asyncio.run(run())
     assert "synthetic-private" not in caplog.text + str(capsys.readouterr())
+
+
+@pytest.mark.parametrize(
+    "mode", ["ok", "failed", "partial_failure", "empty", "missing"]
+)
+def test_assembled_claims_function_uses_only_existing_support_query(
+    rig, monkeypatch, mode
+):
+    from beautyads.domain.labels import Claim
+    from beautyads.graph.evidence_queries import (
+        product_support_parameters,
+        product_support_query,
+    )
+
+    original_run_request = assembly.run_request
+    support_queries, direct, all_queries, direct_queries = [], [], [], []
+
+    def request(**options):
+        direct.append(options["claims_fn"](options["profile"]))
+        direct_queries.append(list(all_queries))
+        all_queries.clear()
+        support_queries.clear()
+        return original_run_request(**options)
+
+    monkeypatch.setattr(assembly, "run_request", request)
+
+    async def run():
+        services = await rig.start()
+        try:
+            original_run = rig.graph.run
+
+            def graph_run(query, params):
+                all_queries.append((query, params))
+                if query == product_support_query():
+                    support_queries.append((query, params))
+                    if mode == "failed" or (
+                        mode == "partial_failure" and params.get("claim") == "soothing"
+                    ):
+                        raise RuntimeError("SYNTH_PRIVATE_GRAPH_DIAGNOSTIC")
+                    return SimpleNamespace(
+                        records=[
+                            {
+                                "ingredient_count": 1,
+                                "supporting_count": int(
+                                    params.get("claim") == "hydration"
+                                ),
+                            }
+                        ]
+                    )
+                return original_run(query, params)
+
+            monkeypatch.setattr(rig.graph, "run", graph_run)
+            tenant = next(iter(services.allowed_tenants))
+            profile = dict(services.workspaces[tenant])
+            if mode == "empty":
+                profile["own_product_url"] = ""
+            elif mode == "missing":
+                profile.pop("own_product_url")
+            result = services.ask(
+                "synthetic",
+                ToolContext(tenant_id=tenant, as_of=services.as_of),
+                profile,
+                {},
+                False,
+            )
+            expected = (
+                (["hydration"], "ok")
+                if mode == "ok"
+                else ([], "skipped" if mode in {"empty", "missing"} else "failed")
+            )
+            assert direct == [expected]
+            assert (
+                result["available_efficacy"],
+                result["available_efficacy_status"],
+            ) == expected
+            assert result["plans"][0]["status"] == "done"
+            if mode in {"empty", "missing"}:
+                assert support_queries == []
+                assert direct_queries == [[]]
+            else:
+                claims = [claim for claim in Claim if claim != Claim.other]
+                assert support_queries == [
+                    (
+                        product_support_query(),
+                        product_support_parameters(
+                            product_url=profile["own_product_url"], claim=claim
+                        ),
+                    )
+                    for claim in claims
+                ]
+                assert all(params["claim"] != "other" for _, params in support_queries)
+                assert direct_queries == [support_queries]
+            assert "SYNTH_PRIVATE_GRAPH_DIAGNOSTIC" not in json.dumps(result)
+            payload = next(
+                json.loads(options["messages"][-1]["content"])
+                for name, options in rig.calls
+                if name == "plan"
+            )
+            assert payload["available_efficacy"] == expected[0]
+            assert "available_efficacy" not in payload["research"]
+        finally:
+            await services.close()
+
+    asyncio.run(run())

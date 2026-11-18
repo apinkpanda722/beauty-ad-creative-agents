@@ -38,8 +38,8 @@ def test_prompt_includes_only_plan_text():
     prompt = image_prompt(value)
     assert isinstance(prompt, str)
     assert value.hook_text not in prompt
-    for text in [value.image_brief, *value.scenes]:
-        assert text in prompt
+    assert value.image_brief in prompt
+    assert all(text not in prompt for text in value.scenes)
     assert value.product_url not in prompt and value.evidence_ids[0] not in prompt
     assert len(prompt) <= 2000
 
@@ -152,7 +152,7 @@ def test_prompt_removes_meta_copy_and_always_ends_with_no_text_clause(brief):
         )
     )
     assert prompt.endswith(IMAGE_NO_TEXT_CLAUSE)
-    assert "빛나는 표면" in prompt
+    assert "빛나는 표면" not in prompt
     if brief is not None:
         assert "창가의 병" in prompt and "물방울" in prompt
     for marker in (
@@ -225,3 +225,57 @@ def test_composed_rejects_invalid_index_without_writing(tmp_path, index):
             b"synthetic", request_key="request", index=index, base_dir=tmp_path
         )
     assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize(
+    "quotes",
+    [
+        '"SYNTH_QUOTE_A" “SYNTH_QUOTE_B” 「SYNTH_QUOTE_C」',
+        "‘SYNTH_QUOTE_A’ 'SYNTH_QUOTE_B' 『SYNTH_QUOTE_C』",
+        "「SYNTH_QUOTE_A “SYNTH_QUOTE_B 'SYNTH_QUOTE_C'”」",
+        "「SYNTH_QUOTE_A「SYNTH_QUOTE_B」SYNTH_QUOTE_C」",
+        "“SYNTH_QUOTE_A\nSYNTH_QUOTE_B” 『SYNTH_QUOTE_C』",
+    ],
+)
+def test_single_cut_prompt_removes_all_quoted_copy_and_video_scenes(quotes):
+    from beautyads.agents.design_images import IMAGE_NO_TEXT_CLAUSE
+
+    value = plan(
+        image_brief=f"SYNTH_VISUAL {quotes} (SYNTH_COMMENT)",
+        scenes=["SYNTH_SCENE_X"],
+        hook_text="SYNTH_HOOK",
+        copy_lines=["SYNTH_COPY"],
+    )
+    prompt = image_prompt(value)
+    assert prompt == "SYNTH_VISUAL\n" + IMAGE_NO_TEXT_CLAUSE
+    for marker in (
+        "SYNTH_QUOTE_",
+        "SYNTH_SCENE_X",
+        "SYNTH_HOOK",
+        "SYNTH_COPY",
+        "SYNTH_COMMENT",
+    ):
+        assert marker not in prompt
+    for phrase in ("콜라주", "스토리보드", "여러 컷", "단일 컷", "자막", "무라벨"):
+        assert phrase in IMAGE_NO_TEXT_CLAUSE
+
+
+@pytest.mark.parametrize(
+    "brief",
+    [None, '"ONLY_COPY"', "“ONLY_COPY”\n「MORE_COPY」", "(COMMENT)\nNote: META"],
+)
+def test_empty_scene_leaves_only_fixed_image_instruction(brief):
+    from beautyads.agents.design_images import IMAGE_NO_TEXT_CLAUSE
+
+    assert image_prompt(plan(image_brief=brief)) == IMAGE_NO_TEXT_CLAUSE
+
+
+@pytest.mark.parametrize(
+    "comment",
+    ["(don't render)", '[remove "note]', "（remove “note）", "<remove 「note>"],
+)
+def test_quote_markers_inside_annotations_do_not_remove_scene_body(comment):
+    from beautyads.agents.design_images import IMAGE_NO_TEXT_CLAUSE
+
+    prompt = image_prompt(plan(image_brief=f"{comment} SYNTH_VISUAL_AFTER"))
+    assert prompt == "SYNTH_VISUAL_AFTER\n" + IMAGE_NO_TEXT_CLAUSE
