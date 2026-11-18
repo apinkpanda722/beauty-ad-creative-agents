@@ -327,16 +327,7 @@
     {
       "step": "7d",
       "name": "full-assembly",
-      "status": "blocked",
-      "started_at": "2026-11-18T16:40:02+0900",
-      "blocked_reason": "선점검에서 hydrate 열 개수 요구가 충돌합니다: “`hydrate`(PostgreSQL `creatives`에서 `source`·`url`·`brand`·`title`·`published_at`·`latest_view_count`·`latest_like_count`만 읽는 파라미터 질의, 모든 값 JSON 안전)”는 7개 열을 요구하지만, “`hydrate`: 가짜 연결에서 파라미터 질의를 쓰고(문자열 연결 없음) 열 목록이 위 다섯 개뿐이다.”는 5개를 요구합니다. 사용할 열 목록을 확정해 주세요. 지시대로 코드 작성·수정 없이 중단했습니다.",
-      "blocked_at": "2026-11-18T16:40:43+0900",
-      "usage": {
-        "input_tokens": 24483,
-        "cached_input_tokens": 0,
-        "output_tokens": 660,
-        "attempts": 1
-      }
+      "status": "pending"
     },
     {
       "step": 8,
