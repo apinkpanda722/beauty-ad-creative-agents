@@ -185,6 +185,7 @@ def _trace_fields(record):
         ],
         "limit_hit": record.limit_hit,
         "limit_kinds": record.limit_kinds,
+        "limit_detail": [detail.model_dump() for detail in record.limit_detail],
         "cost_by_provider": costs,
         "duration_ms": record.duration_ms,
     }
@@ -227,6 +228,7 @@ def _request(scenario, *, run, app, with_image):
         plans=[],
         limit_hit=False,
         limit_kinds=[],
+        limit_detail=[],
         cost_by_provider={},
         duration_ms=0,
     )

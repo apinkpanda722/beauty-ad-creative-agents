@@ -47,7 +47,6 @@ from beautyads.sources.claim_rules import load_claim_rules
 PREREG_PATH = Path("docs/results/p5_dev_compare_preregistration.md")
 OUTPUT_ROOT = Path("data/interim/p5_compare")
 PURPOSE_CAPS = {"compare-inputs": 0.02, "compare-terra": 0.12, "compare-sonnet": 0.10}
-HARD_CAPS = {"gemini": 12.0, "openai": 10.0, "anthropic": 8.0}
 EFFORTS = ("none", "low", "medium")
 MIN_USABLE = 3
 SONNET_SAMPLE = 6
@@ -353,10 +352,7 @@ class _Runtime:
         self.settings, self.environ, self.env_file = settings, environ, env_file
         self.structured_factory = structured_factory
         self.calls = []
-        self.caps = {
-            key: min(value, settings.provider_caps_usd[key])
-            for key, value in HARD_CAPS.items()
-        }
+        self.caps = dict(settings.provider_caps_usd)
 
     def guard(self):
         try:

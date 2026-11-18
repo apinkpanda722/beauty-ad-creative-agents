@@ -1,6 +1,7 @@
 """Request-local Supervisor graph; services and request cost accounting are injected."""
 
 import json
+import re
 from copy import deepcopy
 from datetime import date
 from math import isfinite
@@ -163,6 +164,7 @@ def initial_supervisor_state(message: str, limits: RequestLimits) -> SupervisorS
             "kind": "failed",
             "incomplete": False,
             "limit_kinds": [],
+            "limit_detail": [],
             "node_count": 0,
             "aggregates_removed": [],
             "event_errors": {},
@@ -197,9 +199,22 @@ def _step(state, on_event, agent, phase, status):
     )
 
 
-def _limit(state, kind):
+def _limit(state, kind, cap=None):
     status = state["sv_status"]
     status["limit_kinds"] = sorted(set(status["limit_kinds"]) | {kind})
+    if kind == "image":
+        cap = (
+            cap
+            if isinstance(cap, str)
+            and re.fullmatch(r"(provider|purpose):[a-z_]{1,32}", cap)
+            else "unknown"
+        )
+    else:
+        cap = f"request:{kind}"
+    detail = {"kind": kind, "cap": cap}
+    if detail not in status["limit_detail"]:
+        status["limit_detail"].append(detail)
+        status["limit_detail"].sort(key=lambda item: (item["kind"], item["cap"]))
     status["incomplete"] = True
 
 
@@ -414,7 +429,7 @@ def build_supervisor_graph(
                     image.get("ok") is False
                     and image.get("code") == "IMAGE_CAP_REACHED"
                 ):
-                    _limit(state, "image")
+                    _limit(state, "image", image.get("cap"))
             if status != "done":
                 state["sv_status"]["incomplete"] = True
             return Command(
@@ -488,6 +503,7 @@ def run_request(
             "plans": state["sv_results"],
             "limit_hit": bool(status["limit_kinds"]),
             "limit_kinds": sorted(status["limit_kinds"]),
+            "limit_detail": status["limit_detail"],
             "limits": {
                 "text_spent_usd": state["sv_spent"],
                 "max_text_cost_usd": limits.max_text_cost_usd,

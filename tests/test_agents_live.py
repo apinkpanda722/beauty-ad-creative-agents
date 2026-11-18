@@ -382,6 +382,66 @@ def test_dry_run_has_only_plan_and_never_reads_costs_or_initializes(
     assert not rig.root.exists() and not rig.calls and SECRET not in text
 
 
+@pytest.mark.parametrize(
+    "cap,expected",
+    [
+        ("provider:gemini", "provider:gemini"),
+        ("purpose:image", "purpose:image"),
+        (SECRET, "unknown"),
+    ],
+)
+def test_scenario_summary_copies_trace_limit_detail_without_private_caps(
+    rig, cap, expected
+):
+    records = []
+
+    def run(**kw):
+        record = build_trace(
+            tenant_id=kw["tenant_id"],
+            started_at=rig.now,
+            duration_ms=1,
+            message=SECRET,
+            result={
+                "limit_hit": True,
+                "limit_kinds": ["image", "text"],
+                "limit_detail": [
+                    {"kind": "image", "cap": cap},
+                    {"kind": "text", "cap": "request:text"},
+                ],
+            },
+            failure=None,
+            ledger_entries=[],
+            structured={},
+        )
+        records.append(record)
+        append_trace(rig.settings.ledger_path.with_name("traces.jsonl"), record)
+        return outcome()
+
+    rig.behavior = run
+    code, summary, text = rig.invoke("--config", "image")
+    assert code == 0 and len(records) == 1
+    expected_detail = [
+        {"kind": "image", "cap": expected},
+        {"kind": "text", "cap": "request:text"},
+    ]
+    assert summary["scenarios"][0]["limit_detail"] == expected_detail
+    assert summary["scenarios"][0]["limit_detail"] == [
+        item.model_dump() for item in records[0].limit_detail
+    ]
+    assert SECRET not in text
+    assert (
+        SECRET
+        not in next(
+            path for path in rig.root.glob("*.json") if path.name != "baseline.json"
+        ).read_text()
+    )
+
+
+def test_scenario_without_trace_has_empty_limit_detail(rig):
+    code, summary, _ = rig.invoke("--config", "image")
+    assert code == 0 and summary["scenarios"][0]["limit_detail"] == []
+
+
 def trace(rig, tenant, **kwargs):
     return build_trace(
         **{

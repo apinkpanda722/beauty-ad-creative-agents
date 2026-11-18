@@ -697,7 +697,8 @@ def test_inputs_chat_and_structured_calls_use_comparison_ledger(monkeypatch, tmp
         for kw in calls
     )
     assert all(
-        kw["caps"] == compare.HARD_CAPS and kw["ledger_path"] == tmp_path / "ledger"
+        kw["caps"] == Settings().provider_caps_usd
+        and kw["ledger_path"] == tmp_path / "ledger"
         for kw in calls
     )
     report = json.loads(next(base.glob("*-inputs.json")).read_text())

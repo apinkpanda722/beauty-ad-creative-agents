@@ -50,7 +50,6 @@ from beautyads.store.connection import connect, postgres_dsn
 from beautyads.store.repository import PostgresCreativeStore
 from beautyads.store.tenant_repository import PostgresTenantRepository
 
-_HARD_CAPS = {"gemini": 12.0, "openai": 10.0, "anthropic": 8.0}
 _DESIGN_DIR = Path("data/design")
 _DEFAULT_LIMITS = RequestLimits()
 _HYDRATE_COLUMNS = (
@@ -135,11 +134,8 @@ async def assemble_full(
         **(models or {}),
     }
     config = {"environ": environ, "env_file": env_file}
-    caps = {
-        name: min(cap, settings.provider_caps_usd[name])
-        for name, cap in _HARD_CAPS.items()
-    }
-    purpose_caps = {"image": min(3.5, settings.purpose_caps_usd["image"])}
+    caps = dict(settings.provider_caps_usd)
+    purpose_caps = dict(settings.purpose_caps_usd)
 
     try:
         async with AsyncExitStack() as stack:
@@ -343,8 +339,20 @@ async def assemble_full(
                                     purpose_caps=purpose_caps,
                                     api_key=get_setting("GEMINI_API_KEY", **config),
                                 )
-                            except CostCapExceeded:
-                                return {"ok": False, "code": "IMAGE_CAP_REACHED"}
+                            except CostCapExceeded as exc:
+                                cap = (
+                                    "purpose:image"
+                                    if exc.provider == "purpose:image"
+                                    else "provider:" + exc.provider
+                                    if isinstance(exc.provider, str)
+                                    and re.fullmatch(r"[a-z_]{1,32}", exc.provider)
+                                    else "provider:unknown"
+                                )
+                                return {
+                                    "ok": False,
+                                    "code": "IMAGE_CAP_REACHED",
+                                    "cap": cap,
+                                }
                             except Exception:  # noqa: BLE001 -- no image diagnostics or signatures
                                 return {"ok": False, "code": "IMAGE_FAILED"}
                             if not outcome.ok:

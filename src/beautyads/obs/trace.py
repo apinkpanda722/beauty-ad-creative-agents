@@ -65,6 +65,24 @@ class TraceInputTrim(_TraceModel):
     total: Count
 
 
+class TraceLimitDetail(_TraceModel):
+    kind: Token
+    cap: Token
+
+    @field_validator("cap", mode="before")
+    @classmethod
+    def safe_cap(cls, value):
+        return (
+            value
+            if isinstance(value, str)
+            and re.fullmatch(
+                r"(?:provider|purpose):[a-z_]{1,32}|request:(?:text|steps|plans)|unknown",
+                value,
+            )
+            else "unknown"
+        )
+
+
 class TraceCall(_TraceModel):
     purpose: Token
     model: Token
@@ -104,6 +122,7 @@ class TraceRecord(_TraceModel):
     plans: list[TracePlan] = Field(default_factory=list)
     limit_hit: bool = False
     limit_kinds: list[Token] = Field(default_factory=list)
+    limit_detail: list[TraceLimitDetail] = Field(default_factory=list)
     input_trims: list[TraceInputTrim] = Field(default_factory=list)
     aggregates_removed_count: Count = 0
     text_spent_usd: float | None = None
@@ -215,6 +234,10 @@ def build_trace(
         plans=plans,
         limit_hit=result.get("limit_hit", False),
         limit_kinds=result.get("limit_kinds", []),
+        limit_detail=[
+            TraceLimitDetail(**_project(TraceLimitDetail, detail))
+            for detail in result.get("limit_detail", [])
+        ],
         input_trims=trims,
         aggregates_removed_count=len(result.get("aggregates_removed", [])),
         text_spent_usd=result.get("limits", {}).get("text_spent_usd"),

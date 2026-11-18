@@ -484,7 +484,11 @@ def test_image_caps_return_structured_result_and_supervisor_image_limit(rig, cap
     async def run():
         services = await rig.start(with_image_enabled=True, models={"image": capped})
         result = invoke(services, with_image=True)
-        assert result["plans"][0]["image"] == {"ok": False, "code": "IMAGE_CAP_REACHED"}
+        assert result["plans"][0]["image"] == {
+            "ok": False,
+            "code": "IMAGE_CAP_REACHED",
+            "cap": "provider:gemini" if cap == "gemini" else cap,
+        }
         assert result["limit_kinds"] == ["image"]
         await services.close()
 
@@ -770,3 +774,70 @@ def test_trace_failures_never_change_result_or_original_error(
 
     asyncio.run(run())
     assert secret not in caplog.text + str(capsys.readouterr())
+
+
+@pytest.mark.parametrize(
+    "provider,total,cap,expected",
+    [
+        ("gemini", 16.66, 12, "provider:gemini"),
+        ("purpose:image", 3.6, 3.5, "purpose:image"),
+        ("openai", 20, 10, "provider:openai"),
+        ("synthetic-private secret/value", 1, 1, "provider:unknown"),
+        ("purpose:other", 1, 1, "provider:unknown"),
+        ("Gemini", 1, 1, "provider:unknown"),
+        ("a" * 33, 1, 1, "provider:unknown"),
+    ],
+)
+def test_image_cap_detail_reaches_supervisor_and_trace(
+    rig, provider, total, cap, expected
+):
+    from beautyads.obs.trace import read_traces
+
+    def image(**options):
+        raise CostCapExceeded(provider, total, cap)
+
+    async def run():
+        services = await rig.start(with_image_enabled=True, models={"image": image})
+        try:
+            result = invoke(services, with_image=True)
+            assert result["plans"][0]["image"] == {
+                "ok": False,
+                "code": "IMAGE_CAP_REACHED",
+                "cap": expected,
+            }
+            detail = [{"kind": "image", "cap": expected}]
+            assert result["limit_detail"] == detail
+            assert result["limit_kinds"] == ["image"] and result["limit_hit"]
+            trace = read_traces(rig.settings.ledger_path.with_name("traces.jsonl"))
+            assert len(trace.records) == 1
+            assert [
+                item.model_dump() for item in trace.records[0].limit_detail
+            ] == detail
+            assert (
+                "synthetic-private secret/value"
+                not in trace.records[0].model_dump_json()
+            )
+        finally:
+            await services.close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("raises", [False, True])
+def test_image_failed_contract_stays_unchanged(rig, raises):
+    def image(**options):
+        if raises:
+            raise RuntimeError("synthetic-private diagnostic")
+        return SimpleNamespace(ok=False)
+
+    async def run():
+        services = await rig.start(with_image_enabled=True, models={"image": image})
+        try:
+            result = invoke(services, with_image=True)
+            assert result["plans"][0]["image"] == {"ok": False, "code": "IMAGE_FAILED"}
+            assert result["limit_kinds"] == result["limit_detail"] == []
+            assert not result["limit_hit"]
+        finally:
+            await services.close()
+
+    asyncio.run(run())

@@ -430,3 +430,62 @@ def test_final_plan_reaching_text_cap_is_reported_without_discarding_result():
     assert len(output["plans"]) == 1
     assert output["limit_hit"] and output["limit_kinds"] == ["text"]
     assert output["incomplete"]
+
+
+@pytest.mark.parametrize("text_hit", [False, True])
+@pytest.mark.parametrize(
+    "cap,expected",
+    [
+        ("provider:gemini", "provider:gemini"),
+        ("purpose:image", "purpose:image"),
+        ("provider:unknown", "provider:unknown"),
+        (None, "unknown"),
+        ("request:text", "unknown"),
+        ("provider:Gemini", "unknown"),
+        ("provider:" + "a" * 33, "unknown"),
+        ("provider:gemini\n", "unknown"),
+        ("SYNTHETIC-SECRET-private cap", "unknown"),
+        (7, "unknown"),
+    ],
+)
+def test_limit_detail_reports_safe_image_and_request_caps(cap, expected, text_hit):
+    f = Fakes(
+        plan={
+            "status": "done",
+            "rework_count": 0,
+            "image": {"ok": False, "code": "IMAGE_CAP_REACHED", "cap": cap},
+        }
+    )
+    original = f.planning
+
+    def plan(*args, **kwargs):
+        result = original(*args, **kwargs)
+        if text_hit:
+            f.cost = 0.30
+        return result
+
+    output = supervisor.run_request(**f.args(plan_eval_fn=plan))
+    detail = [{"kind": "image", "cap": expected}]
+    if text_hit:
+        detail.append({"kind": "text", "cap": "request:text"})
+    assert output["limit_detail"] == detail
+    assert output["limit_kinds"] == [item["kind"] for item in detail]
+    assert output["limit_hit"]
+
+
+@pytest.mark.parametrize(
+    "limits,expected",
+    [
+        (RequestLimits(max_steps=1), [{"kind": "steps", "cap": "request:steps"}]),
+        (RequestLimits(max_plans=1), [{"kind": "plans", "cap": "request:plans"}]),
+        (
+            RequestLimits(max_text_cost_usd=0.001),
+            [{"kind": "text", "cap": "request:text"}],
+        ),
+        (RequestLimits(), []),
+    ],
+)
+def test_limit_detail_covers_other_request_limits(limits, expected):
+    output = supervisor.run_request(**Fakes().args(limits=limits))
+    assert output["limit_detail"] == expected
+    assert output["limit_kinds"] == [item["kind"] for item in expected]

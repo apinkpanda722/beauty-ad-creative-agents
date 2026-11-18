@@ -295,3 +295,37 @@ def test_tenant_summary_separates_requests_calls_costs_and_structured_failures()
             },
             "structured_calls": 3 * count,
         }
+
+
+def test_limit_detail_projects_only_safe_fields_and_roundtrips(tmp_path):
+    detail = [
+        {"kind": "image", "cap": "purpose:image"},
+        {"kind": "text", "cap": "request:text"},
+    ]
+    record = make_trace(
+        result={"limit_detail": [{**item, "diagnostic": SECRET} for item in detail]}
+    )
+    assert [item.model_dump() for item in record.limit_detail] == detail
+    path = tmp_path / "trace.jsonl"
+    append_trace(path, record)
+    assert read_traces(path).records == [record]
+    assert SECRET not in path.read_text()
+    assert make_trace().limit_detail == []
+
+
+@pytest.mark.parametrize(
+    "cap", [SECRET, "provider:gemini\n", "provider:Gemini", "a/b", 9, None]
+)
+def test_limit_detail_sanitizes_invalid_cap_without_losing_trace(cap):
+    record = make_trace(result={"limit_detail": [{"kind": "image", "cap": cap}]})
+    assert [item.model_dump() for item in record.limit_detail] == [
+        {"kind": "image", "cap": "unknown"}
+    ]
+    assert SECRET not in record.model_dump_json()
+
+
+def test_limit_detail_kind_must_pass_trace_token_pattern():
+    with pytest.raises(ValidationError):
+        make_trace(
+            result={"limit_detail": [{"kind": "invalid kind/", "cap": "unknown"}]}
+        )

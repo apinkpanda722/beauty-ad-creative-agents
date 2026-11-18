@@ -39,7 +39,6 @@ from beautyads.store.schema import MIGRATIONS
 from beautyads.store.tenant_repository import PostgresTenantRepository
 
 MAX_TOKENS = 1024
-HARD_CAPS = {"gemini": 12.0, "openai": 10.0, "anthropic": 8.0}
 
 
 class CallCostLimit(Exception):
@@ -58,10 +57,7 @@ def estimate_call_usd(messages, tools):
 
 
 def budgeted_chat(settings, max_usd, *, complete=chat_complete):
-    caps = {
-        name: min(settings.provider_caps_usd[name], cap)
-        for name, cap in HARD_CAPS.items()
-    }
+    caps = dict(settings.provider_caps_usd)
 
     def chat(**kwargs):
         estimated = estimate_call_usd(
