@@ -1,0 +1,285 @@
+"""Request-local metadata only: no prompts, generated prose or diagnostics."""
+
+import re
+from collections import defaultdict
+from datetime import UTC, datetime
+from math import fsum
+from pathlib import Path
+from threading import Lock
+from typing import Annotated, Literal, NamedTuple
+from uuid import uuid4
+
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    ValidationError,
+    field_validator,
+)
+
+from beautyads.obs.ledger import LedgerEntry
+
+_trace_lock = Lock()
+# Supervisor's default decide budget. Custom budgets also appear in input_trims.
+_DECIDE_MAX_CHARS = 2000
+Token = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9_.:-]{1,128}$")]
+Count = Annotated[int, Field(strict=True, ge=0)]
+
+
+class _TraceModel(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+
+class TraceStep(_TraceModel):
+    agent: Token
+    phase: Token
+    status: Token
+
+
+class TraceTool(_TraceModel):
+    tool: Token
+    row_count: Count = 0
+    shown_count: Count = 0
+
+
+class TraceAttempt(_TraceModel):
+    attempt: Count = 0
+    passed: bool | None = None
+    scores: dict[Token, Annotated[int, Field(strict=True)]] | None = None
+    failed_check_codes: list[Token] = Field(default_factory=list)
+    cost_usd: float | None = None
+
+
+class TracePlan(_TraceModel):
+    status: Token | None = None
+    rework_count: Count = 0
+    unknown_count: Count = 0
+    efficacy_status: dict[Token, Token] = Field(default_factory=dict)
+    attempts: list[TraceAttempt] = Field(default_factory=list)
+
+
+class TraceInputTrim(_TraceModel):
+    field: Literal["message", "evidence_ids", "aggregates"]
+    kept: Count
+    total: Count
+
+
+class TraceCall(_TraceModel):
+    purpose: Token
+    model: Token
+    reasoning_effort: Token | None = None
+    input_tokens: Count = 0
+    output_tokens: Count = 0
+    thought_tokens: Count = 0
+    cached_tokens: Count = 0
+    cost_usd: float
+    cost_source: Literal["response_cost", "computed", "missing", "price_table"]
+
+
+class TraceStructured(_TraceModel):
+    calls: Count = 0
+    failed_after_retry: Count = 0
+    first_attempt_failures: dict[Token, Count] = Field(default_factory=dict)
+
+
+class TraceRecord(_TraceModel):
+    trace_id: str = Field(
+        default_factory=lambda: uuid4().hex, pattern=r"^[0-9a-f]{32}$"
+    )
+    tenant_id: Token
+    started_at: datetime
+    duration_ms: Count
+    outcome: Literal["ok", "error"]
+    error_class: str | None = None
+    error_code: str | None = None
+    kind: (
+        Literal["research", "plan", "out_of_scope", "no_evidence", "failed"] | None
+    ) = None
+    intent: Literal["pattern", "relation", "plan", "boundary"] | None = None
+    message_chars: Count
+    message_trimmed: bool = False
+    steps: list[TraceStep] = Field(default_factory=list)
+    tools: list[TraceTool] = Field(default_factory=list)
+    plans: list[TracePlan] = Field(default_factory=list)
+    limit_hit: bool = False
+    limit_kinds: list[Token] = Field(default_factory=list)
+    input_trims: list[TraceInputTrim] = Field(default_factory=list)
+    aggregates_removed_count: Count = 0
+    text_spent_usd: float | None = None
+    calls: list[TraceCall] = Field(default_factory=list)
+    cost_total_usd: float = 0.0
+    cost_by_purpose: dict[Token, float] = Field(default_factory=dict)
+    structured: dict[Token, TraceStructured] = Field(default_factory=dict)
+
+    @field_validator("error_class", "error_code", mode="before")
+    @classmethod
+    def safe_error_identifier(cls, value):
+        return (
+            value
+            if isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9_:]{1,64}", value)
+            else None
+        )
+
+    @field_validator("started_at")
+    @classmethod
+    def utc_timestamp(cls, value: datetime) -> datetime:
+        if value.utcoffset() is None:
+            raise ValueError("started_at must include a timezone")
+        return value.astimezone(UTC)
+
+
+class TraceRead(NamedTuple):
+    records: list[TraceRecord]
+    skipped_lines: int
+
+
+def _project(model, value):
+    return {key: value[key] for key in model.model_fields if key in value}
+
+
+def build_trace(
+    *,
+    tenant_id: str,
+    started_at: datetime,
+    duration_ms: int,
+    message: str,
+    result: dict | None,
+    failure: dict | None,
+    ledger_entries: list[LedgerEntry],
+    structured: dict,
+) -> TraceRecord:
+    """Project explicit metadata fields; never traverse source or model bodies."""
+    result = result or {}
+    plans = []
+    for plan in result.get("plans", []):
+        attempts = []
+        for attempt in plan.get("attempts", []):
+            scores = attempt.get("scores")
+            attempts.append(
+                TraceAttempt(
+                    **{
+                        **_project(TraceAttempt, attempt),
+                        "scores": {
+                            key: value
+                            for key, value in scores.items()
+                            if type(value) is int
+                        }
+                        if isinstance(scores, dict)
+                        else None,
+                    }
+                )
+            )
+        plans.append(
+            TracePlan(
+                **{
+                    **_project(TracePlan, plan),
+                    "efficacy_status": {
+                        key: value
+                        for key, value in plan.get("efficacy_status", {}).items()
+                        if isinstance(value, str)
+                    },
+                    "attempts": attempts,
+                }
+            )
+        )
+    calls = [
+        TraceCall(**_project(TraceCall, entry.model_dump())) for entry in ledger_entries
+    ]
+    by_purpose = defaultdict(list)
+    for call in calls:
+        by_purpose[call.purpose].append(call.cost_usd)
+    trims = [
+        TraceInputTrim(**_project(TraceInputTrim, trim))
+        for trim in result.get("input_trims", [])
+    ]
+    return TraceRecord(
+        tenant_id=tenant_id,
+        started_at=started_at,
+        duration_ms=duration_ms,
+        outcome="error" if failure is not None else "ok",
+        error_class=failure.get("class") if failure is not None else None,
+        error_code=failure.get("code") if failure is not None else None,
+        kind=result.get("kind"),
+        intent=result.get("intent"),
+        message_chars=len(message),
+        message_trimmed=len(message) > _DECIDE_MAX_CHARS
+        or any(trim.field == "message" and trim.kept < trim.total for trim in trims),
+        steps=[
+            TraceStep(**_project(TraceStep, step)) for step in result.get("steps", [])
+        ],
+        tools=[
+            TraceTool(**_project(TraceTool, tool))
+            for tool in result.get("handoff", {}).get("result_counts", [])
+        ],
+        plans=plans,
+        limit_hit=result.get("limit_hit", False),
+        limit_kinds=result.get("limit_kinds", []),
+        input_trims=trims,
+        aggregates_removed_count=len(result.get("aggregates_removed", [])),
+        text_spent_usd=result.get("limits", {}).get("text_spent_usd"),
+        calls=calls,
+        cost_total_usd=fsum(call.cost_usd for call in calls),
+        cost_by_purpose={purpose: fsum(costs) for purpose, costs in by_purpose.items()},
+        structured={
+            model: TraceStructured(**_project(TraceStructured, stats))
+            for model, stats in structured.items()
+        },
+    )
+
+
+def append_trace(path: Path, record: TraceRecord) -> None:
+    """Append one serialized line in one write, across local threads."""
+    line = record.model_dump_json() + "\n"
+    with _trace_lock:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as stream:
+            stream.write(line)
+
+
+def read_traces(path: Path) -> TraceRead:
+    """Ignore malformed lines without emitting their contents or errors."""
+    records, skipped_lines = [], 0
+    with _trace_lock:
+        try:
+            stream = path.open(encoding="utf-8")
+        except FileNotFoundError:
+            return TraceRead([], 0)
+        with stream:
+            for line in stream:
+                try:
+                    records.append(TraceRecord.model_validate_json(line))
+                except ValidationError:
+                    skipped_lines += 1
+    return TraceRead(records, skipped_lines)
+
+
+def summarize_by_tenant(records: list[TraceRecord]) -> dict[str, dict]:
+    """Aggregate observed calls and costs independently for each tenant."""
+    grouped = defaultdict(list)
+    for record in records:
+        grouped[record.tenant_id].append(record)
+    summaries = {}
+    for tenant, traces in grouped.items():
+        purposes = defaultdict(list)
+        failures = defaultdict(int)
+        structured_calls = 0
+        for trace in traces:
+            for purpose, cost in trace.cost_by_purpose.items():
+                purposes[purpose].append(cost)
+            for stats in trace.structured.values():
+                structured_calls += stats.calls
+                for kind, count in stats.first_attempt_failures.items():
+                    failures[kind] += count
+        summaries[tenant] = {
+            "requests": len(traces),
+            "errors": sum(trace.outcome == "error" for trace in traces),
+            "calls": sum(len(trace.calls) for trace in traces),
+            "cost_usd": fsum(trace.cost_total_usd for trace in traces),
+            "cost_by_purpose": {
+                purpose: fsum(costs) for purpose, costs in purposes.items()
+            },
+            "first_attempt_failures": dict(failures),
+            "structured_calls": structured_calls,
+        }
+    return summaries

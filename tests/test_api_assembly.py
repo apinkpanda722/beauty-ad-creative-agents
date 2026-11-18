@@ -550,3 +550,223 @@ def test_runtime_errors_do_not_expose_synthetic_credentials(
         assert rig.seen[-1] == "postgres-close"
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("explicit_path", [False, True])
+def test_ask_trace_is_one_line_with_request_ledger_and_model_stats(
+    rig, monkeypatch, explicit_path
+):
+    from datetime import timedelta
+
+    from beautyads.obs.trace import read_traces
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return COLLECTED
+
+    monkeypatch.setattr(assembly, "datetime", Clock)
+    monkeypatch.setattr(
+        assembly,
+        "save_design_image",
+        lambda outcome, **kw: SimpleNamespace(
+            mime=outcome.mime, size=outcome.size, sha256=outcome.sha256
+        ),
+    )
+    append_entry(
+        rig.settings.ledger_path,
+        LedgerEntry(
+            ts=COLLECTED - timedelta(microseconds=1),
+            provider="openai",
+            model="previous-model",
+            purpose="previous-request",
+            cost_usd=1,
+            cost_source="price_table",
+        ),
+    )
+    path = (
+        rig.tmp_path / "custom" / "trace.jsonl"
+        if explicit_path
+        else rig.settings.ledger_path.with_name("traces.jsonl")
+    )
+
+    async def run():
+        services = await rig.start(
+            with_image_enabled=True,
+            **({"trace_path": path} if explicit_path else {}),
+        )
+        assert not path.exists()
+        for count in (1, 2):
+            result = invoke(services, with_image=True)
+            read = read_traces(path)
+            assert read.skipped_lines == 0 and len(read.records) == count
+            assert len(path.read_text().splitlines()) == count
+            trace = read.records[-1]
+            assert trace.tenant_id == next(iter(services.allowed_tenants))
+            assert trace.outcome == "ok" and trace.kind == result["kind"]
+            assert trace.started_at == COLLECTED and trace.duration_ms >= 0
+            # Timestamp windows can overlap; this demo's limitation is explicit.
+            assert len(trace.calls) == 7 * count
+            assert "previous-request" not in trace.cost_by_purpose
+            assert trace.cost_by_purpose["image-plan"] == pytest.approx(0.04 * count)
+            assert any(call.purpose == "image-plan" for call in trace.calls)
+            assert trace.text_spent_usd == pytest.approx(0.006)
+            assert trace.cost_total_usd == pytest.approx(0.046 * count)
+            assert {
+                model: stats.calls for model, stats in trace.structured.items()
+            } == {"gpt-6-luna": 2, "gpt-6.1-terra": 1, "claude-haiku-5-5": 1}
+            assert all(
+                stats.failed_after_retry == 0 for stats in trace.structured.values()
+            )
+        await services.close()
+
+    asyncio.run(run())
+
+
+def test_trace_merges_failure_kinds_without_sharing_requests(rig, monkeypatch):
+    from beautyads.llm.structured import StructuredFailure
+    from beautyads.obs.trace import read_traces
+
+    class Generator:
+        def __init__(self, model):
+            self.model = model
+            self.stats = StructuredStats(
+                calls=2,
+                failed_after_retry=1,
+                first_attempt_failures={StructuredFailure.TOOL_NOT_CALLED: 1},
+            )
+
+        def generate(self, *args, **kwargs):
+            return SimpleNamespace(cost_usd=0.01)
+
+    def request(**options):
+        options["decide_fn"]("synthetic")
+        options["research_fn"]({}, {})
+        return {}
+
+    def decision(text, *, structured, **kwargs):
+        structured.generate(None)
+        return SimpleNamespace(ok=True, decision={})
+
+    def research(*args, structured, **kwargs):
+        structured.generate(None)
+        return {}
+
+    monkeypatch.setattr(assembly, "run_request", request)
+    monkeypatch.setattr(assembly, "decide", decision)
+    monkeypatch.setattr(assembly, "run_research", research)
+
+    async def run():
+        services = await rig.start(models={"structured": Generator})
+        for _ in range(2):
+            invoke(services)
+        traces = read_traces(rig.settings.ledger_path.with_name("traces.jsonl"))
+        assert len(traces.records) == 2
+        for trace in traces.records:
+            stats = trace.structured["gpt-6-luna"]
+            assert stats.calls == 4 and stats.failed_after_retry == 2
+            assert stats.first_attempt_failures == {"TOOL_NOT_CALLED": 2}
+        await services.close()
+
+    asyncio.run(run())
+
+
+def test_trace_preserves_original_model_exception(rig, monkeypatch):
+    from beautyads.obs.trace import read_traces
+
+    failure = CostCapExceeded("openai", 10, 10)
+
+    class Generator:
+        def __init__(self, model):
+            self.model, self.stats = model, StructuredStats()
+
+        def generate(self, *args, **kwargs):
+            raise failure
+
+    def decision(text, *, structured, **kwargs):
+        return structured.generate(None)
+
+    monkeypatch.setattr(assembly, "decide", decision)
+    monkeypatch.setattr(
+        assembly, "run_request", lambda **kw: kw["decide_fn"]("synthetic")
+    )
+
+    async def run():
+        services = await rig.start(models={"structured": Generator})
+        with pytest.raises(CostCapExceeded) as caught:
+            invoke(services)
+        assert caught.value is failure
+        traces = read_traces(rig.settings.ledger_path.with_name("traces.jsonl"))
+        assert len(traces.records) == 1
+        trace = traces.records[0]
+        assert trace.outcome == "error" and trace.error_class == type(failure).__name__
+        assert trace.error_code == failure.code
+        assert trace.kind is None
+        await services.close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(
+    "failing_part", ["path", "build_trace", "append_trace", "read_entries", "stats"]
+)
+@pytest.mark.parametrize("raises", [False, True])
+def test_trace_failures_never_change_result_or_original_error(
+    rig, monkeypatch, caplog, capsys, failing_part, raises
+):
+    secret = "SYNTHETIC-SECRET-observation-error"
+    outcome, failure = {"kind": "out_of_scope"}, RuntimeError(secret)
+
+    def fail(*args, **kwargs):
+        raise RuntimeError(secret)
+
+    def request(**options):
+        if failing_part == "stats":
+            options["decide_fn"]("synthetic")
+        if raises:
+            raise failure
+        return outcome
+
+    monkeypatch.setattr(assembly, "run_request", request)
+    kwargs = {}
+    if failing_part == "path":
+        # A file used as a parent is unwritable even when tests run as root.
+        blocked = rig.tmp_path / "file-parent"
+        blocked.write_text("synthetic")
+        kwargs["trace_path"] = blocked / "traces.jsonl"
+    elif failing_part == "stats":
+
+        class Generator:
+            model = "gpt-6-luna"
+
+            @property
+            def stats(self):
+                fail()
+
+            def generate(self, *args, **kwargs):
+                return SimpleNamespace(cost_usd=0.001)
+
+        monkeypatch.setattr(
+            assembly,
+            "decide",
+            lambda *a, structured, **kw: (
+                (structured.generate(None) or None)
+                and SimpleNamespace(ok=True, decision={})
+            ),
+        )
+        kwargs["models"] = {"structured": lambda model: Generator()}
+    else:
+        monkeypatch.setattr(assembly, failing_part, fail)
+
+    async def run():
+        services = await rig.start(**kwargs)
+        if raises:
+            with pytest.raises(RuntimeError) as caught:
+                invoke(services)
+            assert caught.value is failure
+        else:
+            assert invoke(services) is outcome
+        await services.close()
+
+    asyncio.run(run())
+    assert secret not in caplog.text + str(capsys.readouterr())

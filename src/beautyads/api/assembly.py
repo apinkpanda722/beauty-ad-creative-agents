@@ -5,6 +5,7 @@ from contextlib import AsyncExitStack
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
+from time import monotonic
 from uuid import uuid4
 
 from beautyads.agents.design_images import image_prompt, save_design_image
@@ -40,7 +41,8 @@ from beautyads.graph.evidence_queries import (
 from beautyads.llm.chat import chat_complete
 from beautyads.llm.image import generate_image
 from beautyads.llm.structured import make_structured
-from beautyads.obs.ledger import CostCapExceeded, ledger_total
+from beautyads.obs.ledger import CostCapExceeded, ledger_total, read_entries
+from beautyads.obs.trace import append_trace, build_trace
 from beautyads.settings import DEFAULT_ENV_FILE, get_setting
 from beautyads.sources.claim_rules import load_claim_rules
 from beautyads.sources.workspaces import load_workspaces
@@ -115,6 +117,7 @@ async def assemble_full(
     limits=_DEFAULT_LIMITS,
     with_image_enabled=False,
     evaluation_model="claude-haiku-5-5",
+    trace_path: Path | None = None,
 ) -> Assembly:
     """Build services without invoking models.
 
@@ -253,133 +256,193 @@ async def assemble_full(
                         raise RuntimeError("ASSEMBLY_HYDRATE_FAILED") from None
 
             def ask(message, ctx, profile, feedback, with_image, on_event=None):
-                before = ledger_total(
-                    settings.ledger_path, exclude_purpose_prefix="image"
-                )
-
-                def spent_fn():
-                    return (
-                        ledger_total(
-                            settings.ledger_path, exclude_purpose_prefix="image"
-                        )
-                        - before
+                started_at, started = datetime.now(UTC), monotonic()
+                generators = []
+                result, failure = None, None
+                try:
+                    before = ledger_total(
+                        settings.ledger_path, exclude_purpose_prefix="image"
                     )
 
-                def guard():
-                    if cost_exceeded(spent_fn(), limits):
-                        raise RuntimeError("REQUEST_TEXT_CAP_REACHED")
-
-                def structured(model):
-                    return _ConfiguredStructured(
-                        model_calls["structured"](model), call_options(model), guard
-                    )
-
-                def decide_fn(text):
-                    result = decide(
-                        text,
-                        as_of=ctx.as_of,
-                        structured=structured("gpt-6-luna"),
-                        limits=limits,
-                    )
-                    if not result.ok:
-                        raise RuntimeError("SUPERVISOR_DECISION_FAILED")
-                    return result.decision
-
-                def research_chat(**options):
-                    guard()
-                    return chat(**options)
-
-                def research_fn(brief, raw_store):
-                    return run_research(
-                        brief,
-                        ctx=ctx,
-                        chat=research_chat,
-                        tool_runner=runner,
-                        structured=structured("gpt-6-luna"),
-                        raw_store=raw_store,
-                    )
-
-                def plan_fn(**options):
-                    return make_plan(**options, structured=structured("gpt-6.1-terra"))
-
-                def evaluate_fn(**options):
-                    generator = structured(evaluation_model)
-                    report = evaluate_plan(
-                        **options,
-                        rules=rules,
-                        evidence_index=GraphEvidenceIndex(graph_connection),
-                        support=GraphEfficacySupport(graph_connection),
-                        certs=GraphCertLookup(graph_connection),
-                        structured=generator,
-                        model=evaluation_model,
-                    )
-                    return {
-                        **report.model_dump(mode="json"),
-                        "cost_usd": generator.last_cost,
-                    }
-
-                request_key, image_index = uuid4().hex, 0
-                image_fn = None
-                if with_image_enabled:
-
-                    def image_fn(plan):
-                        nonlocal image_index
-                        try:
-                            outcome = model_calls["image"](
-                                prompt=image_prompt(Plan.model_validate(plan)),
-                                ledger_path=settings.ledger_path,
-                                caps=caps,
-                                purpose_caps=purpose_caps,
-                                api_key=get_setting("GEMINI_API_KEY", **config),
+                    def spent_fn():
+                        return (
+                            ledger_total(
+                                settings.ledger_path, exclude_purpose_prefix="image"
                             )
-                        except CostCapExceeded:
-                            return {"ok": False, "code": "IMAGE_CAP_REACHED"}
-                        except Exception:  # noqa: BLE001 -- no image diagnostics or signatures
-                            return {"ok": False, "code": "IMAGE_FAILED"}
-                        if not outcome.ok:
-                            return {"ok": False, "code": "IMAGE_FAILED"}
-                        index = image_index
-                        image_index += 1
-                        saved = save_design_image(
-                            outcome,
-                            request_key=request_key,
-                            index=index,
-                            base_dir=_DESIGN_DIR,
+                            - before
+                        )
+
+                    def guard():
+                        if cost_exceeded(spent_fn(), limits):
+                            raise RuntimeError("REQUEST_TEXT_CAP_REACHED")
+
+                    def structured(model):
+                        generator = _ConfiguredStructured(
+                            model_calls["structured"](model), call_options(model), guard
+                        )
+                        generators.append(generator)
+                        return generator
+
+                    def decide_fn(text):
+                        result = decide(
+                            text,
+                            as_of=ctx.as_of,
+                            structured=structured("gpt-6-luna"),
+                            limits=limits,
+                        )
+                        if not result.ok:
+                            raise RuntimeError("SUPERVISOR_DECISION_FAILED")
+                        return result.decision
+
+                    def research_chat(**options):
+                        guard()
+                        return chat(**options)
+
+                    def research_fn(brief, raw_store):
+                        return run_research(
+                            brief,
+                            ctx=ctx,
+                            chat=research_chat,
+                            tool_runner=runner,
+                            structured=structured("gpt-6-luna"),
+                            raw_store=raw_store,
+                        )
+
+                    def plan_fn(**options):
+                        return make_plan(
+                            **options, structured=structured("gpt-6.1-terra")
+                        )
+
+                    def evaluate_fn(**options):
+                        generator = structured(evaluation_model)
+                        report = evaluate_plan(
+                            **options,
+                            rules=rules,
+                            evidence_index=GraphEvidenceIndex(graph_connection),
+                            support=GraphEfficacySupport(graph_connection),
+                            certs=GraphCertLookup(graph_connection),
+                            structured=generator,
+                            model=evaluation_model,
                         )
                         return {
-                            "ok": True,
-                            "request_key": request_key,
-                            "index": index,
-                            "mime": saved.mime,
-                            "size": saved.size,
-                            "sha256": saved.sha256,
+                            **report.model_dump(mode="json"),
+                            "cost_usd": generator.last_cost,
                         }
 
-                def plan_eval_fn(brief, handoff, profile, feedback, *, max_reworks):
-                    return run_plan_eval(
-                        brief=brief,
-                        handoff=handoff,
+                    request_key, image_index = uuid4().hex, 0
+                    image_fn = None
+                    if with_image_enabled:
+
+                        def image_fn(plan):
+                            nonlocal image_index
+                            try:
+                                outcome = model_calls["image"](
+                                    prompt=image_prompt(Plan.model_validate(plan)),
+                                    ledger_path=settings.ledger_path,
+                                    caps=caps,
+                                    purpose_caps=purpose_caps,
+                                    api_key=get_setting("GEMINI_API_KEY", **config),
+                                )
+                            except CostCapExceeded:
+                                return {"ok": False, "code": "IMAGE_CAP_REACHED"}
+                            except Exception:  # noqa: BLE001 -- no image diagnostics or signatures
+                                return {"ok": False, "code": "IMAGE_FAILED"}
+                            if not outcome.ok:
+                                return {"ok": False, "code": "IMAGE_FAILED"}
+                            index = image_index
+                            image_index += 1
+                            saved = save_design_image(
+                                outcome,
+                                request_key=request_key,
+                                index=index,
+                                base_dir=_DESIGN_DIR,
+                            )
+                            return {
+                                "ok": True,
+                                "request_key": request_key,
+                                "index": index,
+                                "mime": saved.mime,
+                                "size": saved.size,
+                                "sha256": saved.sha256,
+                            }
+
+                    def plan_eval_fn(brief, handoff, profile, feedback, *, max_reworks):
+                        return run_plan_eval(
+                            brief=brief,
+                            handoff=handoff,
+                            profile=profile,
+                            feedback=feedback,
+                            plan_fn=plan_fn,
+                            evaluate_fn=evaluate_fn,
+                            image_fn=image_fn,
+                            with_image=with_image and with_image_enabled,
+                            max_reworks=max_reworks,
+                        )
+
+                    result = run_request(
+                        message=message,
+                        ctx=ctx,
                         profile=profile,
                         feedback=feedback,
-                        plan_fn=plan_fn,
-                        evaluate_fn=evaluate_fn,
-                        image_fn=image_fn,
-                        with_image=with_image and with_image_enabled,
-                        max_reworks=max_reworks,
+                        decide_fn=decide_fn,
+                        research_fn=research_fn,
+                        plan_eval_fn=plan_eval_fn,
+                        spent_fn=spent_fn,
+                        limits=limits,
+                        on_event=on_event,
                     )
-
-                return run_request(
-                    message=message,
-                    ctx=ctx,
-                    profile=profile,
-                    feedback=feedback,
-                    decide_fn=decide_fn,
-                    research_fn=research_fn,
-                    plan_eval_fn=plan_eval_fn,
-                    spent_fn=spent_fn,
-                    limits=limits,
-                    on_event=on_event,
-                )
+                    return result
+                except BaseException as exc:
+                    failure = exc
+                    raise
+                finally:
+                    try:
+                        structured_stats = {}
+                        for generator in generators:
+                            stats = generator.stats
+                            totals = structured_stats.setdefault(
+                                generator.model,
+                                {
+                                    "calls": 0,
+                                    "failed_after_retry": 0,
+                                    "first_attempt_failures": {},
+                                },
+                            )
+                            totals["calls"] += stats.calls
+                            totals["failed_after_retry"] += stats.failed_after_retry
+                            for kind, count in stats.first_attempt_failures.items():
+                                failures = totals["first_attempt_failures"]
+                                failures[kind] = failures.get(kind, 0) + count
+                        # Timestamp windows may overlap for concurrent requests.
+                        # The demo is single-user; the ledger has no request ID.
+                        entries = [
+                            entry
+                            for entry in read_entries(settings.ledger_path).entries
+                            if entry.ts >= started_at
+                        ]
+                        record = build_trace(
+                            tenant_id=ctx.tenant_id,
+                            started_at=started_at,
+                            duration_ms=max(0, int((monotonic() - started) * 1000)),
+                            message=message,
+                            result=result,
+                            failure={
+                                "class": type(failure).__name__,
+                                "code": getattr(failure, "code", None),
+                            }
+                            if failure is not None
+                            else None,
+                            ledger_entries=entries,
+                            structured=structured_stats,
+                        )
+                        append_trace(
+                            trace_path
+                            if trace_path is not None
+                            else settings.ledger_path.with_name("traces.jsonl"),
+                            record,
+                        )
+                    except Exception:  # noqa: BLE001, S110 -- observation must preserve results without diagnostics
+                        pass
 
             graph = build_graph(chat=chat, tool_runner=runner, checkpointer=saver)
             result = Assembly(
