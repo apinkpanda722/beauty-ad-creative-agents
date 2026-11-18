@@ -157,6 +157,11 @@
       }
     },
     {
+      "step": "1d",
+      "name": "tool-result-message",
+      "status": "pending"
+    },
+    {
       "step": 6,
       "name": "planning-evaluation",
       "status": "pending"
