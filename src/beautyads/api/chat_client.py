@@ -11,6 +11,8 @@ class ChatOutcome:
     events: list[tuple[str, dict]]
     final_text: str
     status_code: int
+    detail: str | None = None
+    error_code: str | None = None
 
 
 def parse_sse(text: str) -> list[tuple[str, dict]]:
@@ -41,4 +43,11 @@ def run_chat_once(app, *, tenant_id, message, thread_id=None) -> ChatOutcome:
         final_text = "".join(
             body.get("text", "") for name, body in events if name == "token"
         )
-        return ChatOutcome(events, final_text, response.status_code)
+        error = next((body for name, body in events if name == "error"), {})
+        return ChatOutcome(
+            events,
+            final_text,
+            response.status_code,
+            detail=error.get("detail"),
+            error_code=error.get("error_code"),
+        )

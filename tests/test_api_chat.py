@@ -3,6 +3,7 @@
 import os
 from datetime import date
 
+import pytest
 from fastapi.testclient import TestClient
 from psycopg.rows import dict_row
 
@@ -112,7 +113,10 @@ def test_error_is_code_only_and_health_calls_no_dependency():
             "/chat", headers={"X-Tenant-Id": "demo-a"}, json={"message": "synthetic"}
         )
     events = parse_sse(response.text)
-    assert events[-1] == ("error", {"code": "AGENT_INTERNAL_ERROR"})
+    assert events[-1] == (
+        "error",
+        {"code": "AGENT_INTERNAL_ERROR", "detail": "RuntimeError"},
+    )
     assert "private" not in response.text
 
 
@@ -205,3 +209,67 @@ def test_chat_entry_point_runs_real_graph_and_registered_tool():
     ]
     assert len(queries) == 1 and len(seen) == 2 and outcome.final_text
     assert seen[-1]["messages"][-1]["role"] == "tool"
+
+
+@pytest.mark.parametrize(
+    "exception_name",
+    [
+        "RuntimeError",
+        "UnsupportedParamsError",
+        "LlmCallError",
+        "CostCapExceeded",
+        "CallCostLimit",
+    ],
+)
+@pytest.mark.parametrize(
+    "code",
+    [
+        None,
+        "FATAL",
+        "A_z:09",
+        "x" * 64,
+        "",
+        "x" * 65,
+        "unsafe value",
+        "unsafe\n",
+        "한글",
+        42,
+        {"private": "payload"},
+    ],
+)
+def test_error_exposes_only_class_and_safe_code(exception_name, code):
+    private = "synthetic-private-diagnostic"
+    secret = "synthetic-private-credential"
+    error = type(exception_name, (Exception,), {})(private, secret)
+    error.__cause__ = RuntimeError("synthetic-private-cause")
+    if code is not None:
+        error.code = code
+
+    class FailingGraph:
+        async def astream(self, *args, **kwargs):
+            raise error
+            yield  # pragma: no cover -- preserve the async iterator contract
+
+    with TestClient(create_app(lambda: assembly(FailingGraph()))) as client:
+        response = client.post(
+            "/chat", headers={"X-Tenant-Id": "demo-a"}, json={"message": "synthetic"}
+        )
+    expected = {"code": "AGENT_INTERNAL_ERROR", "detail": exception_name}
+    if code in ("FATAL", "A_z:09", "x" * 64):
+        expected["error_code"] = code
+    assert parse_sse(response.text)[-1] == ("error", expected)
+    assert all(
+        value not in response.text
+        for value in (private, secret, "synthetic-private-cause")
+    )
+
+
+def test_success_events_have_no_error_details():
+    with TestClient(create_app(lambda: assembly())) as client:
+        response = client.post(
+            "/chat", headers={"X-Tenant-Id": "demo-a"}, json={"message": "synthetic"}
+        )
+    assert all(
+        "detail" not in body and "error_code" not in body
+        for _, body in parse_sse(response.text)
+    )

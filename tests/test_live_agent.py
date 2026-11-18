@@ -322,3 +322,68 @@ def test_real_assembly_resources_are_lifespan_owned(monkeypatch, tmp_path, setup
         "postgres-close",
     ]
     assert seen[0][1] is seen[1][1] is seen[2][1]
+
+
+@pytest.mark.parametrize("code", [None, "FATAL", "CALL_COST_LIMIT"])
+def test_main_reports_safe_error_fields_with_exit_three(tmp_path, code):
+    import json
+
+    from test_api_chat import assembly
+
+    from beautyads.api.app import create_app
+    from beautyads.api.chat_client import run_chat_once
+
+    private = "synthetic-private-diagnostic"
+    secret = "synthetic-private-credential"
+    error = type("UnsupportedParamsError", (Exception,), {})(private, secret)
+    error.__cause__ = RuntimeError("synthetic-private-cause")
+    if code is not None:
+        error.code = code
+
+    class FailingGraph:
+        async def astream(self, *args, **kwargs):
+            raise error
+            yield  # pragma: no cover
+
+    def run(app, **kwargs):
+        return run_chat_once(create_app(lambda: assembly(FailingGraph())), **kwargs)
+
+    out = StringIO()
+    status = live_agent.main(
+        ["--tenant", "demo-a", "--message", "synthetic"],
+        out=out,
+        check=list,
+        run=run,
+        settings=Settings(ledger_path=tmp_path / "ledger"),
+    )
+    assert status == 3
+    output = json.loads(out.getvalue())
+    assert output.get("detail") == "UnsupportedParamsError"
+    assert output.get("error_code") == code
+    assert ("error_code" in output) is (code is not None)
+    assert all(
+        value not in out.getvalue()
+        for value in (private, secret, "synthetic-private-cause")
+    )
+
+
+def test_main_success_has_no_error_fields(tmp_path):
+    import json
+
+    from beautyads.api.chat_client import ChatOutcome
+
+    out = StringIO()
+    assert (
+        live_agent.main(
+            ["--tenant", "demo-a", "--message", "synthetic"],
+            out=out,
+            check=list,
+            run=lambda *a, **kw: ChatOutcome(
+                [("token", {"text": "synthetic"})], "synthetic", 200
+            ),
+            settings=Settings(ledger_path=tmp_path / "ledger"),
+        )
+        == 0
+    )
+    output = json.loads(out.getvalue())
+    assert "detail" not in output and "error_code" not in output

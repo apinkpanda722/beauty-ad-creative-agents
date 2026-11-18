@@ -3,6 +3,7 @@
 import asyncio
 import inspect
 import os
+import re
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -132,8 +133,12 @@ def create_app(assemble: Callable[[], Assembly]) -> FastAPI:
                     },
                 )
                 yield encode_event("token", {"text": final_text})
-            except Exception:  # noqa: BLE001 -- never expose model/driver diagnostics in SSE
-                yield encode_event("error", {"code": "AGENT_INTERNAL_ERROR"})
+            except Exception as exc:  # noqa: BLE001 -- expose only class name and a validated code
+                error = {"code": "AGENT_INTERNAL_ERROR", "detail": type(exc).__name__}
+                code = getattr(exc, "code", None)
+                if isinstance(code, str) and re.fullmatch(r"[A-Za-z0-9_:]{1,64}", code):
+                    error["error_code"] = code
+                yield encode_event("error", error)
 
         return StreamingResponse(
             events(),

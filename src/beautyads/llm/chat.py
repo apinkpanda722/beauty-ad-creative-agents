@@ -216,6 +216,8 @@ def _chat(
     }
     if provider == "openai":
         kwargs["reasoning_effort"] = reasoning_effort
+        if tool_choice is not None:
+            kwargs["allowed_openai_params"] = ["tool_choice"]
     for name, value in (
         ("tools", tools),
         ("tool_choice", tool_choice),

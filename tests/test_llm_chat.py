@@ -417,3 +417,25 @@ def test_cache_block_and_public_helpers(args):
     )
     assert (cost, source) == (0.000011, "price_table")
     assert read_entries(args.get("ledger_path")).entries[0].reasoning_effort == "low"
+
+
+@pytest.mark.parametrize("model", MODELS)
+@pytest.mark.parametrize("choice", [None, "auto", "none", "required"])
+@pytest.mark.parametrize("complete", [chat_complete, chat_stream])
+def test_tool_choice_allowance_is_openai_only(
+    args, model, choice, complete, monkeypatch
+):
+    args.update(model=model, reasoning_effort="none" if model in MODELS[:2] else None)
+    raw = probe()
+    monkeypatch.setattr(chat.litellm, "stream_chunk_builder", Mock(return_value=raw))
+    fn = Mock(return_value=iter([]) if complete is chat_stream else raw)
+    complete(**args, tool_choice=choice, completion_fn=fn)
+    kwargs = fn.call_args.kwargs
+    if model in MODELS[:2] and choice is not None:
+        assert kwargs.get("allowed_openai_params") == ["tool_choice"]
+    else:
+        assert "allowed_openai_params" not in kwargs
+    if choice is None:
+        assert "tool_choice" not in kwargs
+    else:
+        assert kwargs.get("tool_choice") == choice

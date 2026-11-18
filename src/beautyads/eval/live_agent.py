@@ -246,6 +246,12 @@ def main(argv=None, *, out: TextIO | None = None, check=None, run=None, settings
             app, tenant_id=args.tenant, message=args.message
         )
         cost = provider_total(settings.ledger_path, "openai") - before
+        error_fields = {}
+        if any(name == "error" for name, _ in outcome.events):
+            if outcome.detail is not None:
+                error_fields["detail"] = outcome.detail
+            if outcome.error_code is not None:
+                error_fields["error_code"] = outcome.error_code
         print(
             json.dumps(
                 {
@@ -253,6 +259,7 @@ def main(argv=None, *, out: TextIO | None = None, check=None, run=None, settings
                     "events": [name for name, _ in outcome.events],
                     "final_text": outcome.final_text,
                     "cost_usd": cost,
+                    **error_fields,
                 },
                 ensure_ascii=False,
             ),
