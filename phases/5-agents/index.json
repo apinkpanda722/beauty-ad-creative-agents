@@ -173,7 +173,16 @@
     {
       "step": "5b",
       "name": "certified-by-claim",
-      "status": "pending"
+      "status": "blocked",
+      "started_at": "2026-11-18T14:10:05+0900",
+      "blocked_reason": "충돌하는 지시: “도구 `certified_products_by_kind`(종류 `lookup`)를 **추가**한다.”와 “`tests/test_agent_tools.py`(케이스 추가에 한함, 단언 약화 금지)”. 기존 test_registry_is_stable_described_and_closed는 비표시 도구를 QUESTION_IDS의 기존 도구 또는 EVIDENCE_INPUTS의 기존 도구로 제한하며, 후자는 find_example_creatives 외에는 compare 종류만 허용합니다. 따라서 새 lookup 도구는 케이스 추가만으로 기존 단언을 통과할 수 없습니다. 기존 도구의 검증을 유지하면서 새 도구를 별도로 검증하도록 해당 테스트의 분기를 확장할 수 있는 허용이 필요합니다. 코드 변경과 make verify 실행은 하지 않았습니다.",
+      "blocked_at": "2026-11-18T14:11:19+0900",
+      "usage": {
+        "input_tokens": 207260,
+        "cached_input_tokens": 167808,
+        "output_tokens": 1897,
+        "attempts": 1
+      }
     },
     {
       "step": "5c",
