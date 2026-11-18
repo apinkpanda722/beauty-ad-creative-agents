@@ -435,8 +435,12 @@
         "output_tokens": 18537,
         "attempts": 1
       }
+    },
+    {
+      "step": "9g",
+      "name": "single-cut-layout-efficacy",
+      "status": "pending"
     }
   ],
-  "created_at": "2026-11-17T22:15:36+0900",
-  "completed_at": "2026-11-18T20:43:54+0900"
+  "created_at": "2026-11-17T22:15:36+0900"
 }
