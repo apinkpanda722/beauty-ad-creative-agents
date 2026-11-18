@@ -1,6 +1,7 @@
 """Pure screen projection of Supervisor results, without replaying model UI data."""
 
 import json
+import math
 import re
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -77,6 +78,11 @@ def image_reference(image) -> dict | None:
         reference["composed"] = {
             key: composed[key] for key in ("mime", "size", "sha256")
         }
+        if type(composed.get("contrast_adjusted")) is bool:
+            reference["composed"]["contrast_adjusted"] = composed["contrast_adjusted"]
+        contrast = composed.get("min_contrast")
+        if type(contrast) in (int, float) and math.isfinite(contrast) and contrast >= 0:
+            reference["composed"]["min_contrast"] = float(contrast)
     return reference
 
 
@@ -178,7 +184,7 @@ def build_view(result, *, plan_ids, hydrate) -> View:
             if image_reference(item.get("image")) is not None
             else None,
             "product_display": result.get("product_display")
-            or {"brand": None, "display_name": None},
+            or {"brand": None, "display_name": None, "product_name": None},
         }
         commands.append({"kind": "show_plan", "data": data})
 

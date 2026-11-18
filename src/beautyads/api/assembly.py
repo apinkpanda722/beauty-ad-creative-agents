@@ -1,5 +1,6 @@
 """Lifespan-owned full services; connections and model boundaries are injectable."""
 
+import math
 import re
 from contextlib import AsyncExitStack
 from datetime import UTC, datetime
@@ -8,7 +9,7 @@ from pathlib import Path
 from time import monotonic
 from uuid import uuid4
 
-from beautyads.agents.design_compose import FontMissing, compose_design, cta_label
+from beautyads.agents.design_compose import FontMissing, compose_design, product_line
 from beautyads.agents.design_images import (
     image_prompt,
     save_composed_design,
@@ -42,6 +43,8 @@ from beautyads.domain.tenant import WorkspaceProfile, price_band
 from beautyads.domain.tools import EVIDENCE_ID_PATTERN
 from beautyads.graph.connection import connect_graph
 from beautyads.graph.evidence_queries import (
+    product_name_parameters,
+    product_name_query,
     product_unit_price_parameters,
     product_unit_price_query,
 )
@@ -160,7 +163,7 @@ async def assemble_full(
                 if item.last_collected_at is not None
             ]
             tenants = PostgresTenantRepository(conn)
-            workspaces, price_bands = {}, {}
+            workspaces, price_bands, product_names = {}, {}, {}
             for workspace in load_workspaces(workspaces_path):
                 if workspace.group != group:
                     continue
@@ -188,6 +191,18 @@ async def assemble_full(
                     price_bands[profile.tenant_id] = price_band(
                         float(price), profile.price_band_pct
                     ).model_dump(mode="json")
+                try:
+                    rows = graph_connection.run(
+                        product_name_query(),
+                        product_name_parameters(
+                            brand=profile.brand, url=profile.own_product_url
+                        ),
+                    ).records
+                    name = next(iter(rows), {}).get("product_name")
+                    if isinstance(name, str) and name.strip():
+                        product_names[profile.tenant_id] = name
+                except Exception:  # noqa: BLE001, S110 -- optional identity lookup never exposes diagnostics
+                    pass
 
             rules = load_claim_rules(Path("config/claim_rules.yaml"))
             runner = partial(run_tool, graph=graph_connection)
@@ -259,6 +274,7 @@ async def assemble_full(
                         raise RuntimeError("ASSEMBLY_HYDRATE_FAILED") from None
 
             def ask(message, ctx, profile, feedback, with_image, on_event=None):
+                profile = {**profile, "product_name": product_names.get(ctx.tenant_id)}
                 started_at, started = datetime.now(UTC), monotonic()
                 generators = []
                 result, failure = None, None
@@ -400,7 +416,9 @@ async def assemble_full(
                                 composed = compose_design(
                                     outcome.image_bytes,
                                     headline=plan["hook_text"],
-                                    cta=cta_label(plan["cta_type"]) or "",
+                                    product_line=product_line(
+                                        profile["brand"], profile.get("product_name")
+                                    ),
                                 )
                                 saved_composed = save_composed_design(
                                     composed.png_bytes,
@@ -413,6 +431,20 @@ async def assemble_full(
                                     "size": saved_composed.size,
                                     "sha256": saved_composed.sha256,
                                 }
+                                adjusted = getattr(composed, "contrast_adjusted", None)
+                                contrast = getattr(composed, "min_contrast", None)
+                                if type(adjusted) is bool:
+                                    reference["composed"]["contrast_adjusted"] = (
+                                        adjusted
+                                    )
+                                if (
+                                    type(contrast) in (int, float)
+                                    and math.isfinite(contrast)
+                                    and contrast >= 0
+                                ):
+                                    reference["composed"]["min_contrast"] = round(
+                                        float(contrast), 3
+                                    )
                             except FontMissing:
                                 reference["compose_error"] = "FONT_MISSING"
                             except Exception:  # noqa: BLE001 -- composition never invalidates the original

@@ -741,3 +741,44 @@ def test_show_rationale_is_sanitized_terminal_only_and_summary_keeps_safe_alignm
     assert "synthetic reason" not in persisted
     assert SECRET not in persisted + output
     assert all(token not in persisted + output for token in tokens)
+
+
+def test_live_summary_keeps_composed_contrast_from_trace_dump(rig):
+    records = []
+
+    def run(**kwargs):
+        trace = build_trace(
+            tenant_id=kwargs["tenant_id"],
+            started_at=rig.now,
+            duration_ms=1,
+            message=SECRET,
+            result={
+                "plans": [
+                    {
+                        "image": {
+                            "composed": {
+                                "contrast_adjusted": True,
+                                "min_contrast": 2.346,
+                                "path": SECRET,
+                            }
+                        }
+                    }
+                ]
+            },
+            failure=None,
+            ledger_entries=[],
+            structured={},
+        )
+        records.append(trace)
+        append_trace(rig.settings.ledger_path.with_name("traces.jsonl"), trace)
+        return outcome()
+
+    rig.behavior = run
+    code, summary, output = rig.invoke("--config", "image")
+    assert code == 0
+    for scenario, trace in zip(summary["scenarios"], records, strict=True):
+        assert (
+            scenario["plans"][0]["composed_contrast"]
+            == trace.plans[0].model_dump()["composed_contrast"]
+        )
+    assert SECRET not in json.dumps(summary) + output

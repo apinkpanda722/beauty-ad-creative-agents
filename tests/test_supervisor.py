@@ -653,7 +653,7 @@ def test_product_display_is_server_profile_only_and_no_handoff_distribution_is_e
     f = Fakes(decision=decision_data(intent="boundary"))
     result = supervisor.run_request(**f.args(profile=profile))
     assert result["product_display"] == {
-        key: profile.get(key) for key in ("brand", "display_name")
+        key: profile.get(key) for key in ("brand", "display_name", "product_name")
     }
     assert result["pattern_distribution"] == []
     json.dumps(result, allow_nan=False)
@@ -730,3 +730,15 @@ def test_claims_status_is_safe_and_never_changes_evaluation_decisions(mode):
     for field in ("status", "rework_count", "attempts"):
         assert result["plans"][0][field] == base["plans"][0][field]
     assert result["kind"] == base["kind"]
+
+
+def test_product_display_includes_only_server_profile_product_name():
+    profile = {
+        "brand": "English_Brand",
+        "display_name": "합성 작업 공간",
+        "product_name": "공식 합성 제품",
+    }
+    f = Fakes(decision=decision_data(intent="boundary"))
+    value = supervisor.run_request(**f.args(profile=profile))
+    assert value["product_display"] == profile
+    assert set(value["product_display"]) == {"brand", "display_name", "product_name"}

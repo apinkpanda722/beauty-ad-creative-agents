@@ -498,3 +498,75 @@ def test_legacy_trace_failure_details_default_is_independent():
     first, second = TraceStructured(), TraceStructured()
     first.first_attempt_failure_details["spec|-|parse_failed"] = 1
     assert second.first_attempt_failure_details == {}
+
+
+@pytest.mark.parametrize(
+    "composed,expected",
+    [
+        (
+            {"contrast_adjusted": True, "min_contrast": 2.346},
+            {"contrast_adjusted": True, "min_contrast": 2.346},
+        ),
+        (
+            {"contrast_adjusted": False},
+            {"contrast_adjusted": False, "min_contrast": None},
+        ),
+        (
+            {"contrast_adjusted": True, "min_contrast": None},
+            {"contrast_adjusted": True, "min_contrast": None},
+        ),
+        (None, None),
+        ({}, None),
+        ([], None),
+        ({"contrast_adjusted": SECRET, "min_contrast": 3.0}, None),
+        ({"contrast_adjusted": 1, "min_contrast": 3.0}, None),
+        ({"contrast_adjusted": True, "min_contrast": SECRET}, None),
+        ({"contrast_adjusted": True, "min_contrast": float("nan")}, None),
+        ({"contrast_adjusted": True, "min_contrast": float("inf")}, None),
+        ({"contrast_adjusted": True, "min_contrast": -1}, None),
+        ({"contrast_adjusted": True, "min_contrast": True}, None),
+    ],
+)
+def test_trace_composed_contrast_is_validated_without_prose(composed, expected):
+    record = make_trace(
+        result={
+            "plans": [
+                {
+                    "image": {"composed": composed},
+                    "composed_contrast": {"contrast_adjusted": SECRET},
+                }
+            ]
+        }
+    )
+    value = record.plans[0].composed_contrast
+    assert (value.model_dump() if value is not None else None) == expected
+    assert SECRET not in record.model_dump_json()
+
+
+def test_trace_contrast_projects_only_image_metadata_and_roundtrips(tmp_path):
+    record = make_trace(
+        result={
+            "plans": [
+                {
+                    "image": {
+                        "composed": {
+                            "contrast_adjusted": True,
+                            "min_contrast": 2.346,
+                            "path": SECRET,
+                            "base64": SECRET,
+                        }
+                    }
+                },
+                {},
+                {"image": SECRET},
+            ]
+        }
+    )
+    assert record.plans[0].composed_contrast.min_contrast == 2.346
+    assert (
+        record.plans[1].composed_contrast is record.plans[2].composed_contrast is None
+    )
+    path = tmp_path / "trace.jsonl"
+    append_trace(path, record)
+    assert read_traces(path).records[0] == record
+    assert SECRET not in path.read_text()

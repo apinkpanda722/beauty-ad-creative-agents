@@ -269,7 +269,9 @@ def test_plan_has_fixed_image_disclaimer_and_separate_product_display(
     assert data["design_disclaimer"] == (
         DESIGN_IMAGE_DISCLAIMER if with_image else None
     )
-    assert data["product_display"] == (display or {"brand": None, "display_name": None})
+    assert data["product_display"] == (
+        display or {"brand": None, "display_name": None, "product_name": None}
+    )
     json.dumps(data, allow_nan=False)
 
 
@@ -316,3 +318,60 @@ def test_invalid_composed_metadata_is_dropped_but_original_stays_valid(invalid):
     expected = image_reference(image)
     image["composed"] = invalid
     assert image_reference(image) == expected
+
+
+@pytest.mark.parametrize(
+    "adjusted,contrast,expected",
+    [
+        (True, 2.346, {"contrast_adjusted": True, "min_contrast": 2.346}),
+        (False, 0, {"contrast_adjusted": False, "min_contrast": 0.0}),
+        ("private-secret", 3.5, {"min_contrast": 3.5}),
+        (1, -1, {}),
+        (0, float("nan"), {}),
+        (None, float("inf"), {}),
+        (True, True, {"contrast_adjusted": True}),
+        (True, "private-secret", {"contrast_adjusted": True}),
+    ],
+)
+def test_composed_contrast_fields_are_independently_validated(
+    adjusted, contrast, expected
+):
+    from beautyads.api.ask_view import image_reference
+
+    raw = result()
+    image = raw["plans"][0]["image"]
+    base = {"mime": "image/png", "size": 123, "sha256": "b" * 64}
+    image["composed"] = {
+        **base,
+        "contrast_adjusted": adjusted,
+        "min_contrast": contrast,
+        "path": "/private-secret",
+        "base64": "private-secret",
+    }
+    original = deepcopy(image)
+    safe = image_reference(image)
+    assert safe["composed"] == {**base, **expected}
+    assert set(safe) == {"request_key", "index", "mime", "size", "sha256", "composed"}
+    assert "private-secret" not in json.dumps(safe, allow_nan=False)
+    data = command(build_view(raw, plan_ids=["id"], hydrate=None), "show_plan")
+    assert data["image"]["composed"] == safe["composed"]
+    assert image.keys() == original.keys()
+    assert image["composed"].keys() == original["composed"].keys()
+    assert image["composed"]["contrast_adjusted"] is adjusted
+    assert image["composed"]["min_contrast"] is contrast
+
+
+def test_product_identity_is_separate_from_model_plan_and_cta_type_is_preserved():
+    raw = result()
+    raw["product_display"] = {
+        "brand": "English_Brand",
+        "display_name": "합성 작업 공간",
+        "product_name": "공식 합성 세럼",
+    }
+    raw["plans"][0]["plan"].update(
+        cta_type="learn_more", product_display={"brand": "MODEL_SENTINEL"}
+    )
+    data = command(build_view(raw, plan_ids=["id"], hydrate=None), "show_plan")
+    assert data["plan"]["cta_type"] == raw["plans"][0]["plan"]["cta_type"]
+    assert data["product_display"] == raw["product_display"]
+    assert "product_display" not in data["plan"]

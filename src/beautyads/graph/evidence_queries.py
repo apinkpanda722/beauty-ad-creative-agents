@@ -229,3 +229,19 @@ def product_unit_price_parameters(*, brand, url) -> dict:
     if any(not isinstance(value, str) or not value.strip() for value in (brand, url)):
         raise ValueError("PRODUCT_UNIT_PRICE_INPUT_INVALID")
     return {"brand": brand, "url": url}
+
+
+def product_name_query() -> str:
+    """Read only the official mall name for a workspace's exact product key."""
+    return """
+        MATCH (p:Product)
+        WHERE p.brand = $brand AND p.source_url = $url
+        RETURN p.name_ko AS product_name
+    """
+
+
+def product_name_parameters(*, brand, url) -> dict:
+    """Keep the same identifier validation as the unit-price lookup."""
+    if any(not isinstance(value, str) or not value.strip() for value in (brand, url)):
+        raise ValueError("PRODUCT_NAME_INPUT_INVALID")
+    return {"brand": brand, "url": url}

@@ -151,7 +151,8 @@ def test_fp_c14_assembled_image_call_is_scene_only_and_carries_context(
                     )
             profile = services.workspaces[next(iter(services.allowed_tenants))]
             assert result["product_display"] == {
-                key: profile.get(key) for key in ("brand", "display_name")
+                key: profile.get(key)
+                for key in ("brand", "display_name", "product_name")
             }
             view = build_view(result, plan_ids=["id"], hydrate=None)
             data = next(
@@ -1059,10 +1060,10 @@ def test_composed_image_reference_and_safe_original_fallback(
             None,
         )
 
-    def compose(value, *, headline, cta):
+    def compose(value, *, headline, product_line):
         assert value == source
         assert headline == synthetic_plan()["hook_text"]
-        assert cta == "지금 만나보기"
+        assert product_line in {"mixsoon", "cosrx"}
         # Composition starts only after the original has been saved.
         assert len(list(directory.glob("*/*.png"))) >= 1
         if failure == "font":
@@ -1223,3 +1224,144 @@ def test_assembled_claims_function_uses_only_existing_support_query(
             await services.close()
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize(
+    "name_rows",
+    [
+        [{"product_name": "공식 합성 세럼 50ml"}],
+        [],
+        [{"product_name": "  "}],
+        [{"product_name": 123}],
+        "error",
+    ],
+)
+@pytest.mark.parametrize("has_contrast", [False, True])
+def test_product_identity_and_contrast_flow_uses_graph_and_profile_only(
+    rig, monkeypatch, name_rows, has_contrast, caplog, capsys
+):
+    from beautyads.agents.design_compose import product_line
+    from beautyads.api.ask_view import build_view
+    from beautyads.graph.evidence_queries import (
+        product_name_parameters,
+        product_name_query,
+    )
+    from beautyads.obs.trace import read_traces
+
+    private = "SYNTHETIC_PRIVATE_GRAPH_DIAGNOSTIC"
+    graph_run = rig.graph.run
+    name_calls = []
+
+    def graph(query, params):
+        if query == product_name_query():
+            name_calls.append((query, params))
+            if name_rows == "error":
+                raise RuntimeError(private)
+            return SimpleNamespace(records=name_rows)
+        return graph_run(query, params)
+
+    monkeypatch.setattr(rig.graph, "run", graph)
+    original_plan = synthetic_plan
+    plan = original_plan()
+    plan.update(
+        title="MODEL_SENTINEL_TITLE",
+        hook_text="MODEL_SENTINEL_HOOK",
+        scenes=["MODEL_SENTINEL_SCENE"],
+        copy_lines=["MODEL_SENTINEL_COPY"],
+        image_brief="MODEL_SENTINEL_BRIEF",
+    )
+    monkeypatch.setitem(globals(), "synthetic_plan", lambda: dict(plan))
+    monkeypatch.setattr(assembly, "_DESIGN_DIR", rig.tmp_path / "design")
+    seen = []
+
+    def compose(value, **options):
+        seen.append(options)
+        return SimpleNamespace(
+            png_bytes=b"synthetic-local-png",
+            **(
+                {"contrast_adjusted": True, "min_contrast": 2.345678}
+                if has_contrast
+                else {}
+            ),
+        )
+
+    monkeypatch.setattr(assembly, "compose_design", compose)
+
+    async def run():
+        services = await rig.start(with_image_enabled=True)
+        try:
+            profiles_before = json.loads(json.dumps(services.workspaces))
+            tenant_id = next(iter(services.allowed_tenants))
+            profile = services.workspaces[tenant_id]
+            # The caller cannot replace the product identity with plan or request data.
+            caller = {**profile, "product_name": "MODEL_SENTINEL_PROFILE"}
+            result = services.ask(
+                "synthetic",
+                ToolContext(tenant_id=tenant_id, as_of=services.as_of),
+                caller,
+                {},
+                True,
+            )
+            graph_name = (
+                "공식 합성 세럼 50ml"
+                if name_rows == [{"product_name": "공식 합성 세럼 50ml"}]
+                else None
+            )
+            assert result["kind"] == "plan"
+            assert result["product_display"] == {
+                "brand": profile["brand"],
+                "display_name": profile["display_name"],
+                "product_name": graph_name,
+            }
+            assert services.workspaces == profiles_before
+            assert caller["product_name"] == "MODEL_SENTINEL_PROFILE"
+            assert len(seen) == 1
+            assert seen[0] == {
+                "headline": plan["hook_text"],
+                "product_line": product_line(profile["brand"], graph_name),
+            }
+            assert "MODEL_SENTINEL" not in seen[0]["product_line"]
+            assert profile["display_name"] not in seen[0]["product_line"]
+            assert "cta" not in seen[0]
+            assert name_calls == [
+                (
+                    product_name_query(),
+                    product_name_parameters(brand=p["brand"], url=p["own_product_url"]),
+                )
+                for p in services.workspaces.values()
+            ]
+            ref = result["plans"][0]["image"]
+            assert "compose_error" not in ref
+            data = next(
+                c["data"]
+                for c in build_view(result, plan_ids=["id"], hydrate=None).ui_commands
+                if c["kind"] == "show_plan"
+            )
+            trace = read_traces(
+                rig.settings.ledger_path.with_name("traces.jsonl")
+            ).records[-1]
+            if has_contrast:
+                assert ref["composed"]["contrast_adjusted"] is True
+                assert ref["composed"]["min_contrast"] == 2.346
+                assert data["image"]["composed"] == ref["composed"]
+                assert trace.plans[0].composed_contrast.model_dump() == {
+                    "contrast_adjusted": True,
+                    "min_contrast": 2.346,
+                }
+            else:
+                assert (
+                    "contrast_adjusted" not in ref["composed"]
+                    and "min_contrast" not in ref["composed"]
+                )
+                assert trace.plans[0].composed_contrast is None
+            for name, options in rig.calls:
+                if name == "image":
+                    assert (
+                        profile["brand"] not in options["prompt"]
+                        and "공식 합성" not in options["prompt"]
+                    )
+        finally:
+            await services.close()
+
+    asyncio.run(run())
+    assert private not in caplog.text + str(capsys.readouterr())

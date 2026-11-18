@@ -550,7 +550,8 @@ def run_request(
                 "available_efficacy_status", "skipped"
             ),
             "product_display": {
-                key: profile.get(key) for key in ("brand", "display_name")
+                key: profile.get(key)
+                for key in ("brand", "display_name", "product_name")
             },
             "pattern_distribution": [
                 {

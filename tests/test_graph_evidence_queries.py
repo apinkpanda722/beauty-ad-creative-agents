@@ -240,3 +240,35 @@ def test_product_unit_price_validates_inputs_without_values(field, value):
         product_unit_price_parameters(
             **{"brand": "synthetic", "url": "https://example.invalid/p", field: value}
         )
+
+
+def test_product_name_is_only_fixed_read_query_with_bound_identifiers():
+    from beautyads.graph.evidence_queries import (
+        product_name_parameters,
+        product_name_query,
+    )
+
+    brand, url = "brand' OR true", "https://example.invalid/' DELETE p"
+    query = product_name_query()
+    assert normalized(query) == (
+        "MATCH (p:Product) WHERE p.brand = $brand AND p.source_url = $url "
+        "RETURN p.name_ko AS product_name"
+    )
+    assert product_name_parameters(brand=brand, url=url) == {"brand": brand, "url": url}
+    assert set(re.findall(r"\$(\w+)", query)) == {"brand", "url"}
+    assert not re.search(
+        r"\b(CREATE|MERGE|SET|DELETE|REMOVE|CALL)\b", query, re.IGNORECASE
+    )
+    assert brand not in query and url not in query
+    assert query == product_name_query()
+
+
+@pytest.mark.parametrize("field", ["brand", "url"])
+@pytest.mark.parametrize("value", [None, "", " \t", [], {}, 123, True])
+def test_product_name_validates_inputs_without_diagnostics(field, value):
+    from beautyads.graph.evidence_queries import product_name_parameters
+
+    with pytest.raises(ValueError, match="^PRODUCT_NAME_INPUT_INVALID$"):
+        product_name_parameters(
+            **{"brand": "synthetic", "url": "https://example.invalid/p", field: value}
+        )

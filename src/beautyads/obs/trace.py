@@ -3,7 +3,7 @@
 import re
 from collections import defaultdict
 from datetime import UTC, datetime
-from math import fsum
+from math import fsum, isfinite
 from pathlib import Path
 from threading import Lock
 from typing import Annotated, Literal, NamedTuple
@@ -66,6 +66,11 @@ class TracePatternDistribution(_TraceModel):
     second_share: Annotated[float, Field(ge=0)] | None = None
 
 
+class TraceComposedContrast(_TraceModel):
+    contrast_adjusted: Annotated[bool, Field(strict=True)]
+    min_contrast: Annotated[float, Field(strict=True, ge=0)] | None
+
+
 class TracePlan(_TraceModel):
     status: Token | None = None
     rework_count: Count = 0
@@ -73,6 +78,7 @@ class TracePlan(_TraceModel):
     efficacy_status: dict[Token, Token] = Field(default_factory=dict)
     attempts: list[TraceAttempt] = Field(default_factory=list)
     alignment: TraceAlignment = Field(default_factory=TraceAlignment)
+    composed_contrast: TraceComposedContrast | None = None
 
 
 class TraceInputTrim(_TraceModel):
@@ -211,6 +217,21 @@ def build_trace(
     result = result or {}
     plans = []
     for plan in result.get("plans", []):
+        image = plan.get("image")
+        composed = image.get("composed") if isinstance(image, dict) else None
+        composed_contrast = None
+        if (
+            isinstance(composed, dict)
+            and type(composed.get("contrast_adjusted")) is bool
+        ):
+            contrast = composed.get("min_contrast")
+            if contrast is None or (
+                type(contrast) in (int, float) and isfinite(contrast) and contrast >= 0
+            ):
+                composed_contrast = TraceComposedContrast(
+                    contrast_adjusted=composed["contrast_adjusted"],
+                    min_contrast=float(contrast) if contrast is not None else None,
+                )
         alignment = plan.get("pattern_alignment")
         alignment = alignment if isinstance(alignment, dict) else {}
         attempts = []
@@ -234,6 +255,7 @@ def build_trace(
             TracePlan(
                 **{
                     **_project(TracePlan, plan),
+                    "composed_contrast": composed_contrast,
                     "efficacy_status": {
                         key: value
                         for key, value in plan.get("efficacy_status", {}).items()
