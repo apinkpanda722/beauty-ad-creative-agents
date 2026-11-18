@@ -84,6 +84,10 @@ live-product-identify:
 live-agent:
 	uv run python -m beautyads.eval.live_agent $(ARGS)
 
+.PHONY: live-agents
+live-agents:
+	uv run python -m beautyads.eval.agents_live $(ARGS)
+
 .PHONY: live-evidence
 live-evidence:
 	uv run python -m beautyads.eval.evidence_check $(ARGS)
