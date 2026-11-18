@@ -60,6 +60,7 @@
 | 47 | **P5 step 5b·5c·6a~6d 승인과 조건(2026-11-18, 조언 세션 검토)**: 실행 순서 `5b → 5c → 6a → 6b → 6c → 6d`(사용자 live: 5b 뒤 `make live-evidence`, 6d 뒤 `inputs`·`terra`·`sonnet` 비교). (1) `PASS_MIN_SCORE = 3`은 **잠정 개발값**이고 최종 평가(test 브랜드) 전에 동결한다(test 결과를 보고 바꾸지 않고, 개발 중 값을 바꾸면 이유와 날짜를 이 표에 기록, 코드 주석 "잠정값, 최종 평가 전 동결"). (2) 그래프 조회 구현체는 `unsupported`·`not_certified`를 만들지 않는다. 한계를 ARCHITECTURE "그라운딩 원칙"과 결과 문서에 쓴다: 이 버전의 효능 검사는 근거가 확인된 효능을 확인할 뿐 근거 없는 효능을 부당으로 판정하지 못하며 주 실패 검사는 금지 표현·근거 ID·분류 값이다. 6b 평가 보고와 6c 결과에 효능별 상태 칸(`efficacy_status`·`efficacy_summary`, `supported`·`unknown`)을 `passed`와 분리해 둔다. step 7 화면 데이터에도 같은 칸을 싣는다. (3) 사전 등록 파일(`docs/results/p5_dev_compare_preregistration.md`)은 이미 커밋돼 이후 변경은 정정 기록 방식으로만 한다. | 사용자 결정(조언 세션 검토) |
 | 48 | **P5 live-compare 실패 진단과 step 6e(2026-11-18, 조언 세션 검토)**: `make live-compare ARGS='inputs'`가 `COMPARE_FAILED`로 실패했다. 오프라인 진단으로 리서치 `finalize`의 `ResearchHandoffDraft.aggregates`가 자유 형식 객체라 OpenAI strict 규칙을 어김을 확인했다(오류 코드 출력 부재로 원인 전부 확정은 재실행 뒤). **step 6e `compare-diagnostics`** 추가(6d 뒤, P5 순서 `6d → 6e → 7`): 에러 가시성, `aggregates` 항목 목록 변환, 공식 문서(2026-11-18 조회) 기반 strict 검증기·스펙 가드·메시지 시퀀스 검증기. FP-C15·원칙 14 보강. **step 7 요구사항 추가**: `ResearchHandoff.aggregates`는 모델 작성값이며 검증된 수치가 아니므로 결과·화면에서 검증된 수치로 취급하지 않고, **도구 출력에 없는 수치를 `unresolved`로 옮기는 코드 검증을 step 7에서 한다**(6e에서는 하지 않음). 해시 커밋과 terra·sonnet 실행은 재실행 성공 전까지 보류. | 사용자 결정(조언 세션 검토) |
 | 49 | **P5 live-compare 두 번째 실패 진단과 step 6f(2026-11-18, 조언 세션 검토)**: 6e 뒤 재실행이 `PydanticSerializationError`로 실패했다. 오프라인 재현으로 `find_example_creatives`·`ingredient_ad_trend` 행의 `published_at`이 `neo4j.time.DateTime`이라 `ToolResult.model_dump(mode="json")`가 실패함을 확인했고, `tool_message_content`가 같은 입력을 "결과를 읽을 수 없다"로 조용히 대체하는 은폐 결함도 찾았다. **step 6f `json-safe-records`**(6e 뒤, 순서 `6e → 6f → 7`): `graph/values.py` `to_json_safe` 한 곳, 도구 반환 경계 한 곳 적용, 알 수 없는 타입은 값 노출 없는 표지 문자열, 조용한 대체를 `TOOL_RESULT_UNREADABLE` 명시적 표지와 코드 로그로 교체, 실제 neo4j 객체 회귀 테스트. FP-C03 사례 추가. 해시 커밋과 terra·sonnet 실행은 재실행 성공 전까지 보류. | 사용자 결정(조언 세션 검토) |
+| 50 | **P5 step 7 분할과 step 8·9 방향(2026-11-18, 조언 세션 검토)**: 7을 `7a supervisor`·`7b workspace-feedback`·`7c ask-sse`·`7d full-assembly`로 나누고, 8은 `8a trace-jsonl`만 P5에 두고 8b(Langfuse·compose `obs`·`cost_details`)는 P7로 이월한다. 승인된 요구: `aggregates`는 모델 작성값이므로 `verify_aggregates`(숫자 집합 대조)로 도구 출력에 없는 수치를 빼 `unresolved`로 옮기고 리서치 프롬프트에 "수치는 도구 출력의 값을 그대로 인용하고 직접 계산하지 않는다"를 추가, 결과·화면에서 `aggregates`는 "모델 작성값, 검증되지 않음"으로 표시하고 검증 통과분과 분리. step 9 live는 dev workspace만(개발·공식·이미지 포함 3회, 상한 $1.0: OpenAI $0.5·Anthropic $0.4·이미지 $0.1), test 브랜드는 최종 평가 전까지 쓰지 않는다. 컷: `show_graph_fragment`·`show_distribution`은 도구가 만든 데이터를 그대로 전달하는 최소 형태, 그래프 화면은 P7 web. step 9에서 StructuredStats 실패 종류별 집계와 되돌림 점수 경로(차별성·적합성)를 기록한다. | 사용자 결정(조언 세션 검토) |
 
 ## 1. 전제와 일정
 
@@ -204,7 +205,7 @@ step 본문은 `phases/4-ontology/step*.md`가 원본이다. 구 번호와의 �
 
 **P4 착수 전 입력(2026-11-15 결정)**: 식약처 안내서 PDF 내려받기와 `claim_rules.yaml` 초안(완료), 공식몰 응답 원본 5쪽+robots.txt(완료), Gemini 이미지 입력 계약 실측 2회 $0.00183(완료), `SkinType`·`SkinConcern` 목록과 `ADDRESSES` 대응 초안(ADR-012 후속), 성분→효능 수기 표(step 7 live 뒤).
 
-### P5 agents (실행 중, 순서 … 6d → 6e → 6f → 7 → 8 → 9)
+### P5 agents (실행 중, 순서 … 6f → 7a → 7b → 7c → 7d → 8a → 9, 8b Langfuse는 P7로 이월)
 
 | step | 이름 | 내용 |
 |---|---|---|
@@ -228,8 +229,11 @@ step 본문은 `phases/4-ontology/step*.md`가 원본이다. 구 번호와의 �
 | 6f | `json-safe-records` | `neo4j.time.DateTime` 등 Neo4j 값을 JSON 안전한 값으로 바꾸는 `graph/values.py`의 `to_json_safe`를 도구 반환 경계 한 곳에서 적용, `tool_message_content`의 조용한 "읽을 수 없다" 대체를 `TOOL_RESULT_UNREADABLE` 표지와 코드 로그로 교체, 실제 SDK 객체 회귀 테스트 |
 | 6e | `compare-diagnostics` | `make live-compare inputs` 실패 진단 수정: `p5_compare` 실패 출력에 `error_code`·`detail`, `ResearchHandoffDraft.aggregates`를 `{name, value}` 항목 목록으로(결과 계약 불변, 모델 작성값 표시), OpenAI strict 스키마 규칙 검증기·스펙 가드·메시지 시퀀스 검증기 |
 | 6d | `dev-compare` | 사전 등록 비교 실행기 `make live-compare`(terra `reasoning_effort` none·low·medium, sonnet (a) 대 (b)), 사전 등록 파일 커밋 확인과 목적별 상한 검사, 입력 해시 확인 |
-| 7 | `supervisor-sse` | Supervisor, 한도, 기준일 고정, SSE 4종. **효능별 상태(`efficacy_status`·`efficacy_summary`)와 "N건 중 M건 표시"(`count_label`)를 화면 데이터에 `passed`와 분리해 싣는다.** **사용자 화면(기획안 카드·평가)과 보고에 "근거 연결 없음" 건수를 눈에 띄게 노출한다**(`passed`에 섞지 않는다) |
-| 8 | `obs-langfuse` | JSONL(기본), Langfuse(`obs` profile, `langfuse==3.15.0`, `cost_details` 전송) |
+| 7a | `supervisor` | Supervisor 상위 그래프(전용 상태 `sv_*`): 의도 해석(luna `none`, OpenAI strict 스키마), 과제 지시서만 하위 에이전트에 전달, 한도(요청당 비용·기획 안 수·되돌림 2회·입력 예산) 코드 강제, S5 경계·근거 없음은 코드 판정, `verify_aggregates`(도구 출력에 없는 수치는 `aggregates`에서 빼 `unresolved`로), 리서치 프롬프트 "수치는 도구 출력 값을 그대로 인용" |
+| 7b | `workspace-feedback` | `config/workspaces.yaml`(dev 2·test 2)와 로더, 우리 제품 단위당 정가 질의, `POST /feedback`(훅·효능은 저장된 기획안에서 서버가 꺼냄, 다른 테넌트 plan_id는 404), 피드백 요약, `resolve_tenant` |
+| 7c | `ask-sse` | `POST /ask`(SSE: step·tool_start·ui_command·token·error), 화면 명령 `show_evidence_cards`·`show_plan`(unknown·효능별 상태 별도 칸, `count_label`, 되돌림 경로, disclaimer)·최소 형태 `show_distribution`·`show_graph_fragment`, `aggregates` 검증 표시, `GET /design`(테넌트 검사), `run_ask_once` |
+| 7d | `full-assembly` | `api/assembly.py` `assemble_full`(연결·작업 공간 시드·가격대·모델 서비스·`ledger_total` 비용 가드, 기본 `group=dev`, 평가 기본 haiku), step 9 live 도구의 조립 |
+| 8a | `trace-jsonl` | 요청 1건=trace 1개 JSONL(단계·도구·모델 호출·구조화 실패 종류·한도·입력 예산 자름·unknown_count, 값·키 없음), 테넌트별 집계. Langfuse(8b)는 P7로 이월 |
 | 9 | `agents-live-target` | `make live-agents` |
 
 ### P6·P7

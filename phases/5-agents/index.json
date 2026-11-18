@@ -283,8 +283,23 @@
       }
     },
     {
-      "step": 7,
-      "name": "supervisor-sse",
+      "step": "7a",
+      "name": "supervisor",
+      "status": "pending"
+    },
+    {
+      "step": "7b",
+      "name": "workspace-feedback",
+      "status": "pending"
+    },
+    {
+      "step": "7c",
+      "name": "ask-sse",
+      "status": "pending"
+    },
+    {
+      "step": "7d",
+      "name": "full-assembly",
       "status": "pending"
     },
     {
