@@ -201,7 +201,16 @@
     {
       "step": "6a",
       "name": "image-design",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-18T14:35:40+0900",
+      "summary": "텍스트 전용 이미지 생성 래퍼·이중 비용 상한·매직 바이트 검증·서명 비노출·원자적 로컬 저장 구현. FP-C13·아키텍처 검사 포함 make verify 통과(4,066 tests). 실제 서비스 호출·패키지 설치 없음.",
+      "completed_at": "2026-11-18T14:41:02+0900",
+      "usage": {
+        "input_tokens": 769809,
+        "cached_input_tokens": 716928,
+        "output_tokens": 11354,
+        "attempts": 1
+      }
     },
     {
       "step": "6b",
