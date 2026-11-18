@@ -393,8 +393,17 @@
         "output_tokens": 18073,
         "attempts": 1
       }
+    },
+    {
+      "step": "9d",
+      "name": "structured-failure-detail",
+      "status": "pending"
+    },
+    {
+      "step": "9e",
+      "name": "weak-contrast-image-prompt",
+      "status": "pending"
     }
   ],
-  "created_at": "2026-11-17T22:15:36+0900",
-  "completed_at": "2026-11-18T19:40:36+0900"
+  "created_at": "2026-11-17T22:15:36+0900"
 }
