@@ -145,7 +145,16 @@
     {
       "step": "1c",
       "name": "chat-param-compat",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-18T13:31:02+0900",
+      "summary": "OpenAI tool_choice 호환 인자·오프라인 회귀 가드·SSE/클라이언트/CLI의 안전한 오류 상세 전달 구현. 아키텍처 검사 포함 make verify 통과(3,887 tests). 실제 서비스 접속·패키지 설치 없음. 실제 OpenAI API 수락 여부는 미실측.",
+      "completed_at": "2026-11-18T13:35:21+0900",
+      "usage": {
+        "input_tokens": 1212371,
+        "cached_input_tokens": 1121408,
+        "output_tokens": 8672,
+        "attempts": 1
+      }
     },
     {
       "step": 6,
