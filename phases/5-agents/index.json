@@ -341,7 +341,16 @@
     {
       "step": "8a",
       "name": "trace-jsonl",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-18T18:42:29+0900",
+      "summary": "요청별 로컬 JSONL trace·테넌트별 집계·ask 관측 연결 및 합성 테스트 구현. 아키텍처 검사 포함 make verify 통과(4,532 tests). 실제 서비스 접속·패키지 설치 없음.",
+      "completed_at": "2026-11-18T18:49:19+0900",
+      "usage": {
+        "input_tokens": 1780804,
+        "cached_input_tokens": 1692544,
+        "output_tokens": 13785,
+        "attempts": 1
+      }
     },
     {
       "step": 9,
