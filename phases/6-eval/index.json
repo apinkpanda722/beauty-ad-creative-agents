@@ -141,8 +141,12 @@
         "output_tokens": 24303,
         "attempts": 1
       }
+    },
+    {
+      "step": 11,
+      "name": "dev-split",
+      "status": "pending"
     }
   ],
-  "created_at": "2026-11-19T12:16:24+0900",
-  "completed_at": "2026-11-19T15:23:59+0900"
+  "created_at": "2026-11-19T12:16:24+0900"
 }
