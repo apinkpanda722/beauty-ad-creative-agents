@@ -89,13 +89,16 @@
     {
       "step": 7,
       "name": "e2e5-live",
-      "status": "pending",
+      "status": "completed",
       "usage": {
-        "input_tokens": 290866,
-        "cached_input_tokens": 225280,
-        "output_tokens": 1565,
+        "input_tokens": 3200348,
+        "cached_input_tokens": 3093632,
+        "output_tokens": 32631,
         "attempts": 1
-      }
+      },
+      "started_at": "2026-11-19T13:13:29+0900",
+      "summary": "E2·E5 공용 러너(run/score/sheet/report), 동결·예산·재개 가드, 합성 테스트 48건과 live-e2e5 타깃 구현. 실제 서비스 접속 없이 make verify 통과(5,224 tests), 추가 패키지 없음.",
+      "completed_at": "2026-11-19T13:27:31+0900"
     },
     {
       "step": 8,
