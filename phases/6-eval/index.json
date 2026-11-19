@@ -89,10 +89,7 @@
     {
       "step": 7,
       "name": "e2e5-live",
-      "status": "blocked",
-      "started_at": "2026-11-19T13:09:14+0900",
-      "blocked_reason": "선점검에서 충돌을 확인했습니다. 요구사항은 \"채점 모델은 mode별(dev: haiku, final: sonnet).\"이지만, src/beautyads/eval/e2_scoring.py:204–205의 score_plans는 haiku를 SCORING_MODEL_INVALID로 거부하며 tests/test_e2_scoring.py:354–356도 이를 강제합니다. 이를 정상 지원하려면 해당 채점기의 수정이 필요한데, \"수정 허용 경로: src/beautyads/eval/e2e5_live.py, tests/test_e2e5_live.py, Makefile\"에 포함되지 않습니다. e2_scoring.py의 명시적 dev 모델 지원과 관련 테스트 추가를 허용하도록 범위를 조정해야 합니다. 파일 수정·실제 호출·검증 실행 없이 중단했습니다.",
-      "blocked_at": "2026-11-19T13:10:39+0900",
+      "status": "pending",
       "usage": {
         "input_tokens": 290866,
         "cached_input_tokens": 225280,
