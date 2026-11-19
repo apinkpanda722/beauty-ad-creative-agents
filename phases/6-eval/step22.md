@@ -11,7 +11,7 @@
 - `tests/test_e2_scoring.py`의 점수 합성(`population()`의 `scores[req.id][arm] = {...}` 평면 구조)은 **그대로 통과해야 한다**: `analyze`는 평면 구조(`"status"` 키가 있는 딕셔너리)를 반복 1의 점수로도 받아들인다.
 - `tests/test_e2_scoring.py:212` 부근의 `hashlib` 단언(`build_claim_sheet`의 숨김 id 형식): `repeat == 1`만 쓰므로 **형식 불변**이다.
 - `tests/test_e2e5_live.py:233 test_arm_order_keyword_image_identity_and_resume`·`:291 test_budget_stops_before_next_arm_and_resume_counts_previous_spend`: `--repeat` 미지정(기본 1)에서 순서·재개·예산 동작이 불변이어야 한다. `:419` `scores.json` 읽는 부분은 새 구조(`{요청: {팔: {"1": 점수}}}`)에 맞게 갱신한다.
-- `tests/test_prereg.py`: 문장 수 `== 19` → `== 20`, `test_none_measurement_preserves_original_bytes`의 SHA-256 기대값은 문장 변경·추가로 바뀌므로 **그 한 줄만** 갱신한다(step 19와 같은 이유). 3·4·19번째 문장의 문구를 단언하는 기존 테스트가 있으면 새 문구로 갱신한다(구절을 더하는 변경이며 기존 의미를 약화하지 않는다).
+- `tests/test_prereg.py`: 문장 수 `== 19` → `== 20`, **문장 해시를 고정하는 기존 테스트가 세 곳**이다(선점검에서 확인된 사실): (a) `test_none_measurement_preserves_original_bytes`(`dev_measurement=None` 렌더링 전체의 SHA-256), (b) `test_first_seventeen_procedures_remain_byte_identical`(`:113-117`, `REQUIRED_SENTENCES[:17]`을 JSON으로 만든 SHA-256 — **3번째·4번째 문장이 이 범위에 있어 바뀐다**), (c) `test_failure_as_worst_procedure_is_nineteenth`(`:120-145`, `REQUIRED_SENTENCES[:18]`의 SHA-256 — 같은 이유로 바뀐다; 같은 테스트의 문구 단언은 유지하고 19번째 문장의 새 구절 단언을 더한다). **세 기대 해시 각각 한 줄씩만** 새 값으로 갱신한다(`uv run python`으로 계산). 이 해시들은 사전 등록 문서가 생성·커밋되기 전의 문장 수정을 막지 않으며(문서 생성 전이라 기존 문장 수정이 허용된다) 사전 등록 이후의 문장 변경을 막는 장치로 그대로 남는다. 각 테스트의 나머지 단언은 그대로 유지한다. 3·4·19번째 문장의 문구를 단언하는 기존 테스트가 있으면 새 문구로 갱신한다(구절을 더하는 변경이며 기존 의미를 약화하지 않는다).
 
 **새 칸 대응표**: `ArmRecord.repeat`(runner `--repeat` → 기록 → 채점 숨김 id → 공개 키 → `analyze`의 요청별 평균), `run.json`의 `repeats`(최대 반복 수; 같은 `run_id`에 반복을 이어 실행), `--repeat N`(기본 1, 1~`MAX_REPEATS`), 점수 구조 `scores[요청][팔][반복 문자열]`(`reveal_scores` → `scores.json` → `analyze`), 사람 시트 `repeat == 1` 규칙(`build_claim_sheet` → 사전 등록 4번째 문장), `repeats`(`analyze` → 팔별 반복 분포 보고).
 
@@ -110,4 +110,4 @@ make verify   # lint + test 통과
 - 두 번째 반복이 첫 번째 반복의 모델 응답·호출 결과·시드를 재사용하게 하거나 반복 사이 원장 증가분을 합치지 마라. 이유: 모델 비결정성이 반복의 목적이고 입력 토큰·비용은 기록 단위로 분리되어야 한다.
 - 사람 claim 시트의 후보에 반복 2 이상을 넣거나 시트 형식·숨김 id 형식·지침 문서를 바꾸지 마라. 이유: 사람 판정은 반복 1로 고정한다(조언 세션 결정).
 - E3·격리 실행기와 `eval/e3_live.py`·`eval/isolation_live.py`·`eval/evalset*.py`·`Makefile`을 수정하거나 새 의존성을 추가하지 마라. 이유: 허용 범위 밖이며 E3·격리는 반복하지 않는다(필요하면 `blocked`로 보고).
-- 기존 테스트의 단언을 약화하지 마라(위 "상수 단언 grep"에 적힌 형식·구조·문구·해시 한 줄 갱신만 허용). 이유: 이미 통과한 step의 계약이다.
+- 기존 테스트의 단언을 약화하지 마라(위 "상수 단언 grep"에 적힌 형식·구조·문구와 위 세 곳의 해시 기대값 한 줄씩 갱신만 허용). 이유: 이미 통과한 step의 계약이다.
