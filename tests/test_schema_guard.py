@@ -31,6 +31,7 @@ from beautyads.llm.structured import (
 
 ROOT = Path(__file__).resolve().parents[1]
 GUARDED_MODULES = {
+    "eval/e2_scoring.py",
     "eval/single_agent.py",
     "agents/research.py",
     "agents/planning.py",
@@ -455,3 +456,20 @@ def test_actual_single_agent_chat_messages():
     execute_single(chat, CaptureStructured("gpt-6.1-terra"))
     assert len(chat.calls) == 2
     guard_messages(chat.calls)
+
+
+def test_actual_e2_scoring_specs_are_strict(tmp_path):
+    from test_e2_scoring import blind
+
+    from beautyads.eval.e2_scoring import score_plans
+
+    generator = CaptureStructured("claude-sonnet-5-5")
+    items, _ = blind(1)
+    score_plans(items, structured=generator, ledger_path=tmp_path / "ledger")
+    assert generator.calls, "No E2 scoring specs captured"
+    checked = 0
+    for spec, _ in generator.calls:
+        assert spec.name == "e2_scores"
+        assert strict_violations(spec.schema) == []
+        checked += 1
+    assert checked > 0, "No E2 scoring specs validated"
