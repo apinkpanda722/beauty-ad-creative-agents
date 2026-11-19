@@ -12,6 +12,7 @@ import sys
 from datetime import date
 from pathlib import Path
 
+from beautyads.agents.supervisor import SUPERVISOR_PROMPT_VERSION
 from beautyads.domain.research import ResearchBrief
 from beautyads.domain.supervisor import RequestLimits
 from beautyads.eval import e2_scoring, e2e5_live, e3_live, evalset_candidates
@@ -363,6 +364,19 @@ REQUIRED_SENTENCES = (
         "요청 20건·dev 구성은 불변이다. "
         f"질문 {TEST_QUESTIONS_COUNT}건이 20건 이상이므로 판정 불가 하한은 해당하지 않는다."
     ),
+    (
+        f"변경 기록: 해석 프롬프트({SUPERVISOR_PROMPT_VERSION})·닫힌 값 대응표 payload·"
+        "pattern_context의 지정 축 제외는 P5 이후 변경이며 근거는 dev 스모크 관찰이다. "
+        "사용자가 포맷·훅·앵글을 지정해도 해석 결과 brief의 해당 축이 비어 있었고 "
+        "기획 단계에 지정 값이 전달되지 않았다. P5 dev 비교 증거는 불변인 기획·평가 프롬프트에 "
+        "대한 것이고 해석 단계는 P5에서 동결 대상이 아니었다. "
+        "해석 프롬프트 버전·_SYSTEM·대응표 해시는 이번에 동결 줄에 추가한다."
+    ),
+    (
+        "한계: 요청 문장은 대응표와 같은 표시 이름을 쓰므로 해석이 쉬운 조건이며 "
+        "자유 표현(UGC·후기 영상 등)의 이해는 평가하지 않는다. "
+        "단일 팔은 원문을 받으므로 영향이 없다."
+    ),
 )
 
 
@@ -472,6 +486,7 @@ def render_results_template() -> str:
             "쌍 비교 차이·95% CI",
             "비용·지연(p50·p95)·모델 호출 수",
             "지정 축 준수(코드 판정, 참고용)",
+            "요청에 없는 축 채움(과채움, 코드 판정, 참고용)",
             "팔별 기획 실패율",
             "완전 사례 민감도 판정",
             "실행되지 않은 항목 수",

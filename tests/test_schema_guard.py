@@ -487,3 +487,24 @@ def test_actual_e3_specs_and_messages_are_guarded():
     guard_messages([kw for _, kw in generator.calls])
     guard_messages([kw for kw in calls if "messages" in kw])
     assert all(spec.name == "e3_answer" for spec, _ in generator.calls)
+
+
+def test_actual_supervisor_messages_with_axes_are_guarded():
+    import json
+
+    from beautyads.agents.supervisor import decide
+    from beautyads.analysis.prompts import axis_glossary
+    from beautyads.domain.supervisor import RequestLimits
+
+    generator = CaptureStructured("gpt-6-luna")
+    decide(
+        "synthetic",
+        as_of=CTX.as_of,
+        structured=generator,
+        limits=RequestLimits(),
+        glossary=axis_glossary(),
+    )
+    assert guard_specs([generator]) == 1
+    calls = [options for _, options in generator.calls]
+    assert json.loads(calls[0]["messages"][1]["content"])["axes"] == axis_glossary()
+    guard_messages(calls)

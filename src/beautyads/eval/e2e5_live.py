@@ -23,6 +23,7 @@ from beautyads.agents.lookups import (
     GraphEfficacySupport,
     GraphEvidenceIndex,
 )
+from beautyads.agents.supervisor import SUPERVISOR_PROMPT_VERSION
 from beautyads.agents.tools import run_tool
 from beautyads.api.assembly import assemble_full
 from beautyads.api.feedback import feedback_for_prompt
@@ -475,7 +476,9 @@ def _record(
     status = "plan" if plan is not None else result.get("kind", "failed")
     if status not in ArmRecord.model_fields["status"].annotation.__args__:
         status = "failed"
-    versions = result.get("prompt_versions") or {}
+    versions = dict(result.get("prompt_versions") or {})
+    if arm != "single":
+        versions["supervisor"] = SUPERVISOR_PROMPT_VERSION
     if arm == "single" and isinstance(result.get("prompt_version"), str):
         versions = {"single": result["prompt_version"]}
     return _RecordedArm(
@@ -750,6 +753,11 @@ def _axis_adherence(rows, items):
                     and r.brief_axes.get(axis) is None
                     for r in available
                 ),
+                "unrequested_filled": sum(
+                    r.brief_axes.get(axis) is not None
+                    and axis not in requests[r.item_id].axes_used
+                    for r in available
+                ),
             }
         report[arm] = {
             "unavailable": sum(r.brief_axes is None for r in selected),
@@ -815,11 +823,11 @@ def _report(rows, items, root, metadata, out):
     )
     print("\n지정 축 준수(코드 판정, 참고용)", file=out)
     print(
-        "| 팔 | 축 | 지정 | 준수 | 지배 값과 충돌 | 해석 누락 | unavailable |\n| --- | --- | --- | --- | --- | --- | --- |",
+        "| 팔 | 축 | 지정 | 준수 | 지배 값과 충돌 | 해석 누락 | 과채움 | unavailable |\n| --- | --- | --- | --- | --- | --- | --- | --- |",
         file=out,
     )
     for arm, values in adherence.items():
-        print(f"| {arm} | 전체 | | | | | {values['unavailable']} |", file=out)
+        print(f"| {arm} | 전체 | | | | | | {values['unavailable']} |", file=out)
         for axis, counts in values["axes"].items():
             cells = [
                 str(counts[k])
@@ -828,6 +836,7 @@ def _report(rows, items, root, metadata, out):
                     "adherent",
                     "dominant_conflict",
                     "interpretation_missing",
+                    "unrequested_filled",
                 )
             ]
             print(f"| {arm} | {axis} | " + " | ".join(cells) + " | |", file=out)

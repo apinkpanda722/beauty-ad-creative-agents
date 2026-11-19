@@ -16,7 +16,16 @@ from typing import NamedTuple
 
 from pydantic import ValidationError
 
-from beautyads.domain.labels import Angle, Category, Claim, Format, HookType
+from beautyads.domain.labels import (
+    ANGLE_NAMES,
+    FORMAT_NAMES,
+    HOOK_TYPE_NAMES,
+    Angle,
+    Category,
+    Claim,
+    Format,
+    HookType,
+)
 from beautyads.domain.skin import SkinConcern, SkinType
 from beautyads.eval.cq_verify import cq_preflight, error_code
 from beautyads.eval.evalset import (
@@ -68,7 +77,7 @@ REVIEW_COLUMNS = (
     "note",
 )
 
-# Korean display names are deliberately local, closed, and independent of models.
+# Closed Korean display names are independent of models.
 _LABELS = {
     "category": {
         "mask_pack": "마스크팩",
@@ -88,32 +97,9 @@ _LABELS = {
         "texture_finish": "사용감·마무리",
         "other": "기타 효능",
     },
-    "format": {
-        "ugc_style": "일반인 후기형",
-        "studio_film": "스튜디오 촬영",
-        "demo": "시연",
-        "text_motion": "문자 모션",
-        "static_image": "정지 이미지",
-        "other": "기타 포맷",
-    },
-    "hook_type": {
-        "question": "질문형",
-        "problem": "문제 제기형",
-        "result_first": "결과 선공개형",
-        "bold_claim": "강한 주장형",
-        "product_first": "제품 먼저 제시형",
-        "person_first": "인물 먼저 제시형",
-        "other": "기타 훅",
-    },
-    "angle": {
-        "problem_solution": "문제 해결",
-        "desire": "욕구",
-        "social_proof": "사회적 증거",
-        "comparison": "비교",
-        "ingredient_science": "성분 과학",
-        "how_to": "사용법",
-        "other": "기타 각도",
-    },
+    "format": {member.value: name for member, name in FORMAT_NAMES.items()},
+    "hook_type": {member.value: name for member, name in HOOK_TYPE_NAMES.items()},
+    "angle": {member.value: name for member, name in ANGLE_NAMES.items()},
     "concern": {v.value: v.value for v in SkinConcern},
     "skin_type": {v.value: v.value for v in SkinType},
 }

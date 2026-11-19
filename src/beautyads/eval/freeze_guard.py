@@ -1,6 +1,7 @@
 """Read-only preregistration and code guards for development and final runs."""
 
 import hashlib
+import json
 import re
 import subprocess
 from dataclasses import dataclass
@@ -8,6 +9,8 @@ from pathlib import Path
 from typing import Literal
 
 from beautyads.agents import evaluation, planning
+from beautyads.agents import supervisor as agent_supervisor
+from beautyads.analysis.prompts import axis_glossary
 from beautyads.domain import evaluation as domain_evaluation
 from beautyads.domain import supervisor
 from beautyads.eval.evalset import (
@@ -33,6 +36,9 @@ THIN_POOL_MAX_LABEL = "동결 THIN_POOL_MAX"
 PASS_MIN_SCORE_LABEL = "동결 PASS_MIN_SCORE"
 PLANNING_SYSTEM_HASH_LABEL = "동결 기획 _SYSTEM sha256"
 EVALUATION_SYSTEM_HASH_LABEL = "동결 평가 _SYSTEM sha256"
+SUPERVISOR_PROMPT_VERSION_LABEL = "동결 해석 프롬프트 버전"
+SUPERVISOR_SYSTEM_HASH_LABEL = "동결 해석 _SYSTEM sha256"
+AXIS_GLOSSARY_HASH_LABEL = "동결 해석 대응표 sha256"
 
 
 class FreezeError(Exception):
@@ -71,6 +77,18 @@ def frozen_values() -> dict[str, str]:
         ).hexdigest(),
         EVALUATION_SYSTEM_HASH_LABEL: hashlib.sha256(
             evaluation._SYSTEM.encode("utf-8")
+        ).hexdigest(),
+        SUPERVISOR_PROMPT_VERSION_LABEL: agent_supervisor.SUPERVISOR_PROMPT_VERSION,
+        SUPERVISOR_SYSTEM_HASH_LABEL: hashlib.sha256(
+            agent_supervisor._SYSTEM.encode("utf-8")
+        ).hexdigest(),
+        AXIS_GLOSSARY_HASH_LABEL: hashlib.sha256(
+            json.dumps(
+                axis_glossary(),
+                sort_keys=True,
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ).encode("utf-8")
         ).hexdigest(),
     }
 

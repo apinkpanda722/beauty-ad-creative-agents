@@ -27,6 +27,7 @@ from beautyads.agents.research import run_research
 from beautyads.agents.skeleton import build_graph
 from beautyads.agents.supervisor import decide, run_request
 from beautyads.agents.tools import run_tool
+from beautyads.analysis.prompts import axis_glossary
 from beautyads.api.app import Assembly
 from beautyads.api.ask_view import json_copy
 from beautyads.api.checkpointer import (
@@ -317,6 +318,7 @@ async def assemble_full(
                             as_of=ctx.as_of,
                             structured=structured("gpt-6-luna"),
                             limits=limits,
+                            glossary=axis_glossary(),
                         )
                         if not result.ok:
                             raise RuntimeError("SUPERVISOR_DECISION_FAILED")

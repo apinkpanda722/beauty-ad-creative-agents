@@ -47,6 +47,38 @@ class Format(StrEnum):
     other = "other"
 
 
+HOOK_TYPE_NAMES: dict[HookType, str] = {
+    HookType.question: "질문형",
+    HookType.problem: "문제 제기형",
+    HookType.result_first: "결과 선공개형",
+    HookType.bold_claim: "강한 주장형",
+    HookType.product_first: "제품 먼저 제시형",
+    HookType.person_first: "인물 먼저 제시형",
+    HookType.other: "기타 훅",
+}
+
+
+ANGLE_NAMES: dict[Angle, str] = {
+    Angle.problem_solution: "문제 해결",
+    Angle.desire: "욕구",
+    Angle.social_proof: "사회적 증거",
+    Angle.comparison: "비교",
+    Angle.ingredient_science: "성분 과학",
+    Angle.how_to: "사용법",
+    Angle.other: "기타 각도",
+}
+
+
+FORMAT_NAMES: dict[Format, str] = {
+    Format.ugc_style: "일반인 후기형",
+    Format.studio_film: "스튜디오 촬영",
+    Format.demo: "시연",
+    Format.text_motion: "문자 모션",
+    Format.static_image: "정지 이미지",
+    Format.other: "기타 포맷",
+}
+
+
 class Talent(StrEnum):
     none = "none"
     ordinary_person = "ordinary_person"

@@ -2,6 +2,7 @@
 
 import hashlib
 import inspect
+import json
 import subprocess
 from functools import partial
 from types import SimpleNamespace
@@ -11,6 +12,8 @@ from test_evalset import synthetic_set
 from test_evalset import workspaces_path as workspace_config  # noqa: F401 -- shared fixture
 
 from beautyads.agents import evaluation, planning
+from beautyads.agents import supervisor as agent_supervisor
+from beautyads.analysis.prompts import axis_glossary
 from beautyads.domain import evaluation as domain_evaluation
 from beautyads.domain import supervisor
 from beautyads.eval import evalset as sets
@@ -141,6 +144,18 @@ def test_frozen_values_follow_current_code():
     assert values == {
         guard.PLANNING_PROMPT_VERSION_LABEL: planning.PLANNING_PROMPT_VERSION,
         guard.EVALUATION_PROMPT_VERSION_LABEL: evaluation.EVALUATION_PROMPT_VERSION,
+        guard.SUPERVISOR_PROMPT_VERSION_LABEL: agent_supervisor.SUPERVISOR_PROMPT_VERSION,
+        guard.SUPERVISOR_SYSTEM_HASH_LABEL: hashlib.sha256(
+            agent_supervisor._SYSTEM.encode()
+        ).hexdigest(),
+        guard.AXIS_GLOSSARY_HASH_LABEL: hashlib.sha256(
+            json.dumps(
+                axis_glossary(),
+                sort_keys=True,
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest(),
         guard.MIN_DOMINANT_SHARE_LABEL: str(supervisor.MIN_DOMINANT_SHARE),
         guard.THIN_POOL_MAX_LABEL: str(supervisor.THIN_POOL_MAX),
         guard.PASS_MIN_SCORE_LABEL: str(domain_evaluation.PASS_MIN_SCORE),
@@ -236,6 +251,9 @@ def test_actual_set_change_is_detected(frozen_run, collection):
         guard.PASS_MIN_SCORE_LABEL,
         guard.PLANNING_SYSTEM_HASH_LABEL,
         guard.EVALUATION_SYSTEM_HASH_LABEL,
+        guard.SUPERVISOR_PROMPT_VERSION_LABEL,
+        guard.SUPERVISOR_SYSTEM_HASH_LABEL,
+        guard.AXIS_GLOSSARY_HASH_LABEL,
         "동결 합성 실행기",
     ],
 )
@@ -368,3 +386,20 @@ def test_error_code_set_is_exact_and_messages_are_safe(frozen_run):
         "FROZEN_VALUE_MISMATCH",
         "WORKSPACE_GROUP_INVALID",
     }
+
+
+@pytest.mark.parametrize("component", ["version", "system", "glossary"])
+def test_interpretation_changes_fail_final_freeze(frozen_run, monkeypatch, component):
+    if component == "version":
+        monkeypatch.setattr(
+            agent_supervisor, "SUPERVISOR_PROMPT_VERSION", "SENTINEL_CHANGED"
+        )
+    elif component == "system":
+        monkeypatch.setattr(
+            agent_supervisor, "_SYSTEM", agent_supervisor._SYSTEM + " SENTINEL_CHANGED"
+        )
+    else:
+        glossary = axis_glossary()
+        glossary["format"][0]["name"] += " SENTINEL_CHANGED"
+        monkeypatch.setattr(guard, "axis_glossary", lambda: glossary)
+    assert_error(frozen_run, "FROZEN_VALUE_MISMATCH")

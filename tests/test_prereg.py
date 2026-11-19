@@ -39,7 +39,7 @@ def render_inputs():
 def test_all_fourteen_required_procedures_are_present(render_inputs):
     text = prereg.render_preregistration(**render_inputs)
     sentences = prereg.REQUIRED_SENTENCES
-    assert len(sentences) == len(set(sentences)) == 21
+    assert len(sentences) == len(set(sentences)) == 23
     checked = 0
     for sentence in sentences:
         assert sentence.strip()
@@ -565,7 +565,7 @@ def test_none_measurement_preserves_original_bytes(render_inputs):
     assert "E3 dev 측정 근거" not in text
     # Captured from the unchanged renderer before implementing this step.
     assert hashlib.sha256(text.encode()).hexdigest() == (
-        "183349941294fb96e9df130f6dbaad8b5c1ea2b9c889302a252e5fb79331086a"
+        "95e3c5c05134a2f33a6a4e5013d0e062d6c233b3ca683849012df334aabb29cf"
     )
 
 
@@ -814,7 +814,7 @@ def test_cli_incomplete_measurement_never_creates_document(
 
 def test_repeat_procedures_and_empty_distribution_template(render_inputs):
     sentences = prereg.REQUIRED_SENTENCES
-    assert len(sentences) == 21
+    assert len(sentences) == 23
     for phrase in (
         "2회",
         "요청 20건 × 2회",
@@ -852,3 +852,36 @@ def test_repeat_procedures_and_empty_distribution_template(render_inputs):
         prereg.render_results_template().split("## E2\n", 1)[1].split("\n## ", 1)[0]
     )
     assert "| 요청당 반복 수(팔별 분포) |  |  |  |  |" in section
+
+
+def test_interpretation_change_and_limit_are_appended_and_frozen(render_inputs):
+    from beautyads.agents.supervisor import SUPERVISOR_PROMPT_VERSION
+
+    changed, limitation = prereg.REQUIRED_SENTENCES[21:]
+    for phrase in (
+        "P5 이후",
+        "dev 스모크",
+        "동결",
+        "pattern_context",
+        SUPERVISOR_PROMPT_VERSION,
+        "대응표",
+        "payload",
+        "기획·평가 프롬프트",
+        "기획 단계",
+    ):
+        assert phrase in changed
+    for phrase in ("자유 표현", "단일 팔은 원문", "표시 이름", "UGC", "후기 영상"):
+        assert phrase in limitation
+    rendered = prereg.render_preregistration(**render_inputs)
+    assert changed in rendered and limitation in rendered
+    parsed = guard.parse_preregistration(rendered)
+    for label in (
+        "동결 해석 프롬프트 버전",
+        "동결 해석 _SYSTEM sha256",
+        "동결 해석 대응표 sha256",
+    ):
+        assert parsed[label] == guard.frozen_values()[label]
+    content = (
+        prereg.render_results_template().split("## E2\n", 1)[1].split("\n## ", 1)[0]
+    )
+    assert "| 요청에 없는 축 채움(과채움, 코드 판정, 참고용) |  |  |  |  |" in content

@@ -2,6 +2,7 @@
 
 import ast
 import csv
+import hashlib
 import io
 import json
 import math
@@ -19,6 +20,38 @@ from beautyads.graph.queries import Question
 from beautyads.sources.workspaces import load_workspaces
 
 DAY = date(2026, 11, 19)
+
+
+def test_request_wording_preserves_all_original_messages(synthetic, monkeypatch):
+    rows, workspaces = synthetic
+    monkeypatch.setattr(candidates, "CANDIDATE_FACTOR", 100)
+    result = candidates.build_request_candidates(rows, workspaces)
+    messages = sorted({(r.tenant_id, r.message) for r in result.requests})
+    assert len(messages) == 180
+    assert hashlib.sha256(
+        json.dumps(messages, ensure_ascii=False).encode()
+    ).hexdigest() == (
+        "c7f6b382fd7cbf952de28a969424b39471e467c6ddaac4289b507a23cbe8b1fb"
+    )
+    for tenant, stem in (
+        ("dev-cosrx", "선케어 제품의 자외선 차단 광고 기획안 1안을"),
+        ("dev-mixsoon", "세럼·앰플 제품의 미백 광고 기획안 1안을"),
+    ):
+        for condition in (
+            " 문자 모션 포맷으로",
+            " 강한 주장형 훅 유형으로",
+            " 문제 해결 각도로",
+            "",
+        ):
+            assert (tenant, f"{stem}{condition} 작성해 주세요.") in messages
+
+
+def test_request_set_hash_preserves_default_synthetic_candidates(synthetic):
+    rows, workspaces = synthetic
+    result = candidates.build_request_candidates(rows, workspaces)
+    assert sets.request_set_hash(result.requests) == (
+        "1f076b4a54342ad556c0da898dfc552e2f9c1931c02321530ce30cf11bb19c45"
+    )
 
 
 def test_test_targets_use_evalset_source_and_preserve_dev_targets():

@@ -361,3 +361,80 @@ def test_v1_codebook_and_prompt_use_document_definitions(taxonomy_text):
 def test_hook_version_matches_v1_registry_and_model_is_unchanged():
     assert HOOK_PROMPT_VERSION == PROMPT_VERSIONS["hook"] == "hook-v1"
     assert ANALYSIS_MODEL_ID == "gemini-3.6-flash"
+
+
+@pytest.mark.parametrize(
+    "axis,enum,constant,expected",
+    [
+        (
+            "hook_type",
+            HookResult.model_fields["hook_type"].annotation,
+            "HOOK_TYPE_NAMES",
+            {
+                "question": "질문형",
+                "problem": "문제 제기형",
+                "result_first": "결과 선공개형",
+                "bold_claim": "강한 주장형",
+                "product_first": "제품 먼저 제시형",
+                "person_first": "인물 먼저 제시형",
+                "other": "기타 훅",
+            },
+        ),
+        (
+            "angle",
+            Angle,
+            "ANGLE_NAMES",
+            {
+                "problem_solution": "문제 해결",
+                "desire": "욕구",
+                "social_proof": "사회적 증거",
+                "comparison": "비교",
+                "ingredient_science": "성분 과학",
+                "how_to": "사용법",
+                "other": "기타 각도",
+            },
+        ),
+        (
+            "format",
+            Format,
+            "FORMAT_NAMES",
+            {
+                "ugc_style": "일반인 후기형",
+                "studio_film": "스튜디오 촬영",
+                "demo": "시연",
+                "text_motion": "문자 모션",
+                "static_image": "정지 이미지",
+                "other": "기타 포맷",
+            },
+        ),
+    ],
+)
+def test_axis_names_and_glossary_follow_frozen_sources(
+    taxonomy_text, axis, enum, constant, expected
+):
+    from beautyads.analysis.prompts import axis_glossary
+    from beautyads.domain import labels
+    from beautyads.eval.evalset_candidates import _LABELS
+
+    names = getattr(labels, constant)
+    assert list(names) == list(enum)
+    assert all(type(member) is enum for member in names)
+    assert names == expected == _LABELS[axis]
+    glossary = axis_glossary()
+    assert list(glossary) == ["hook_type", "angle", "format"]
+    definitions = parse_taxonomy(taxonomy_text)[axis].definitions
+    assert glossary[axis] == [
+        {
+            "value": member.value,
+            "name": names[member],
+            "definition": definitions[member.value],
+        }
+        for member in enum
+        if member is not enum.other
+    ]
+    glossary[axis][0]["definition"] = "SENTINEL_MUTATED"
+    glossary[axis].clear()
+    glossary["extra"] = []
+    assert axis_glossary() == axis_glossary()
+    assert axis_glossary()[axis] and "extra" not in axis_glossary()
+    assert axis_glossary()[axis][0]["definition"] == definitions[next(iter(enum)).value]

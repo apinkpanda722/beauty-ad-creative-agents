@@ -1034,6 +1034,7 @@ def test_axis_adherence_counts_specified_matches_conflicts_and_omissions(tmp_pat
             "adherent": 1,
             "dominant_conflict": 1,
             "interpretation_missing": 1,
+            "unrequested_filled": 0,
         }
         for axis in ("hook_type", "angle"):
             assert data[arm]["axes"][axis] == {
@@ -1041,6 +1042,7 @@ def test_axis_adherence_counts_specified_matches_conflicts_and_omissions(tmp_pat
                 "adherent": 3,
                 "dominant_conflict": 3,
                 "interpretation_missing": 0,
+                "unrequested_filled": 0,
             }
     assert "single" not in data
     assert "지정 축 준수(코드 판정, 참고용)" in output
@@ -1296,3 +1298,64 @@ def test_supplement_pairs_same_repeat_only():
         {"supervisor": 10, "off": 20, "reduction": 0.5, "repeat": 1},
         {"supervisor": 40, "off": 80, "reduction": 0.5, "repeat": 2},
     ]
+
+
+@pytest.mark.parametrize("arm", ["supervisor", "off", "single"])
+def test_record_supervisor_version_does_not_mutate_results(arm):
+    from copy import deepcopy
+
+    from beautyads.agents.supervisor import SUPERVISOR_PROMPT_VERSION
+
+    payload = result()
+    if arm == "single":
+        payload["prompt_version"] = "SENTINEL_SINGLE_VERSION"
+        payload["plan"] = payload["plans"][0]["plan"]
+    before = deepcopy(payload)
+    row = synthetic_record(0, arm, payload=payload)
+    assert payload == before
+    if arm == "single":
+        assert row.prompt_versions == {"single": "SENTINEL_SINGLE_VERSION"}
+    else:
+        assert row.prompt_versions == {
+            **before["prompt_versions"],
+            "supervisor": SUPERVISOR_PROMPT_VERSION,
+        }
+
+
+@pytest.mark.parametrize("arm", ["supervisor", "off"])
+def test_axis_adherence_counts_unrequested_fills_only_with_brief_and_plan(arm):
+    rows = [synthetic_record(i, arm, payload=axis_payload()) for i in range(2)]
+    # First request specifies every axis; second specifies none.
+    items = [
+        RequestItem.model_validate(
+            {**request(0), "axes_used": ["format", "hook_type", "angle"]}
+        ),
+        RequestItem.model_validate(request(1)),
+    ]
+    report = live._axis_adherence(rows[:1], items)[arm]
+    assert all(counts["unrequested_filled"] == 0 for counts in report["axes"].values())
+    # Missing brief, missing plan and unrelated item must not count as overfilling.
+    rows += [
+        synthetic_record(2, arm),
+        synthetic_record(3, arm, payload=axis_payload()).model_copy(
+            update={"plan": None, "status": "failed"}
+        ),
+        synthetic_record(4, arm, payload=axis_payload()),
+    ]
+    items += [RequestItem.model_validate(request(i)) for i in (2, 3)]
+    report = live._axis_adherence(rows, items)[arm]
+    assert report["unavailable"] == 1 and report["with_plan"] == 2
+    for counts in report["axes"].values():
+        assert counts == {
+            "specified": 2,
+            "adherent": 2,
+            "dominant_conflict": 2,
+            "interpretation_missing": 0,
+            "unrequested_filled": 1,
+        }
+    # An unspecified axis left null is not overfilled.
+    rows[1].brief_axes["format"] = None
+    assert (
+        live._axis_adherence(rows, items)[arm]["axes"]["format"]["unrequested_filled"]
+        == 0
+    )
