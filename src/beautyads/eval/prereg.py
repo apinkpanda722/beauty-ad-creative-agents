@@ -385,6 +385,13 @@ REQUIRED_SENTENCES = (
         "최종 기획안 준수 8건이며 해석 누락 2건은 모두 정지 이미지 포맷이었다. "
         "이 수치는 dev 관찰이며 test 결과가 아니다."
     ),
+    (
+        '문장 2의 "생성 모델이 같다"는 기획 생성 모델(gpt-6.1-terra, reasoning_effort low)과 '
+        "도구 집합·한도를 뜻한다. Supervisor의 요청 해석·리서치는 gpt-6-luna, "
+        "루프 내 평가는 claude-sonnet-5-5(최종 실행)이고 단일 팔의 도구 루프와 기획은 "
+        "gpt-6.1-terra(reasoning_effort low) 하나다. 격리 실험은 표식 노출만 보므로 "
+        "루프 내 평가 모델은 claude-haiku-5-5를 쓴다(결과 해석에 영향 없음)."
+    ),
 )
 
 

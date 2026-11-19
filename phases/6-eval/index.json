@@ -379,8 +379,22 @@
         "output_tokens": 11649,
         "attempts": 1
       }
+    },
+    {
+      "step": 28,
+      "name": "evaluation-model",
+      "status": "completed",
+      "started_at": "2026-11-19T21:10:54+0900",
+      "summary": "최종 E2·E5 루프 평가를 sonnet으로 지정(dev haiku 유지), 모델 기록·동결 줄·25번째 문장과 합성 테스트 10건 추가. make verify 통과(5,870 tests), 실제 호출·추가 패키지 없음.",
+      "completed_at": "2026-11-19T21:16:10+0900",
+      "usage": {
+        "input_tokens": 1913431,
+        "cached_input_tokens": 1814784,
+        "output_tokens": 6192,
+        "attempts": 1
+      }
     }
   ],
   "created_at": "2026-11-19T12:16:24+0900",
-  "completed_at": "2026-11-19T20:49:58+0900"
+  "completed_at": "2026-11-19T21:16:10+0900"
 }
