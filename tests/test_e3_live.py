@@ -831,3 +831,445 @@ def test_measure_dry_run_never_reads_answers_or_emits_hash(tmp_path, monkeypatch
         cache_dir=tmp_path,
     )
     assert "dev_question_hash" not in result
+
+
+@pytest.mark.parametrize(
+    "items,expected",
+    [
+        (["a", "b"], (1, 1, 1)),
+        (["a", "c"], (0.5, 0.5, 0.5)),
+        (["a"], (1, 0.5, 2 / 3)),
+        (["c"], (0, 0, 0)),
+        ([], (0, 0, 0)),
+        ([" a ", "a", " b "], (1, 1, 1)),
+    ],
+)
+def test_set_f1_normalizes_and_counts_only_sets(items, expected):
+    t = truth().model_copy(update={"answer_type": "set", "value": [" a ", "b", "b"]})
+    answer = e3.E3Answer(count=None, items=items, evidence_ids=[])
+    assert e3.set_f1(answer, t) == dict(
+        zip(("precision", "recall", "f1"), expected, strict=True)
+    )
+    assert e3.set_f1(answer, truth()) is None
+
+
+def report_rows(qs, truths, *, partial=False):
+    return [
+        {
+            "question_id": q.id,
+            "arm": arm,
+            "identity": asdict(IDENTITY),
+            "answer": {
+                "count": t.value
+                if t.answer_type == "count" and arm == "graph"
+                else None,
+                "items": t.value
+                if t.answer_type == "set" and arm == "graph"
+                else t.value[:1]
+                if partial and t.answer_type == "set"
+                else [],
+                "evidence_ids": [],
+            },
+        }
+        for q, t in zip(qs, truths, strict=True)
+        for arm in ("graph", "vector")
+    ]
+
+
+def test_report_size_strata_boundaries_f1_and_unchanged_decisions(
+    tmp_path, monkeypatch
+):
+    from beautyads.eval import vector_baseline
+
+    monkeypatch.setattr(vector_baseline, "TOP_K", 3)
+    sizes = [3] * e3.MIN_STRATUM_N + [4, 10, 11, None]
+    qs = [
+        question(i).model_copy(update={"answer_type": "set" if size else "count"})
+        for i, size in enumerate(sizes)
+    ]
+    truths = [
+        truth(i).model_copy(
+            update={"answer_type": "set", "value": [f"v{j}" for j in range(size)]}
+        )
+        if size
+        else truth(i)
+        for i, size in enumerate(sizes)
+    ]
+    path = tmp_path / "answers"
+    write_jsonl(path, truths)
+    rows = report_rows(qs, truths)
+    result = e3.report(rows, qs, answers_path=path, split="dev")
+    expected = {"size_le10": len(sizes) - 2, "size_gt10": 1, "size_count": 1}
+    assert {key: value["n"] for key, value in result["size_strata"].items()} == expected
+    assert {key: value["n"] for key, value in result["size_vs_top_k"].items()} == {
+        "size_le_top_k": e3.MIN_STRATUM_N,
+        "size_gt_top_k": 3,
+    }
+    for layer in (*result["size_strata"].values(), *result["size_vs_top_k"].values()):
+        assert layer["status"] == (
+            "undecidable" if layer["n"] < e3.MIN_STRATUM_N else "descriptive_only"
+        )
+        assert layer["decision"] == "undecidable"
+    assert result["overall"]["arms"]["graph"]["set_f1"] == {
+        "f1": 1.0,
+        "n": len(sizes) - 1,
+    }
+    assert result["size_strata"]["size_count"]["arms"]["vector"]["set_f1"] == {
+        "f1": None,
+        "n": 0,
+    }
+    # Original summaries are exactly the original score computation plus the new F1 key.
+    scores = {
+        (row["question_id"], row["arm"]): e3.score_answer(
+            e3.E3Answer.model_validate(row["answer"]),
+            truths[int(row["question_id"][1:])],
+        )
+        for row in rows
+    }
+    old = e3._summary(qs, scores)
+    for key in ("n", "difference", "difference_ci", "decision"):
+        assert result["overall"][key] == old[key]
+    for arm in ("graph", "vector"):
+        for key in ("accuracy", "accuracy_ci", "evidence_hit_rate"):
+            assert result["overall"]["arms"][arm][key] == old["arms"][arm][key]
+    assert result["strata"]["reliable"]["n"] == len(qs)
+    assert result["strata"]["unreliable"]["n"] == 0
+    assert "v0" not in json.dumps(result)
+
+
+def test_partial_f1_cannot_change_adoption(tmp_path):
+    qs = [question(i).model_copy(update={"answer_type": "set"}) for i in range(20)]
+    truths = [
+        truth(i).model_copy(update={"answer_type": "set", "value": ["a", "b"]})
+        for i in range(20)
+    ]
+    path = tmp_path / "answers"
+    write_jsonl(path, truths)
+    reports = [
+        e3.report(
+            report_rows(qs, truths, partial=p), qs, answers_path=path, split="dev"
+        )
+        for p in (False, True)
+    ]
+    assert {r["overall"]["decision"] for r in reports} == {"graph_adopted"}
+    assert [r["overall"]["arms"]["vector"]["set_f1"]["f1"] for r in reports] == [
+        0,
+        2 / 3,
+    ]
+    assert (
+        reports[0]["overall"]["difference_ci"] == reports[1]["overall"]["difference_ci"]
+    )
+
+
+@pytest.mark.parametrize(
+    "values,evidence,expected",
+    [
+        (2, ["youtube:a", "absent"], {"youtube:a"}),
+        (
+            ["https://example.invalid/p:1"],
+            [],
+            {"product:brand:https://example.invalid/p:1"},
+        ),
+        (["youtube:a"], [], {"youtube:a"}),
+        (["rule-id", "SENTINEL_TRUTH"], [], set()),
+        (
+            ["youtube:a", "https://example.invalid/p:1"],
+            ["youtube:a"],
+            {"youtube:a", "product:brand:https://example.invalid/p:1"},
+        ),
+        (2, [], set()),
+    ],
+)
+def test_target_ids_maps_only_corpus_ids(values, evidence, expected):
+    t = truth().model_copy(
+        update={
+            "answer_type": "set" if isinstance(values, list) else "count",
+            "value": values,
+            "evidence_ids": evidence,
+        }
+    )
+    assert (
+        e3.target_ids(
+            t,
+            {
+                "youtube:a",
+                "product:brand:https://example.invalid/p:1",
+                "product:malformed",
+            },
+        )
+        == expected
+    )
+
+
+def measurement_inputs(tmp_path, *, no_target=False):
+    docs = [
+        CorpusDoc("youtube:a", "abcdef"),
+        CorpusDoc("product:brand:https://example.invalid/p", "ghijkl"),
+    ]
+    qs = [
+        question(i).model_copy(update={"answer_type": "set" if i != 2 else "count"})
+        for i in range(4)
+    ]
+    truths = [
+        truth(0).model_copy(
+            update={
+                "answer_type": "set",
+                "value": ["https://example.invalid/p"],
+                "evidence_ids": [],
+            }
+        ),
+        truth(1).model_copy(
+            update={
+                "answer_type": "set",
+                "value": ["youtube:a", "https://example.invalid/p"],
+                "evidence_ids": [],
+            }
+        ),
+        truth(2),
+        truth(3).model_copy(
+            update={
+                "answer_type": "set",
+                "value": ["SENTINEL_TRUTH"],
+                "evidence_ids": [],
+            }
+        ),
+    ]
+    if no_target:
+        truths = [
+            t.model_copy(
+                update={
+                    "value": ["SENTINEL_TRUTH"] if t.answer_type == "set" else 2,
+                    "evidence_ids": [],
+                }
+            )
+            for t in truths
+        ]
+    path = tmp_path / "answers"
+    write_jsonl(path, truths)
+    calls = []
+
+    def embed(texts, **kw):
+        from beautyads.llm.embed import EmbedResult
+
+        calls.append((texts, kw))
+        return EmbedResult([[1.0, 0.0] for _ in texts], 5, 0.01)
+
+    return docs, qs, path, embed, calls
+
+
+def test_measure_targets_recall_combinations_and_no_leaks(tmp_path, capsys):
+    docs, qs, path, embed, calls = measurement_inputs(tmp_path)
+    result = e3.measure(
+        docs,
+        qs,
+        answers_path=path,
+        models=["text-embedding-3-small"],
+        embed=embed,
+        cache_dir=tmp_path / "cache",
+        top_ks=[1, 2],
+    )
+    assert len(calls) == 2
+    assert result["n_set_questions_values_not_in_corpus"] == 1
+    baseline = result["models"][0]
+    assert baseline["hit_at_k"] == baseline["recall_at_k"] == 1
+    assert baseline["n_with_target"] == 3 and baseline["n_no_target"] == 1
+    assert baseline["hit_at_k_all_questions"] == 0.25
+    by_k = {r["top_k"]: r for r in result["combinations"]}
+    assert by_k[1]["hit_at_k"] == pytest.approx(2 / 3)
+    assert by_k[1]["recall_at_k"] == 0.5
+    assert by_k[1]["hit_at_k_all_questions"] == 0.0
+    assert by_k[2]["recall_at_k"] == 1
+    assert all(r["n_with_target"] == 3 and r["n_no_target"] == 1 for r in by_k.values())
+    output = tmp_path / "measurement.json"
+    e3._write_json(output, result)
+    assert (
+        "SENTINEL"
+        not in json.dumps(calls) + output.read_text() + capsys.readouterr().out
+    )
+    for p in (tmp_path / "cache").glob("*.json"):
+        assert "SENTINEL" not in p.read_text()
+
+
+def test_measure_no_targets_null_metrics_and_price_tie_break(tmp_path):
+    docs, qs, path, embed, _ = measurement_inputs(tmp_path, no_target=True)
+    result = e3.measure(
+        docs,
+        qs,
+        answers_path=path,
+        models=list(reversed(e3.EMBEDDING_PRICES)),
+        embed=embed,
+        cache_dir=tmp_path / "cache",
+    )
+    assert all(
+        m["hit_at_k"] is None
+        and m["recall_at_k"] is None
+        and m["n_with_target"] == 0
+        and m["n_no_target"] == len(qs)
+        for m in result["models"]
+    )
+    assert result["selected_model"] == min(
+        e3.EMBEDDING_PRICES, key=e3.EMBEDDING_PRICES.get
+    )
+
+
+def test_measure_length_candidates_share_queries_and_isolate_caches(tmp_path):
+    docs, qs, path, embed, calls = measurement_inputs(tmp_path)
+    kwargs = {
+        "answers_path": path,
+        "models": ["text-embedding-3-small"],
+        "embed": embed,
+        "cache_dir": tmp_path / "cache",
+    }
+    baseline = e3.measure(docs, qs, **kwargs)
+    calls.clear()
+    expanded = e3.measure(docs, qs, **kwargs, top_ks=[1, 2], max_doc_chars=[2, 3])
+    assert len(calls) == 3  # two new corpus lengths, one shared question batch
+    assert sum(texts == [q.text for q in qs] for texts, _ in calls) == 1
+    assert {len(texts[0]) for texts, _ in calls if len(texts) == len(docs)} == {2, 3}
+    assert len(list((tmp_path / "cache").glob("*.bin"))) == 3
+    # Cached corpus costs differ, but primary retrieval and truncation remain at defaults.
+    assert expanded["models"][0]["hit_at_k"] == baseline["models"][0]["hit_at_k"]
+    for key in (
+        "selected_model",
+        "truncated_document_ratio",
+        "truncated_dev_evidence_ratio",
+        "top_k",
+        "max_doc_chars",
+    ):
+        assert expanded[key] == baseline[key]
+    assert len(expanded["combinations"]) == 9
+    calls.clear()
+    e3.measure(docs, qs, **kwargs, top_ks=[1, 2], max_doc_chars=[2, 3])
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize(
+    "command,mode",
+    [
+        ("run", "dev"),
+        ("report", "dev"),
+        ("run", "final"),
+        ("report", "final"),
+        ("measure", "final"),
+    ],
+)
+@pytest.mark.parametrize("flag", ["--top-ks", "--max-doc-chars"])
+def test_measure_options_rejected_before_io(command, mode, flag, monkeypatch, capsys):
+    from pathlib import Path
+
+    def forbidden(*a, **kw):
+        pytest.fail("invalid arguments must precede I/O")
+
+    monkeypatch.setattr(Path, "open", forbidden)
+    assert (
+        e3.main(
+            [command, "--mode", mode, flag, "1,2"],
+            check_fn=forbidden,
+            corpus_loader=forbidden,
+            settings_fn=forbidden,
+        )
+        == 1
+    )
+    assert json.loads(capsys.readouterr().out) == {"code": "E3_ARGUMENTS_INVALID"}
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "1,,2", "a", "1.5", ""])
+@pytest.mark.parametrize("flag", ["--top-ks", "--max-doc-chars"])
+def test_measure_options_require_positive_integer_lists(value, flag, capsys):
+    assert e3.main(["measure", flag, value]) == 1
+    assert json.loads(capsys.readouterr().out) == {"code": "E3_ARGUMENTS_INVALID"}
+
+
+def test_cli_measure_candidates_and_dry_run_never_reads_truth(
+    tmp_path, monkeypatch, capsys
+):
+    injected, _, _, calls, _ = fake_cli_options(tmp_path)
+    qs = tmp_path / "questions"
+    answers = tmp_path / "answers"
+    write_jsonl(qs, [question()])
+    write_jsonl(answers, [truth()])
+    injected.update(questions_path=qs, answers_path=answers)
+    flags = [
+        "measure",
+        "--models",
+        "text-embedding-3-small",
+        "--top-ks",
+        "1,2",
+        "--max-doc-chars",
+        "2,3",
+    ]
+    assert e3.main(flags, **injected) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert len(result["combinations"]) == 9 and len(calls) == 4
+    assert result == json.loads(
+        (injected["output_dir"] / "measurement.json").read_text()
+    )
+    calls.clear()
+    monkeypatch.setattr(
+        e3, "read_answers", lambda *a, **kw: pytest.fail("dry-run answers")
+    )
+    assert e3.main([*flags, "--dry-run"], **injected) == 0
+    dry = json.loads(capsys.readouterr().out)
+    assert {r["max_doc_chars"] for r in dry["lengths"]} == {2, 3, e3.MAX_DOC_CHARS}
+    assert all(
+        r["documents"] == 1 and r["estimated_tokens"] > 0 for r in dry["lengths"]
+    )
+    assert "가정" in dry["assumption"] and "미실측" in dry["assumption"]
+    assert "dev_question_hash" not in dry and "models" not in dry and not calls
+
+
+def test_model_selection_uses_default_k_and_length_even_when_candidates_tie(tmp_path):
+    from beautyads.llm.embed import EmbedResult
+
+    docs = [CorpusDoc(f"youtube:{i:03}", f"document {i}") for i in range(e3.TOP_K)]
+    docs.append(CorpusDoc("youtube:zz", "target document"))
+    path = tmp_path / "answers"
+    write_jsonl(path, [truth().model_copy(update={"evidence_ids": ["youtube:zz"]})])
+    cheap, expensive = sorted(e3.EMBEDDING_PRICES, key=e3.EMBEDDING_PRICES.get)
+
+    def embed(texts, *, model):
+        if texts == [question().text]:
+            vectors = [[1.0, 0.0]]
+        elif model == expensive and len(texts[0]) > 1:
+            vectors = [[0.0, 1.0] for _ in docs[:-1]] + [[1.0, 0.0]]
+        else:
+            vectors = [[1.0, 0.0] for _ in texts]
+        return EmbedResult(vectors, 1, 0.0)
+
+    result = e3.measure(
+        docs,
+        [question()],
+        answers_path=path,
+        models=[cheap, expensive],
+        embed=embed,
+        cache_dir=tmp_path / "cache",
+        top_ks=[len(docs)],
+        max_doc_chars=[1],
+    )
+    assert result["selected_model"] == expensive
+    assert [m["hit_at_k"] for m in result["models"]] == [0.0, 1.0]
+    larger_k = [m for m in result["combinations"] if m["top_k"] == len(docs)]
+    assert all(m["hit_at_k"] == 1 for m in larger_k)
+    shorter = [
+        m
+        for m in result["combinations"]
+        if m["max_doc_chars"] == 1 and m["top_k"] == e3.TOP_K
+    ]
+    assert all(m["hit_at_k"] == 0 for m in shorter)
+
+
+def test_measure_invalid_truth_never_exposes_answer_in_exception(tmp_path, capsys):
+    path = tmp_path / "answers"
+    write_jsonl(path, [{**truth().model_dump(), "value": "SENTINEL_TRUTH"}])
+    with pytest.raises(e3.E3Error, match="^E3_ANSWERS_INVALID$") as caught:
+        e3.measure(
+            [CorpusDoc("a", "document")],
+            [question()],
+            answers_path=path,
+            models=["text-embedding-3-small"],
+            embed=lambda *a, **kw: pytest.fail("invalid truth before embedding"),
+            cache_dir=tmp_path / "cache",
+        )
+    assert caught.value.__suppress_context__
+    assert "SENTINEL" not in str(caught.value) + capsys.readouterr().out
+    assert not (tmp_path / "cache").exists()

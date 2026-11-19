@@ -17,6 +17,7 @@ from beautyads.agents.research import RESEARCH_REASONING_EFFORT
 from beautyads.agents.tools import run_tool
 from beautyads.domain.research import ResearchBrief
 from beautyads.domain.tools import ToolContext
+from beautyads.eval import vector_baseline
 from beautyads.eval.e2_scoring import MIN_STRATUM_N, bootstrap_ci
 from beautyads.eval.evalset import (
     ANSWERS_PATH,
@@ -58,6 +59,7 @@ ANSWER_MODEL = "gpt-6-luna"
 EMBED_PURPOSE_CAP = 1.0
 ANSWER_SPLIT_FORBIDDEN = "ANSWER_SPLIT_FORBIDDEN"
 E3_PATH_OPTION_FORBIDDEN = "E3_PATH_OPTION_FORBIDDEN"
+SIZE_STRATUM_THRESHOLD = 10
 OUTPUT_DIR = Path("data/interim/e3")
 _SYSTEM = (
     "질문에 근거 데이터만 사용해 답한다. 집계 답은 count, 목록 답은 items에 넣는다. "
@@ -231,15 +233,84 @@ def score_answer(answer, truth):
     }
 
 
-def _corpus_vectors(docs, model, embed, cache_dir):
-    cached = load_cache(cache_dir, model, docs)
+def set_f1(answer, truth) -> dict | None:
+    """Descriptive set overlap only; never used for correctness or adoption."""
+    if truth.answer_type != "set":
+        return None
+    predicted = {v.strip() for v in answer.items}
+    expected = {v.strip() for v in truth.value}
+    overlap = len(predicted & expected)
+    precision = overlap / len(predicted) if predicted else 0.0
+    recall = overlap / len(expected) if expected else 0.0
+    return {
+        "precision": precision,
+        "recall": recall,
+        "f1": 2 * precision * recall / (precision + recall)
+        if precision + recall
+        else 0.0,
+    }
+
+
+def _value_target_ids(value, doc_ids):
+    if not isinstance(value, list):
+        return set()
+    values = set(value)
+    return (values & doc_ids) | {
+        id_
+        for id_ in doc_ids
+        if id_.startswith("product:")
+        and len(id_.split(":", 2)) == 3
+        and id_.split(":", 2)[2] in values
+    }
+
+
+def target_ids(truth, doc_ids) -> set[str]:
+    """Map answers to existing corpus IDs locally, without exposing values."""
+    ids = set(doc_ids)
+    return (set(truth.evidence_ids) & ids) | _value_target_ids(truth.value, ids)
+
+
+def _corpus_vectors(docs, model, embed, cache_dir, max_chars=None):
+    cached = load_cache(cache_dir, model, docs, max_chars)
     if cached is not None:
         return EmbedResult(cached[1], 0, 0.0)
     if not docs:
         raise E3Error("E3_CORPUS_EMPTY")
-    response = embed([d.embedding_text for d in docs], model=model)
-    save_cache(cache_dir, model, docs, response.vectors)
+    response = embed([d.embedding_text_for(max_chars) for d in docs], model=model)
+    save_cache(cache_dir, model, docs, response.vectors, max_chars)
     return response
+
+
+def _candidates(values, default):
+    if values is None:
+        return [default]
+    if not values or any(type(v) is not int or v <= 0 for v in values):
+        raise E3Error("E3_ARGUMENTS_INVALID")
+    # Always measure the preregistered defaults for the primary result/selection.
+    return list(dict.fromkeys([default, *values]))
+
+
+def _retrieval_metrics(retrieved, targets, evidence):
+    eligible = [
+        (found, target)
+        for found, target in zip(retrieved, targets, strict=True)
+        if target
+    ]
+    return {
+        "hit_at_k": fmean(bool(found & target) for found, target in eligible)
+        if eligible
+        else None,
+        "recall_at_k": fmean(
+            len(found & target) / len(target) for found, target in eligible
+        )
+        if eligible
+        else None,
+        "n_with_target": len(eligible),
+        "n_no_target": len(targets) - len(eligible),
+        "hit_at_k_all_questions": fmean(
+            bool(found & ids) for found, ids in zip(retrieved, evidence, strict=True)
+        ),
+    }
 
 
 def measure(
@@ -252,56 +323,90 @@ def measure(
     split="dev",
     dry_run=False,
     cache_dir=OUTPUT_DIR,
+    top_ks=None,
+    max_doc_chars=None,
 ):
     if split != "dev":
         raise E3Error(ANSWER_SPLIT_FORBIDDEN)
     if not models or any(model not in EMBEDDING_PRICES for model in models):
         raise E3Error("EMBED_MODEL_UNPRICED")
+    ks = _candidates(top_ks, TOP_K)
+    lengths = _candidates(max_doc_chars, MAX_DOC_CHARS)
     if dry_run:
+        estimates = [
+            {
+                "max_doc_chars": length,
+                "documents": len(docs),
+                "estimated_tokens": sum(
+                    len(d.embedding_text_for(length).encode("utf-8")) for d in docs
+                )
+                + sum(
+                    len(q.text.encode("utf-8")) for q in questions if q.split == "dev"
+                ),
+            }
+            for length in lengths
+        ]
         return {
             "documents": len(docs),
-            "estimated_tokens": sum(len(d.embedding_text.encode("utf-8")) for d in docs)
-            + sum(len(q.text.encode("utf-8")) for q in questions if q.split == "dev"),
+            "estimated_tokens": estimates[0]["estimated_tokens"],
+            "lengths": estimates,
             "assumption": "가정(미실측)",
         }
     dev = [q for q in questions if q.split == "dev"]
     _questions(dev, "dev")
     truths = read_answers(answers_path, questions=dev, split="dev", purpose="measure")
     ids = [d.id for d in docs]
+    targets = [target_ids(truths[q.id], ids) for q in dev]
+    evidence = [set(truths[q.id].evidence_ids) for q in dev]
     truth_ids = {id_ for truth in truths.values() for id_ in truth.evidence_ids}
     evidence_docs = [d for d in docs if d.id in truth_ids]
-    measured = []
+    measured, combinations = [], []
     for model in models:
-        corpus = _corpus_vectors(docs, model, embed, cache_dir)
-        queries = embed([q.text for q in dev], model=model)
-        shape = (
-            corpus.response_shape
-            if corpus.response_shape is not None
-            else queries.response_shape
-        )
-        shape_path = cache_dir / "embedding_response_shape.json"
-        if shape is not None and not shape_path.exists():
-            _write_json(shape_path, shape)
-        hits = [
-            bool(set(top_k(vec, corpus.vectors, ids)) & set(truths[q.id].evidence_ids))
-            for q, vec in zip(dev, queries.vectors, strict=True)
-        ]
-        measured.append(
-            {
-                "embedding_model": model,
-                "price_per_million": EMBEDDING_PRICES[model],
-                "hit_at_k": fmean(hits),
-                "questions": len(dev),
-                "input_tokens": corpus.input_tokens + queries.input_tokens,
-                "cost_usd": corpus.cost_usd + queries.cost_usd,
-            }
-        )
+        queries = None
+        for length in lengths:
+            corpus = _corpus_vectors(docs, model, embed, cache_dir, length)
+            if queries is None:
+                queries = embed([q.text for q in dev], model=model)
+            if len(queries.vectors) != len(dev):
+                raise E3Error("EMBED_RESPONSE_INVALID")
+            shape = (
+                corpus.response_shape
+                if corpus.response_shape is not None
+                else queries.response_shape
+            )
+            shape_path = cache_dir / "embedding_response_shape.json"
+            if shape is not None and not shape_path.exists():
+                _write_json(shape_path, shape)
+            for k in ks:
+                retrieved = [
+                    set(top_k(vec, corpus.vectors, ids, k=k)) for vec in queries.vectors
+                ]
+                metrics = {
+                    "embedding_model": model,
+                    "price_per_million": EMBEDDING_PRICES[model],
+                    **_retrieval_metrics(retrieved, targets, evidence),
+                    "questions": len(dev),
+                    "input_tokens": corpus.input_tokens + queries.input_tokens,
+                    "cost_usd": corpus.cost_usd + queries.cost_usd,
+                }
+                combinations.append({**metrics, "top_k": k, "max_doc_chars": length})
+                if length == MAX_DOC_CHARS and k == TOP_K:
+                    measured.append(metrics)
     selected = min(
         measured,
-        key=lambda m: (-m["hit_at_k"], m["price_per_million"], m["embedding_model"]),
+        key=lambda m: (
+            -m["hit_at_k"] if m["hit_at_k"] is not None else float("inf"),
+            m["price_per_million"],
+            m["embedding_model"],
+        ),
     )
     return {
         "models": measured,
+        "combinations": combinations,
+        "n_set_questions_values_not_in_corpus": sum(
+            t.answer_type == "set" and not _value_target_ids(t.value, set(ids))
+            for t in truths.values()
+        ),
         "dev_question_hash": question_set_hash(dev, list(truths.values())),
         "selected_model": selected["embedding_model"],
         "truncated_document_ratio": sum(len(d.text) > MAX_DOC_CHARS for d in docs)
@@ -435,10 +540,16 @@ def _summary(questions, scores):
             for id_ in ids
             if scores[(id_, arm)]["evidence_hit_rate"] is not None
         ]
+        partial = [
+            scores[(id_, arm)]["set_f1"]["f1"]
+            for id_ in ids
+            if scores[(id_, arm)].get("set_f1") is not None
+        ]
         arms[arm] = {
             "accuracy": fmean(values) if values else None,
             "accuracy_ci": list(bootstrap_ci(values)) if values else None,
             "evidence_hit_rate": fmean(evidence) if evidence else None,
+            "set_f1": {"f1": fmean(partial) if partial else None, "n": len(partial)},
         }
     diffs = [
         float(scores[(id_, "graph")]["correct"])
@@ -475,9 +586,11 @@ def report(records, questions, *, answers_path, split):
             ):
                 raise ValueError
             identities.add(json.dumps(row.get("identity"), sort_keys=True))
-            scores[key] = score_answer(
-                E3Answer.model_validate(row.get("answer")), truths[key[0]]
-            )
+            answer = E3Answer.model_validate(row.get("answer"))
+            scores[key] = {
+                **score_answer(answer, truths[key[0]]),
+                "set_f1": set_f1(answer, truths[key[0]]),
+            }
         if len(identities) != 1 or set(scores) != {
             (q.id, arm) for q in selected for arm in ("graph", "vector")
         }:
@@ -493,6 +606,17 @@ def report(records, questions, *, answers_path, split):
         )
         summary["decision"] = "undecidable"
         strata[name] = summary
+    sets = [q for q in selected if truths[q.id].answer_type == "set"]
+    sizes = {q.id: len(truths[q.id].value) for q in sets}
+
+    def descriptive(subset):
+        summary = _summary(subset, scores)
+        summary["status"] = (
+            "undecidable" if len(subset) < MIN_STRATUM_N else "descriptive_only"
+        )
+        summary["decision"] = "undecidable"
+        return summary
+
     return {
         "overall": _summary(selected, scores),
         "graph_questions": _summary([q for q in selected if q.kind == "graph"], scores),
@@ -500,6 +624,25 @@ def report(records, questions, *, answers_path, split):
             [q for q in selected if q.kind == "simple_search"], scores
         ),
         "strata": strata,
+        "size_strata": {
+            "size_le10": descriptive(
+                [q for q in sets if sizes[q.id] <= SIZE_STRATUM_THRESHOLD]
+            ),
+            "size_gt10": descriptive(
+                [q for q in sets if sizes[q.id] > SIZE_STRATUM_THRESHOLD]
+            ),
+            "size_count": descriptive(
+                [q for q in selected if truths[q.id].answer_type == "count"]
+            ),
+        },
+        "size_vs_top_k": {
+            "size_le_top_k": descriptive(
+                [q for q in sets if sizes[q.id] <= vector_baseline.TOP_K]
+            ),
+            "size_gt_top_k": descriptive(
+                [q for q in sets if sizes[q.id] > vector_baseline.TOP_K]
+            ),
+        },
     }
 
 
@@ -647,8 +790,30 @@ def main(
     parser.add_argument("--models", default=None)
     parser.add_argument("--limit", type=int)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--top-ks")
+    parser.add_argument("--max-doc-chars")
     args = parser.parse_args(argv)
     try:
+        if (args.top_ks is not None or args.max_doc_chars is not None) and (
+            args.command != "measure" or args.mode != "dev"
+        ):
+            raise E3Error("E3_ARGUMENTS_INVALID")
+
+        def positive_list(value):
+            if value is None:
+                return None
+            try:
+                values = [int(part) for part in value.split(",")]
+            except ValueError:
+                raise E3Error("E3_ARGUMENTS_INVALID") from None
+            if any(v <= 0 for v in values):
+                raise E3Error("E3_ARGUMENTS_INVALID")
+            return values
+
+        measure_options = {
+            "top_ks": positive_list(args.top_ks),
+            "max_doc_chars": positive_list(args.max_doc_chars),
+        }
         if args.mode == "final" and (
             args.questions is not None or args.answers is not None
         ):
@@ -722,6 +887,7 @@ def main(
                     embed=None,
                     dry_run=True,
                     cache_dir=output_dir,
+                    **measure_options,
                 )
             else:
                 settings = settings_fn()
@@ -738,6 +904,7 @@ def main(
                             models=models,
                             embed=calls.embed,
                             cache_dir=output_dir,
+                            **measure_options,
                         )
                         _write_json(output_dir / "measurement.json", result)
                     else:

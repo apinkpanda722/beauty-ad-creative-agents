@@ -1,6 +1,8 @@
 """Deterministic vector retrieval and the existing-store corpus boundary."""
 
 import ast
+import hashlib
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -117,3 +119,34 @@ def test_no_new_queries_or_forbidden_imports():
             assert not any(
                 word in node.value.upper() for word in ("SELECT ", "MATCH (", "MERGE (")
             )
+
+
+def test_length_specific_text_and_cache_preserve_legacy_format(tmp_path):
+    from beautyads.eval.vector_baseline import _fingerprint, _paths
+
+    docs = [CorpusDoc("a", "abcdef")]
+    assert docs[0].embedding_text_for(3) == "abc"
+    assert docs[0].embedding_text_for(None) == docs[0].embedding_text
+    expected_stem = "model_a-" + hashlib.sha256(b"model/a").hexdigest()[:16]
+    assert _paths(tmp_path, "model/a")[0].name == expected_stem + ".json"
+    assert _paths(tmp_path, "model/a", MAX_DOC_CHARS) == _paths(tmp_path, "model/a")
+    expected_hash = hashlib.sha256(json.dumps([("a", "abcdef")]).encode()).hexdigest()
+    assert _fingerprint(docs) == expected_hash
+    assert _fingerprint(docs, MAX_DOC_CHARS) == expected_hash
+    save_cache(tmp_path, "model/a", docs, [[1.0]])
+    meta = json.loads(_paths(tmp_path, "model/a")[0].read_text())
+    assert set(meta) == {"model", "ids", "dimension", "fingerprint", "binary_sha256"}
+    for length in (2, 3):
+        assert load_cache(tmp_path, "model/a", docs, length) is None
+        save_cache(tmp_path, "model/a", docs, [[float(length)]], length)
+    for length in (2, 3):
+        assert load_cache(tmp_path, "model/a", docs, length) == (
+            ["a"],
+            [[float(length)]],
+        )
+    assert load_cache(tmp_path, "model/a", docs) == (["a"], [[1.0]])
+    assert len(list(tmp_path.glob("*.json"))) == 3
+    # Even identical truncated text must have distinct non-default fingerprints.
+    assert _fingerprint([CorpusDoc("a", "x")], 2) != _fingerprint(
+        [CorpusDoc("a", "x")], 3
+    )

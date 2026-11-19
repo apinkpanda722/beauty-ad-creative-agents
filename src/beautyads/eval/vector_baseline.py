@@ -42,7 +42,10 @@ class CorpusDoc:
 
     @property
     def embedding_text(self):
-        return self.text[:MAX_DOC_CHARS]
+        return self.embedding_text_for(None)
+
+    def embedding_text_for(self, max_chars=None):
+        return self.text[: MAX_DOC_CHARS if max_chars is None else max_chars]
 
 
 def cosine(a, b):
@@ -122,25 +125,26 @@ def build_corpus(creative_source, product_source, *, run_tag="v1"):
     return docs
 
 
-def _paths(root, model):
+def _paths(root, model, max_chars=None):
     # Include the original name digest so path-safe names never collide.
     stem = (
         re.sub(r"[^A-Za-z0-9_-]", "_", model)
         + "-"
         + hashlib.sha256(model.encode()).hexdigest()[:16]
     )
+    if max_chars is not None and max_chars != MAX_DOC_CHARS:
+        stem += f"-chars-{max_chars}"
     return root / (stem + ".json"), root / (stem + ".bin")
 
 
-def _fingerprint(docs):
-    return hashlib.sha256(
-        json.dumps(
-            [(d.id, d.embedding_text) for d in docs], ensure_ascii=False
-        ).encode()
-    ).hexdigest()
+def _fingerprint(docs, max_chars=None):
+    payload = [(d.id, d.embedding_text_for(max_chars)) for d in docs]
+    if max_chars is not None and max_chars != MAX_DOC_CHARS:
+        payload = {"max_chars": max_chars, "documents": payload}
+    return hashlib.sha256(json.dumps(payload, ensure_ascii=False).encode()).hexdigest()
 
 
-def save_cache(root, model, docs, vectors):
+def save_cache(root, model, docs, vectors, max_chars=None):
     if (
         len(docs) != len(vectors)
         or not vectors
@@ -152,7 +156,7 @@ def save_cache(root, model, docs, vectors):
     ):
         raise ValueError("VECTOR_CACHE_INVALID")
     root.mkdir(parents=True, exist_ok=True)
-    meta, binary = _paths(root, model)
+    meta, binary = _paths(root, model, max_chars)
     values = array("f", (x for vec in vectors for x in vec))
     binary.write_bytes(values.tobytes())
     meta.write_text(
@@ -161,7 +165,7 @@ def save_cache(root, model, docs, vectors):
                 "model": model,
                 "ids": [d.id for d in docs],
                 "dimension": len(vectors[0]),
-                "fingerprint": _fingerprint(docs),
+                "fingerprint": _fingerprint(docs, max_chars),
                 "binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
             }
         ),
@@ -169,13 +173,13 @@ def save_cache(root, model, docs, vectors):
     )
 
 
-def load_cache(root, model, docs):
-    meta, binary = _paths(root, model)
+def load_cache(root, model, docs, max_chars=None):
+    meta, binary = _paths(root, model, max_chars)
     try:
         data = json.loads(meta.read_text(encoding="utf-8"))
         if (
             data.get("model") != model
-            or data.get("fingerprint") != _fingerprint(docs)
+            or data.get("fingerprint") != _fingerprint(docs, max_chars)
             or data.get("ids") != [d.id for d in docs]
         ):
             return None

@@ -36,7 +36,7 @@ def render_inputs():
 def test_all_fourteen_required_procedures_are_present(render_inputs):
     text = prereg.render_preregistration(**render_inputs)
     sentences = prereg.REQUIRED_SENTENCES
-    assert len(sentences) == len(set(sentences)) == 15
+    assert len(sentences) == len(set(sentences)) == 16
     checked = 0
     for sentence in sentences:
         assert sentence.strip()
@@ -47,6 +47,27 @@ def test_all_fourteen_required_procedures_are_present(render_inputs):
     assert "재등록" in sentences[12]
     assert "커밋 절차" in sentences[13]
     assert "함께" in sentences[13]
+
+
+def test_e3_reporting_procedure_is_appended(render_inputs):
+    sentence = prereg.REQUIRED_SENTENCES[15]
+    for phrase in (
+        str(e3_live.SIZE_STRATUM_THRESHOLD),
+        "F1",
+        "참고용",
+        "사전 등록 전에 확정",
+        "완전 일치",
+        "TOP_K",
+        "MAX_DOC_CHARS",
+        "evidence_ids",
+        "대상이 없는 질문 수",
+        "표현 규칙 ID",
+        "효능",
+        "카테고리",
+        "test 결과",
+    ):
+        assert phrase in sentence
+    assert sentence in prereg.render_preregistration(**render_inputs)
 
 
 def test_approved_limitations_are_not_weakened(render_inputs):
@@ -342,7 +363,7 @@ def test_render_functions_perform_no_file_io(tmp_path, monkeypatch, render_input
 def test_candidate_validity_limitations_are_appended(render_inputs):
     from beautyads.eval import evalset_candidates
 
-    sentence = prereg.REQUIRED_SENTENCES[-1]
+    sentence = prereg.REQUIRED_SENTENCES[14]
     text = prereg.render_preregistration(**render_inputs)
     assert f"15. {sentence}" in text
     for phrase in (
