@@ -206,6 +206,13 @@ def dev_measurement():
         "combinations": [
             {**model, "top_k": k, "max_doc_chars": length}
             for model, k, length in product(models, (3, 17), (47, 83))
+        ]
+        + [
+            {
+                **models[1],
+                "top_k": e3_live.TOP_K,
+                "max_doc_chars": e3_live.MAX_DOC_CHARS,
+            }
         ],
     }
 
@@ -474,7 +481,7 @@ def test_none_measurement_preserves_original_bytes(render_inputs):
     assert "E3 dev 측정 근거" not in text
     # Captured from the unchanged renderer before implementing this step.
     assert hashlib.sha256(text.encode()).hexdigest() == (
-        "d96b62169c8ddc9d4ae3a58e493e7d63defe609309ad9c281486577346a7aff4"
+        "97d739c95a2d6cf2155bdac1ba171ded2ee52cfacdf26aa4daed41e86c84958e"
     )
 
 
@@ -508,6 +515,9 @@ def test_dev_measurement_tables_preserve_every_cell_and_order(
         "잘린 문서 비율",
         "정답 근거 소재 문서 중 잘린 비율",
         "정답 값이 코퍼스에 없는 집합 질문 수",
+        "측정 파일 기본 TOP_K",
+        "동결 TOP_K",
+        "동결 MAX_DOC_CHARS",
     ]
     assert [row[1] for row in value_rows] == [
         str(dev_measurement[key]) if dev_measurement[key] is not None else "해당 없음"
@@ -519,7 +529,7 @@ def test_dev_measurement_tables_preserve_every_cell_and_order(
             "truncated_dev_evidence_ratio",
             "n_set_questions_values_not_in_corpus",
         )
-    ]
+    ] + ["해당 없음", str(e3_live.TOP_K), str(e3_live.MAX_DOC_CHARS)]
     assert all(":" not in line for line in section.splitlines())
     assert guard.parse_preregistration(text) == guard.parse_preregistration(
         prereg.render_preregistration(**render_inputs)
@@ -528,6 +538,46 @@ def test_dev_measurement_tables_preserve_every_cell_and_order(
         **render_inputs, dev_measurement=dev_measurement
     )
     assert dev_measurement == before
+
+
+@pytest.mark.parametrize("measurement_k", [None, 7])
+def test_dev_evidence_records_measurement_and_frozen_parameters(
+    render_inputs, dev_measurement, measurement_k
+):
+    if measurement_k is not None:
+        dev_measurement["top_k"] = measurement_k
+    text = prereg.render_preregistration(
+        **render_inputs, dev_measurement=dev_measurement
+    )
+    section = text.split("## E3 dev 측정 근거\n", 1)[1].split("## 절차와 한계", 1)[0]
+    assert (
+        f"| 측정 파일 기본 TOP_K | {measurement_k if measurement_k is not None else '해당 없음'} |"
+        in section
+    )
+    assert f"| 동결 TOP_K | {e3_live.TOP_K} |" in section
+    assert f"| 동결 MAX_DOC_CHARS | {e3_live.MAX_DOC_CHARS} |" in section
+    assert all(":" not in line for line in section.splitlines())
+    parsed = guard.parse_preregistration(text)
+    assert parsed == guard.parse_preregistration(
+        prereg.render_preregistration(**render_inputs)
+    )
+    assert parsed["동결 E3 TOP_K"] == "50"
+
+
+@pytest.mark.parametrize("missing", ["absent", "other_model_only", "different_length"])
+def test_prereg_requires_selected_models_frozen_combination(
+    render_inputs, dev_measurement, missing
+):
+    frozen = dev_measurement["combinations"].pop()
+    if missing == "other_model_only":
+        frozen["embedding_model"] = dev_measurement["models"][0]["embedding_model"]
+        dev_measurement["combinations"].append(frozen)
+    elif missing == "different_length":
+        frozen["max_doc_chars"] += 1
+        dev_measurement["combinations"].append(frozen)
+    assert prereg.validate_dev_measurement(dev_measurement) is None
+    with pytest.raises(ValueError, match="^PREREG_INPUT_INVALID$"):
+        prereg.render_preregistration(**render_inputs, dev_measurement=dev_measurement)
 
 
 @pytest.mark.parametrize(

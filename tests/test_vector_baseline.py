@@ -2,6 +2,7 @@
 
 import ast
 import hashlib
+import inspect
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -11,9 +12,11 @@ import pytest
 
 from beautyads.domain.claims import ClaimRule
 from beautyads.domain.sync import SyncCreative, SyncLabel
+from beautyads.eval import evalset_candidates
 from beautyads.eval.vector_baseline import (
     CORPUS_FIELDS,
     MAX_DOC_CHARS,
+    TOP_K,
     CorpusDoc,
     build_corpus,
     cosine,
@@ -21,6 +24,19 @@ from beautyads.eval.vector_baseline import (
     save_cache,
     top_k,
 )
+
+
+def test_frozen_retrieval_constants():
+    assert TOP_K == 50
+    assert MAX_DOC_CHARS == 1500
+
+
+def test_top_k_covers_answer_set_limit():
+    assert TOP_K >= evalset_candidates.MAX_ANSWER_SET
+
+
+def test_top_k_default_matches_frozen_constant():
+    assert inspect.signature(top_k).parameters["k"].default == TOP_K
 
 
 @pytest.mark.parametrize(

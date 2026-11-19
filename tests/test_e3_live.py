@@ -95,6 +95,37 @@ def arm_options():
     return options, generator, calls
 
 
+def test_frozen_top_k_and_unchanged_limits():
+    from beautyads.eval.evalset_candidates import MAX_ANSWER_SET
+
+    frozen = e3.extra_frozen("m")
+    assert frozen["동결 E3 TOP_K"] == "50"
+    assert frozen["동결 E3 MAX_DOC_CHARS"] == "1500"
+    assert e3.SIZE_STRATUM_THRESHOLD == 10
+    assert MAX_ANSWER_SET == 50
+
+
+def test_vector_run_uses_default_top_k_evidence(monkeypatch):
+    from beautyads.eval.vector_baseline import TOP_K, top_k
+
+    options, generator, _ = arm_options()
+    docs = [CorpusDoc(f"youtube:{i:03}", f"document {i}") for i in range(60)]
+    options.update(arms=("vector",), docs=docs, doc_vecs=[[1.0, 0.0]] * len(docs))
+    retrieval_calls = []
+
+    def retrieve(query_vec, doc_vecs, ids):
+        retrieval_calls.append(ids)
+        return top_k(query_vec, doc_vecs, ids)
+
+    monkeypatch.setattr(e3, "top_k", retrieve)
+    rows = e3.run([question()], **options)
+    assert len(rows) == len(generator.calls) == len(retrieval_calls) == 1
+    _, kw = generator.calls[0]
+    evidence = json.loads(kw["messages"][1]["content"])["evidence"]
+    assert len(evidence) == TOP_K
+    assert [item["id"] for item in evidence] == sorted(d.id for d in docs)[:TOP_K]
+
+
 def test_run_signature_and_common_spec_prompt_inputs():
     signature = inspect.signature(e3.run)
     assert not any(
@@ -876,6 +907,35 @@ def report_rows(qs, truths, *, partial=False):
     ]
 
 
+@pytest.mark.parametrize(
+    "size,top_k_layer,size_layer",
+    [
+        (10, "size_le_top_k", "size_le10"),
+        (11, "size_le_top_k", "size_gt10"),
+        (50, "size_le_top_k", "size_gt10"),
+        (51, "size_gt_top_k", "size_gt10"),
+    ],
+)
+def test_report_frozen_top_k_and_size_threshold_are_distinct(
+    tmp_path, size, top_k_layer, size_layer
+):
+    qs = [question().model_copy(update={"answer_type": "set"})]
+    truths = [
+        truth().model_copy(
+            update={"answer_type": "set", "value": [f"v{i}" for i in range(size)]}
+        )
+    ]
+    path = tmp_path / "answers"
+    write_jsonl(path, truths)
+    result = e3.report(report_rows(qs, truths), qs, answers_path=path, split="dev")
+    assert {key: value["n"] for key, value in result["size_vs_top_k"].items()} == {
+        key: int(key == top_k_layer) for key in ("size_le_top_k", "size_gt_top_k")
+    }
+    assert {key: value["n"] for key, value in result["size_strata"].items()} == {
+        key: int(key == size_layer) for key in ("size_le10", "size_gt10", "size_count")
+    }
+
+
 def test_report_size_strata_boundaries_f1_and_unchanged_decisions(
     tmp_path, monkeypatch
 ):
@@ -1055,6 +1115,36 @@ def measurement_inputs(tmp_path, *, no_target=False):
         return EmbedResult([[1.0, 0.0] for _ in texts], 5, 0.01)
 
     return docs, qs, path, embed, calls
+
+
+def test_measure_default_candidates_and_selection_follow_top_k(tmp_path):
+    from beautyads.eval.vector_baseline import TOP_K
+
+    docs, qs, path, embed, _ = measurement_inputs(tmp_path)
+    result = e3.measure(
+        docs,
+        qs,
+        answers_path=path,
+        models=list(e3.EMBEDDING_PRICES),
+        embed=embed,
+        cache_dir=tmp_path / "cache",
+    )
+    assert {row["top_k"] for row in result["combinations"]} == {TOP_K}
+    assert result["top_k"] == TOP_K
+    selected = next(
+        row
+        for row in result["combinations"]
+        if row["embedding_model"] == result["selected_model"]
+    )
+    assert selected["top_k"] == TOP_K
+    assert selected["max_doc_chars"] == e3.MAX_DOC_CHARS
+    assert {
+        k: v for k, v in selected.items() if k not in {"top_k", "max_doc_chars"}
+    } == next(
+        row
+        for row in result["models"]
+        if row["embedding_model"] == result["selected_model"]
+    )
 
 
 def test_measure_targets_recall_combinations_and_no_leaks(tmp_path, capsys):

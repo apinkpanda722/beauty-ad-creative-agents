@@ -187,7 +187,7 @@ def _dev_measurement_lines(measurement):
     lines.extend(
         table(
             ("항목", "값"),
-            (
+            [
                 (label, measurement.get(key))
                 for label, key in (
                     ("선택 모델", "selected_model"),
@@ -203,7 +203,12 @@ def _dev_measurement_lines(measurement):
                         "n_set_questions_values_not_in_corpus",
                     ),
                 )
-            ),
+            ]
+            + [
+                ("측정 파일 기본 TOP_K", measurement.get("top_k")),
+                ("동결 TOP_K", e3_live.TOP_K),
+                ("동결 MAX_DOC_CHARS", e3_live.MAX_DOC_CHARS),
+            ],
         )
     )
     return lines
@@ -328,6 +333,13 @@ def render_preregistration(
     """Render caller-supplied hashes and runner labels alongside current code."""
     if dev_measurement is not None:
         validate_dev_measurement(dev_measurement)
+        if not any(
+            row.get("embedding_model") == dev_measurement.get("selected_model")
+            and row.get("top_k") == e3_live.TOP_K
+            and row.get("max_doc_chars") == e3_live.MAX_DOC_CHARS
+            for row in dev_measurement.get("combinations")
+        ):
+            raise ValueError("PREREG_INPUT_INVALID")
     values = {
         REQUEST_HASH_LABEL: request_hash,
         QUESTION_HASH_LABEL: question_hash,

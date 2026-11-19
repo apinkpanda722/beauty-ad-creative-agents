@@ -7,7 +7,7 @@ import re
 from array import array
 from dataclasses import dataclass
 
-TOP_K = 10
+TOP_K = 50
 MAX_DOC_CHARS = 1500
 _CREATIVE_FIELDS = (
     "brand",
