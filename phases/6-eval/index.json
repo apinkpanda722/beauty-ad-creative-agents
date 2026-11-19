@@ -253,8 +253,22 @@
         "output_tokens": 10299,
         "attempts": 1
       }
+    },
+    {
+      "step": 19,
+      "name": "top-k-50",
+      "status": "pending"
+    },
+    {
+      "step": 20,
+      "name": "e2e5-records",
+      "status": "pending"
+    },
+    {
+      "step": 21,
+      "name": "failure-as-worst",
+      "status": "pending"
     }
   ],
-  "created_at": "2026-11-19T12:16:24+0900",
-  "completed_at": "2026-11-19T17:36:07+0900"
+  "created_at": "2026-11-19T12:16:24+0900"
 }
