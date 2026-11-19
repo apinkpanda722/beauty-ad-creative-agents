@@ -19,7 +19,16 @@
     {
       "step": 2,
       "name": "evalset-freeze-guard",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-19T12:26:18+0900",
+      "summary": "평가셋 모델·검증·해시와 사전 등록·코드 동결 가드 및 합성 테스트 구현. make verify 통과(5,033 tests), 추가 패키지 없음.",
+      "completed_at": "2026-11-19T12:36:26+0900",
+      "usage": {
+        "input_tokens": 2953046,
+        "cached_input_tokens": 2833920,
+        "output_tokens": 21439,
+        "attempts": 1
+      }
     },
     {
       "step": 3,
