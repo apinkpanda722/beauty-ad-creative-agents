@@ -1559,3 +1559,160 @@ def test_load_corpus_reuses_claim_rule_reader_and_sanitizes_failure(
         assert builds == [(creative_source, product_source, {"rules": rules})]
     assert reads == [Path("config/claim_rules.yaml")]
     assert closed == [True]
+
+
+def test_corpus_runner_imports_only_closed_public_store_sources():
+    import ast
+    from pathlib import Path
+
+    tree = ast.parse(Path(e3.__file__).read_text(encoding="utf-8"))
+    imports = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imports.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            assert node.level == 0 and node.module is not None
+            imports.update(f"{node.module}.{alias.name}" for alias in node.names)
+    store_modules = {
+        ".".join(name.split(".")[:3])
+        for name in imports
+        if name == "beautyads.store" or name.startswith("beautyads.store.")
+    }
+    assert store_modules == {
+        "beautyads.store.connection",
+        "beautyads.store.layer1_source",
+        "beautyads.store.repository",
+        "beautyads.store.sync_source",
+    }
+    forbidden = {
+        "beautyads.store.tenant_repository",
+        "beautyads.store.feedback_source",
+        "beautyads.store.links_source",
+        "beautyads.store.product_repository",
+        "beautyads.api",
+        "beautyads.eval.isolation_live",
+    }
+    assert {
+        name
+        for name in imports
+        if any(name == path or name.startswith(path + ".") for path in forbidden)
+    } == set()
+
+
+def test_load_corpus_excludes_tenant_data_and_uses_only_public_document_ids(
+    monkeypatch,
+):
+    import re
+    from datetime import UTC, datetime
+    from pathlib import Path
+
+    from test_vector_baseline import synthetic_rule
+
+    from beautyads.domain.sync import SyncCreative, SyncLabel
+    from beautyads.eval.isolation_live import ISOLATION_TENANTS
+    from beautyads.store import tenant_repository
+
+    class ForbiddenTenantRepository:
+        def __getattribute__(self, name):
+            pytest.fail("E3 corpus must not access the tenant repository")
+
+        def __call__(self, *args, **kwargs):
+            pytest.fail("E3 corpus must not construct the tenant repository")
+
+    monkeypatch.setattr(
+        tenant_repository, "PostgresTenantRepository", ForbiddenTenantRepository()
+    )
+    private = {
+        "plan": "SENTINEL_TENANT_PLAN",
+        "feedback": "SENTINEL_TENANT_FEEDBACK",
+        "tenant_id": ISOLATION_TENANTS[0],
+        "other_tenant_id": ISOLATION_TENANTS[1],
+    }
+    closed, calls = [], []
+    conn = SimpleNamespace(close=lambda: closed.append(True))
+
+    class CreativeSource:
+        def __init__(self, connection):
+            assert connection is conn
+            calls.append("creative_source")
+
+        def read_changed(self, **kwargs):
+            assert kwargs == {"since": None, "limit": None, "run_tag": "v1"}
+            calls.append("creatives")
+            return [
+                SyncCreative(
+                    {
+                        "source": "youtube",
+                        "source_id": "public-creative",
+                        "brand": "synthetic-public-brand",
+                        **private,
+                    },
+                    datetime(2026, 11, 19, tzinfo=UTC),
+                )
+            ]
+
+        def read_labels(self, key, **kwargs):
+            assert (key.source.value, key.source_id) == ("youtube", "public-creative")
+            assert kwargs == {"run_tag": "v1"}
+            calls.append("labels")
+            return [SyncLabel("full@v1", "done", {"angle": "comparison", **private})]
+
+    product = SimpleNamespace(
+        brand="synthetic-public-brand",
+        source_url="https://example.invalid/public-product",
+        name_ko="synthetic public product",
+        **private,
+    )
+
+    class ProductSource:
+        def __init__(self, connection):
+            assert connection is conn
+            calls.append("product_source")
+
+        def read_changed(self, **kwargs):
+            assert kwargs == {"since": None, "limit": None}
+            calls.append("products")
+            return [SimpleNamespace(product=product, ingredients=[], certs=[])]
+
+    rule = synthetic_rule().model_copy(
+        update={"law_basis": json.dumps(private), "exception_note": json.dumps(private)}
+    )
+
+    def load_rules(path):
+        assert path == Path("config/claim_rules.yaml")
+        calls.append("rules")
+        return [rule]
+
+    def connect(dsn):
+        assert dsn == "synthetic"
+        calls.append("connect")
+        return conn
+
+    monkeypatch.setattr(e3, "postgres_dsn", lambda: "synthetic")
+    monkeypatch.setattr(e3, "connect", connect)
+    monkeypatch.setattr(e3, "PostgresGraphSyncSource", CreativeSource)
+    monkeypatch.setattr(e3, "PostgresLayer1Source", ProductSource)
+    monkeypatch.setattr(e3, "load_claim_rules", load_rules)
+    docs = e3.load_corpus()
+    assert calls == [
+        "connect",
+        "rules",
+        "creative_source",
+        "product_source",
+        "creatives",
+        "labels",
+        "products",
+    ]
+    assert closed == [True]
+    assert {doc.id for doc in docs} == {
+        "youtube:public-creative",
+        f"product:{product.brand}:{product.source_url}",
+        rule.rule_id,
+    }
+    assert all(
+        re.fullmatch(r"(?:youtube:[^:]+|product:[^:]+:.+|CR-\d{3})", doc.id)
+        for doc in docs
+    )
+    assert all(
+        marker not in doc.id + doc.text for doc in docs for marker in private.values()
+    )

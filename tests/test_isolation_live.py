@@ -524,3 +524,100 @@ def test_empty_raw_result_stays_a_scan_failure_after_api_sanitization(rig):
     assert code != 0 and json.loads(output)["status"] == "incomplete"
     records = json.loads(next(rig.root.glob("*/records.json")).read_text())
     assert any(row["failure"] == "SCAN_EMPTY" for row in records)
+
+
+def test_tenant_repository_all_sql_write_targets_are_tenant_tables():
+    from beautyads.store import tenant_repository
+
+    source = Path(tenant_repository.__file__).read_text(encoding="utf-8")
+    # ON CONFLICT DO UPDATE SET has no new target table.
+    targets = re.findall(
+        r"\b(?:INSERT\s+INTO|UPDATE(?!\s+SET\b)|DELETE\s+FROM)\s+"
+        r'((?:"[^"]+"|[A-Za-z_]\w*)(?:\.(?:"[^"]+"|[A-Za-z_]\w*))*)',
+        source,
+        flags=re.IGNORECASE,
+    )
+    assert targets
+    tables = {target.strip('"').lower() for target in targets}
+    assert all(table.startswith("tenant_") for table in tables)
+    assert tables == {
+        "tenant_profiles",
+        "tenant_threads",
+        "tenant_plans",
+        "tenant_feedback",
+    }
+
+
+def test_setup_only_uses_tenants_as_writable_repository(rig, monkeypatch):
+    attributes, methods = set(), set()
+    assembly_get = Assembly.__getattribute__
+    memory_get = Memory.__getattribute__
+
+    def read_assembly(self, name):
+        # Ignore Python protocol probes, while recording every service attribute.
+        if self is rig.value and not (name.startswith("__") and name.endswith("__")):
+            attributes.add(name)
+        return assembly_get(self, name)
+
+    def read_memory(self, name):
+        value = memory_get(self, name)
+        if self is rig.tenants and callable(value):
+            methods.add(name)
+        return value
+
+    monkeypatch.setattr(Assembly, "__getattribute__", read_assembly)
+    monkeypatch.setattr(Memory, "__getattribute__", read_memory)
+    status, output = rig.cli(["setup"])
+    assert status == 0, output
+    assert len(rig.calls) == 1
+    assert attributes
+    assert attributes <= {
+        "tenants",
+        "ask",
+        "allowed_tenants",
+        "workspaces",
+        "as_of",
+        "last_collected_at",
+        "hydrate",
+        "price_bands",
+        "design_dir",
+        "image_enabled",
+        "close",
+    }
+    assert attributes.isdisjoint({"graph", "chat", "tool_runner"})
+    assert {"tenants", "ask", "hydrate", "price_bands", "close"} <= attributes
+    assert methods <= {
+        "register_thread",
+        "save_plan",
+        "add_feedback",
+        "assert_thread_access",
+        "get_plan",
+        "list_feedback",
+        "save_profile",
+    }
+    assert {
+        "register_thread",
+        "save_plan",
+        "add_feedback",
+        "assert_thread_access",
+        "get_plan",
+        "list_feedback",
+    } <= methods
+
+
+def test_setup_persists_only_isolation_tenant_ids(rig):
+    status, output = rig.cli(["setup"])
+    assert status == 0, output
+    allowed = set(iso.ISOLATION_TENANTS)
+    assert set(rig.tenants.threads.values()) == allowed
+    assert {tenant for tenant, _ in rig.tenants.plans} == allowed
+    assert {plan.tenant_id for plan in rig.tenants.plans.values()} == allowed
+    assert {feedback.tenant_id for feedback in rig.tenants.feedback} == allowed
+    assert all(
+        thread.partition(":")[0] == tenant
+        for thread, tenant in rig.tenants.threads.items()
+    )
+    assert all(
+        tenant == plan.tenant_id and plan.thread_id.partition(":")[0] == tenant
+        for (tenant, _), plan in rig.tenants.plans.items()
+    )

@@ -254,3 +254,21 @@ def test_rule_id_collisions_use_existing_error(duplicate):
         rules *= 2
     with pytest.raises(ValueError, match="^CORPUS_ID_DUPLICATE$"):
         build_corpus(source, products, rules=rules)
+
+
+def test_corpus_module_imports_only_stdlib_without_tenant_or_api_dependencies():
+    import sys
+
+    import beautyads.eval.vector_baseline as module
+
+    tree = ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
+    roots = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            roots.update(alias.name.split(".")[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            assert node.level == 0 and node.module is not None
+            roots.add(node.module.split(".")[0])
+    assert roots
+    assert roots <= sys.stdlib_module_names
+    assert roots.isdisjoint({"beautyads"})
