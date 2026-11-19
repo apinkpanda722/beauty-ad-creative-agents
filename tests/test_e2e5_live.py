@@ -355,6 +355,56 @@ def test_preflight_failure_and_dev_budget_rejection_are_call_free(rig):
     assert not rig.calls and not rig.models and not rig.assemblies
 
 
+@pytest.mark.parametrize("budget,accepted", [("0.40", True), ("0.41", False)])
+def test_dev_budget_boundary_is_call_free(rig, budget, accepted):
+    rig.problems = ["DOCKER_DOWN"]
+    code, output = rig.invoke(
+        "run", "--mode", "dev", "--run-id", "trial", "--budget-usd", budget
+    )
+    assert code != 0
+    if accepted:
+        assert "PREFLIGHT_FAILED DOCKER_DOWN" in output
+        assert "DEV_BUDGET_INVALID" not in output
+    else:
+        assert "DEV_BUDGET_INVALID" in output
+        assert "PREFLIGHT_FAILED" not in output
+        assert not rig.guards
+    assert not rig.calls and not rig.models and not rig.assemblies
+    assert not rig.structured_calls and not rig.root.exists()
+
+
+@pytest.mark.parametrize("mode", ["dev", "final"])
+def test_default_budget_is_passed_to_batch_without_calls(rig, monkeypatch, mode):
+    write_jsonl(rig.requests, [request(split="test" if mode == "final" else "dev")])
+    budgets = []
+
+    async def batch(args, *positional, **kwargs):
+        budgets.append(args.budget_usd)
+        return 0
+
+    monkeypatch.setattr(live, "_run_batch", batch)
+    code, _ = rig.invoke("run", "--mode", mode, "--run-id", "trial")
+    assert code == 0
+    assert budgets == [live.DEFAULT_BUDGET_USD[mode]]
+    assert not rig.calls and not rig.models and not rig.assemblies
+    assert not rig.structured_calls
+
+
+@pytest.mark.parametrize("budget", ["3.0", "3.01"])
+def test_final_budget_reaches_preflight_above_dev_cap_without_calls(rig, budget):
+    assert live.DEFAULT_BUDGET_USD["final"] == 3.0
+    write_jsonl(rig.requests, [request(split="test")])
+    rig.problems = ["DOCKER_DOWN"]
+    code, output = rig.invoke(
+        "run", "--mode", "final", "--run-id", "trial", "--budget-usd", budget
+    )
+    assert code != 0 and "PREFLIGHT_FAILED DOCKER_DOWN" in output
+    assert "DEV_BUDGET_INVALID" not in output
+    assert len(rig.guards) == 1 and rig.guards[0]["mode"] == "final"
+    assert not rig.calls and not rig.models and not rig.assemblies
+    assert not rig.structured_calls and not rig.root.exists()
+
+
 @pytest.mark.parametrize("mode", ["dev", "final"])
 def test_scoring_all_arms_share_sonnet_scoring_run(rig, mode):
     write_jsonl(
@@ -380,6 +430,7 @@ def test_scoring_all_arms_share_sonnet_scoring_run(rig, mode):
 
 
 def test_dev_score_refuses_seven_or_more_items_without_model_creation(rig):
+    assert live.DEV_SCORE_MAX_ITEMS == 6
     assert rig.invoke("run", "--run-id", "trial")[0] == 0
     code, output = rig.invoke("score", "--run-id", "trial")
     assert code != 0 and "DEV_SCORE_MAX_ITEMS" in output

@@ -72,7 +72,7 @@ from beautyads.sources.claim_rules import load_claim_rules
 from beautyads.sources.workspaces import load_workspaces
 
 ARMS_DEFAULT = ("supervisor", "single", "off")
-DEFAULT_BUDGET_USD = {"dev": 0.15, "final": 3.0}
+DEFAULT_BUDGET_USD = {"dev": 0.40, "final": 3.0}
 DEV_SCORE_MAX_ITEMS = 6
 RESULT_ROOT = Path("data/interim/e2e5")
 _SCORING_MODEL = "claude-sonnet-5-5"
