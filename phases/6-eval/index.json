@@ -131,7 +131,16 @@
     {
       "step": 9,
       "name": "isolation-live",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-19T15:11:41+0900",
+      "summary": "격리 작업 공간 2개와 setup/run/report 실행기, 4경로 200건 요청·표식 판정·동결·예산 가드 및 합성 테스트 42건 구현. 실제 서비스 호출 없이 make verify 통과(5,342 tests), 추가 패키지 없음.",
+      "completed_at": "2026-11-19T15:23:59+0900",
+      "usage": {
+        "input_tokens": 2926512,
+        "cached_input_tokens": 2819712,
+        "output_tokens": 24303,
+        "attempts": 1
+      }
     }
   ],
   "created_at": "2026-11-19T12:16:24+0900"
