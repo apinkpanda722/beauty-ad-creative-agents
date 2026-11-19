@@ -102,3 +102,7 @@ fetch-font:
 .PHONY: live-evalset
 live-evalset:
 	uv run python -m beautyads.eval.evalset_candidates $(ARGS)
+
+.PHONY: live-e2e5
+live-e2e5:
+	uv run python -m beautyads.eval.e2e5_live $(ARGS)
