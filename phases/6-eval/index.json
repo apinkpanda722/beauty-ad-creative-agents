@@ -103,10 +103,7 @@
     {
       "step": 8,
       "name": "embed-vector-e3",
-      "status": "blocked",
-      "started_at": "2026-11-19T13:27:31+0900",
-      "blocked_reason": "선점검에서 정답 접근 규칙의 충돌을 확인했습니다. “정답은 `score_answer`를 부르는 `report` 단계에서만 읽는다”는 제한과 “후보 임베딩 모델 각각에 대해 코퍼스를 임베딩하고 dev 질문(`split == \"dev\"`)의 정답 `evidence_ids`에 대한 `hit@TOP_K` […] 를 코드로 계산해 모델별로 출력한다”는 measure 요구가 충돌합니다. measure에 dev 정답 접근 예외를 허용하는지 명시가 필요합니다. 코드는 수정하지 않았습니다.",
-      "blocked_at": "2026-11-19T13:29:38+0900",
+      "status": "pending",
       "usage": {
         "input_tokens": 605644,
         "cached_input_tokens": 520064,
