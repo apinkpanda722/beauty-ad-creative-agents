@@ -39,7 +39,7 @@ def render_inputs():
 def test_all_fourteen_required_procedures_are_present(render_inputs):
     text = prereg.render_preregistration(**render_inputs)
     sentences = prereg.REQUIRED_SENTENCES
-    assert len(sentences) == len(set(sentences)) == 19
+    assert len(sentences) == len(set(sentences)) == 20
     checked = 0
     for sentence in sentences:
         assert sentence.strip()
@@ -113,7 +113,7 @@ def test_e5_supplement_procedure_is_eighteenth(render_inputs):
 def test_first_seventeen_procedures_remain_byte_identical():
     original = json.dumps(prereg.REQUIRED_SENTENCES[:17], ensure_ascii=False)
     assert hashlib.sha256(original.encode()).hexdigest() == (
-        "f6bf43d9f1f74e30564564e1ce38fb2580dae1a2b9f49d59f91e3e6d1dfb59ed"
+        "7d2e1f96acc748c9ff8d35338311cb4504beeb264f2dc9959317f338fd9c1842"
     )
 
 
@@ -136,12 +136,13 @@ def test_failure_as_worst_procedure_is_nineteenth(render_inputs):
         "차별성 1점",
         "근거 유효율 0",
         "두 판정이 다르면 그대로",
+        "out_of_scope",
     ):
         assert phrase in sentence
     assert f"19. {sentence}" in prereg.render_preregistration(**render_inputs)
     original = json.dumps(prereg.REQUIRED_SENTENCES[:18], ensure_ascii=False)
     assert hashlib.sha256(original.encode()).hexdigest() == (
-        "109604556c78de6b49356416b722f280ad7fc5a917005666f368d1065bf45506"
+        "f4f0c41f8a4822acc98448d2af6065effe9311041323560d204c78cafbe8a357"
     )
 
 
@@ -547,7 +548,7 @@ def test_none_measurement_preserves_original_bytes(render_inputs):
     assert "E3 dev 측정 근거" not in text
     # Captured from the unchanged renderer before implementing this step.
     assert hashlib.sha256(text.encode()).hexdigest() == (
-        "6c3ca359f95bd247cb3d2de2ab85289b74ccabc93ae2c50c6f1742568fc5121a"
+        "0179c72289759b295e6ad195161d695d86f234fd1c5a292dee09e061d639d1c7"
     )
 
 
@@ -792,3 +793,45 @@ def test_cli_incomplete_measurement_never_creates_document(
     assert prereg.main(args, out=out) == 1
     assert out.getvalue() == "PREREG_INPUT_INVALID\n"
     assert not target.exists()
+
+
+def test_repeat_procedures_and_empty_distribution_template(render_inputs):
+    sentences = prereg.REQUIRED_SENTENCES
+    assert len(sentences) == 20
+    for phrase in (
+        "2회",
+        "요청 20건 × 2회",
+        "요청별로 평균",
+        "단위는 요청",
+        "10,000회",
+        "모델 비결정성",
+        "docs/EVAL.md",
+    ):
+        assert phrase in sentences[2]
+    for phrase in ("반복 1", "근거 소재마다 한 행", "200행", "고정 시드"):
+        assert phrase in sentences[3]
+    for phrase in ("우리 요청은 전부 지원 범위 안", "out_of_scope", "실패로 센다"):
+        assert phrase in sentences[18]
+    for phrase in (
+        "반복마다 따로 채점",
+        "팔 이름 숨김",
+        "순서 섞기",
+        "고정 시드",
+        "숨김 id",
+        "최저점",
+        "반복 단위",
+        "일부만 없으면",
+        "하나도 없으면",
+        "요청별 반복 평균",
+        "두 반복을 모두 재사용",
+        "같은 코드 커밋",
+        "세트 해시",
+        "채점 실행",
+        "E3와 격리는 반복하지 않는다",
+    ):
+        assert phrase in sentences[19]
+    assert f"20. {sentences[19]}" in prereg.render_preregistration(**render_inputs)
+    section = (
+        prereg.render_results_template().split("## E2\n", 1)[1].split("\n## ", 1)[0]
+    )
+    assert "| 요청당 반복 수(팔별 분포) |  |  |  |  |" in section

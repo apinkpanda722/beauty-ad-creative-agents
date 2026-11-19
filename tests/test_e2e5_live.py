@@ -418,7 +418,14 @@ def test_scoring_all_arms_share_sonnet_scoring_run(rig, mode):
     assert {model for model, _ in rig.structured_calls} == {"claude-sonnet-5-5"}
     scores = json.loads((rig.root / "trial" / "scores.json").read_text())
     assert (
-        len({s["scoring_run_id"] for arms in scores.values() for s in arms.values()})
+        len(
+            {
+                s["scoring_run_id"]
+                for arms in scores.values()
+                for repeats in arms.values()
+                for s in repeats.values()
+            }
+        )
         == 1
     )
     with pytest.raises(ValueError, match="SCORING_MODEL_INVALID"):
@@ -974,8 +981,8 @@ def test_e5_supplement_calculates_paired_metrics_without_prose(tmp_path):
     assert data["purposes"]["research"]["reduction"] == 0
     assert data["purposes"]["image"]["reduction"] == "해당 없음"
     assert data["plan_per_request"] == [
-        {"supervisor": 20, "off": 40, "reduction": 0.5},
-        {"supervisor": 40, "off": 80, "reduction": 0.5},
+        {"supervisor": 20, "off": 40, "reduction": 0.5, "repeat": 1},
+        {"supervisor": 40, "off": 80, "reduction": 0.5, "repeat": 1},
     ]
     for arm in ("supervisor", "off"):
         assert data["research"][arm] == {
@@ -1097,7 +1104,7 @@ def test_supplement_preserves_negative_changes_and_zero_denominators(tmp_path):
     assert data["pairs_used"] == 1 and data["pairs_unavailable"] == 0
     assert data["purposes"]["research"]["reduction"] == -2
     assert data["plan_per_request"] == [
-        {"supervisor": 0, "off": 0, "reduction": "해당 없음"}
+        {"supervisor": 0, "off": 0, "reduction": "해당 없음", "repeat": 1}
     ]
     assert "해당 없음" in output
     for arm in ("supervisor", "off"):
@@ -1105,3 +1112,187 @@ def test_supplement_preserves_negative_changes_and_zero_denominators(tmp_path):
             "mean_calls_per_request": 0,
             "input_tokens_per_call": "해당 없음",
         }
+
+
+def test_repeat_runs_fresh_calls_in_outer_order_and_resumes(rig):
+    payloads = []
+
+    def behavior(*args, **kwargs):
+        payload = result()
+        payload["plans"][0]["plan"]["title"] = str(len(payloads))
+        payloads.append(payload)
+        return payload
+
+    rig.behavior = behavior
+    assert (
+        rig.invoke("run", "--run-id", "trial", "--limit", "2", "--repeat", "1")[0] == 0
+    )
+    assert len(rig.calls) == 6
+    assert rig.invoke("run", "--run-id", "trial", "--repeat", "2")[0] == 0
+    rows = live._load_records(rig.root / "trial")
+    assert [(r.repeat, r.item_id, r.arm) for r in rows] == [
+        (repeat, f"req-{i}", arm)
+        for repeat in (1, 2)
+        for i in range(2)
+        for arm in live.ARMS_DEFAULT
+    ]
+    assert len(rig.calls) == 12 and len(payloads) == 8
+    assert len({id(p) for p in payloads}) == 8
+    assert len({r.plan["title"] for r in rows if r.arm != "single"}) == 8
+    assert all("seed" not in kw for _, kw in rig.calls)
+    assert json.loads((rig.root / "trial" / "run.json").read_text())["repeats"] == 2
+    assert rig.invoke("run", "--run-id", "trial")[0] == 0
+    assert len(rig.calls) == 12
+    assert json.loads((rig.root / "trial" / "run.json").read_text())["repeats"] == 2
+
+
+def test_repeat_two_from_start_orders_all_first_repeats_before_second(rig):
+    assert rig.invoke("run", "--run-id", "trial", "--repeat", "2")[0] == 0
+    rows = live._load_records(rig.root / "trial")
+    assert len(rig.calls) == len(rows) == 18
+    assert [(r.repeat, r.item_id, r.arm) for r in rows] == [
+        (repeat, f"req-{i}", arm)
+        for repeat in (1, 2)
+        for i in range(3)
+        for arm in live.ARMS_DEFAULT
+    ]
+
+
+def test_repeat_ledger_deltas_are_separate_for_every_call(rig):
+    append_entry(rig.settings.ledger_path, entry(cost=0, tokens=999))
+
+    def behavior(*args, **kwargs):
+        number = len(rig.calls)
+        append_entry(
+            rig.settings.ledger_path,
+            entry(cost=number / 1000, tokens=number, purpose="plan"),
+        )
+        return result()
+
+    rig.behavior = behavior
+    assert (
+        rig.invoke(
+            "run",
+            "--run-id",
+            "trial",
+            "--repeat",
+            "2",
+            "--arms",
+            "supervisor,off",
+            "--limit",
+            "2",
+        )[0]
+        == 0
+    )
+    rows = live._load_records(rig.root / "trial")
+    assert len(rows) == 8
+    for i, row in enumerate(rows, 1):
+        assert row.input_tokens == i and row.spent_usd == i / 1000
+        assert row.model_calls == 1
+        assert row.input_tokens_by_purpose == {"plan": i}
+        assert row.model_calls_by_purpose == {"plan": 1}
+
+
+def test_budget_during_repeat_one_never_starts_repeat_two(rig):
+    def behavior(*args, **kwargs):
+        append_entry(
+            rig.settings.ledger_path, entry(cost=live.DEFAULT_BUDGET_USD["dev"])
+        )
+        return result()
+
+    rig.behavior = behavior
+    code, output = rig.invoke("run", "--run-id", "trial", "--repeat", "2")
+    assert code == 2 and "STOPPED BUDGET_REACHED" in output
+    rows = live._load_records(rig.root / "trial")
+    assert len(rig.calls) == len(rows) == 1 and rows[0].repeat == 1
+
+
+@pytest.mark.parametrize(
+    "command,repeat",
+    [
+        ("run", "0"),
+        ("run", "6"),
+        ("run", "x"),
+        ("score", "2"),
+        ("sheet", "1"),
+        ("report", "2"),
+    ],
+)
+def test_repeat_argument_rejections_are_call_free(rig, command, repeat):
+    code, output = rig.invoke(command, "--repeat", repeat)
+    assert code == 2 and output.strip() == "ARGUMENT_ERROR"
+    assert not rig.guards and not rig.calls and not rig.assemblies and not rig.models
+
+
+@pytest.mark.parametrize("repeats", [1, 2, 5])
+def test_repeat_dry_run_multiplies_counts_without_calls(rig, repeats):
+    assert live.MAX_REPEATS == 5
+    code, output = rig.invoke("run", "--dry-run", "--repeat", str(repeats))
+    data = json.loads(output)
+    assert code == 0 and data["repeats"] == repeats
+    assert data["request_arm_count"] == 3 * 3 * repeats
+    assert data["generation_calls_assumed"] == 3 * 3 * repeats * 8
+    assert data["scoring_calls"] == 3 * 3 * repeats
+    assert data["cost_estimate_usd_assumed"] == pytest.approx(
+        3 * 3 * repeats * (8 * 0.005 + 0.01)
+    )
+    assert (
+        not rig.calls
+        and not rig.assemblies
+        and not rig.models
+        and not rig.root.exists()
+    )
+
+
+def test_repeated_scoring_structure_and_report_distribution(rig):
+    assert (
+        rig.invoke("run", "--run-id", "trial", "--repeat", "2", "--limit", "1")[0] == 0
+    )
+    assert rig.invoke("score", "--run-id", "trial")[0] == 0
+    assert len(rig.structured_calls) == 6
+    scores = json.loads((rig.root / "trial" / "scores.json").read_text())
+    for arm in live.ARMS_DEFAULT:
+        assert set(scores["req-0"][arm]) == {"1", "2"}
+        assert {v["repeat"] for v in scores["req-0"][arm].values()} == {1, 2}
+    code, output = rig.invoke("report", "--run-id", "trial")
+    assert code == 0 and "| repeats |" in output
+    assert '"per_request": {"2": 1}' in output
+
+
+def test_record_loader_duplicates_include_repeat(tmp_path):
+    row = synthetic_record(0, "supervisor")
+    second = row.model_copy(update={"repeat": 2})
+    write_jsonl(tmp_path / "records.jsonl", [row.model_dump(), second.model_dump()])
+    assert len(live._load_records(tmp_path)) == 2
+    write_jsonl(
+        tmp_path / "records.jsonl",
+        [row.model_dump(), second.model_dump(), second.model_dump()],
+    )
+    with pytest.raises(live._Stopped, match="ARM_RECORD_DUPLICATE"):
+        live._load_records(tmp_path)
+    legacy = row.model_dump()
+    legacy.pop("repeat")
+    write_jsonl(tmp_path / "records.jsonl", [legacy])
+    assert live._load_records(tmp_path)[0].repeat == 1
+
+
+def test_supplement_pairs_same_repeat_only():
+    rows = [
+        synthetic_record(0, arm, tokens={"plan": tokens}).model_copy(
+            update={"repeat": repeat}
+        )
+        for arm, repeat, tokens in [
+            ("supervisor", 1, 10),
+            ("off", 1, 20),
+            ("supervisor", 2, 40),
+            ("off", 2, 80),
+            ("supervisor", 3, 900),
+            ("off", 4, 999),
+        ]
+    ]
+    data = live._e5_supplement(rows, [RequestItem.model_validate(request())])
+    assert data["pairs_used"] == 2 and data["pairs_unavailable"] == 0
+    assert data["plan_per_request"] == [
+        {"supervisor": 10, "off": 20, "reduction": 0.5, "repeat": 1},
+        {"supervisor": 40, "off": 80, "reduction": 0.5, "repeat": 2},
+    ]

@@ -76,6 +76,7 @@ from beautyads.sources.workspaces import load_workspaces
 ARMS_DEFAULT = ("supervisor", "single", "off")
 DEFAULT_BUDGET_USD = {"dev": 0.40, "final": 3.0}
 DEV_SCORE_MAX_ITEMS = 6
+MAX_REPEATS = 5
 RESULT_ROOT = Path("data/interim/e2e5")
 _SCORING_MODEL = "claude-sonnet-5-5"
 
@@ -403,7 +404,7 @@ def _load_records(root):
     if not path.exists():
         return []
     rows = [_RecordedArm.model_validate(row) for row in read_jsonl(path)]
-    if len({(r.item_id, r.arm) for r in rows}) != len(rows):
+    if len({(r.item_id, r.arm, r.repeat) for r in rows}) != len(rows):
         raise _Stopped("ARM_RECORD_DUPLICATE")
     return rows
 
@@ -457,7 +458,17 @@ def _record_axes(arm, result):
 
 
 def _record(
-    item, arm, result, *, run_id, identity, set_hash, delta, by_purpose, latency
+    item,
+    arm,
+    result,
+    *,
+    run_id,
+    identity,
+    set_hash,
+    delta,
+    by_purpose,
+    latency,
+    repeat=1,
 ):
     first = next(iter(result.get("plans") or []), {})
     plan = result.get("plan") if arm == "single" else first.get("plan")
@@ -471,6 +482,7 @@ def _record(
         run_id=run_id,
         item_id=item.id,
         arm=arm,
+        repeat=repeat,
         tenant_id=item.tenant_id,
         status=status,
         plan=plan,
@@ -523,7 +535,7 @@ async def _run_batch(
 ):
     assembly, single, watch = None, None, _Watch()
     limits = RequestLimits()
-    seen = {(r.item_id, r.arm) for r in rows}
+    seen = {(r.item_id, r.arm, r.repeat) for r in rows}
     baseline = ledger_total(settings.ledger_path)
     previous_spend = math.fsum(r.spent_usd for r in rows) + prior_score_spend
     exit_code = 0
@@ -549,71 +561,76 @@ async def _run_batch(
                 structured_factory=structured_factory,
                 watch=watch,
             )
-        for item in items:
-            for arm in ARMS_DEFAULT:
-                if arm not in args.arms or (item.id, arm) in seen:
-                    continue
-                if (
-                    previous_spend + ledger_total(settings.ledger_path) - baseline
-                    >= args.budget_usd
-                ):
-                    print("STOPPED BUDGET_REACHED", file=out)
-                    return 2
-                before, started = (
-                    len(read_entries(settings.ledger_path).entries),
-                    monotonic(),
-                )
-                watch.tool_logs.clear()
-                watch.error_class = None
-                result, stopped = {"kind": "failed"}, None
-                try:
-                    result = run_arm(arm, item, assembly=assembly, single=single)
-                except CostCapExceeded as error:
-                    stopped = "COST_CAP_REACHED"
-                    watch.error_class = type(error).__name__
-                    watch.cap_scope = _cap_scope(error)
-                except LlmCallError as error:
-                    watch.error_class = type(error).__name__
-                    if error.kind in {
-                        ErrorKind.DAILY_LIMIT,
-                        ErrorKind.CREDITS_DEPLETED,
-                    }:
-                        stopped = "DAILY_LIMIT"
-                except Exception as error:  # noqa: BLE001 -- no exception prose
-                    result = {"kind": "failed"}
-                    watch.error_class = type(error).__name__
-                stopped = stopped or watch.stopped
-                result = {
-                    **result,
-                    "tool_logs": [*watch.tool_logs, *(result.get("tool_logs") or [])],
-                }
-                row = _record(
-                    item,
-                    arm,
-                    result,
-                    run_id=args.run_id,
-                    identity=identity,
-                    set_hash=set_hash,
-                    delta=ledger_delta(settings.ledger_path, before),
-                    by_purpose=ledger_purpose_totals(settings.ledger_path, before),
-                    latency=monotonic() - started,
-                )
-                with (root / "records.jsonl").open("a", encoding="utf-8") as stream:
-                    stream.write(row.model_dump_json() + "\n")
-                if row.status == "failed":
-                    exit_code = 3
-                    print(
-                        "REQUEST_FAILED " + (watch.error_class or "RESULT_FAILED"),
-                        file=out,
+        for repeat in range(1, args.repeat + 1):
+            for item in items:
+                for arm in ARMS_DEFAULT:
+                    if arm not in args.arms or (item.id, arm, repeat) in seen:
+                        continue
+                    if (
+                        previous_spend + ledger_total(settings.ledger_path) - baseline
+                        >= args.budget_usd
+                    ):
+                        print("STOPPED BUDGET_REACHED", file=out)
+                        return 2
+                    before, started = (
+                        len(read_entries(settings.ledger_path).entries),
+                        monotonic(),
                     )
-                if stopped:
-                    print(
-                        "STOPPED "
-                        + stopped
-                        + (" " + watch.cap_scope if watch.cap_scope else ""),
-                        file=out,
+                    watch.tool_logs.clear()
+                    watch.error_class = None
+                    result, stopped = {"kind": "failed"}, None
+                    try:
+                        result = run_arm(arm, item, assembly=assembly, single=single)
+                    except CostCapExceeded as error:
+                        stopped = "COST_CAP_REACHED"
+                        watch.error_class = type(error).__name__
+                        watch.cap_scope = _cap_scope(error)
+                    except LlmCallError as error:
+                        watch.error_class = type(error).__name__
+                        if error.kind in {
+                            ErrorKind.DAILY_LIMIT,
+                            ErrorKind.CREDITS_DEPLETED,
+                        }:
+                            stopped = "DAILY_LIMIT"
+                    except Exception as error:  # noqa: BLE001 -- no exception prose
+                        result = {"kind": "failed"}
+                        watch.error_class = type(error).__name__
+                    stopped = stopped or watch.stopped
+                    result = {
+                        **result,
+                        "tool_logs": [
+                            *watch.tool_logs,
+                            *(result.get("tool_logs") or []),
+                        ],
+                    }
+                    row = _record(
+                        item,
+                        arm,
+                        result,
+                        repeat=repeat,
+                        run_id=args.run_id,
+                        identity=identity,
+                        set_hash=set_hash,
+                        delta=ledger_delta(settings.ledger_path, before),
+                        by_purpose=ledger_purpose_totals(settings.ledger_path, before),
+                        latency=monotonic() - started,
                     )
-                    return 2
+                    with (root / "records.jsonl").open("a", encoding="utf-8") as stream:
+                        stream.write(row.model_dump_json() + "\n")
+                    if row.status == "failed":
+                        exit_code = 3
+                        print(
+                            "REQUEST_FAILED " + (watch.error_class or "RESULT_FAILED"),
+                            file=out,
+                        )
+                    if stopped:
+                        print(
+                            "STOPPED "
+                            + stopped
+                            + (" " + watch.cap_scope if watch.cap_scope else ""),
+                            file=out,
+                        )
+                        return 2
         print("COMPLETED " + args.run_id, file=out)
         return exit_code
     finally:
@@ -639,12 +656,14 @@ def _token_summary(on, off):
 
 
 def _e5_supplement(rows, items):
-    """Descriptive paired metrics only; never passed to the frozen analyzer."""
-    index = {(r.item_id, r.arm): r for r in rows}
+    """Pair the same request and repeat; descriptive, never used for verdicts."""
+    index = {(r.item_id, r.arm, r.repeat): r for r in rows}
     paired = [
-        (index[item.id, "supervisor"], index[item.id, "off"])
+        (index[item.id, "supervisor", repeat], index[item.id, "off", repeat])
         for item in items
-        if (item.id, "supervisor") in index and (item.id, "off") in index
+        for repeat in sorted({r.repeat for r in rows if r.item_id == item.id})
+        if (item.id, "supervisor", repeat) in index
+        and (item.id, "off", repeat) in index
     ]
     pairs = [p for p in paired if all(r.input_tokens_by_purpose for r in p)]
     purposes = sorted(
@@ -678,6 +697,7 @@ def _e5_supplement(rows, items):
         "purposes": totals,
         "plan_per_request": [
             {
+                "repeat": a.repeat,
                 "supervisor": a.input_tokens_by_purpose.get("plan", 0),
                 "off": b.input_tokens_by_purpose.get("plan", 0),
                 "reduction": _token_summary(
@@ -838,6 +858,8 @@ def main(
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--run-id")
     parser.add_argument("--requests", type=Path)
+    # None distinguishes an omitted flag from an explicit --repeat 1 on score.
+    parser.add_argument("--repeat", type=int)
     try:
         args = parser.parse_args(argv)
         args.arms = args.arms.split(",")
@@ -851,8 +873,15 @@ def main(
             and args.requests is not None
             or args.run_id is not None
             and not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", args.run_id)
+            or args.repeat is not None
+            and (
+                not 1 <= args.repeat <= MAX_REPEATS
+                or args.command != "run"
+                and not args.dry_run
+            )
         ):
             raise _Stopped("ARGUMENT_ERROR")
+        args.repeat = 1 if args.repeat is None else args.repeat
         if args.budget_usd is None:
             args.budget_usd = DEFAULT_BUDGET_USD[args.mode]
         if not math.isfinite(args.budget_usd) or args.budget_usd <= 0:
@@ -911,7 +940,10 @@ def main(
                 "evalset_hash": set_hash,
                 "item_ids": [r.id for r in items],
                 "scoring_spent_usd": 0.0,
+                "repeats": args.repeat,
             }
+        if args.command == "run":
+            metadata["repeats"] = max(metadata.get("repeats", 1), args.repeat)
         if any(
             r.run_id != args.run_id
             or r.evalset_hash != set_hash
@@ -923,13 +955,14 @@ def main(
         ):
             raise _Stopped("RUN_IDENTITY_MISMATCH")
         if args.dry_run:
-            count = len(items) * len(args.arms)
+            count = len(items) * len(args.arms) * args.repeat
             scoring_count = sum(r.plan is not None for r in rows) if rows else count
             print(
                 json.dumps(
                     {
                         "requests": len(items),
                         "arms": args.arms,
+                        "repeats": args.repeat,
                         "request_arm_count": count,
                         "scoring_items": scoring_count,
                         "scoring_calls": scoring_count,

@@ -78,13 +78,14 @@ _SYSTEM = (
 
 
 class ArmRecord(BaseModel):
-    """One final attempt per request and arm; ledger deltas belong to the runner."""
+    """One attempt per request, arm and repeat; ledger deltas belong to the runner."""
 
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
     run_id: str = Field(min_length=1)
     item_id: str = Field(min_length=1)
     arm: Literal["supervisor", "single", "off"]
+    repeat: int = Field(default=1, ge=1)
     tenant_id: str = Field(min_length=1)
     status: Literal["plan", "no_evidence", "limit", "failed", "out_of_scope"]
     plan: dict | None
@@ -124,7 +125,7 @@ def e2_rubric_sha256() -> str:
 
 def _records(records) -> list[ArmRecord]:
     rows = [ArmRecord.model_validate(r) for r in records]
-    ids = [(r.item_id, r.arm) for r in rows]
+    ids = [(r.item_id, r.arm, r.repeat) for r in rows]
     if len(ids) != len(set(ids)):
         raise ValueError("ARM_RECORD_DUPLICATE")
     return rows
@@ -168,12 +169,12 @@ def blind_items(records, *, requests, seed=SCORING_SEED) -> tuple[list[dict], di
     rows, reqs = _records(records), _requests(requests)
     _check_requests(rows, reqs)
     items, key = [], {}
-    for row in sorted(rows, key=lambda r: (r.item_id, r.arm)):
+    for row in sorted(rows, key=lambda r: (r.item_id, r.arm, r.repeat)):
         if row.plan is None:
             continue
-        hidden = hashlib.sha256(f"{seed}:{row.item_id}:{row.arm}".encode()).hexdigest()[
-            :12
-        ]
+        hidden = hashlib.sha256(
+            f"{seed}:{row.item_id}:{row.arm}:{row.repeat}".encode()
+        ).hexdigest()[:12]
         if hidden in key:
             raise ValueError("BLIND_ID_COLLISION")
         items.append(
@@ -186,6 +187,7 @@ def blind_items(records, *, requests, seed=SCORING_SEED) -> tuple[list[dict], di
         )
         key[hidden] = {
             "arm": row.arm,
+            "repeat": row.repeat,
             "item_id": row.item_id,
             "run_id": row.run_id,
             "code_commit": row.code_commit,
@@ -264,7 +266,7 @@ def score_plans(items, *, structured, ledger_path, purpose="e2-score") -> list[d
 
 
 def reveal_scores(scores, key) -> dict:
-    """Call after scoring; returned mapping is request ID -> arm -> result."""
+    """Call after scoring; mapping is request ID -> arm -> repeat string -> result."""
     revealed, seen = {}, set()
     for row in scores:
         hidden = row["arm_hidden_id"]
@@ -272,9 +274,11 @@ def reveal_scores(scores, key) -> dict:
             raise ValueError("SCORING_KEY_INVALID")
         source = key[hidden]
         arms = revealed.setdefault(source["item_id"], {})
-        if source["arm"] in arms:
+        repeats = arms.setdefault(source["arm"], {})
+        repeat = str(source["repeat"])
+        if repeat in repeats:
             raise ValueError("SCORING_KEY_INVALID")
-        arms[source["arm"]] = {**row, **source}
+        repeats[repeat] = {**row, **source}
         seen.add(hidden)
     if seen != set(key):
         raise ValueError("SCORING_KEY_INVALID")
@@ -339,19 +343,15 @@ def _paired_summary(diffs, total):
     }
 
 
-def _pairs(index, reqs, left, right, *, plans=False):
+def _request_groups(rows, reqs, left, right):
+    """Pair requests with any recorded repeat on both arms, in stable order."""
+    index = {}
+    for row in sorted(rows, key=lambda r: r.repeat):
+        index.setdefault((row.item_id, row.arm), []).append(row)
     return [
-        (index[(item, left)], index[(item, right)])
+        (item, index[(item, left)], index[(item, right)])
         for item in sorted(reqs)
-        if (item, left) in index
-        and (item, right) in index
-        and (
-            not plans
-            or (
-                index[(item, left)].plan is not None
-                and index[(item, right)].plan is not None
-            )
-        )
+        if (item, left) in index and (item, right) in index
     ]
 
 
@@ -378,7 +378,12 @@ def _descriptive(rows, pairs, total):
         "arms": arms,
         "differences": {
             field: _paired_summary(
-                [getattr(a, field) - getattr(b, field) for a, b in pairs], total
+                [
+                    fmean(getattr(r, field) for r in a)
+                    - fmean(getattr(r, field) for r in b)
+                    for _, a, b in pairs
+                ],
+                total,
             )
             for field in fields
         },
@@ -386,24 +391,44 @@ def _descriptive(rows, pairs, total):
     }
 
 
+def _scores_by_repeat(scores, item, arm) -> dict[int, dict]:
+    """Accept nested scores or the legacy flat score as repeat one."""
+    value = scores.get(item, {}).get(arm)
+    if not isinstance(value, dict):
+        return {}
+    if "status" in value:
+        return {1: value}
+    if any(
+        not isinstance(k, (str, int))
+        or isinstance(k, bool)
+        or not str(k).isdigit()
+        or int(k) < 1
+        or not isinstance(v, dict)
+        for k, v in value.items()
+    ):
+        return {}
+    return {int(k): v for k, v in value.items()}
+
+
 def _check_identity(rows, scores):
     identities = {(r.run_id, r.code_commit, r.evalset_hash) for r in rows}
     if len(identities) > 1:
         raise RunIdentityMismatch()
     batches = set()
-    index = {(r.item_id, r.arm): r for r in rows}
+    index = {(r.item_id, r.arm, r.repeat): r for r in rows}
     for item_id, arms in scores.items():
-        for arm, score in arms.items():
-            if score.get("scoring_run_id") is not None:
-                batches.add(score["scoring_run_id"])
-            source = index.get((item_id, arm))
-            if source is None:
-                continue
-            if any(
-                name in score and score[name] != getattr(source, name)
-                for name in ("run_id", "code_commit", "evalset_hash")
-            ):
-                raise RunIdentityMismatch()
+        for arm in arms:
+            for repeat, score in _scores_by_repeat(scores, item_id, arm).items():
+                if score.get("scoring_run_id") is not None:
+                    batches.add(score["scoring_run_id"])
+                source = index.get((item_id, arm, repeat))
+                if source is None:
+                    continue
+                if any(
+                    name in score and score[name] != getattr(source, name)
+                    for name in ("run_id", "code_commit", "evalset_hash")
+                ):
+                    raise RunIdentityMismatch()
     if len(batches) > 1:
         raise RunIdentityMismatch()
 
@@ -414,7 +439,10 @@ def _validity_summary(pairs, total):
             evidence_validity(row) if row.plan is not None else WORST_EVIDENCE_VALIDITY
         )
 
-    return _paired_summary([value(a) - value(b) for a, b in pairs], total)
+    return _paired_summary(
+        [fmean(value(r) for r in a) - fmean(value(r) for r in b) for _, a, b in pairs],
+        total,
+    )
 
 
 def _e2_metrics(pairs, scores, total):
@@ -426,25 +454,28 @@ def _e2_metrics(pairs, scores, total):
         ("distinctiveness", WORST_DISTINCTIVENESS),
     ):
         diffs = []
-        for pair in pairs:
-            observed = [
-                scores.get(row.item_id, {}).get(row.arm, {})
-                if row.plan is not None
-                else None
-                for row in pair
-            ]
-            if any(s is not None and s.get("status") != "scored" for s in observed):
-                continue
-            # A corrupted externally loaded score must not silently enter a CI.
-            values = [
-                worst
-                if score is None
-                else _Scores.model_validate(
-                    {k: score.get(k) for k in _Scores.model_fields}
-                ).model_dump()[name]
-                for score in observed
-            ]
-            diffs.append(values[0] - values[1])
+        for _, left, right in pairs:
+            means = []
+            for repeats in (left, right):
+                values = []
+                for row in repeats:
+                    if row.plan is None:
+                        values.append(worst)
+                        continue
+                    score = _scores_by_repeat(scores, row.item_id, row.arm).get(
+                        row.repeat, {}
+                    )
+                    if score.get("status") != "scored":
+                        continue
+                    # A corrupted externally loaded score must not enter a CI.
+                    values.append(
+                        _Scores.model_validate(
+                            {k: score.get(k) for k in _Scores.model_fields}
+                        ).model_dump()[name]
+                    )
+                means.append(fmean(values) if values else None)
+            if all(value is not None for value in means):
+                diffs.append(means[0] - means[1])
         metrics[name] = _paired_summary(diffs, total)
     return metrics
 
@@ -481,12 +512,13 @@ def _e5_verdict(validity, reduction):
 
 def _imputed_counts(pairs, left, right):
     return {
-        arm: sum(pair[i].plan is None for pair in pairs)
-        for i, arm in enumerate((left, right))
+        arm: sum(row.plan is None for pair in pairs for row in pair[i])
+        for i, arm in enumerate((left, right), 1)
     }
 
 
 def _failure_rates(rows):
+    """Count failures per recorded repeat, including unpaired attempts."""
     result = {}
     for arm in ARMS:
         selected = [r for r in rows if r.arm == arm]
@@ -507,32 +539,33 @@ def _failure_rates(rows):
 def analyze(records, *, scores, requests, claim_matches=None) -> dict:
     """Use request-paired differences; no observed axes or human labels affect verdicts.
 
-    기획안이 없는 시도는 최저점으로 포함한다. 실행되지 않은 항목만 제외하고 보고한다.
-    scores is the request -> arm mapping returned by reveal_scores. Unscored
-    existing plans are excluded only from the affected quality metrics, never
-    imputed. Complete-case results are reported as sensitivity analyses. E2
+    Apply worst scores per repeat, then average each arm within each request.
+    scores maps request -> arm -> repeat -> score (flat repeat-one scores also
+    work). Unscored plans are excluded per repeat only from quality metrics.
+    Complete cases average planned repeats, with scored repeats for quality.
+    Failure rates, strata and claim bias counts remain record/repeat-level. E2
     requires ten pairs for every primary metric. Empty E5 token denominators
     cannot meet its token condition. Output contains no claim-validity verdict.
     """
     rows, reqs = _records(records), _requests(requests)
     _check_identity(rows, scores)
     _check_requests(rows, reqs)
-    index = {(r.item_id, r.arm): r for r in rows}
     total = len(reqs)
-    e2_pairs = _pairs(index, reqs, "supervisor", "single")
-    e2_plans = _pairs(index, reqs, "supervisor", "single", plans=True)
+    e2_pairs = _request_groups(rows, reqs, "supervisor", "single")
+    planned = [r for r in rows if r.plan is not None]
+    e2_plans = _request_groups(planned, reqs, "supervisor", "single")
     metrics = _e2_metrics(e2_pairs, scores, total)
     complete_metrics = _e2_metrics(e2_plans, scores, total)
     n = min(m["n"] for m in metrics.values())
     complete_n = min(m["n"] for m in complete_metrics.values())
     verdict_e2 = _e2_verdict(metrics)
     verdict_e2_complete_case = _e2_verdict(complete_metrics)
-    e5_pairs = _pairs(index, reqs, "supervisor", "off")
-    e5_plans = _pairs(index, reqs, "supervisor", "off", plans=True)
+    e5_pairs = _request_groups(rows, reqs, "supervisor", "off")
+    e5_plans = _request_groups(planned, reqs, "supervisor", "off")
     validity = _validity_summary(e5_pairs, total)
     complete_validity = _validity_summary(e5_plans, total)
     on_tokens, off_tokens = (
-        sum(pair[i].input_tokens for pair in e5_pairs) for i in (0, 1)
+        sum(fmean(r.input_tokens for r in pair[i]) for pair in e5_pairs) for i in (1, 2)
     )
     reduction = 1 - on_tokens / off_tokens if off_tokens else None
     verdict_e5 = _e5_verdict(validity, reduction)
@@ -575,8 +608,23 @@ def analyze(records, *, scores, requests, claim_matches=None) -> dict:
             "arms": counts,
             "note": "편향 점검, 1인 라벨링. 주 지표와 판정에 쓰지 않는다.",
         }
+    repeats = {}
+    for arm in ARMS:
+        counts = {}
+        for row in rows:
+            if row.arm == arm:
+                counts[row.item_id] = counts.get(row.item_id, 0) + 1
+        repeats[arm] = {
+            "records": sum(counts.values()),
+            "requests": len(counts),
+            "per_request": {
+                str(n): sum(count == n for count in counts.values())
+                for n in sorted(set(counts.values()))
+            },
+        }
     return {
         "confidence": CI_CONFIDENCE,
+        "repeats": repeats,
         "e2": {
             "metrics": metrics,
             "n": n,
@@ -673,7 +721,7 @@ def _closed_claim(plan):
 def build_claim_sheet(
     records, *, evidence_texts, seed, size=200, out_dir
 ) -> dict[str, Path]:
-    """Sample plan/evidence pairs. Caller supplies title/brand text without links.
+    """Sample repeat-one plan/evidence pairs, using caller's title/brand text.
 
     The reveal key is written in a private subdirectory, outside the sheet's
     directory. Only the CSV and instructions should be passed to the labeler.
@@ -682,7 +730,7 @@ def build_claim_sheet(
         raise ValueError("CLAIM_SIZE_INVALID")
     candidates = []
     for row in sorted(_records(records), key=lambda r: (r.item_id, r.arm)):
-        if row.plan is None:
+        if row.repeat != 1 or row.plan is None:
             continue
         claim = _closed_claim(row.plan)
         for evidence_id in dict.fromkeys(row.plan.get("evidence_ids") or []):

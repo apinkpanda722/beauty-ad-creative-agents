@@ -179,7 +179,7 @@ def test_blinding_whitelists_and_reproducible_shuffle(tmp_path):
     for item in items:
         source = key[item["arm_hidden_id"]]
         expected = hashlib.sha256(
-            f"{scoring.SCORING_SEED}:{source['item_id']}:{source['arm']}".encode()
+            f"{scoring.SCORING_SEED}:{source['item_id']}:{source['arm']}:{source['repeat']}".encode()
         ).hexdigest()[:12]
         assert item["arm_hidden_id"] == expected
         assert item["order_seed"] == scoring.SCORING_SEED
@@ -957,3 +957,236 @@ def test_load_claim_matches_rejects_unknown_or_duplicate_ids(tmp_path):
             writer.writerows(changed)
         with pytest.raises(ValueError, match="CLAIM_SHEET_INVALID"):
             scoring.load_claim_matches(paths["sheet"], paths["key"])
+
+
+def test_repeat_contract_blinding_reveal_and_duplicate_keys(tmp_path):
+    first, second = record(), record(repeat=2)
+    assert first.repeat == 1
+    for invalid in (0, -1):
+        with pytest.raises(ValidationError):
+            record(repeat=invalid)
+    items, key = scoring.blind_items([second, first], requests=[request()])
+    assert len(items) == len(key) == 2
+    assert {v["repeat"] for v in key.values()} == {1, 2}
+    assert len({v["arm_hidden_id"] for v in items}) == 2
+    assert (items, key) == scoring.blind_items([first, second], requests=[request()])
+    fake = FakeStructured()
+    revealed = scoring.reveal_scores(
+        scoring.score_plans(items, structured=fake, ledger_path=tmp_path / "ledger"),
+        key,
+    )
+    assert set(revealed[first.item_id]["supervisor"]) == {"1", "2"}
+    for repeat in (1, 2):
+        assert revealed[first.item_id]["supervisor"][str(repeat)]["repeat"] == repeat
+    assert all(
+        not any(arm in json.dumps(kw["messages"]) for arm in scoring.ARMS)
+        for _, kw in fake.calls
+    )
+    with pytest.raises(ValueError, match="ARM_RECORD_DUPLICATE"):
+        scoring.blind_items([first, second, second], requests=[request()])
+    bad_key = deepcopy(key)
+    for source in bad_key.values():
+        source["repeat"] = 1
+    scores = [{"arm_hidden_id": hidden} for hidden in key]
+    with pytest.raises(ValueError, match="SCORING_KEY_INVALID"):
+        scoring.reveal_scores(scores, bad_key)
+
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        ({"status": "SCORE_FAILED"}, {1: {"status": "SCORE_FAILED"}}),
+        (
+            {"1": {"status": "scored"}, 2: {"status": "SCORE_FAILED"}},
+            {1: {"status": "scored"}, 2: {"status": "SCORE_FAILED"}},
+        ),
+        (None, {}),
+        ({}, {}),
+        ([], {}),
+        ({"unknown": {}}, {}),
+        ({"1": None}, {}),
+    ],
+)
+def test_scores_by_repeat_accepts_legacy_and_nested_only(value, expected):
+    assert (
+        scoring._scores_by_repeat({"item": {"supervisor": value}}, "item", "supervisor")
+        == expected
+    )
+    assert scoring._scores_by_repeat({}, "item", "supervisor") == {}
+
+
+def test_repeat_one_matches_step21_output_including_all_keys(point_ci):
+    rows, scores, reqs = population(n=3, fit=1)
+    rows[0].plan, rows[0].status = None, "failed"
+    scores[reqs[1].id]["single"] = {"status": "SCORE_FAILED"}
+    rows = [r for r in rows if not (r.item_id == reqs[2].id and r.arm == "off")]
+    reqs.append(request(3))
+    result = scoring.analyze(rows, scores=scores, requests=reqs)
+    result.pop("repeats")
+    # Captured from step 21 before implementation; normalize integral floats.
+    canonical = json.dumps(
+        json.loads(json.dumps(result), parse_int=float), sort_keys=True
+    )
+    assert (
+        hashlib.sha256(canonical.encode()).hexdigest()
+        == "368522505349ce99e0324d1c58ffa4d0e8774cd9ad41acb0a61e447354f97c74"
+    )
+
+
+def repeated_population():
+    rows, scores, reqs = population(n=3)
+    nested = {
+        item: {arm: {"1": value} for arm, value in arms.items()}
+        for item, arms in scores.items()
+    }
+    for row in list(rows):
+        rows.append(row.model_copy(deep=True, update={"repeat": 2}))
+        nested[row.item_id][row.arm]["2"] = {
+            **nested[row.item_id][row.arm]["1"],
+            "request_fit": 5 if row.arm == "supervisor" else 1,
+        }
+    return rows, nested, reqs
+
+
+def test_repeats_average_before_pairing_and_bootstrap(point_ci, monkeypatch):
+    rows, scores, reqs = repeated_population()
+    # Unequal repeat counts and one missing arm must not weight requests differently.
+    rows = [
+        r
+        for r in rows
+        if not (r.item_id == reqs[1].id and r.arm == "single" and r.repeat == 2)
+        and not (r.item_id == reqs[2].id and r.arm == "single")
+    ]
+    observed = []
+
+    def ci(values):
+        observed.append(list(values))
+        return (0, 0)
+
+    monkeypatch.setattr(scoring, "bootstrap_ci", ci)
+    result = scoring.analyze(rows, scores=scores, requests=reqs)
+    fit = result["e2"]["metrics"]["request_fit"]
+    assert fit == {"mean_diff": 1.5, "ci": (0, 0), "n": 2, "excluded": 1}
+    assert [2, 1] in observed
+    assert all(len(values) <= len(reqs) for values in observed)
+    assert result["e2"]["not_run"] == 1
+    assert result["repeats"]["supervisor"] == {
+        "records": 6,
+        "requests": 3,
+        "per_request": {"2": 3},
+    }
+    assert result["repeats"]["single"] == {
+        "records": 3,
+        "requests": 2,
+        "per_request": {"1": 1, "2": 1},
+    }
+    groups = scoring._request_groups(
+        rows[::-1], {r.id: r for r in reqs}, "supervisor", "single"
+    )
+    assert [g[0] for g in groups] == [reqs[0].id, reqs[1].id]
+    assert [[r.repeat for r in g[1]] for g in groups] == [[1, 2], [1, 2]]
+
+
+def test_repeated_failures_are_imputed_before_mean_and_complete_cases_filter(point_ci):
+    rows, scores, reqs = repeated_population()
+    for row in rows:
+        if row.arm == "supervisor" and (
+            row.item_id == reqs[1].id or (row.item_id == reqs[0].id and row.repeat == 2)
+        ):
+            row.plan, row.status = None, "out_of_scope"
+    result = scoring.analyze(rows, scores=scores, requests=reqs)
+    # Supervisor request means: 2, 1, 4; single: 2, 2, 2.
+    assert result["e2"]["metrics"]["request_fit"]["mean_diff"] == pytest.approx(1 / 3)
+    assert result["e2"]["metrics"]["evidence_validity"]["mean_diff"] == -0.5
+    assert result["e2"]["n"] == 3
+    assert result["e2"]["imputed_no_plan"] == {"supervisor": 3, "single": 0}
+    assert result["e5"]["imputed_no_plan"] == {"supervisor": 3, "off": 0}
+    complete = result["e2_complete_case"]
+    assert complete["metrics"]["request_fit"]["mean_diff"] == 1.5
+    assert complete["metrics"]["evidence_validity"]["mean_diff"] == 0
+    assert complete["n"] == 2 and complete["excluded_no_plan"] == 1
+    assert result["e5_complete_case"]["excluded_no_plan"] == 1
+    assert result["failure_rates"]["supervisor"]["no_plan"] == 3
+    assert result["strata"]["reliable"]["arms"]["supervisor"]["n"] == 3
+
+
+@pytest.mark.parametrize("missing", [None, "SCORE_FAILED", "SCORING_CAP_REACHED"])
+def test_only_unscored_repeat_is_excluded_from_quality(point_ci, missing):
+    rows, scores, reqs = repeated_population()
+    for req in reqs:
+        if missing is None:
+            scores[req.id]["supervisor"].pop("2")
+        else:
+            scores[req.id]["supervisor"]["2"] = {"status": missing}
+    result = scoring.analyze(rows, scores=scores, requests=reqs)
+    assert result["e2"]["metrics"]["request_fit"]["mean_diff"] == 1
+    assert result["e2"]["metrics"]["request_fit"]["n"] == 3
+    assert result["e2_complete_case"]["metrics"]["request_fit"]["mean_diff"] == 1
+    scores[reqs[0].id]["supervisor"] = {}
+    result = scoring.analyze(rows, scores=scores, requests=reqs)
+    assert result["e2"]["metrics"]["request_fit"]["n"] == 2
+    assert result["e2"]["metrics"]["request_fit"]["excluded"] == 1
+    assert result["e2"]["metrics"]["evidence_validity"]["n"] == 3
+    assert result["e2"]["not_run"] == 0
+
+
+def test_repeated_tokens_and_descriptive_differences_use_request_means(point_ci):
+    rows, scores, reqs = repeated_population()
+    for row in rows:
+        row.input_tokens = (
+            (10 if row.repeat == 1 else 30) if row.arm == "supervisor" else 100
+        )
+        row.model_calls = (
+            (2 if row.repeat == 1 else 6) if row.arm == "supervisor" else 1
+        )
+    rows = [
+        r
+        for r in rows
+        if not (r.item_id == reqs[0].id and r.arm == "supervisor" and r.repeat == 2)
+    ]
+    result = scoring.analyze(rows, scores=scores, requests=reqs)
+    assert result["e5"]["on_input_tokens"] == 50
+    assert result["e5"]["off_input_tokens"] == 300
+    assert result["e5"]["token_reduction"] == 1 - 50 / 300
+    assert result["e5"]["n"] == 3
+    desc = result["e2"]["descriptive"]
+    assert desc["arms"]["supervisor"]["model_calls"] == {"mean": 3.6, "n": 5}
+    assert desc["differences"]["model_calls"]["mean_diff"] == pytest.approx(7 / 3)
+
+
+@pytest.mark.parametrize(
+    "field", ["run_id", "code_commit", "evalset_hash", "scoring_run_id"]
+)
+def test_repeat_two_score_identity_is_checked(field, point_ci):
+    rows, scores, reqs = repeated_population()
+    for arms in scores.values():
+        for repeats in arms.values():
+            for score in repeats.values():
+                score["scoring_run_id"] = "batch"
+    scores[reqs[0].id]["supervisor"]["2"][field] = "different"
+    with pytest.raises(scoring.RunIdentityMismatch):
+        scoring.analyze(rows, scores=scores, requests=reqs)
+
+
+def test_claim_sheet_only_samples_first_repeat(tmp_path):
+    first, second = record(count=1), record(repeat=2, count=1)
+    second.plan["evidence_ids"] = ["repeat-two-only"]
+    paths = scoring.build_claim_sheet(
+        [second, first],
+        evidence_texts={"yt:synthetic-0": "합성"},
+        seed=scoring.SCORING_SEED,
+        out_dir=tmp_path,
+    )
+    key = json.loads(paths["key"].read_text())
+    assert len(key) == 1
+    assert {v["evidence_id"] for v in key.values()} == {"yt:synthetic-0"}
+    assert (
+        "repeat-two-only" not in paths["sheet"].read_text() + paths["key"].read_text()
+    )
+    hidden = hashlib.sha256(
+        json.dumps(
+            [scoring.SCORING_SEED, first.item_id, first.arm, "yt:synthetic-0"],
+            ensure_ascii=False,
+        ).encode()
+    ).hexdigest()[:12]
+    assert set(key) == {hidden}
