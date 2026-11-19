@@ -22,6 +22,8 @@ from beautyads.eval.e2_scoring import MIN_STRATUM_N, bootstrap_ci
 from beautyads.eval.evalset import (
     ANSWERS_PATH,
     QUESTIONS_PATH,
+    TEST_QUESTIONS_COUNT,
+    TEST_SIMPLE_SEARCH_COUNT,
     WORKSPACES_PATH,
     AnswerItem,
     QuestionItem,
@@ -127,7 +129,8 @@ def _questions(questions, mode):
     if len({q.id for q in questions}) != len(questions):
         raise E3Error("E3_QUESTION_DUPLICATE")
     if mode == "final" and (
-        len(questions) != 40 or sum(q.kind == "simple_search" for q in questions) != 10
+        len(questions) != TEST_QUESTIONS_COUNT
+        or sum(q.kind == "simple_search" for q in questions) != TEST_SIMPLE_SEARCH_COUNT
     ):
         raise E3Error("EVALSET_COUNT_INVALID")
 

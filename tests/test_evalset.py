@@ -32,7 +32,7 @@ def workspaces_path(tmp_path):
 
 def synthetic_set():
     requests, questions, answers = [], [], []
-    for split, request_count, question_count in (("dev", 10, 10), ("test", 20, 40)):
+    for split, request_count, question_count in (("dev", 10, 10), ("test", 20, 37)):
         for index in range(request_count):
             requests.append(
                 {
@@ -76,6 +76,67 @@ def synthetic_set():
                 }
             )
     return requests, questions, answers
+
+
+def test_test_question_targets_and_synthetic_composition():
+    assert sets.TEST_QUESTIONS_COUNT == 37
+    assert sets.TEST_SIMPLE_SEARCH_COUNT == 10
+    assert sets.TEST_GRAPH_QUESTIONS_COUNT == 27
+    questions = [q for q in synthetic_set()[1] if q["split"] == "test"]
+    assert len(questions) == sets.TEST_QUESTIONS_COUNT
+    assert sum(q["kind"] == "simple_search" for q in questions) == 10
+    assert sum(q["kind"] == "graph" for q in questions) == 27
+
+
+@pytest.mark.parametrize("count", [36, 37, 38])
+def test_final_test_question_count_boundaries(count, workspaces_path):
+    requests, questions, answers = synthetic_set()
+    if count == 36:
+        removed = questions.pop()
+        answers = [a for a in answers if a["question_id"] != removed["id"]]
+    elif count == 38:
+        questions.append({**questions[-1], "id": "q-test-extra"})
+        answers.append({**answers[-1], "question_id": "q-test-extra"})
+    test_questions = [q for q in questions if q["split"] == "test"]
+    assert len(test_questions) == count
+    assert sum(q["kind"] == "simple_search" for q in test_questions) == 10
+    assert {a["question_id"] for a in answers} == {q["id"] for q in questions}
+    if count == 37:
+        assert (
+            sets.validate_set(
+                requests,
+                questions,
+                answers,
+                final=True,
+                workspaces_path=workspaces_path,
+            )
+            is None
+        )
+    else:
+        with pytest.raises(sets.EvalsetError, match="^EVALSET_COUNT_INVALID$"):
+            sets.validate_set(
+                requests,
+                questions,
+                answers,
+                final=True,
+                workspaces_path=workspaces_path,
+            )
+
+
+@pytest.mark.parametrize("simple_count", [9, 11])
+def test_final_simple_search_count_boundaries(simple_count, workspaces_path):
+    requests, questions, answers = synthetic_set()
+    kind = "simple_search" if simple_count == 9 else "graph"
+    next(q for q in questions if q["split"] == "test" and q["kind"] == kind)["kind"] = (
+        "graph" if simple_count == 9 else "simple_search"
+    )
+    test_questions = [q for q in questions if q["split"] == "test"]
+    assert len(test_questions) == 37
+    assert sum(q["kind"] == "simple_search" for q in test_questions) == simple_count
+    with pytest.raises(sets.EvalsetError, match="^EVALSET_COUNT_INVALID$"):
+        sets.validate_set(
+            requests, questions, answers, final=True, workspaces_path=workspaces_path
+        )
 
 
 def test_axis_partition_and_strata():

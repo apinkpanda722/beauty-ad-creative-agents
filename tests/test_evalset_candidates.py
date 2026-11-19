@@ -21,6 +21,25 @@ from beautyads.sources.workspaces import load_workspaces
 DAY = date(2026, 11, 19)
 
 
+def test_test_targets_use_evalset_source_and_preserve_dev_targets():
+    assert (
+        candidates._FINAL_TARGETS["questions_test_graph"]
+        == sets.TEST_GRAPH_QUESTIONS_COUNT
+    )
+    assert (
+        candidates._FINAL_TARGETS["questions_test_simple_search"]
+        == sets.TEST_SIMPLE_SEARCH_COUNT
+    )
+    assert candidates.DEV_TARGETS == {"requests_dev": 10, "questions_dev": 10}
+    assert (
+        math.ceil(
+            candidates._FINAL_TARGETS["questions_test_graph"]
+            * candidates.CANDIDATE_FACTOR
+        )
+        == 41
+    )
+
+
 @pytest.fixture
 def synthetic(monkeypatch):
     specs = {
@@ -260,7 +279,11 @@ def test_questions_counts_round_robin_and_disjoint_combinations(synthetic):
         rows, workspaces, graph=FakeGraph(), as_of=DAY
     )
     assert result == again
-    assert Counter(q.split for q in result.questions) == {"dev": 15, "test": 60}
+    assert Counter(q.split for q in result.questions) == {
+        "dev": 15,
+        "test": math.ceil(sets.TEST_GRAPH_QUESTIONS_COUNT * candidates.CANDIDATE_FACTOR)
+        + 15,
+    }
     assert (
         sum(q.split == "test" and q.kind == "simple_search" for q in result.questions)
         == 15
@@ -300,7 +323,10 @@ def test_missing_pool_reports_shortages_without_duplicates(synthetic, monkeypatc
     assert len(result.questions) == 1
     assert result.shortages == {
         "questions_dev": 15,
-        "questions_test_graph": 44,
+        "questions_test_graph": math.ceil(
+            sets.TEST_GRAPH_QUESTIONS_COUNT * candidates.CANDIDATE_FACTOR
+        )
+        - 1,
         "questions_test_simple_search": 15,
     }
 
@@ -459,6 +485,10 @@ def test_sheet_columns_instructions_and_hash_guard(synthetic, tmp_path):
     assert sets.request_set_hash(bundle.requests) in instructions
     assert sets.question_set_hash(bundle.questions, bundle.answers) in instructions
     assert (
+        "요청 dev 10/test 20, 질문 dev 10/test 관계 27·단순 검색 10을 골라 나머지는 X로 둔다."
+        in instructions.splitlines()
+    )
+    assert (
         "요청의 source_cq는 문장에 나타나지 않는 표시용 연결이며 수정하지 않는다."
         in instructions.splitlines()
     )
@@ -484,7 +514,7 @@ def test_dry_run_never_checks_or_connects(synthetic, tmp_path):
         == 0
     )
     assert "모델 호출 0건" in out.getvalue()
-    assert "그래프 읽기 전용 질의 75건(가정, 미실측)" in out.getvalue()
+    assert "그래프 읽기 전용 질의 71건(가정, 미실측)" in out.getvalue()
     assert not list(tmp_path.iterdir())
 
 
@@ -587,6 +617,34 @@ def write_review_csv(path, rows):
         writer.writerows(rows)
 
 
+def test_full_finalize_one_graph_question_short_reports_exact_deficit(
+    synthetic, tmp_path
+):
+    generate_files(synthetic, tmp_path)
+    bundle = candidates.load_candidates(tmp_path)
+    rows = split_review_rows(bundle)
+    next(
+        row
+        for row in rows
+        if row["split"] == "test" and row["kind"] == "graph" and row["decision"] == "O"
+    )["decision"] = "X"
+    write_review_csv(tmp_path / "review_sheet.csv", rows)
+    destination = tmp_path / "final"
+    out = io.StringIO()
+    assert (
+        candidates.main(
+            ["finalize"], candidate_dir=tmp_path, final_dir=destination, out=out
+        )
+        == 3
+    )
+    summary = json.loads(out.getvalue())
+    assert summary["questions"] == 10 + sets.TEST_QUESTIONS_COUNT - 1
+    assert summary["shortages"] == {
+        key: int(key == "questions_test_graph") for key in candidates._FINAL_TARGETS
+    }
+    assert not destination.exists()
+
+
 def test_finalize_validates_exact_reviewed_set_before_writing(
     synthetic, tmp_path, monkeypatch
 ):
@@ -597,7 +655,7 @@ def test_finalize_validates_exact_reviewed_set_before_writing(
         ("request", "dev"): 10,
         ("request", "test"): 20,
         ("graph", "dev"): 10,
-        ("graph", "test"): 30,
+        ("graph", "test"): sets.TEST_GRAPH_QUESTIONS_COUNT,
         ("simple_search", "test"): 10,
     }
     counts = Counter()
@@ -1023,7 +1081,7 @@ def test_empty_and_oversize_answers_are_excluded(synthetic, empty):
     assert result.answer_sizes == {"CQ-01": {"le10": 0, "gt10": 0, "count": 0}}
     assert result.final_shortages == {
         "questions_dev": 10,
-        "questions_test_graph": 30,
+        "questions_test_graph": sets.TEST_GRAPH_QUESTIONS_COUNT,
         "questions_test_simple_search": 10,
     }
 
@@ -1056,32 +1114,41 @@ def test_mixed_pool_proportions_statistics_ids_and_answers(synthetic):
     assert result == candidates.build_question_candidates(
         list(reversed(rows)), workspaces, graph=MixedGraph(), as_of=DAY
     )
-    assert result.valid_pool == {"CQ-01": 22, "CQ-04": 11, "CQ-11": 22}
+    assert result.valid_pool == {"CQ-01": 22, "CQ-04": 11, "CQ-11": 21}
     assert result.answer_sizes == {
         "CQ-01": {"le10": 11, "gt10": 11, "count": 0},
         "CQ-04": {"le10": 0, "gt10": 0, "count": 11},
-        "CQ-11": {"le10": 22, "gt10": 0, "count": 0},
+        "CQ-11": {"le10": 21, "gt10": 0, "count": 0},
     }
-    assert result.excluded == {"empty": 33, "oversize": 0, "duplicate_answers": 51}
+    assert result.excluded == {"empty": 33, "oversize": 0, "duplicate_answers": 50}
     assert result.composition == {
-        "dev": {"CQ-01": 5, "CQ-04": 3, "CQ-11": 7},
-        "test": {"CQ-01": 17, "CQ-04": 8, "CQ-11": 15},
+        "dev": {"CQ-01": 6, "CQ-04": 3, "CQ-11": 6},
+        "test": {"CQ-01": 16, "CQ-04": 8, "CQ-11": 15},
     }
     for cq in ("CQ-01", "CQ-04"):
         assert (
-            abs(result.composition["dev"][cq] - result.composition["test"][cq] / 3) <= 1
+            abs(
+                result.composition["dev"][cq]
+                - result.composition["test"][cq]
+                * candidates._FINAL_TARGETS["questions_dev"]
+                / sets.TEST_GRAPH_QUESTIONS_COUNT
+            )
+            <= 1
         )
     assert result.final_shortages == {
         "questions_dev": 0,
-        "questions_test_graph": 5,
+        "questions_test_graph": sets.TEST_GRAPH_QUESTIONS_COUNT - 24,
         "questions_test_simple_search": 0,
     }
     assert result.shortages == {
         "questions_dev": 0,
-        "questions_test_graph": 20,
+        "questions_test_graph": math.ceil(
+            sets.TEST_GRAPH_QUESTIONS_COUNT * candidates.CANDIDATE_FACTOR
+        )
+        - 24,
         "questions_test_simple_search": 0,
     }
-    assert result.query_count == len(graph.calls) == 66 + 22
+    assert result.query_count == len(graph.calls) == 66 + 21
     assert [c for c, _ in graph.calls[:66]].count("SYNTHETIC_GRAPH") == 33
     assert all(c == "SYNTHETIC_SIMPLE" for c, _ in graph.calls[66:])
     assert len(
@@ -1122,7 +1189,7 @@ def test_simple_search_reserved_for_test_before_dev_fallback(synthetic, monkeypa
     }
     assert result.final_shortages == {
         "questions_dev": 10,
-        "questions_test_graph": 29,
+        "questions_test_graph": sets.TEST_GRAPH_QUESTIONS_COUNT - 1,
         "questions_test_simple_search": 0,
     }
     assert result.query_count == 12
@@ -1168,7 +1235,10 @@ def test_simple_search_filters_invalid_answers_lazily(synthetic, monkeypatch):
     assert result.excluded == {"empty": 1, "oversize": 1, "duplicate_answers": 29}
     assert result.valid_pool == {"CQ-11": 30}
     assert result.query_count == len(graph.calls) == 32
-    assert result.final_shortages["questions_test_graph"] == 30
+    assert (
+        result.final_shortages["questions_test_graph"]
+        == sets.TEST_GRAPH_QUESTIONS_COUNT
+    )
 
 
 def test_full_pool_is_trimmed_proportionally_without_deduplicating_answers(synthetic):
@@ -1179,7 +1249,7 @@ def test_full_pool_is_trimmed_proportionally_without_deduplicating_answers(synth
     assert result.valid_pool == {"CQ-01": 33, "CQ-04": 33, "CQ-11": 15}
     assert result.excluded == {"empty": 0, "oversize": 0, "duplicate_answers": 78}
     assert result.composition["dev"] == {"CQ-01": 8, "CQ-04": 7}
-    assert result.composition["test"] == {"CQ-01": 22, "CQ-04": 23, "CQ-11": 15}
+    assert result.composition["test"] == {"CQ-01": 20, "CQ-04": 21, "CQ-11": 15}
     assert result.query_count == 81
     assert not any(result.final_shortages.values())
 
@@ -1201,7 +1271,7 @@ def test_offline_estimate_uses_same_apportionment_without_answers(
     assert result.composition == live.composition
     assert result.valid_pool == live.valid_pool
     assert not result.answers
-    assert result.query_count == len(result.questions) == 75
+    assert result.query_count == len(result.questions) == 71
     assert result.excluded == {"empty": 0, "oversize": 0, "duplicate_answers": 0}
 
 
@@ -1353,7 +1423,7 @@ def test_unequal_cq_pools_are_capped_before_dev_test_allocation(synthetic, monke
     assert result.valid_pool == {"CQ-01": 33, "CQ-04": 33, "CQ-11": 3}
     assert result.composition == {
         "dev": {"CQ-01": 7, "CQ-04": 7, "CQ-11": 1},
-        "test": {"CQ-01": 22, "CQ-04": 22, "CQ-11": 1},
+        "test": {"CQ-01": 20, "CQ-04": 20, "CQ-11": 1},
     }
     assert result.query_count == 69
     assert result.final_shortages == {

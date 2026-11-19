@@ -26,6 +26,10 @@ QUESTIONS_PATH = EVALSET_DIR / "questions.jsonl"
 ANSWERS_PATH = EVALSET_DIR / "answers.jsonl"
 WORKSPACES_PATH = Path("config/workspaces.yaml")
 
+TEST_QUESTIONS_COUNT = 37
+TEST_SIMPLE_SEARCH_COUNT = 10
+TEST_GRAPH_QUESTIONS_COUNT = TEST_QUESTIONS_COUNT - TEST_SIMPLE_SEARCH_COUNT
+
 AXIS_NAMES = (
     "category",
     "content_type",
@@ -263,9 +267,10 @@ def validate_set(
         return
     if (
         Counter(row.split for row in requests) != {"dev": 10, "test": 20}
-        or Counter(row.split for row in questions) != {"dev": 10, "test": 40}
+        or Counter(row.split for row in questions)
+        != {"dev": 10, "test": TEST_QUESTIONS_COUNT}
         or sum(row.split == "test" and row.kind == "simple_search" for row in questions)
-        != 10
+        != TEST_SIMPLE_SEARCH_COUNT
     ):
         raise EvalsetError("EVALSET_COUNT_INVALID")
     if any(

@@ -39,7 +39,7 @@ def render_inputs():
 def test_all_fourteen_required_procedures_are_present(render_inputs):
     text = prereg.render_preregistration(**render_inputs)
     sentences = prereg.REQUIRED_SENTENCES
-    assert len(sentences) == len(set(sentences)) == 20
+    assert len(sentences) == len(set(sentences)) == 21
     checked = 0
     for sentence in sentences:
         assert sentence.strip()
@@ -50,6 +50,23 @@ def test_all_fourteen_required_procedures_are_present(render_inputs):
     assert "재등록" in sentences[12]
     assert "커밋 절차" in sentences[13]
     assert "함께" in sentences[13]
+
+
+def test_test_question_count_change_is_twenty_first_procedure(render_inputs):
+    sentence = prereg.REQUIRED_SENTENCES[20]
+    for phrase in (
+        "EVAL.md 대비 변경",
+        "40→37",
+        "관계 30→27",
+        "CQ-04",
+        "정답이 항상 1",
+        "판정 불가 하한",
+        "단순 검색 10",
+        "요청 20건·dev 구성은 불변",
+    ):
+        assert phrase in sentence
+    assert "질문 37건" in prereg.REQUIRED_SENTENCES[5]
+    assert f"21. {sentence}" in prereg.render_preregistration(**render_inputs)
 
 
 def test_e3_reporting_procedure_is_appended(render_inputs):
@@ -113,7 +130,7 @@ def test_e5_supplement_procedure_is_eighteenth(render_inputs):
 def test_first_seventeen_procedures_remain_byte_identical():
     original = json.dumps(prereg.REQUIRED_SENTENCES[:17], ensure_ascii=False)
     assert hashlib.sha256(original.encode()).hexdigest() == (
-        "7d2e1f96acc748c9ff8d35338311cb4504beeb264f2dc9959317f338fd9c1842"
+        "8511f0d460d4e074f0fc61ca4263af5716616fd98597d187ac589da2eea532c0"
     )
 
 
@@ -142,7 +159,7 @@ def test_failure_as_worst_procedure_is_nineteenth(render_inputs):
     assert f"19. {sentence}" in prereg.render_preregistration(**render_inputs)
     original = json.dumps(prereg.REQUIRED_SENTENCES[:18], ensure_ascii=False)
     assert hashlib.sha256(original.encode()).hexdigest() == (
-        "f4f0c41f8a4822acc98448d2af6065effe9311041323560d204c78cafbe8a357"
+        "8e0a75bfa9e8363815950108a523829853ed88b80734ce5049247d2909b6fba2"
     )
 
 
@@ -548,7 +565,7 @@ def test_none_measurement_preserves_original_bytes(render_inputs):
     assert "E3 dev 측정 근거" not in text
     # Captured from the unchanged renderer before implementing this step.
     assert hashlib.sha256(text.encode()).hexdigest() == (
-        "0179c72289759b295e6ad195161d695d86f234fd1c5a292dee09e061d639d1c7"
+        "183349941294fb96e9df130f6dbaad8b5c1ea2b9c889302a252e5fb79331086a"
     )
 
 
@@ -797,7 +814,7 @@ def test_cli_incomplete_measurement_never_creates_document(
 
 def test_repeat_procedures_and_empty_distribution_template(render_inputs):
     sentences = prereg.REQUIRED_SENTENCES
-    assert len(sentences) == 20
+    assert len(sentences) == 21
     for phrase in (
         "2회",
         "요청 20건 × 2회",

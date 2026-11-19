@@ -20,6 +20,9 @@ from beautyads.eval.evalset import (
     EVALSET_DIR,
     QUESTIONS_PATH,
     REQUESTS_PATH,
+    TEST_GRAPH_QUESTIONS_COUNT,
+    TEST_QUESTIONS_COUNT,
+    TEST_SIMPLE_SEARCH_COUNT,
     WORKSPACES_PATH,
     EvalsetError,
     question_set_hash,
@@ -253,7 +256,8 @@ REQUIRED_SENTENCES = (
         "답 프롬프트 버전(`ANSWER_PROMPT_VERSION`), 청크 방식(청크 분할 없음), "
         "임베딩 모델과 선택 기준(dev 질문 hit@k 최고, 동률이면 저가)이 고정이다. "
         "정답은 그래프 질의로 계산해 사람이 확인했다(그래프에 유리한 질문일 수 있다). "
-        "코퍼스에 test 브랜드 소재가 섞인다. 질문 40건과 단순 검색형 10건 부분집합을 따로 보고한다."
+        f"코퍼스에 test 브랜드 소재가 섞인다. 질문 {TEST_QUESTIONS_COUNT}건과 "
+        f"단순 검색형 {TEST_SIMPLE_SEARCH_COUNT}건 부분집합을 따로 보고한다."
     ),
     (
         "격리: 4경로·경로당 50건·합계 200건, 표식 문자열 검색을 코드가 판정, 노출 0건 기준, "
@@ -349,6 +353,15 @@ REQUIRED_SENTENCES = (
         "실행되지 않은 항목으로 센다. E5 입력 토큰은 요청별 반복 평균이고 "
         "E5 (a)는 E2 Supervisor의 두 반복을 모두 재사용한다(같은 코드 커밋·세트 해시·채점 실행). "
         "E3와 격리는 반복하지 않는다."
+    ),
+    (
+        f"EVAL.md 대비 변경: test 질문 40→{TEST_QUESTIONS_COUNT}"
+        f"(관계 30→{TEST_GRAPH_QUESTIONS_COUNT}, 단순 검색 {TEST_SIMPLE_SEARCH_COUNT} 유지). "
+        f"사유: CQ-04 count 질문 {TEST_SIMPLE_SEARCH_COUNT}건은 정답이 항상 1(결과 행 수)이라 "
+        "정보가 없어 제외했고, 닫힌 입력 조합을 모두 계산해도 유효한 관계 질문이 "
+        f"{TEST_GRAPH_QUESTIONS_COUNT}건이다. 단순 검색 {TEST_SIMPLE_SEARCH_COUNT}건 비율은 유지하며 "
+        "요청 20건·dev 구성은 불변이다. "
+        f"질문 {TEST_QUESTIONS_COUNT}건이 20건 이상이므로 판정 불가 하한은 해당하지 않는다."
     ),
 )
 

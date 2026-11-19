@@ -21,6 +21,8 @@ from beautyads.domain.skin import SkinConcern, SkinType
 from beautyads.eval.cq_verify import cq_preflight, error_code
 from beautyads.eval.evalset import (
     EVALSET_DIR,
+    TEST_GRAPH_QUESTIONS_COUNT,
+    TEST_SIMPLE_SEARCH_COUNT,
     WORKSPACES_PATH,
     AnswerItem,
     EvalsetError,
@@ -163,8 +165,8 @@ _FINAL_TARGETS = {
     "requests_dev": 10,
     "requests_test": 20,
     "questions_dev": 10,
-    "questions_test_graph": 30,
-    "questions_test_simple_search": 10,
+    "questions_test_graph": TEST_GRAPH_QUESTIONS_COUNT,
+    "questions_test_simple_search": TEST_SIMPLE_SEARCH_COUNT,
 }
 DEV_TARGETS = {key: _FINAL_TARGETS[key] for key in ("requests_dev", "questions_dev")}
 _REQUEST_HASH = "후보 요청 sha256"
@@ -647,7 +649,7 @@ def write_review_sheet(candidates, out_dir=CANDIDATE_DIR):
         writer = csv.DictWriter(stream, fieldnames=REVIEW_COLUMNS)
         writer.writeheader()
         writer.writerows(review_rows(candidates))
-    instructions = """# 평가셋 후보 검수 (1인 라벨링)
+    instructions = f"""# 평가셋 후보 검수 (1인 라벨링)
 
 ## 칸의 뜻과 칸별 기준
 - item_id: 후보 ID. kind: request(요청), graph(관계 질문), simple_search(단순 검색).
@@ -673,7 +675,7 @@ answer_confirmed=Y, note=표현만 명료화 (나머지 칸은 원본 유지).
 CSV를 UTF-8로 저장한다. 생성 시 비어 있는 decision·edited_text·answer_confirmed·note를
 모든 행에서 채운다. 빈 칸 금지이며 해당 없는 칸에는 위 기준대로 - 또는 N을 기록한다.
 이 네 칸만 편집하고 나머지는 원본을 유지한다. 질문은 Y로 확인한 O·수정만 채택한다.
-요청 dev 10/test 20, 질문 dev 10/test 관계 30·단순 검색 10을 골라 나머지는 X로 둔다.
+요청 dev 10/test 20, 질문 dev 10/test 관계 {TEST_GRAPH_QUESTIONS_COUNT}·단순 검색 {TEST_SIMPLE_SEARCH_COUNT}을 골라 나머지는 X로 둔다.
 충족 축만 쓴 reliable 후보를 우선하되 미충족 축 후보도 층화 분석용으로 유지한다.
 카테고리 대응·효능 문구의 사실은 사람이 확인한다. 부족하면 확정 파일을 쓰지 않는다.
 검수 후 python -m beautyads.eval.evalset_candidates finalize (또는 --finalize)를 실행한다.

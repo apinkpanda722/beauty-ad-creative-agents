@@ -12,6 +12,7 @@ from test_evalset_candidates import synthetic as candidate_synthetic  # noqa: F4
 
 from beautyads.domain.tools import ToolContext
 from beautyads.eval import e3_live as e3
+from beautyads.eval import evalset as sets
 from beautyads.eval.evalset import AnswerItem, QuestionItem, write_jsonl
 from beautyads.eval.freeze_guard import RunIdentity
 from beautyads.eval.vector_baseline import CorpusDoc
@@ -44,6 +45,19 @@ def truth(i=0):
         evidence_ids=["youtube:a"],
         confirmed=True,
     )
+
+
+@pytest.mark.parametrize("count,simple_count", [(36, 10), (38, 10), (37, 9), (37, 10)])
+def test_final_question_count_boundaries(count, simple_count):
+    questions = [
+        question(i, "test", "simple_search" if i < simple_count else "graph")
+        for i in range(count)
+    ]
+    if (count, simple_count) == (37, 10):
+        assert e3._questions(questions, "final") is None
+    else:
+        with pytest.raises(e3.E3Error, match="^EVALSET_COUNT_INVALID$"):
+            e3._questions(questions, "final")
 
 
 class Structured:
@@ -256,10 +270,10 @@ def test_paired_report_subsets_and_strata(tmp_path):
             "simple_search" if i < 10 else "graph",
             ["hook_type"] if i < 3 else ["category"],
         )
-        for i in range(40)
+        for i in range(sets.TEST_QUESTIONS_COUNT)
     ]
     path = tmp_path / "answers"
-    write_jsonl(path, [truth(i) for i in range(40)])
+    write_jsonl(path, [truth(i) for i in range(sets.TEST_QUESTIONS_COUNT)])
     rows = [
         {
             "question_id": q.id,
@@ -275,8 +289,10 @@ def test_paired_report_subsets_and_strata(tmp_path):
         for arm in ("graph", "vector")
     ]
     result = e3.report(rows, qs, answers_path=path, split="test")
-    assert result["overall"]["n"] == 40
+    assert result["overall"]["n"] == sets.TEST_QUESTIONS_COUNT
     assert result["overall"]["decision"] == "graph_adopted"
+    assert result["graph_questions"]["n"] == sets.TEST_GRAPH_QUESTIONS_COUNT
+    assert result["graph_questions"]["decision"] != "undecidable"
     assert result["simple_search"]["n"] == 10
     assert result["simple_search"]["decision"] == "undecidable"
     assert result["strata"]["unreliable"]["status"] == "undecidable"
@@ -388,7 +404,7 @@ def test_cli_final_guard_failure_means_no_service_or_model_calls(tmp_path):
         questions,
         [
             question(i, "test", "simple_search" if i < 10 else "graph")
-            for i in range(40)
+            for i in range(sets.TEST_QUESTIONS_COUNT)
         ],
     )
     calls = []
@@ -688,10 +704,12 @@ def test_final_default_paths_only_with_synthetic_file_routing(tmp_path, monkeypa
         paths[e3.QUESTIONS_PATH],
         [
             question(i, "test", "simple_search" if i < 10 else "graph")
-            for i in range(40)
+            for i in range(sets.TEST_QUESTIONS_COUNT)
         ],
     )
-    write_jsonl(paths[e3.ANSWERS_PATH], [truth(i) for i in range(40)])
+    write_jsonl(
+        paths[e3.ANSWERS_PATH], [truth(i) for i in range(sets.TEST_QUESTIONS_COUNT)]
+    )
     injected, _, _, _, guards = fake_cli_options(tmp_path)
     original = Path.open
     opened = []
@@ -1556,7 +1574,7 @@ def test_cli_corpus_ids_only_for_loaded_corpus_and_report_forwarding(
             "dev" if mode == "dev" else "test",
             "simple_search" if i < 10 else "graph",
         ).model_copy(update={"answer_type": "set"})
-        for i in range(1 if mode == "dev" else 40)
+        for i in range(1 if mode == "dev" else sets.TEST_QUESTIONS_COUNT)
     ]
     questions_path, answers_path = tmp_path / "questions", tmp_path / "answers"
     write_jsonl(questions_path, qs)
