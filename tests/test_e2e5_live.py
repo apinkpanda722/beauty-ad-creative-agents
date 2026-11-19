@@ -257,6 +257,47 @@ def test_arm_order_keyword_image_identity_and_resume(rig):
     assert rig.single_options[0]["limits"] == rig.assemblies[0]["limits"]
 
 
+@pytest.mark.parametrize(
+    "mode,model",
+    [("final", "claude-sonnet-5-5"), ("dev", "claude-haiku-5-5")],
+)
+def test_loop_evaluation_model_is_shared_and_recorded_for_supervisor_arms(
+    rig, mode, model
+):
+    write_jsonl(rig.requests, [request(split="test" if mode == "final" else "dev")])
+    assert rig.invoke("run", "--mode", mode, "--run-id", "trial")[0] == 0
+    assert len(rig.assemblies) == 1
+    assert rig.assemblies[0]["evaluation_model"] == model
+    rows = live._load_records(rig.root / "trial")
+    assert [row.arm for row in rows] == ["supervisor", "single", "off"]
+    assert len(rig.calls) == 3
+    assert rig.calls[0][1] == {}
+    assert rig.calls[2][1] == {"context_mode": "off"}
+    assert rows[0].prompt_versions["evaluation_model"] == model
+    assert rows[2].prompt_versions["evaluation_model"] == model
+    assert "evaluation_model" not in rows[1].prompt_versions
+
+
+def test_loop_evaluation_model_is_frozen():
+    assert live._EVALUATION_MODEL == "claude-sonnet-5-5"
+    assert (
+        live._extra_frozen()["동결 Supervisor 루프 내 평가 모델"]
+        == live._EVALUATION_MODEL
+    )
+
+
+@pytest.mark.parametrize("mode", ["dev", "final"])
+def test_sheet_keeps_default_assembly_evaluation_model(rig, mode):
+    write_jsonl(rig.requests, [request(split="test" if mode == "final" else "dev")])
+    assert rig.invoke("run", "--mode", mode, "--run-id", "trial")[0] == 0
+    before = list(rig.calls)
+    assert rig.invoke("sheet", "--mode", mode, "--run-id", "trial")[0] == 0
+    assert len(rig.assemblies) == 2
+    assert "evaluation_model" not in rig.assemblies[-1]
+    assert rig.calls == before
+    assert (rig.root / "trial" / "claim_sheet.csv").is_file()
+
+
 def test_one_failure_continues_and_never_leaks_exception(rig):
     def behavior(*args, **kwargs):
         if len(rig.calls) == 1:

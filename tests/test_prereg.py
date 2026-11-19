@@ -39,7 +39,7 @@ def render_inputs():
 def test_all_fourteen_required_procedures_are_present(render_inputs):
     text = prereg.render_preregistration(**render_inputs)
     sentences = prereg.REQUIRED_SENTENCES
-    assert len(sentences) == len(set(sentences)) == 24
+    assert len(sentences) == len(set(sentences)) == 25
     checked = 0
     for sentence in sentences:
         assert sentence.strip()
@@ -563,9 +563,9 @@ def test_none_measurement_preserves_original_bytes(render_inputs):
     text = prereg.render_preregistration(**render_inputs, dev_measurement=None)
     assert text == prereg.render_preregistration(**render_inputs)
     assert "E3 dev 측정 근거" not in text
-    # Captured from the unchanged renderer before implementing this step.
+    # 이 step에서 동결 줄과 25번째 문장 추가로 갱신.
     assert hashlib.sha256(text.encode()).hexdigest() == (
-        "867067c857b72a21558ed6a15de8dc904304f4157464cb39901340da741f2dc5"
+        "d15ebcbc981097230e3878d67ebb4c101c0743929e5a292bbcea08cd405e5a1c"
     )
 
 
@@ -814,7 +814,7 @@ def test_cli_incomplete_measurement_never_creates_document(
 
 def test_repeat_procedures_and_empty_distribution_template(render_inputs):
     sentences = prereg.REQUIRED_SENTENCES
-    assert len(sentences) == 24
+    assert len(sentences) == 25
     for phrase in (
         "2회",
         "요청 20건 × 2회",
@@ -918,3 +918,64 @@ def test_first_twenty_three_procedures_remain_byte_identical():
     assert hashlib.sha256(original.encode()).hexdigest() == (
         "786632ffa3d03b04bb13afb70951ed6fd58b022e7996e8fc85c6fcb0834cec6e"
     )
+
+
+def test_first_twenty_four_procedures_remain_byte_identical():
+    original = json.dumps(prereg.REQUIRED_SENTENCES[:24], ensure_ascii=False)
+    assert hashlib.sha256(original.encode()).hexdigest() == (
+        "fa0a73058096fa36463fd43e04a174efe04a2d435057f5464b77e51f13730908"
+    )
+
+
+def test_evaluation_model_explanation_is_twenty_fifth_procedure(render_inputs):
+    sentence = prereg.REQUIRED_SENTENCES[24]
+    for phrase in (
+        '문장 2의 "생성 모델이 같다"',
+        "기획 생성 모델(gpt-6.1-terra, reasoning_effort low)",
+        "도구 집합·한도",
+        "Supervisor의 요청 해석·리서치는 gpt-6-luna",
+        f"루프 내 평가는 {e2e5_live._EVALUATION_MODEL}(최종 실행)",
+        "단일 팔의 도구 루프와 기획은 gpt-6.1-terra(reasoning_effort low) 하나다",
+        "격리 실험은 표식 노출만",
+        "루프 내 평가 모델은 claude-haiku-5-5",
+        "결과 해석에 영향 없음",
+    ):
+        assert phrase in sentence
+    assert ":" not in sentence and "\n" not in sentence
+    assert f"25. {sentence}\n" in prereg.render_preregistration(**render_inputs)
+
+
+@pytest.mark.parametrize("change", [None, "value", "missing"])
+def test_loop_evaluation_model_label_roundtrips_and_is_enforced(
+    tmp_path, request, render_inputs, change
+):
+    paths = [tmp_path / name for name in ("r.jsonl", "q.jsonl", "a.jsonl")]
+    for path, collection in zip(paths, synthetic_set(), strict=True):
+        sets.write_jsonl(path, collection)
+    label = "동결 Supervisor 루프 내 평가 모델"
+    rendered = prereg.render_preregistration(**render_inputs)
+    assert guard.parse_preregistration(rendered)[label] == "claude-sonnet-5-5"
+    line = guard.PREREG_LINE_FORMAT.format(label=label, value="claude-sonnet-5-5")
+    if change == "value":
+        rendered = rendered.replace(line, line.replace("sonnet", "haiku"))
+    elif change == "missing":
+        rendered = rendered.replace(line + "\n", "")
+    path = tmp_path / "prereg.md"
+    path.write_text(rendered, encoding="utf-8")
+    options = {
+        "mode": "final",
+        "groups": {"test"},
+        "requests_path": paths[0],
+        "questions_path": paths[1],
+        "answers_path": paths[2],
+        "workspaces_path": request.getfixturevalue("workspace_config"),
+        "prereg_path": path,
+        "extra": render_inputs["extra"],
+        "committed_fn": lambda path: True,
+        "run": FakeGit(),
+    }
+    if change is None:
+        assert guard.check_run(**options).request_hash == render_inputs["request_hash"]
+    else:
+        with pytest.raises(guard.FreezeError, match="^FROZEN_VALUE_MISMATCH$"):
+            guard.check_run(**options)

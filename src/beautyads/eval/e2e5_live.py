@@ -80,6 +80,7 @@ DEV_SCORE_MAX_ITEMS = 6
 MAX_REPEATS = 5
 RESULT_ROOT = Path("data/interim/e2e5")
 _SCORING_MODEL = "claude-sonnet-5-5"
+_EVALUATION_MODEL = "claude-sonnet-5-5"
 
 
 class _RecordedArm(ArmRecord):
@@ -110,6 +111,7 @@ def _extra_frozen():
             single_agent_system_prompt().encode("utf-8")
         ).hexdigest(),
         "동결 E2 채점 루브릭 sha256": e2_rubric_sha256(),
+        "동결 Supervisor 루프 내 평가 모델": _EVALUATION_MODEL,
     }
 
 
@@ -470,6 +472,7 @@ def _record(
     by_purpose,
     latency,
     repeat=1,
+    evaluation_model=None,
 ):
     first = next(iter(result.get("plans") or []), {})
     plan = result.get("plan") if arm == "single" else first.get("plan")
@@ -479,6 +482,8 @@ def _record(
     versions = dict(result.get("prompt_versions") or {})
     if arm != "single":
         versions["supervisor"] = SUPERVISOR_PROMPT_VERSION
+        if evaluation_model is not None:
+            versions["evaluation_model"] = evaluation_model
     if arm == "single" and isinstance(result.get("prompt_version"), str):
         versions = {"single": result["prompt_version"]}
     return _RecordedArm(
@@ -548,6 +553,7 @@ async def _run_batch(
         + metadata.get("interrupted_spent_usd", 0.0)
     )
     exit_code = 0
+    evaluation_model = "claude-haiku-5-5" if args.mode == "dev" else _EVALUATION_MODEL
     try:
         assembly = await assemble(
             settings=settings,
@@ -559,6 +565,7 @@ async def _run_batch(
                 "chat": partial(watch.call, chat_fn),
                 "structured": partial(watch.structured, structured_factory),
             },
+            evaluation_model=evaluation_model,
         )
         if "single" in args.arms:
             single = single_builder(
@@ -623,6 +630,7 @@ async def _run_batch(
                         delta=ledger_delta(settings.ledger_path, before),
                         by_purpose=ledger_purpose_totals(settings.ledger_path, before),
                         latency=monotonic() - started,
+                        evaluation_model=evaluation_model,
                     )
                     if stopped:
                         metadata["interrupted_spent_usd"] = (
