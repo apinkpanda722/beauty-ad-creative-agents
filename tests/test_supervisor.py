@@ -599,6 +599,53 @@ def test_fp_c14_thin_pool_note_is_appended_and_survives_trim():
     assert all(call["handoff"]["basis_notes"] == expected for call in f.plan_calls)
 
 
+@pytest.mark.parametrize(
+    "fixed",
+    [
+        {"format": "ugc_style"},
+        {"hook_type": "question"},
+        {"angle": "desire"},
+        {"hook_type": "question", "angle": "desire", "format": "ugc_style"},
+    ],
+)
+def test_brief_fixed_axes_reach_planning_and_result_pattern_context(fixed):
+    from test_domain_supervisor import comparison_rows
+
+    from beautyads.domain.supervisor import pattern_context
+
+    f = Fakes(decision=decision_data(**fixed))
+    original = f.research
+    outputs = [
+        comparison_rows((value, 5), total=8)
+        for value in ("question", "desire", "ugc_style")
+    ]
+
+    def research(brief, raw_store):
+        result = original(brief, raw_store)
+        for index, output in enumerate(outputs):
+            raw_store[f"comparison:{index}"] = {
+                "tool": output["tool"],
+                "row_count": len(output["rows"]),
+                "top_rows": output["rows"],
+            }
+        return result
+
+    baseline = pattern_context(outputs, f.handoff["evidence_ids"])
+    assert set(fixed) <= {item["axis"] for item in baseline["dominant_axes"]}
+    result = supervisor.run_request(**f.args(research_fn=research))
+    context = result["handoff"]["pattern_context"]
+    assert context == {
+        **baseline,
+        "dominant_axes": [
+            item for item in baseline["dominant_axes"] if item["axis"] not in fixed
+        ],
+        "weak_axes": [axis for axis in baseline["weak_axes"] if axis not in fixed],
+        "fixed_axes": sorted(fixed),
+    }
+    assert f.plan_calls
+    assert all(call["handoff"]["pattern_context"] == context for call in f.plan_calls)
+
+
 def test_fp_c14_context_is_reporting_only_for_final_pass_and_reworks(monkeypatch):
     from test_plan_eval import Planner, report
 
@@ -619,8 +666,8 @@ def test_fp_c14_context_is_reporting_only_for_final_pass_and_reworks(monkeypatch
     first = supervisor.run_request(**f.args(plan_eval_fn=planning))
     original = supervisor.pattern_context
 
-    def changed(*args):
-        value = original(*args)
+    def changed(*args, **kwargs):
+        value = original(*args, **kwargs)
         value.update(
             thin_pool=False,
             pool_size=100,

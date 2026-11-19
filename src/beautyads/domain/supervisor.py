@@ -159,18 +159,24 @@ def verify_aggregates(
     return verified, unresolved
 
 
-def pattern_context(tool_outputs: list[dict], evidence_ids: list[str]) -> dict:
+def pattern_context(
+    tool_outputs: list[dict], evidence_ids: list[str], *, fixed_axes=()
+) -> dict:
     """Describe observed populations and dominant axes without judging a plan.
 
     Axis inference, additive counts and repeated totals follow pattern_alignment.
     Tied values all rank first; the second share is the next distinct rank.
     Distribution is observation only, independent of the provisional threshold.
+    Brief-fixed axes remain observable but are excluded from classification.
     """
     closed = {
         "hook_type": {item.value for item in HookType},
         "angle": {item.value for item in Angle},
         "format": {item.value for item in Format},
     }
+    fixed_axes = set(fixed_axes)
+    if fixed_axes.difference(closed):
+        raise ValueError("PATTERN_FIXED_AXES_INVALID")
     counts = {axis: {} for axis in closed}
     totals = dict.fromkeys(closed, None)
     populations = []
@@ -216,10 +222,11 @@ def pattern_context(tool_outputs: list[dict], evidence_ids: list[str]) -> dict:
         total = totals[axis]
         top_share = ranks[0] / total if total else None
         share = sum(observed[value] for value in dominant) / total if total else None
-        if share is not None and share >= MIN_DOMINANT_SHARE:
-            dominant_axes.append({"axis": axis, "values": dominant, "share": share})
-        else:
-            weak_axes.append(axis)
+        if axis not in fixed_axes:
+            if share is not None and share >= MIN_DOMINANT_SHARE:
+                dominant_axes.append({"axis": axis, "values": dominant, "share": share})
+            else:
+                weak_axes.append(axis)
         distribution.append(
             {
                 "axis": axis,
@@ -237,7 +244,7 @@ def pattern_context(tool_outputs: list[dict], evidence_ids: list[str]) -> dict:
         if compared
         else len(set(evidence_ids))
     )
-    return {
+    context = {
         "pool_size": pool_size,
         "pool_basis": "axis_total" if compared else "evidence_ids",
         "thin_pool": pool_size is not None and pool_size < THIN_POOL_MAX,
@@ -247,6 +254,9 @@ def pattern_context(tool_outputs: list[dict], evidence_ids: list[str]) -> dict:
         "weak_axes": weak_axes,
         "distribution": distribution,
     }
+    if fixed_axes:
+        context["fixed_axes"] = sorted(fixed_axes)
+    return context
 
 
 def pattern_alignment(plan: dict, tool_outputs: list[dict]) -> dict:

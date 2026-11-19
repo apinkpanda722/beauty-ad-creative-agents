@@ -369,8 +369,13 @@ def build_supervisor_graph(
             handoff["aggregates"] = verified
             handoff["unresolved"].extend(unresolved)
             state["sv_tool_outputs"] = _tool_outputs(raw_store)
+            fixed = tuple(
+                axis
+                for axis in ("hook_type", "angle", "format")
+                if state["sv_brief"].get(axis)
+            )
             handoff["pattern_context"] = pattern_context(
-                state["sv_tool_outputs"], handoff["evidence_ids"]
+                state["sv_tool_outputs"], handoff["evidence_ids"], fixed_axes=fixed
             )
             context = handoff["pattern_context"]
             if context["thin_pool"]:
