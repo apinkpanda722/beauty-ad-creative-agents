@@ -31,6 +31,7 @@ from beautyads.llm.structured import (
 
 ROOT = Path(__file__).resolve().parents[1]
 GUARDED_MODULES = {
+    "eval/single_agent.py",
     "agents/research.py",
     "agents/planning.py",
     "agents/evaluation.py",
@@ -436,3 +437,21 @@ def test_actual_supervisor_specs_are_guarded():
     generator = CaptureStructured("gpt-6-luna")
     decide("synthetic", as_of=CTX.as_of, structured=generator, limits=RequestLimits())
     assert guard_specs([generator]) == 1
+
+
+def test_actual_single_agent_specs_are_guarded():
+    from test_single_agent import execute_single
+
+    generator = CaptureStructured("gpt-6.1-terra")
+    execute_single(Chat([reply([call()]), reply()]), generator)
+    assert guard_specs([generator]) == 1
+    assert generator.calls[0][0].name == "single_agent_plan"
+
+
+def test_actual_single_agent_chat_messages():
+    from test_single_agent import execute_single
+
+    chat = Chat([reply([call(), call()]), reply()])
+    execute_single(chat, CaptureStructured("gpt-6.1-terra"))
+    assert len(chat.calls) == 2
+    guard_messages(chat.calls)
