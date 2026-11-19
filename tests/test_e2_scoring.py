@@ -435,7 +435,7 @@ def test_e2_verdict_branches(fit, distinct, invalid_sup, invalid_single, expecte
         assert metric["n"] == len(reqs) and metric["excluded"] == 0
 
 
-def test_exclusions_are_per_metric_and_small_sample_undecidable():
+def test_exclusions_are_per_metric_and_small_sample_undecidable(monkeypatch):
     records, scores, reqs = population(n=12, fit=1)
     records[0].plan = None
     records[0].status = "no_evidence"
@@ -443,14 +443,29 @@ def test_exclusions_are_per_metric_and_small_sample_undecidable():
     records = [
         r for r in records if not (r.item_id == reqs[2].id and r.arm == "single")
     ]
+    monkeypatch.setattr(scoring, "bootstrap_ci", lambda values: (0, 0))
     result = scoring.analyze(records, scores=scores, requests=reqs)
-    metrics = result["e2"]["metrics"]
+    metrics = result["e2_complete_case"]["metrics"]
     assert metrics["evidence_validity"]["n"] == 10
     assert metrics["evidence_validity"]["excluded"] == 2
     assert metrics["request_fit"]["n"] == 9
     assert metrics["request_fit"]["excluded"] == 3
-    assert result["verdict_e2"] == "undecidable"
-    assert result["e2"]["excluded_no_plan"] == 1
+    assert result["verdict_e2_complete_case"] == "undecidable"
+    assert result["e2_complete_case"]["excluded_no_plan"] == 1
+    assert result["e2_complete_case"]["n"] == 9
+    assert result["e2_complete_case"]["excluded"] == 3
+    assert result["e2_complete_case"]["verdict"] == "undecidable"
+    primary = result["e2"]
+    assert primary["metrics"]["evidence_validity"]["n"] == 11
+    assert primary["metrics"]["evidence_validity"]["excluded"] == 1
+    for name in ("request_fit", "distinctiveness"):
+        assert primary["metrics"][name]["n"] == 10
+        assert primary["metrics"][name]["excluded"] == 2
+    assert primary["n"] == 10 and primary["excluded"] == 2
+    assert primary["not_run"] == 1
+    assert primary["imputed_no_plan"] == {"supervisor": 1, "single": 0}
+    assert "excluded_no_plan" not in primary
+    assert result["verdict_e2"] == "no_difference_found"
     records, scores, reqs = population(n=9, fit=1)
     assert (
         scoring.analyze(records, scores=scores, requests=reqs)["verdict_e2"]
@@ -588,6 +603,259 @@ def test_strata_use_preassigned_axes_and_claims_bias_is_separate():
     without = scoring.analyze(records, scores=scores, requests=reqs)
     assert result["verdict_e2"] == without["verdict_e2"]
     assert result["verdict_e5"] == without["verdict_e5"]
+
+
+@pytest.fixture
+def point_ci(monkeypatch):
+    """Fix synthetic CIs at their means to isolate missingness and verdict rules."""
+    monkeypatch.setattr(
+        scoring, "bootstrap_ci", lambda values: (sum(values) / len(values),) * 2
+    )
+
+
+def test_worst_constants_match_score_schema_lower_bounds():
+    assert scoring.WORST_REQUEST_FIT == scoring.WORST_DISTINCTIVENESS == 1
+    assert scoring.WORST_EVIDENCE_VALIDITY == 0.0
+    data = {"request_fit": 1, "distinctiveness": 1, "rationale": ""}
+    assert scoring._Scores.model_validate(data).model_dump() == data
+    for name in ("request_fit", "distinctiveness"):
+        with pytest.raises(ValidationError):
+            scoring._Scores.model_validate({**data, name: 0})
+
+
+@pytest.mark.parametrize("failed_arm", scoring.ARMS)
+def test_one_failed_arm_enters_primary_at_worst_scores(point_ci, failed_arm):
+    records, scores, reqs = population(n=1)
+    for row in records:
+        row.check_report = record(invalid=1).check_report
+        if row.arm == failed_arm:
+            row.plan, row.status = None, "no_evidence"
+            # Failed plans have no blinded score; even a stale score is ignored.
+            scores[reqs[0].id][row.arm] = {"status": "scored", "request_fit": 0}
+    result = scoring.analyze(records, scores=scores, requests=reqs)
+    for block, right in (("e2", "single"), ("e5", "off")):
+        sign = 1 if failed_arm == "supervisor" else -1 if failed_arm == right else 0
+        validity = (
+            result[block]["metrics"]["evidence_validity"]
+            if block == "e2"
+            else result[block]["evidence_validity"]
+        )
+        expected = sign * (scoring.WORST_EVIDENCE_VALIDITY - 0.75)
+        assert validity == {
+            "mean_diff": expected,
+            "ci": (expected, expected),
+            "n": 1,
+            "excluded": 0,
+        }
+        assert result[block]["imputed_no_plan"] == {
+            arm: int(arm == failed_arm) for arm in ("supervisor", right)
+        }
+        assert result[block]["not_run"] == 0
+        assert result[f"{block}_complete_case"]["excluded_no_plan"] == abs(sign)
+        assert "excluded_no_plan" not in result[block]
+    sign = 1 if failed_arm == "supervisor" else -1 if failed_arm == "single" else 0
+    for name, worst in (
+        ("request_fit", scoring.WORST_REQUEST_FIT),
+        ("distinctiveness", scoring.WORST_DISTINCTIVENESS),
+    ):
+        metric = result["e2"]["metrics"][name]
+        expected = sign * (worst - 3)
+        assert metric == {
+            "mean_diff": expected,
+            "ci": (expected, expected),
+            "n": 1,
+            "excluded": 0,
+        }
+
+
+def test_both_failed_arms_enter_as_zero_differences(point_ci):
+    records = [record(arm=arm, plan=None, status="failed") for arm in scoring.ARMS]
+    result = scoring.analyze(records, scores={}, requests=[request()])
+    zero = {"mean_diff": 0, "ci": (0, 0), "n": 1, "excluded": 0}
+    assert all(metric == zero for metric in result["e2"]["metrics"].values())
+    assert result["e5"]["evidence_validity"] == zero
+    for block, right in (("e2", "single"), ("e5", "off")):
+        assert result[block]["imputed_no_plan"] == {"supervisor": 1, right: 1}
+        assert result[f"{block}_complete_case"]["excluded_no_plan"] == 1
+
+
+@pytest.mark.parametrize("missing_arm", scoring.ARMS)
+def test_missing_records_are_not_run_and_never_imputed(point_ci, missing_arm):
+    records, scores, reqs = population(n=3)
+    records = [
+        r for r in records if not (r.item_id == reqs[1].id and r.arm == missing_arm)
+    ]
+    # A wholly unattempted request also counts once per comparison.
+    reqs.append(request(3))
+    result = scoring.analyze(records, scores=scores, requests=reqs)
+    for block, right in (("e2", "single"), ("e5", "off")):
+        missing = 1 + int(missing_arm in ("supervisor", right))
+        assert result[block]["not_run"] == missing
+        assert result[block]["n"] == 4 - missing
+        assert result[block]["excluded"] == missing
+        assert result[block]["imputed_no_plan"] == {"supervisor": 0, right: 0}
+    for metric in result["e2"]["metrics"].values():
+        assert metric["n"] == result["e2"]["n"]
+
+
+@pytest.mark.parametrize(
+    "score_status", [None, "SCORE_FAILED", "SCORING_CAP_REACHED", "SCORING_DAILY_LIMIT"]
+)
+@pytest.mark.parametrize("failed_plan", [False, True])
+def test_unscored_plans_exclude_quality_only(point_ci, score_status, failed_plan):
+    records, scores, reqs = population(n=1)
+    if failed_plan:
+        records[1].plan, records[1].status = None, "failed"
+        scores[reqs[0].id].pop("single")
+    if score_status is None:
+        scores[reqs[0].id].pop("supervisor")
+    else:
+        scores[reqs[0].id]["supervisor"] = {"status": score_status}
+    result = scoring.analyze(records, scores=scores, requests=reqs)
+    for name in ("request_fit", "distinctiveness"):
+        assert result["e2"]["metrics"][name] == {
+            "mean_diff": None,
+            "ci": None,
+            "n": 0,
+            "excluded": 1,
+        }
+    assert result["e2"]["metrics"]["evidence_validity"]["n"] == 1
+    assert result["e2"]["not_run"] == 0
+    assert result["e2"]["imputed_no_plan"] == {
+        "supervisor": 0,
+        "single": int(failed_plan),
+    }
+    assert result["failure_rates"]["supervisor"]["no_plan"] == 0
+
+
+@pytest.mark.parametrize("name", ["request_fit", "distinctiveness"])
+@pytest.mark.parametrize("other_failed", [False, True])
+def test_external_scored_values_still_require_schema(point_ci, name, other_failed):
+    records, scores, reqs = population(n=1)
+    if other_failed:
+        records[1].plan, records[1].status = None, "failed"
+        scores[reqs[0].id].pop("single")
+    scores[reqs[0].id]["supervisor"][name] = 0
+    with pytest.raises(ValidationError):
+        scoring.analyze(records, scores=scores, requests=reqs)
+
+
+@pytest.mark.parametrize("arm", scoring.ARMS)
+def test_failure_rates_count_every_no_plan_status_and_unpaired_attempt(point_ci, arm):
+    records, scores, reqs = population(n=5)
+    statuses = ("no_evidence", "failed", "limit", "out_of_scope")
+    for i, status in enumerate(statuses):
+        row = next(r for r in records if r.item_id == reqs[i].id and r.arm == arm)
+        row.plan, row.status = None, status
+        scores[reqs[i].id].pop(arm)
+    result = scoring.analyze(records, scores=scores, requests=reqs)
+    assert result["failure_rates"][arm] == {
+        "records": 5,
+        "no_plan": 4,
+        "rate": 4 / 5,
+        "by_status": dict.fromkeys(statuses, 1),
+    }
+    for other in set(scoring.ARMS) - {arm}:
+        assert result["failure_rates"][other] == {
+            "records": 5,
+            "no_plan": 0,
+            "rate": 0,
+            "by_status": {},
+        }
+    for block, right in (("e2", "single"), ("e5", "off")):
+        assert result[block]["imputed_no_plan"] == {
+            name: 4 if name == arm else 0 for name in ("supervisor", right)
+        }
+        sign = 1 if arm == "supervisor" else -1 if arm == right else 0
+        validity = (
+            result[block]["metrics"]["evidence_validity"]
+            if block == "e2"
+            else result[block]["evidence_validity"]
+        )
+        assert validity["mean_diff"] == sign * (-4 / 5)
+        assert validity["n"] == 5 and validity["excluded"] == 0
+    sign = 1 if arm == "supervisor" else -1 if arm == "single" else 0
+    for name in ("request_fit", "distinctiveness"):
+        metric = result["e2"]["metrics"][name]
+        assert metric["mean_diff"] == sign * (-8 / 5)
+        assert metric["n"] == 5 and metric["excluded"] == 0
+    only_arm = [record(arm=arm, plan=None, status="limit")]
+    rates = scoring.analyze(only_arm, scores={}, requests=[request()])["failure_rates"]
+    assert rates[arm] == {
+        "records": 1,
+        "no_plan": 1,
+        "rate": 1,
+        "by_status": {"limit": 1},
+    }
+    for other in set(scoring.ARMS) - {arm}:
+        assert rates[other] == {
+            "records": 0,
+            "no_plan": 0,
+            "rate": None,
+            "by_status": {},
+        }
+
+
+def test_survivor_bias_is_visible_in_complete_case_sensitivity(point_ci):
+    records, scores, reqs = population(n=20, fit=1, distinct=1)
+    for row in records:
+        row.input_tokens = 50 if row.arm == "supervisor" else 100
+        if row.arm == "supervisor" and row.item_id in {r.id for r in reqs[:10]}:
+            row.plan, row.status = None, "no_evidence"
+            scores[row.item_id].pop(row.arm)
+    result = scoring.analyze(records, scores=scores, requests=reqs)
+    assert result["e2"]["n"] == 20 and result["e2_complete_case"]["n"] == 10
+    assert result["e2"]["metrics"]["request_fit"]["mean_diff"] == -0.5
+    assert result["e2_complete_case"]["metrics"]["request_fit"]["mean_diff"] == 1
+    assert result["verdict_e2_complete_case"] == "supervisor_better"
+    assert result["e2_complete_case"]["verdict"] == "supervisor_better"
+    assert result["verdict_e2"] == "single_better"
+    assert result["verdicts_agree"]["e2"] is False
+    assert result["verdict_e5"] == "not_met:evidence"
+    assert result["verdict_e5_complete_case"] == "cost_reduced_evidence_kept"
+    assert result["e5_complete_case"]["verdict"] == result["verdict_e5_complete_case"]
+    assert result["verdicts_agree"]["e5"] is False
+
+
+@pytest.mark.parametrize("failed_arm", ["supervisor", "off"])
+def test_e5_token_totals_do_not_depend_on_plan_success(point_ci, failed_arm):
+    records, scores, reqs = population(n=2)
+    for row in records:
+        row.input_tokens = 50 if row.arm == "supervisor" else 100
+    before = scoring.analyze(records, scores=scores, requests=reqs)
+    for row in records:
+        if row.arm == failed_arm:
+            row.plan, row.status = None, "failed"
+            scores[row.item_id].pop(row.arm)
+    after = scoring.analyze(records, scores=scores, requests=reqs)
+    for key, expected in (
+        ("token_reduction", 0.5),
+        ("on_input_tokens", 100),
+        ("off_input_tokens", 200),
+    ):
+        assert before["e5"][key] == after["e5"][key] == expected
+    for key in ("n", "excluded", "descriptive"):
+        assert before["e5"][key] == after["e5"][key]
+
+
+def test_no_failures_give_identical_primary_and_complete_case(point_ci):
+    records, scores, reqs = population(fit=1)
+    result = scoring.analyze(records, scores=scores, requests=reqs)
+    for name in ("metrics", "n", "excluded"):
+        assert result["e2"][name] == result["e2_complete_case"][name]
+    assert (
+        result["e5"]["evidence_validity"]
+        == result["e5_complete_case"]["evidence_validity"]
+    )
+    assert (
+        result["e2_complete_case"]["excluded_no_plan"]
+        == result["e5_complete_case"]["excluded_no_plan"]
+        == 0
+    )
+    for block in ("e2", "e5"):
+        assert result[f"verdict_{block}"] == result[f"verdict_{block}_complete_case"]
+        assert result[f"{block}_complete_case"]["verdict"] == result[f"verdict_{block}"]
+    assert result["verdicts_agree"] == {"e2": True, "e5": True}
 
 
 def write_labels(path, labels):

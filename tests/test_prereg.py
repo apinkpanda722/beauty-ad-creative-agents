@@ -39,7 +39,7 @@ def render_inputs():
 def test_all_fourteen_required_procedures_are_present(render_inputs):
     text = prereg.render_preregistration(**render_inputs)
     sentences = prereg.REQUIRED_SENTENCES
-    assert len(sentences) == len(set(sentences)) == 18
+    assert len(sentences) == len(set(sentences)) == 19
     checked = 0
     for sentence in sentences:
         assert sentence.strip()
@@ -114,6 +114,34 @@ def test_first_seventeen_procedures_remain_byte_identical():
     original = json.dumps(prereg.REQUIRED_SENTENCES[:17], ensure_ascii=False)
     assert hashlib.sha256(original.encode()).hexdigest() == (
         "f6bf43d9f1f74e30564564e1ce38fb2580dae1a2b9f49d59f91e3e6d1dfb59ed"
+    )
+
+
+def test_failure_as_worst_procedure_is_nineteenth(render_inputs):
+    sentence = prereg.REQUIRED_SENTENCES[18]
+    for phrase in (
+        "E2",
+        "E5",
+        "최저점",
+        "실행되지 않은",
+        "민감도",
+        "실패율",
+        "채점 실패",
+        "근거 없음",
+        "실패",
+        "한도",
+        "범위 밖",
+        "기록 없음",
+        "요청 적합성 1점",
+        "차별성 1점",
+        "근거 유효율 0",
+        "두 판정이 다르면 그대로",
+    ):
+        assert phrase in sentence
+    assert f"19. {sentence}" in prereg.render_preregistration(**render_inputs)
+    original = json.dumps(prereg.REQUIRED_SENTENCES[:18], ensure_ascii=False)
+    assert hashlib.sha256(original.encode()).hexdigest() == (
+        "109604556c78de6b49356416b722f280ad7fc5a917005666f368d1065bf45506"
     )
 
 
@@ -426,6 +454,14 @@ def test_results_template_leaves_every_measurement_cell_empty():
     ):
         content = text.split(f"## {section}\n", 1)[1].split("\n## ", 1)[0]
         assert f"| {label} |  |  |  |  |" in content
+    for section in ("E2", "E5"):
+        content = text.split(f"## {section}\n", 1)[1].split("\n## ", 1)[0]
+        for label in (
+            "팔별 기획 실패율",
+            "완전 사례 민감도 판정",
+            "실행되지 않은 항목 수",
+        ):
+            assert f"| {label} |  |  |  |  |" in content
 
 
 def test_results_cli_needs_no_input_files_and_performs_no_writes(tmp_path, monkeypatch):
@@ -511,7 +547,7 @@ def test_none_measurement_preserves_original_bytes(render_inputs):
     assert "E3 dev 측정 근거" not in text
     # Captured from the unchanged renderer before implementing this step.
     assert hashlib.sha256(text.encode()).hexdigest() == (
-        "e3d852d7643a1e6b0a91c4cc4fda4f91db52d6b1e69d90424dd46200ca05fde3"
+        "6c3ca359f95bd247cb3d2de2ab85289b74ccabc93ae2c50c6f1742568fc5121a"
     )
 
 

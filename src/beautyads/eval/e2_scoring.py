@@ -36,6 +36,9 @@ E5_MIN_TOKEN_REDUCTION = 0.30
 E5_MIN_VALIDITY_LOWER = -0.05
 CI_CONFIDENCE = 0.95
 MIN_E2_PAIRS = 10
+WORST_REQUEST_FIT = 1
+WORST_DISTINCTIVENESS = 1
+WORST_EVIDENCE_VALIDITY = 0.0
 _SCORING_MODEL = "claude-sonnet-5-5"
 _TEXT_FIELDS = (
     "title",
@@ -405,45 +408,52 @@ def _check_identity(rows, scores):
         raise RunIdentityMismatch()
 
 
-def analyze(records, *, scores, requests, claim_matches=None) -> dict:
-    """Use request-paired differences; no observed axes or human labels affect verdicts.
-
-    scores is the request -> arm mapping returned by reveal_scores. Missing
-    plans/scores are excluded per metric, never imputed. E2 requires at least
-    ten complete pairs for every primary metric. Empty E5 token denominators
-    cannot meet its token condition. Output contains no claim-validity verdict.
-    """
-    rows, reqs = _records(records), _requests(requests)
-    _check_identity(rows, scores)
-    _check_requests(rows, reqs)
-    index = {(r.item_id, r.arm): r for r in rows}
-    total = len(reqs)
-    e2_pairs = _pairs(index, reqs, "supervisor", "single")
-    e2_plans = _pairs(index, reqs, "supervisor", "single", plans=True)
-    metrics = {
-        "evidence_validity": _paired_summary(
-            [evidence_validity(a) - evidence_validity(b) for a, b in e2_plans], total
+def _validity_summary(pairs, total):
+    def value(row):
+        return (
+            evidence_validity(row) if row.plan is not None else WORST_EVIDENCE_VALIDITY
         )
+
+    return _paired_summary([value(a) - value(b) for a, b in pairs], total)
+
+
+def _e2_metrics(pairs, scores, total):
+    metrics = {
+        "evidence_validity": _validity_summary(pairs, total),
     }
-    for name in ("request_fit", "distinctiveness"):
+    for name, worst in (
+        ("request_fit", WORST_REQUEST_FIT),
+        ("distinctiveness", WORST_DISTINCTIVENESS),
+    ):
         diffs = []
-        for a, b in e2_plans:
-            first, second = (scores.get(r.item_id, {}).get(r.arm, {}) for r in (a, b))
-            if first.get("status") == second.get("status") == "scored":
-                # A corrupted externally loaded score must not silently enter a CI.
-                diffs.append(
-                    _Scores.model_validate(
-                        {k: first.get(k) for k in _Scores.model_fields}
-                    ).model_dump()[name]
-                    - _Scores.model_validate(
-                        {k: second.get(k) for k in _Scores.model_fields}
-                    ).model_dump()[name]
-                )
+        for pair in pairs:
+            observed = [
+                scores.get(row.item_id, {}).get(row.arm, {})
+                if row.plan is not None
+                else None
+                for row in pair
+            ]
+            if any(s is not None and s.get("status") != "scored" for s in observed):
+                continue
+            # A corrupted externally loaded score must not silently enter a CI.
+            values = [
+                worst
+                if score is None
+                else _Scores.model_validate(
+                    {k: score.get(k) for k in _Scores.model_fields}
+                ).model_dump()[name]
+                for score in observed
+            ]
+            diffs.append(values[0] - values[1])
         metrics[name] = _paired_summary(diffs, total)
+    return metrics
+
+
+def _e2_verdict(metrics):
     positive = any(m["ci"] and m["ci"][0] > 0 for m in metrics.values())
     negative = any(m["ci"] and m["ci"][1] < 0 for m in metrics.values())
     n = min(m["n"] for m in metrics.values())
-    verdict_e2 = (
+    return (
         "undecidable"
         if n < MIN_E2_PAIRS
         else "mixed"
@@ -454,25 +464,79 @@ def analyze(records, *, scores, requests, claim_matches=None) -> dict:
         if negative
         else "no_difference_found"
     )
-    e5_pairs = _pairs(index, reqs, "supervisor", "off")
-    e5_plans = _pairs(index, reqs, "supervisor", "off", plans=True)
-    validity = _paired_summary(
-        [evidence_validity(a) - evidence_validity(b) for a, b in e5_plans], total
-    )
-    on_tokens, off_tokens = (
-        sum(pair[i].input_tokens for pair in e5_pairs) for i in (0, 1)
-    )
-    reduction = 1 - on_tokens / off_tokens if off_tokens else None
+
+
+def _e5_verdict(validity, reduction):
     tokens_ok = reduction is not None and reduction >= E5_MIN_TOKEN_REDUCTION
     evidence_ok = (
         validity["ci"] is not None and validity["ci"][0] > E5_MIN_VALIDITY_LOWER
     )
-    verdict_e5 = (
+    return (
         "cost_reduced_evidence_kept"
         if tokens_ok and evidence_ok
         else "not_met:"
         + ("evidence" if tokens_ok else "tokens" if evidence_ok else "both")
     )
+
+
+def _imputed_counts(pairs, left, right):
+    return {
+        arm: sum(pair[i].plan is None for pair in pairs)
+        for i, arm in enumerate((left, right))
+    }
+
+
+def _failure_rates(rows):
+    result = {}
+    for arm in ARMS:
+        selected = [r for r in rows if r.arm == arm]
+        failed = [r for r in selected if r.plan is None]
+        by_status = {}
+        for row in failed:
+            if row.status != "plan":
+                by_status[row.status] = by_status.get(row.status, 0) + 1
+        result[arm] = {
+            "records": len(selected),
+            "no_plan": len(failed),
+            "rate": len(failed) / len(selected) if selected else None,
+            "by_status": by_status,
+        }
+    return result
+
+
+def analyze(records, *, scores, requests, claim_matches=None) -> dict:
+    """Use request-paired differences; no observed axes or human labels affect verdicts.
+
+    기획안이 없는 시도는 최저점으로 포함한다. 실행되지 않은 항목만 제외하고 보고한다.
+    scores is the request -> arm mapping returned by reveal_scores. Unscored
+    existing plans are excluded only from the affected quality metrics, never
+    imputed. Complete-case results are reported as sensitivity analyses. E2
+    requires ten pairs for every primary metric. Empty E5 token denominators
+    cannot meet its token condition. Output contains no claim-validity verdict.
+    """
+    rows, reqs = _records(records), _requests(requests)
+    _check_identity(rows, scores)
+    _check_requests(rows, reqs)
+    index = {(r.item_id, r.arm): r for r in rows}
+    total = len(reqs)
+    e2_pairs = _pairs(index, reqs, "supervisor", "single")
+    e2_plans = _pairs(index, reqs, "supervisor", "single", plans=True)
+    metrics = _e2_metrics(e2_pairs, scores, total)
+    complete_metrics = _e2_metrics(e2_plans, scores, total)
+    n = min(m["n"] for m in metrics.values())
+    complete_n = min(m["n"] for m in complete_metrics.values())
+    verdict_e2 = _e2_verdict(metrics)
+    verdict_e2_complete_case = _e2_verdict(complete_metrics)
+    e5_pairs = _pairs(index, reqs, "supervisor", "off")
+    e5_plans = _pairs(index, reqs, "supervisor", "off", plans=True)
+    validity = _validity_summary(e5_pairs, total)
+    complete_validity = _validity_summary(e5_plans, total)
+    on_tokens, off_tokens = (
+        sum(pair[i].input_tokens for pair in e5_pairs) for i in (0, 1)
+    )
+    reduction = 1 - on_tokens / off_tokens if off_tokens else None
+    verdict_e5 = _e5_verdict(validity, reduction)
+    verdict_e5_complete_case = _e5_verdict(complete_validity, reduction)
     strata = {}
     for label in ("reliable", "unreliable"):
         ids = {r.id for r in reqs.values() if stratum(r.axes_used) == label}
@@ -517,7 +581,8 @@ def analyze(records, *, scores, requests, claim_matches=None) -> dict:
             "metrics": metrics,
             "n": n,
             "excluded": total - n,
-            "excluded_no_plan": len(e2_pairs) - len(e2_plans),
+            "not_run": total - len(e2_pairs),
+            "imputed_no_plan": _imputed_counts(e2_pairs, "supervisor", "single"),
             "descriptive": _descriptive(rows, e2_pairs, total),
             "note": "품질 차이를 확인하지 못했다"
             if verdict_e2 == "no_difference_found"
@@ -530,11 +595,31 @@ def analyze(records, *, scores, requests, claim_matches=None) -> dict:
             "off_input_tokens": off_tokens,
             "n": len(e5_pairs),
             "excluded": total - len(e5_pairs),
-            "excluded_no_plan": len(e5_pairs) - len(e5_plans),
+            "not_run": total - len(e5_pairs),
+            "imputed_no_plan": _imputed_counts(e5_pairs, "supervisor", "off"),
             "evidence_validity": validity,
             "descriptive": _descriptive(rows, e5_pairs, total),
         },
         "verdict_e5": verdict_e5,
+        "e2_complete_case": {
+            "metrics": complete_metrics,
+            "n": complete_n,
+            "excluded": total - complete_n,
+            "excluded_no_plan": len(e2_pairs) - len(e2_plans),
+            "verdict": verdict_e2_complete_case,
+        },
+        "verdict_e2_complete_case": verdict_e2_complete_case,
+        "e5_complete_case": {
+            "evidence_validity": complete_validity,
+            "excluded_no_plan": len(e5_pairs) - len(e5_plans),
+            "verdict": verdict_e5_complete_case,
+        },
+        "verdict_e5_complete_case": verdict_e5_complete_case,
+        "verdicts_agree": {
+            "e2": verdict_e2 == verdict_e2_complete_case,
+            "e5": verdict_e5 == verdict_e5_complete_case,
+        },
+        "failure_rates": _failure_rates(rows),
         "strata": strata,
         "claim_bias_check": bias,
     }
