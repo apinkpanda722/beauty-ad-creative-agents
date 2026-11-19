@@ -75,7 +75,16 @@
     {
       "step": 6,
       "name": "context-mode",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-19T13:04:03+0900",
+      "summary": "E5 context_mode on/off 경로와 합성 테스트 41건 구현. 기본 동작·동결 프롬프트 유지, 모드는 off 결과 dict에만 기록(trace 불변). make verify 통과(5,176 tests), 추가 패키지 없음.",
+      "completed_at": "2026-11-19T13:09:14+0900",
+      "usage": {
+        "input_tokens": 1964882,
+        "cached_input_tokens": 1865600,
+        "output_tokens": 8527,
+        "attempts": 1
+      }
     },
     {
       "step": 7,
