@@ -39,7 +39,7 @@ def render_inputs():
 def test_all_fourteen_required_procedures_are_present(render_inputs):
     text = prereg.render_preregistration(**render_inputs)
     sentences = prereg.REQUIRED_SENTENCES
-    assert len(sentences) == len(set(sentences)) == 23
+    assert len(sentences) == len(set(sentences)) == 24
     checked = 0
     for sentence in sentences:
         assert sentence.strip()
@@ -565,7 +565,7 @@ def test_none_measurement_preserves_original_bytes(render_inputs):
     assert "E3 dev 측정 근거" not in text
     # Captured from the unchanged renderer before implementing this step.
     assert hashlib.sha256(text.encode()).hexdigest() == (
-        "95e3c5c05134a2f33a6a4e5013d0e062d6c233b3ca683849012df334aabb29cf"
+        "867067c857b72a21558ed6a15de8dc904304f4157464cb39901340da741f2dc5"
     )
 
 
@@ -814,7 +814,7 @@ def test_cli_incomplete_measurement_never_creates_document(
 
 def test_repeat_procedures_and_empty_distribution_template(render_inputs):
     sentences = prereg.REQUIRED_SENTENCES
-    assert len(sentences) == 23
+    assert len(sentences) == 24
     for phrase in (
         "2회",
         "요청 20건 × 2회",
@@ -857,7 +857,7 @@ def test_repeat_procedures_and_empty_distribution_template(render_inputs):
 def test_interpretation_change_and_limit_are_appended_and_frozen(render_inputs):
     from beautyads.agents.supervisor import SUPERVISOR_PROMPT_VERSION
 
-    changed, limitation = prereg.REQUIRED_SENTENCES[21:]
+    changed, limitation = prereg.REQUIRED_SENTENCES[21:23]
     for phrase in (
         "P5 이후",
         "dev 스모크",
@@ -885,3 +885,36 @@ def test_interpretation_change_and_limit_are_appended_and_frozen(render_inputs):
         prereg.render_results_template().split("## E2\n", 1)[1].split("\n## ", 1)[0]
     )
     assert "| 요청에 없는 축 채움(과채움, 코드 판정, 참고용) |  |  |  |  |" in content
+
+
+def test_axis_adherence_supplement_is_twenty_fourth_procedure(render_inputs):
+    sentence = prereg.REQUIRED_SENTENCES[23]
+    for phrase in (
+        "정지 이미지",
+        "불안정",
+        "지정 축 준수율",
+        "해석 채움",
+        "최종 기획안 준수",
+        "요청에 없는 축 채움",
+        "과채움",
+        "코드 판정 보조 지표",
+        "판정에 쓰지 않",
+        "graph_adopted",
+        "verdict_e2",
+        "verdict_e5",
+        "dev 재스모크",
+        "지정 축 요청 8건 중 해석 채움 6건",
+        "과채움 0건",
+        "최종 기획안 준수 8건",
+        "해석 누락 2건은 모두 정지 이미지 포맷",
+        "dev 관찰이며 test 결과가 아니다",
+    ):
+        assert phrase in sentence
+    assert f"24. {sentence}\n" in prereg.render_preregistration(**render_inputs)
+
+
+def test_first_twenty_three_procedures_remain_byte_identical():
+    original = json.dumps(prereg.REQUIRED_SENTENCES[:23], ensure_ascii=False)
+    assert hashlib.sha256(original.encode()).hexdigest() == (
+        "786632ffa3d03b04bb13afb70951ed6fd58b022e7996e8fc85c6fcb0834cec6e"
+    )
