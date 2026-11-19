@@ -323,8 +323,17 @@
         "output_tokens": 10743,
         "attempts": 1
       }
+    },
+    {
+      "step": 24,
+      "name": "fixed-axes-pattern",
+      "status": "pending"
+    },
+    {
+      "step": 25,
+      "name": "interpretation-glossary",
+      "status": "pending"
     }
   ],
-  "created_at": "2026-11-19T12:16:24+0900",
-  "completed_at": "2026-11-19T19:02:46+0900"
+  "created_at": "2026-11-19T12:16:24+0900"
 }
