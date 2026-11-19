@@ -98,3 +98,7 @@ live-compare:
 .PHONY: fetch-font
 fetch-font:
 	uv run python scripts/fetch_design_font.py $(ARGS)
+
+.PHONY: live-evalset
+live-evalset:
+	uv run python -m beautyads.eval.evalset_candidates $(ARGS)
