@@ -271,7 +271,16 @@
     {
       "step": 20,
       "name": "e2e5-records",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-19T18:12:57+0900",
+      "summary": "E2·E5 목적별 토큰·호출 수와 brief·지배 축 기록, 보조 보고 표·JSON, 사전 등록 18번째 문장과 합성 테스트 16건 구현. 판정 로직 유지, make verify 통과(5,674 tests). 실제 서비스 호출·추가 패키지 없음.",
+      "completed_at": "2026-11-19T18:20:57+0900",
+      "usage": {
+        "input_tokens": 1574410,
+        "cached_input_tokens": 1482880,
+        "output_tokens": 14645,
+        "attempts": 1
+      }
     },
     {
       "step": 21,
