@@ -351,8 +351,12 @@
         "output_tokens": 11415,
         "attempts": 1
       }
+    },
+    {
+      "step": 26,
+      "name": "prereg-adherence-sentence",
+      "status": "pending"
     }
   ],
-  "created_at": "2026-11-19T12:16:24+0900",
-  "completed_at": "2026-11-19T20:00:27+0900"
+  "created_at": "2026-11-19T12:16:24+0900"
 }
