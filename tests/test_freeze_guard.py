@@ -187,6 +187,86 @@ def test_empty_values_do_not_hide_duplicate_labels(value):
         guard.parse_preregistration(f"{label}: SENTINEL_FIRST\n{label}: {value}\n")
 
 
+@pytest.mark.parametrize("first", ["", "SENTINEL_FIRST"])
+@pytest.mark.parametrize("strict_labels", [set(), {guard.REQUEST_HASH_LABEL}])
+def test_parse_non_strict_duplicates_keep_first_value(first, strict_labels):
+    assert guard.parse_preregistration(
+        f"날짜: {first}\n날짜: SENTINEL_SECOND\n", strict_labels=strict_labels
+    ) == {"날짜": first}
+
+
+def test_default_parser_still_rejects_non_frozen_duplicates():
+    with pytest.raises(guard.FreezeError, match="^FROZEN_VALUE_MISMATCH$"):
+        guard.parse_preregistration("날짜: SENTINEL_FIRST\n날짜: SENTINEL_SECOND\n")
+
+
+@pytest.mark.parametrize(
+    "label",
+    [
+        *guard.frozen_values(),
+        guard.REQUEST_HASH_LABEL,
+        guard.QUESTION_HASH_LABEL,
+        "동결 합성 실행기",
+    ],
+)
+def test_parse_strict_label_duplicates_are_rejected(label):
+    with pytest.raises(guard.FreezeError, match="^FROZEN_VALUE_MISMATCH$"):
+        guard.parse_preregistration(
+            f"{label}:\n{label}: SENTINEL_SECOND\n", strict_labels={label}
+        )
+
+
+def test_final_allows_non_frozen_duplicate_lines(frozen_run):
+    with frozen_run.prereg_path.open("a") as stream:
+        stream.write("\n날짜: SENTINEL_FIRST\n날짜: SENTINEL_SECOND\n")
+    assert frozen_run.check().code_commit == CODE_COMMIT
+
+
+@pytest.mark.parametrize(
+    "label",
+    [
+        *guard.frozen_values(),
+        guard.REQUEST_HASH_LABEL,
+        guard.QUESTION_HASH_LABEL,
+        "동결 합성 실행기",
+    ],
+)
+def test_final_rejects_duplicate_frozen_hash_and_extra_labels(frozen_run, label):
+    with frozen_run.prereg_path.open("a") as stream:
+        stream.write(f"\n{label}: {frozen_run.document[label]}\n")
+    assert_error(frozen_run, "FROZEN_VALUE_MISMATCH")
+
+
+@pytest.mark.parametrize("groups", [set(), {"dev"}, {"test", "dev"}, {"unknown"}])
+def test_final_invalid_groups_precede_preregistration_and_git(frozen_run, groups):
+    frozen_run.prereg_path.unlink()
+    assert_error(
+        frozen_run,
+        "WORKSPACE_GROUP_INVALID",
+        groups=groups,
+        committed_fn=lambda path: pytest.fail("preregistration before groups"),
+    )
+    assert frozen_run.git.calls == []
+
+
+@pytest.mark.parametrize("groups", [{"test"}, {"isolation"}, {"test", "isolation"}])
+def test_final_accepts_only_nonempty_final_groups(frozen_run, groups):
+    assert frozen_run.check(groups=groups).code_commit == CODE_COMMIT
+
+
+@pytest.mark.parametrize("groups", [set(), {"dev"}, {"isolation"}, {"unknown"}])
+def test_dev_group_behavior_stays_permissive_without_test(frozen_run, groups):
+    frozen_run.prereg_path.unlink()
+    assert (
+        frozen_run.check(
+            mode="dev",
+            groups=groups,
+            committed_fn=lambda path: pytest.fail("dev prereg check"),
+        ).code_commit
+        == CODE_COMMIT
+    )
+
+
 @pytest.mark.parametrize(
     "failure",
     [

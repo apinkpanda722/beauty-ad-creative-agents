@@ -535,12 +535,18 @@ async def _run_batch(
     env_file,
     out,
     prior_score_spend,
+    metadata,
+    metadata_path,
 ):
     assembly, single, watch = None, None, _Watch()
     limits = RequestLimits()
     seen = {(r.item_id, r.arm, r.repeat) for r in rows}
     baseline = ledger_total(settings.ledger_path)
-    previous_spend = math.fsum(r.spent_usd for r in rows) + prior_score_spend
+    previous_spend = (
+        math.fsum(r.spent_usd for r in rows)
+        + prior_score_spend
+        + metadata.get("interrupted_spent_usd", 0.0)
+    )
     exit_code = 0
     try:
         assembly = await assemble(
@@ -618,8 +624,16 @@ async def _run_batch(
                         by_purpose=ledger_purpose_totals(settings.ledger_path, before),
                         latency=monotonic() - started,
                     )
-                    with (root / "records.jsonl").open("a", encoding="utf-8") as stream:
-                        stream.write(row.model_dump_json() + "\n")
+                    if stopped:
+                        metadata["interrupted_spent_usd"] = (
+                            metadata.get("interrupted_spent_usd", 0.0) + row.spent_usd
+                        )
+                        _json_write(metadata_path, metadata)
+                    else:
+                        with (root / "records.jsonl").open(
+                            "a", encoding="utf-8"
+                        ) as stream:
+                            stream.write(row.model_dump_json() + "\n")
                     if row.status == "failed":
                         exit_code = 3
                         print(
@@ -949,6 +963,7 @@ def main(
                 "evalset_hash": set_hash,
                 "item_ids": [r.id for r in items],
                 "scoring_spent_usd": 0.0,
+                "interrupted_spent_usd": 0.0,
                 "repeats": args.repeat,
             }
         if args.command == "run":
@@ -1029,12 +1044,16 @@ def main(
                     env_file=env_file,
                     out=out,
                     prior_score_spend=metadata["scoring_spent_usd"],
+                    metadata=metadata,
+                    metadata_path=metadata_path,
                 )
             )
         if args.command == "score":
             baseline = ledger_total(settings.ledger_path)
             previous_spend = (
-                math.fsum(r.spent_usd for r in rows) + metadata["scoring_spent_usd"]
+                math.fsum(r.spent_usd for r in rows)
+                + metadata["scoring_spent_usd"]
+                + metadata.get("interrupted_spent_usd", 0.0)
             )
             if previous_spend >= args.budget_usd:
                 raise _Stopped("BUDGET_REACHED")

@@ -93,7 +93,9 @@ def frozen_values() -> dict[str, str]:
     }
 
 
-def parse_preregistration(text: str) -> dict[str, str]:
+def parse_preregistration(
+    text: str, *, strict_labels: set[str] | None = None
+) -> dict[str, str]:
     values = {}
     for line in text.splitlines():
         label, separator, value = line.strip().partition(":")
@@ -101,7 +103,9 @@ def parse_preregistration(text: str) -> dict[str, str]:
             continue
         label, value = label.strip(), value.strip()
         if label in values:
-            raise FreezeError("FROZEN_VALUE_MISMATCH")
+            if strict_labels is None or label in strict_labels:
+                raise FreezeError("FROZEN_VALUE_MISMATCH")
+            continue
         values[label] = value
     return values
 
@@ -161,6 +165,8 @@ def check_run(
         return run_identity(prereg_path=prereg_path, run=run)
     if mode != "final":
         raise FreezeError("WORKSPACE_GROUP_INVALID")
+    if not groups or set(groups) - {"test", "isolation"}:
+        raise FreezeError("WORKSPACE_GROUP_INVALID")
     try:
         # The shared P5 default must use the same injected git runner. Custom
         # checkers can be path-only callables or partials with their own runner.
@@ -174,7 +180,15 @@ def check_run(
         text = prereg_path.read_text(encoding="utf-8")
     except (OSError, UnicodeError, subprocess.TimeoutExpired):
         raise FreezeError("PREREG_NOT_COMMITTED") from None
-    values = parse_preregistration(text)
+    values = parse_preregistration(
+        text,
+        strict_labels={
+            REQUEST_HASH_LABEL,
+            QUESTION_HASH_LABEL,
+            *frozen_values(),
+            *(extra or {}),
+        },
+    )
     requests, questions, answers = (
         read_jsonl(path) for path in (requests_path, questions_path, answers_path)
     )

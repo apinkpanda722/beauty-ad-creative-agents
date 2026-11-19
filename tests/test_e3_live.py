@@ -479,14 +479,34 @@ def test_measure_selection_truncation_costs_and_first_shape(tmp_path):
     assert json.loads((tmp_path / "embedding_response_shape.json").read_text())["data"]
 
 
-def test_evidence_ratio_counts_submitted_ids_and_count_tolerance():
+def test_evidence_ratio_counts_unique_submitted_ids_and_count_tolerance():
     answer = e3.E3Answer(
         count=3, items=[], evidence_ids=["youtube:a", "youtube:a", "wrong"]
     )
     t = truth().model_copy(update={"tolerance_abs": 1.0})
     score = e3.score_answer(answer, t)
     assert score["correct"] is True
-    assert score["evidence_hit_rate"] == pytest.approx(2 / 3)
+    assert score["evidence_hit_rate"] == pytest.approx(1 / 2)
+
+
+@pytest.mark.parametrize(
+    "submitted,expected_ids,rate",
+    [
+        (["a", "a", "wrong"], ["a"], 0.5),
+        (["a", "b", "wrong"], ["a", "b"], 2 / 3),
+        (["c1", "c1", "c1", "x"], ["c1"], 0.5),
+        (["c1", "c1", "c1"], ["c1"], 1.0),
+        ([], ["c1"], 0.0),
+        (["c1", "c1"], [], None),
+        ([], [], None),
+    ],
+)
+def test_evidence_hit_rate_uses_unique_submissions(submitted, expected_ids, rate):
+    answer = e3.E3Answer(count=2, items=[], evidence_ids=submitted)
+    t = truth().model_copy(update={"evidence_ids": expected_ids})
+    score = e3.score_answer(answer, t)
+    assert score == {"correct": True, "evidence_hit_rate": rate}
+    assert answer.evidence_ids == submitted
 
 
 def test_run_unpriced_model_and_wrong_structured_model_refused_before_calls():

@@ -279,13 +279,185 @@ def test_one_failure_continues_and_never_leaks_exception(rig):
     ],
 )
 def test_batch_stops_on_provider_limits(rig, error):
+    append_entry(rig.settings.ledger_path, entry(cost=0.1))
+
     def behavior(*args, **kw):
+        append_entry(rig.settings.ledger_path, entry(cost=0.03))
         raise error
 
     rig.behavior = behavior
     code, output = rig.invoke("run", "--run-id", "trial")
     assert code != 0 and len(rig.calls) == 1 and "STOPPED" in output
-    assert len((rig.root / "trial" / "records.jsonl").read_text().splitlines()) == 1
+    assert live._load_records(rig.root / "trial") == []
+    metadata = json.loads((rig.root / "trial" / "run.json").read_text())
+    assert metadata["interrupted_spent_usd"] == pytest.approx(0.03)
+
+
+@pytest.mark.parametrize("repeat", [1, 2])
+def test_interrupted_arm_restarts_and_is_recorded_only_once(rig, repeat):
+    args = (
+        "run",
+        "--run-id",
+        "trial",
+        "--arms",
+        "supervisor",
+        "--limit",
+        "1",
+        "--repeat",
+        str(repeat),
+    )
+
+    def behavior(*args, **kw):
+        if len(rig.calls) == repeat:
+            append_entry(rig.settings.ledger_path, entry(cost=0.03))
+            raise CostCapExceeded("openai", 1, 1)
+        return result()
+
+    rig.behavior = behavior
+    assert rig.invoke(*args)[0] == 2
+    rows = live._load_records(rig.root / "trial")
+    assert len(rows) == repeat - 1
+    assert rig.invoke(*args)[0] == 0
+    rows = live._load_records(rig.root / "trial")
+    assert len(rig.calls) == repeat + 1
+    assert rig.calls[repeat - 1] == rig.calls[repeat]
+    assert [(r.item_id, r.arm, r.repeat, r.status) for r in rows] == [
+        ("req-0", "supervisor", i, "plan") for i in range(1, repeat + 1)
+    ]
+    assert rig.invoke(*args)[0] == 0
+    assert len(rig.calls) == repeat + 1
+    metadata = json.loads((rig.root / "trial" / "run.json").read_text())
+    assert metadata["interrupted_spent_usd"] == pytest.approx(0.03)
+
+
+def test_resume_counts_interrupted_spend_exactly_once_with_other_spend(rig):
+    write_jsonl(rig.requests, [request(i) for i in range(4)])
+    append_entry(rig.settings.ledger_path, entry(cost=5.0))
+    args = ("run", "--run-id", "trial", "--arms", "supervisor")
+
+    def behavior(*args, **kw):
+        cost = 0.02 if len(rig.calls) == 1 else 0.25
+        append_entry(rig.settings.ledger_path, entry(cost=cost))
+        if len(rig.calls) == 2:
+            raise CostCapExceeded("openai", 1, 1)
+        return result()
+
+    rig.behavior = behavior
+    assert rig.invoke(*args)[0] == 2
+    assert len(rig.calls) == 2
+    path = rig.root / "trial" / "run.json"
+    metadata = json.loads(path.read_text())
+    assert metadata["interrupted_spent_usd"] == pytest.approx(0.25)
+    metadata["scoring_spent_usd"] = 0.03
+    path.write_text(json.dumps(metadata))
+    append_entry(rig.settings.ledger_path, entry(cost=0.03, purpose="e2-score"))
+
+    def resumed(*args, **kw):
+        append_entry(rig.settings.ledger_path, entry(cost=0.06))
+        return result()
+
+    rig.behavior = resumed
+    code, output = rig.invoke(*args)
+    assert code == 2 and "STOPPED BUDGET_REACHED" in output
+    assert len(rig.calls) == 4
+    rows = live._load_records(rig.root / "trial")
+    assert [r.item_id for r in rows] == ["req-0", "req-1", "req-2"]
+    assert [r.spent_usd for r in rows] == pytest.approx([0.02, 0.06, 0.06])
+    assert json.loads(path.read_text())["interrupted_spent_usd"] == pytest.approx(0.25)
+    assert rig.invoke(*args)[0] == 2
+    assert len(rig.calls) == 4
+
+
+def test_score_budget_includes_interrupted_spend_before_model_creation(rig):
+    assert rig.invoke("run", "--run-id", "trial", "--limit", "1")[0] == 0
+    path = rig.root / "trial" / "run.json"
+    metadata = json.loads(path.read_text())
+    assert metadata["interrupted_spent_usd"] == 0.0
+    metadata["interrupted_spent_usd"] = live.DEFAULT_BUDGET_USD["dev"]
+    path.write_text(json.dumps(metadata))
+    code, output = rig.invoke("score", "--run-id", "trial")
+    assert code == 2 and "BUDGET_REACHED" in output
+    assert not rig.models and not rig.structured_calls
+
+
+def test_multiple_interruptions_accumulate_only_each_attempt_delta(rig):
+    args = ("run", "--run-id", "trial", "--arms", "supervisor", "--limit", "1")
+
+    def behavior(*args, **kw):
+        append_entry(rig.settings.ledger_path, entry(cost=0.03))
+        raise LlmCallError(kind=ErrorKind.DAILY_LIMIT, code="synthetic")
+
+    rig.behavior = behavior
+    for attempt in (1, 2):
+        assert rig.invoke(*args)[0] == 2
+        assert len(rig.calls) == attempt
+        assert live._load_records(rig.root / "trial") == []
+        metadata = json.loads((rig.root / "trial" / "run.json").read_text())
+        assert metadata["interrupted_spent_usd"] == pytest.approx(attempt * 0.03)
+
+
+@pytest.mark.parametrize("command", ["run", "score"])
+def test_old_metadata_without_interrupted_spend_defaults_to_zero(rig, command):
+    args = ("--run-id", "trial", "--arms", "supervisor", "--limit", "1")
+    assert rig.invoke("run", *args)[0] == 0
+    path = rig.root / "trial" / "run.json"
+    metadata = json.loads(path.read_text())
+    metadata.pop("interrupted_spent_usd", None)
+    path.write_text(json.dumps(metadata))
+    if command == "run":
+        code, _ = rig.invoke(command, *args, "--repeat", "2")
+        assert len(rig.calls) == 2
+        assert len(live._load_records(rig.root / "trial")) == 2
+    else:
+        code, _ = rig.invoke(command, "--run-id", "trial")
+        assert len(rig.structured_calls) == 1
+    assert code == 0
+
+
+def test_old_failed_record_is_complete_and_general_failure_still_continues(rig):
+    def behavior(*args, **kw):
+        if len(rig.calls) == 1:
+            raise ValueError("SENTINEL_BODY")
+        return result()
+
+    rig.behavior = behavior
+    args = ("run", "--run-id", "trial", "--arms", "supervisor")
+    code, output = rig.invoke(*args)
+    assert code == 3 and "REQUEST_FAILED ValueError" in output
+    rows = live._load_records(rig.root / "trial")
+    assert len(rig.calls) == len(rows) == 3
+    assert [r.status for r in rows] == ["failed", "plan", "plan"]
+    path = rig.root / "trial" / "run.json"
+    metadata = json.loads(path.read_text())
+    metadata.pop("interrupted_spent_usd", None)
+    path.write_text(json.dumps(metadata))
+    records = rig.root / "trial" / "records.jsonl"
+    original = records.read_bytes()
+    # Older interrupted attempts have exactly the same failed record format.
+    assert rig.invoke(*args)[0] == 0
+    assert len(rig.calls) == 3
+    assert records.read_bytes() == original
+
+
+def test_swallowed_limit_keeps_spend_without_recording_result(rig):
+    def chat():
+        append_entry(rig.settings.ledger_path, entry(cost=0.02))
+        raise LlmCallError(kind=ErrorKind.DAILY_LIMIT, code="synthetic")
+
+    def behavior(*args, **kw):
+        try:
+            rig.assemblies[-1]["models"]["chat"]()
+        except LlmCallError:
+            return result()
+        pytest.fail("model should fail")
+
+    rig.behavior = behavior
+    code, output = rig.invoke("run", "--run-id", "trial", chat_override=chat)
+    assert code == 2 and "STOPPED DAILY_LIMIT" in output
+    assert len(rig.calls) == 1
+    assert live._load_records(rig.root / "trial") == []
+    metadata = json.loads((rig.root / "trial" / "run.json").read_text())
+    assert metadata["interrupted_spent_usd"] == pytest.approx(0.02)
 
 
 def test_budget_stops_before_next_arm_and_resume_counts_previous_spend(rig):

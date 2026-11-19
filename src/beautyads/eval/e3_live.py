@@ -226,7 +226,7 @@ def score_answer(answer, truth):
     else:
         normalize = lambda values: {v.strip() for v in values}
         correct = normalize(answer.items) == normalize(truth.value)
-    evidence = answer.evidence_ids
+    evidence = list(dict.fromkeys(answer.evidence_ids))
     return {
         "correct": bool(correct),
         "evidence_hit_rate": sum(id_ in truth.evidence_ids for id_ in evidence)
