@@ -27,6 +27,8 @@ from beautyads.agents.tools import run_tool
 from beautyads.api.assembly import assemble_full
 from beautyads.api.feedback import feedback_for_prompt
 from beautyads.api.session import resolve_session
+from beautyads.domain.labels import Angle, Category, Claim, Format, HookType
+from beautyads.domain.skin import SkinConcern
 from beautyads.domain.supervisor import RequestLimits, cost_exceeded
 from beautyads.domain.tools import ToolContext
 from beautyads.eval.cq_verify import cq_preflight
@@ -83,6 +85,10 @@ class _RecordedArm(ArmRecord):
 
     prereg_commit: str | None
     prompt_versions: dict[str, str] = Field(default_factory=dict)
+    input_tokens_by_purpose: dict[str, int] = Field(default_factory=dict)
+    model_calls_by_purpose: dict[str, int] = Field(default_factory=dict)
+    brief_axes: dict[str, str | None] | None = None
+    dominant_axes: list[dict] | None = None
 
 
 class _Stopped(Exception):
@@ -126,6 +132,16 @@ def ledger_delta(path, before):
             if e.purpose != "image" and not e.purpose.startswith("image-")
         ),
     }
+
+
+def ledger_purpose_totals(path, before):
+    """Count the same ledger increment by exact purpose, including images."""
+    tokens, calls = {}, {}
+    for entry in read_entries(path).entries[before:]:
+        purpose = entry.purpose
+        tokens[purpose] = tokens.get(purpose, 0) + entry.input_tokens
+        calls[purpose] = calls.get(purpose, 0) + 1
+    return {"input_tokens_by_purpose": tokens, "model_calls_by_purpose": calls}
 
 
 def observed_axes(result, tool_logs=()):
@@ -396,7 +412,53 @@ def _plain(rows):
     return [r.model_dump(include=set(ArmRecord.model_fields)) for r in rows]
 
 
-def _record(item, arm, result, *, run_id, identity, set_hash, delta, latency):
+def _record_axes(arm, result):
+    """Retain only closed brief values and numeric pattern observations."""
+    if arm == "single":
+        return {"brief_axes": None, "dominant_axes": None}
+    closed = {
+        "category": Category,
+        "claim": Claim,
+        "hook_type": HookType,
+        "angle": Angle,
+        "format": Format,
+        "skin_concern": SkinConcern,
+    }
+    brief = result.get("brief")
+    brief_axes = (
+        {
+            axis: value
+            if isinstance(value := brief.get(axis), str) and value in values
+            else None
+            for axis, values in closed.items()
+        }
+        if isinstance(brief, dict) and brief
+        else None
+    )
+    context = (result.get("handoff") or {}).get("pattern_context") or {}
+    dominant = context.get("dominant_axes")
+    dominant_axes = None
+    if isinstance(dominant, list):
+        dominant_axes = []
+        for row in dominant:
+            if not isinstance(row, dict):
+                continue
+            axis, values, share = (row.get(k) for k in ("axis", "values", "share"))
+            if (
+                axis not in ("format", "hook_type", "angle")
+                or not isinstance(values, list)
+                or not all(isinstance(v, str) and v in closed[axis] for v in values)
+                or type(share) not in (int, float)
+                or not math.isfinite(share)
+            ):
+                continue
+            dominant_axes.append({"axis": axis, "values": values, "share": share})
+    return {"brief_axes": brief_axes, "dominant_axes": dominant_axes}
+
+
+def _record(
+    item, arm, result, *, run_id, identity, set_hash, delta, by_purpose, latency
+):
     first = next(iter(result.get("plans") or []), {})
     plan = result.get("plan") if arm == "single" else first.get("plan")
     status = "plan" if plan is not None else result.get("kind", "failed")
@@ -419,6 +481,8 @@ def _record(item, arm, result, *, run_id, identity, set_hash, delta, latency):
         or (result.get("handoff") or {}).get("evidence_ids")
         or [],
         **delta,
+        **by_purpose,
+        **_record_axes(arm, result),
         latency_s=latency,
         tool_calls=result.get(
             "tool_calls", len((result.get("handoff") or {}).get("result_counts") or [])
@@ -531,6 +595,7 @@ async def _run_batch(
                     identity=identity,
                     set_hash=set_hash,
                     delta=ledger_delta(settings.ledger_path, before),
+                    by_purpose=ledger_purpose_totals(settings.ledger_path, before),
                     latency=monotonic() - started,
                 )
                 with (root / "records.jsonl").open("a", encoding="utf-8") as stream:
@@ -558,6 +623,122 @@ async def _run_batch(
             await _close(assembly)
 
 
+def _token_summary(on, off):
+    on_total, off_total = sum(on), sum(off)
+    return {
+        "supervisor": {
+            "total": on_total,
+            "mean_per_request": on_total / len(on) if on else None,
+        },
+        "off": {
+            "total": off_total,
+            "mean_per_request": off_total / len(off) if off else None,
+        },
+        "reduction": 1 - on_total / off_total if off_total else "해당 없음",
+    }
+
+
+def _e5_supplement(rows, items):
+    """Descriptive paired metrics only; never passed to the frozen analyzer."""
+    index = {(r.item_id, r.arm): r for r in rows}
+    paired = [
+        (index[item.id, "supervisor"], index[item.id, "off"])
+        for item in items
+        if (item.id, "supervisor") in index and (item.id, "off") in index
+    ]
+    pairs = [p for p in paired if all(r.input_tokens_by_purpose for r in p)]
+    purposes = sorted(
+        {
+            purpose
+            for pair in pairs
+            for r in pair
+            for purpose in r.input_tokens_by_purpose
+        }
+    )
+    totals = {
+        purpose: _token_summary(
+            [a.input_tokens_by_purpose.get(purpose, 0) for a, _ in pairs],
+            [b.input_tokens_by_purpose.get(purpose, 0) for _, b in pairs],
+        )
+        for purpose in purposes
+    }
+    research = {}
+    for i, arm in enumerate(("supervisor", "off")):
+        calls = sum(pair[i].model_calls_by_purpose.get("research", 0) for pair in pairs)
+        tokens = sum(
+            pair[i].input_tokens_by_purpose.get("research", 0) for pair in pairs
+        )
+        research[arm] = {
+            "mean_calls_per_request": calls / len(pairs) if pairs else None,
+            "input_tokens_per_call": tokens / calls if calls else "해당 없음",
+        }
+    return {
+        "pairs_used": len(pairs),
+        "pairs_unavailable": len(paired) - len(pairs),
+        "purposes": totals,
+        "plan_per_request": [
+            {
+                "supervisor": a.input_tokens_by_purpose.get("plan", 0),
+                "off": b.input_tokens_by_purpose.get("plan", 0),
+                "reduction": _token_summary(
+                    [a.input_tokens_by_purpose.get("plan", 0)],
+                    [b.input_tokens_by_purpose.get("plan", 0)],
+                )["reduction"],
+            }
+            for a, b in pairs
+        ],
+        "research": research,
+        "non_research": _token_summary(
+            [
+                a.input_tokens - a.input_tokens_by_purpose.get("research", 0)
+                for a, _ in pairs
+            ],
+            [
+                b.input_tokens - b.input_tokens_by_purpose.get("research", 0)
+                for _, b in pairs
+            ],
+        ),
+    }
+
+
+def _axis_adherence(rows, items):
+    requests = {item.id: item for item in items}
+    report = {}
+    for arm in ("supervisor", "off"):
+        selected = [r for r in rows if r.arm == arm and r.item_id in requests]
+        available = [
+            r for r in selected if r.brief_axes is not None and r.plan is not None
+        ]
+        axes = {}
+        for axis in ("format", "hook_type", "angle"):
+            specified = [r for r in available if r.brief_axes.get(axis) is not None]
+            axes[axis] = {
+                "specified": len(specified),
+                "adherent": sum(
+                    r.plan.get(axis) == r.brief_axes.get(axis) for r in specified
+                ),
+                "dominant_conflict": sum(
+                    any(
+                        d.get("axis") == axis
+                        and r.brief_axes.get(axis) in (d.get("values") or [])
+                        for d in r.dominant_axes or []
+                    )
+                    for r in specified
+                ),
+                "interpretation_missing": sum(
+                    axis in requests[r.item_id].axes_used
+                    and r.brief_axes.get(axis) is None
+                    for r in available
+                ),
+            }
+        report[arm] = {
+            "unavailable": sum(r.brief_axes is None for r in selected),
+            "with_plan": len(available),
+            "axes": axes,
+        }
+    return report
+
+
 def _report(rows, items, root, metadata, out):
     scores = json.loads((root / "scores.json").read_text(encoding="utf-8"))
     sheet = root / "claim_sheet.csv"
@@ -583,6 +764,53 @@ def _report(rows, items, root, metadata, out):
         count = sum(axis in r.axes_used_observed for r in rows)
         if count:
             print(f"| {axis} | {count} |", file=out)
+    supplement = _e5_supplement(rows, items)
+    adherence = _axis_adherence(rows, items)
+    _json_write(root / "e5_supplement.json", supplement)
+    _json_write(root / "axis_adherence.json", adherence)
+    print("\nE5 보조 지표(참고용, 판정에 쓰지 않음)", file=out)
+    print(
+        "| 항목 | 켬(supervisor) | 끔(off) | 변화율 1 − 켬/끔 |\n| --- | --- | --- | --- |",
+        file=out,
+    )
+    print(f"| 사용한 쌍 수 | {supplement['pairs_used']} | | |", file=out)
+    print(f"| 값이 없어 뺀 쌍 수 | {supplement['pairs_unavailable']} | | |", file=out)
+    for label, values in (
+        *supplement["purposes"].items(),
+        ("리서치 제외 합계", supplement["non_research"]),
+        ("리서치 호출 수 평균·호출당 입력 토큰", supplement["research"]),
+        *(
+            (f"plan 요청 {i}", value)
+            for i, value in enumerate(supplement["plan_per_request"], 1)
+        ),
+    ):
+        cells = [
+            json.dumps(values.get(k, ""), ensure_ascii=False)
+            for k in ("supervisor", "off", "reduction")
+        ]
+        print(f"| {label} | " + " | ".join(cells) + " |", file=out)
+    print(
+        "리서치 호출 수 변동이 합계를 수천 토큰 흔들 수 있다. 판정은 요청당 입력 토큰 합계 기준 그대로다.",
+        file=out,
+    )
+    print("\n지정 축 준수(코드 판정, 참고용)", file=out)
+    print(
+        "| 팔 | 축 | 지정 | 준수 | 지배 값과 충돌 | 해석 누락 | unavailable |\n| --- | --- | --- | --- | --- | --- | --- |",
+        file=out,
+    )
+    for arm, values in adherence.items():
+        print(f"| {arm} | 전체 | | | | | {values['unavailable']} |", file=out)
+        for axis, counts in values["axes"].items():
+            cells = [
+                str(counts[k])
+                for k in (
+                    "specified",
+                    "adherent",
+                    "dominant_conflict",
+                    "interpretation_missing",
+                )
+            ]
+            print(f"| {arm} | {axis} | " + " | ".join(cells) + " | |", file=out)
 
 
 def main(

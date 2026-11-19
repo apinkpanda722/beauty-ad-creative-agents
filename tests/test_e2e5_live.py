@@ -18,8 +18,8 @@ from beautyads.domain.supervisor import RequestLimits
 from beautyads.domain.tools import ToolContext
 from beautyads.eval import e2e5_live as live
 from beautyads.eval import single_agent
-from beautyads.eval.e2_scoring import ArmRecord, score_plans
-from beautyads.eval.evalset import write_jsonl
+from beautyads.eval.e2_scoring import ArmRecord, analyze, blind_items, score_plans
+from beautyads.eval.evalset import RequestItem, write_jsonl
 from beautyads.eval.freeze_guard import FreezeError, RunIdentity
 from beautyads.llm.errors import ErrorKind, LlmCallError
 from beautyads.llm.structured import StructuredStats
@@ -761,3 +761,347 @@ def test_cap_stop_prints_only_safe_scope_and_class(rig, provider, scope):
     code, output = rig.invoke("run", "--run-id", "trial", "--arms", "supervisor")
     assert code != 0 and scope in output and "CostCapExceeded" in output
     assert "SENTINEL" not in output
+
+
+def test_ledger_purpose_totals_counts_only_increment_including_images(tmp_path):
+    path = tmp_path / "ledger"
+    for purpose, tokens in (
+        ("plan", 999),
+        ("research", 20),
+        ("plan", 7),
+        ("research", 30),
+        ("image", 3),
+        ("image-plan", 4),
+        ("plan", 0),
+    ):
+        append_entry(path, entry(purpose=purpose, tokens=tokens))
+    assert live.ledger_purpose_totals(path, 1) == {
+        "input_tokens_by_purpose": {
+            "research": 50,
+            "plan": 7,
+            "image": 3,
+            "image-plan": 4,
+        },
+        "model_calls_by_purpose": {
+            "research": 2,
+            "plan": 2,
+            "image": 1,
+            "image-plan": 1,
+        },
+    }
+    assert live.ledger_purpose_totals(path, 7) == {
+        "input_tokens_by_purpose": {},
+        "model_calls_by_purpose": {},
+    }
+
+
+def axis_payload():
+    payload = result()
+    plan = payload["plans"][0]["plan"]
+    payload["brief"] = {
+        "goal": "SENTINEL_GOAL",
+        "category": "mask_pack",
+        "claim": None,
+        "skin_concern": None,
+        "output": "both",
+        "max_tool_calls": 6,
+        **{axis: plan[axis] for axis in ("format", "hook_type", "angle")},
+    }
+    payload["handoff"]["pattern_context"]["dominant_axes"] = [
+        {"axis": axis, "values": [plan[axis]], "share": 0.75, "body": "SENTINEL_BODY"}
+        for axis in ("format", "hook_type", "angle")
+    ]
+    return payload
+
+
+def test_runner_records_only_closed_axes_and_purpose_increment(rig):
+    payload = axis_payload()
+    append_entry(rig.settings.ledger_path, entry(tokens=999))
+
+    def ask(*args, **kwargs):
+        for purpose, tokens in (("research", 10), ("plan", 20), ("research", 30)):
+            append_entry(
+                rig.settings.ledger_path, entry(purpose=purpose, tokens=tokens)
+            )
+        return payload
+
+    rig.behavior = ask
+    assert rig.invoke("run", "--run-id", "trial", "--limit", "1")[0] == 0
+    rows = live._load_records(rig.root / "trial")
+    for row in rows:
+        if row.arm == "single":
+            assert row.brief_axes is row.dominant_axes is None
+            assert row.input_tokens_by_purpose == row.model_calls_by_purpose == {}
+            continue
+        assert row.input_tokens_by_purpose == {"research": 40, "plan": 20}
+        assert row.model_calls_by_purpose == {"research": 2, "plan": 1}
+        assert row.brief_axes == {
+            axis: payload["brief"][axis]
+            for axis in (
+                "category",
+                "claim",
+                "hook_type",
+                "angle",
+                "format",
+                "skin_concern",
+            )
+        }
+        assert row.dominant_axes == [
+            {key: value[key] for key in ("axis", "values", "share")}
+            for value in payload["handoff"]["pattern_context"]["dominant_axes"]
+        ]
+    text = (rig.root / "trial" / "records.jsonl").read_text()
+    assert "SENTINEL" not in text and "synthetic request" not in text
+
+
+def synthetic_record(index, arm, *, payload=None, tokens=None, calls=None):
+    return live._record(
+        RequestItem.model_validate(request(index)),
+        arm,
+        result() if payload is None else payload,
+        run_id="synthetic",
+        identity=RunIdentity("a" * 40, "b" * 40, None, None),
+        set_hash="synthetic-hash",
+        latency=0,
+        delta={"input_tokens": 1000, "model_calls": 4, "spent_usd": 0},
+        by_purpose={
+            "input_tokens_by_purpose": tokens or {},
+            "model_calls_by_purpose": calls or {},
+        },
+    )
+
+
+def supplemental_report(tmp_path, rows, items):
+    (tmp_path / "scores.json").write_text("{}")
+    out = StringIO()
+    live._report(
+        rows,
+        [RequestItem.model_validate(item) for item in items],
+        tmp_path,
+        {
+            "mode": "dev",
+            "evalset_hash": "synthetic-hash",
+            "identity": {},
+        },
+        out,
+    )
+    return (
+        json.loads((tmp_path / "e5_supplement.json").read_text()),
+        json.loads((tmp_path / "axis_adherence.json").read_text()),
+        out.getvalue(),
+    )
+
+
+def test_legacy_records_load_and_report_unavailable(tmp_path):
+    row = synthetic_record(0, "supervisor").model_dump()
+    for key in (
+        "input_tokens_by_purpose",
+        "model_calls_by_purpose",
+        "brief_axes",
+        "dominant_axes",
+    ):
+        row.pop(key)
+    write_jsonl(tmp_path / "records.jsonl", [row])
+    rows = live._load_records(tmp_path)
+    assert rows[0].brief_axes is None and rows[0].dominant_axes is None
+    assert rows[0].input_tokens_by_purpose == rows[0].model_calls_by_purpose == {}
+    _, axes, output = supplemental_report(tmp_path, rows, [request()])
+    assert axes["supervisor"]["unavailable"] == 1
+    assert "unavailable" in output
+
+
+def test_plain_strips_all_runner_fields_and_supplements_cannot_change_verdicts():
+    items = [request(i) for i in range(10)]
+    rows = [synthetic_record(i, arm) for i in range(10) for arm in live.ARMS_DEFAULT]
+    original = live._plain(rows)
+    expected = analyze(original, scores={}, requests=items)
+    blinded = blind_items(original, requests=items)
+    for row in rows:
+        row.input_tokens_by_purpose = {"plan": 1 if row.arm == "supervisor" else 9000}
+        row.model_calls_by_purpose = {"research": 5}
+        row.brief_axes = axis_payload()["brief"]
+        row.dominant_axes = []
+    plain = live._plain(rows)
+    assert all(set(row) == set(ArmRecord.model_fields) for row in plain)
+    assert plain == original
+    assert blind_items(plain, requests=items) == blinded
+    actual = analyze(plain, scores={}, requests=items)
+    assert actual["verdict_e2"] == expected["verdict_e2"]
+    assert actual["verdict_e5"] == expected["verdict_e5"]
+    assert actual["e5"]["token_reduction"] == expected["e5"]["token_reduction"]
+
+
+def test_e5_supplement_calculates_paired_metrics_without_prose(tmp_path):
+    rows = []
+    for i, on, off, on_calls, off_calls in (
+        (
+            0,
+            {"plan": 20, "research": 60, "image": 10},
+            {"plan": 40, "research": 30, "image": 0},
+            3,
+            1,
+        ),
+        (1, {"plan": 40, "research": 20}, {"plan": 80, "research": 50}, 1, 3),
+    ):
+        for arm, tokens, count in (
+            ("supervisor", on, on_calls),
+            ("off", off, off_calls),
+        ):
+            rows.append(
+                synthetic_record(
+                    i,
+                    arm,
+                    payload=axis_payload(),
+                    tokens=tokens,
+                    calls={"research": count},
+                )
+            )
+    rows += [
+        synthetic_record(2, "supervisor", tokens={"plan": 99}),
+        synthetic_record(2, "off"),
+    ]
+    # An unpaired request must not enter either the used or missing-value pairs.
+    rows.append(synthetic_record(3, "supervisor", tokens={"plan": 999}))
+    data, _, output = supplemental_report(
+        tmp_path, rows, [request(i) for i in range(4)]
+    )
+    assert data["pairs_used"] == 2 and data["pairs_unavailable"] == 1
+    assert data["purposes"]["plan"] == {
+        "supervisor": {"total": 60, "mean_per_request": 30},
+        "off": {"total": 120, "mean_per_request": 60},
+        "reduction": 0.5,
+    }
+    assert data["purposes"]["research"]["reduction"] == 0
+    assert data["purposes"]["image"]["reduction"] == "해당 없음"
+    assert data["plan_per_request"] == [
+        {"supervisor": 20, "off": 40, "reduction": 0.5},
+        {"supervisor": 40, "off": 80, "reduction": 0.5},
+    ]
+    for arm in ("supervisor", "off"):
+        assert data["research"][arm] == {
+            "mean_calls_per_request": 2,
+            "input_tokens_per_call": 20,
+        }
+        assert data["non_research"][arm] == {"total": 1920, "mean_per_request": 960}
+    assert "E5 보조 지표(참고용, 판정에 쓰지 않음)" in output
+    assert (
+        "리서치 호출 수 변동이 합계를 수천 토큰 흔들 수 있다. 판정은 요청당 입력 토큰 합계 기준 그대로다."
+        in output
+    )
+    saved = (tmp_path / "e5_supplement.json").read_text()
+    assert (
+        "SENTINEL" not in saved
+        and "synthetic request" not in saved
+        and "goal" not in saved
+    )
+
+
+def test_axis_adherence_counts_specified_matches_conflicts_and_omissions(tmp_path):
+    rows = []
+    for arm in ("supervisor", "off"):
+        for i in range(3):
+            payload = axis_payload()
+            if i == 1:
+                # Choose a different closed value without asserting any model choice.
+                from beautyads.domain.labels import Format
+
+                payload["brief"]["format"] = next(
+                    v.value for v in Format if v != payload["brief"]["format"]
+                )
+            if i == 2:
+                payload["brief"]["format"] = None
+            rows.append(synthetic_record(i, arm, payload=payload))
+        rows.append(synthetic_record(3, arm))
+        no_plan = synthetic_record(4, arm, payload=axis_payload())
+        rows.append(no_plan.model_copy(update={"plan": None, "status": "failed"}))
+    rows.append(synthetic_record(0, "single"))
+    items = [
+        {**request(i), "axes_used": ["format", "hook_type", "angle"]} for i in range(5)
+    ]
+    _, data, output = supplemental_report(tmp_path, rows, items)
+    for arm in ("supervisor", "off"):
+        assert data[arm]["unavailable"] == 1
+        assert data[arm]["with_plan"] == 3
+        assert data[arm]["axes"]["format"] == {
+            "specified": 2,
+            "adherent": 1,
+            "dominant_conflict": 1,
+            "interpretation_missing": 1,
+        }
+        for axis in ("hook_type", "angle"):
+            assert data[arm]["axes"][axis] == {
+                "specified": 3,
+                "adherent": 3,
+                "dominant_conflict": 3,
+                "interpretation_missing": 0,
+            }
+    assert "single" not in data
+    assert "지정 축 준수(코드 판정, 참고용)" in output
+    saved = (tmp_path / "axis_adherence.json").read_text()
+    assert "SENTINEL" not in saved and "synthetic request" not in saved
+
+
+@pytest.mark.parametrize("payload", [result(), {"kind": "failed"}])
+def test_missing_brief_and_pattern_context_record_as_unavailable(payload):
+    row = synthetic_record(0, "supervisor", payload=payload)
+    assert row.brief_axes is None and row.dominant_axes is None
+
+
+@pytest.mark.parametrize("arm", ["supervisor", "off", "single"])
+def test_axis_record_rejects_prose_and_non_numeric_pattern_values(arm):
+    payload = axis_payload()
+    payload["brief"]["format"] = "SENTINEL_BODY"
+    dominant = payload["handoff"]["pattern_context"]["dominant_axes"]
+    retained = len(dominant)
+    dominant.extend(
+        [
+            "SENTINEL_BODY",
+            {"axis": "SENTINEL_BODY", "values": [], "share": 0.5},
+            {"axis": "format", "values": ["SENTINEL_BODY"], "share": 0.5},
+            {"axis": "format", "values": [], "share": "SENTINEL_BODY"},
+            {"axis": "format", "values": [], "share": float("nan")},
+        ]
+    )
+    row = synthetic_record(0, arm, payload=payload)
+    if arm == "single":
+        assert row.brief_axes is row.dominant_axes is None
+    else:
+        assert row.brief_axes["format"] is None
+        assert len(row.dominant_axes) == retained
+    assert "SENTINEL" not in row.model_dump_json()
+
+
+@pytest.mark.parametrize("missing_arm", ["supervisor", "off"])
+def test_supplement_excludes_missing_values_on_either_side(tmp_path, missing_arm):
+    rows = [
+        synthetic_record(0, arm, tokens={} if arm == missing_arm else {"plan": 0})
+        for arm in ("supervisor", "off")
+    ]
+    data, _, _ = supplemental_report(tmp_path, rows, [request()])
+    assert data["pairs_used"] == 0 and data["pairs_unavailable"] == 1
+    assert data["purposes"] == {} and data["plan_per_request"] == []
+    for arm in ("supervisor", "off"):
+        assert data["non_research"][arm]["mean_per_request"] is None
+        assert data["research"][arm] == {
+            "mean_calls_per_request": None,
+            "input_tokens_per_call": "해당 없음",
+        }
+
+
+def test_supplement_preserves_negative_changes_and_zero_denominators(tmp_path):
+    rows = [
+        synthetic_record(0, "supervisor", tokens={"plan": 0, "research": 30}),
+        synthetic_record(0, "off", tokens={"plan": 0, "research": 10}),
+    ]
+    data, _, output = supplemental_report(tmp_path, rows, [request()])
+    assert data["pairs_used"] == 1 and data["pairs_unavailable"] == 0
+    assert data["purposes"]["research"]["reduction"] == -2
+    assert data["plan_per_request"] == [
+        {"supervisor": 0, "off": 0, "reduction": "해당 없음"}
+    ]
+    assert "해당 없음" in output
+    for arm in ("supervisor", "off"):
+        assert data["research"][arm] == {
+            "mean_calls_per_request": 0,
+            "input_tokens_per_call": "해당 없음",
+        }

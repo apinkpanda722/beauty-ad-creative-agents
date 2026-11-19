@@ -39,7 +39,7 @@ def render_inputs():
 def test_all_fourteen_required_procedures_are_present(render_inputs):
     text = prereg.render_preregistration(**render_inputs)
     sentences = prereg.REQUIRED_SENTENCES
-    assert len(sentences) == len(set(sentences)) == 17
+    assert len(sentences) == len(set(sentences)) == 18
     checked = 0
     for sentence in sentences:
         assert sentence.strip()
@@ -91,6 +91,30 @@ def test_rule_corpus_procedure_is_seventeenth(render_inputs):
     ):
         assert phrase in sentence
     assert f"17. {sentence}" in prereg.render_preregistration(**render_inputs)
+
+
+def test_e5_supplement_procedure_is_eighteenth(render_inputs):
+    sentence = prereg.REQUIRED_SENTENCES[17]
+    for phrase in (
+        "30%",
+        "참고용",
+        "리서치",
+        "토큰 기준 미달",
+        "그대로",
+        "-0.05",
+        "95%",
+        "70%",
+    ):
+        assert phrase in sentence
+    assert f"18. {sentence}" in prereg.render_preregistration(**render_inputs)
+    assert sentence in prereg.render_results_template()
+
+
+def test_first_seventeen_procedures_remain_byte_identical():
+    original = json.dumps(prereg.REQUIRED_SENTENCES[:17], ensure_ascii=False)
+    assert hashlib.sha256(original.encode()).hexdigest() == (
+        "f6bf43d9f1f74e30564564e1ce38fb2580dae1a2b9f49d59f91e3e6d1dfb59ed"
+    )
 
 
 def test_approved_limitations_are_not_weakened(render_inputs):
@@ -396,6 +420,12 @@ def test_results_template_leaves_every_measurement_cell_empty():
     assert "한 에이전트 대 한 시스템" in text
     assert "대화 압축 요약 경로는 미구현" in text
     assert "1인 라벨링" in text
+    for section, label in (
+        ("E2", "지정 축 준수(코드 판정, 참고용)"),
+        ("E5", "목적별 입력 토큰(기획 포함, 참고용)"),
+    ):
+        content = text.split(f"## {section}\n", 1)[1].split("\n## ", 1)[0]
+        assert f"| {label} |  |  |  |  |" in content
 
 
 def test_results_cli_needs_no_input_files_and_performs_no_writes(tmp_path, monkeypatch):
@@ -481,7 +511,7 @@ def test_none_measurement_preserves_original_bytes(render_inputs):
     assert "E3 dev 측정 근거" not in text
     # Captured from the unchanged renderer before implementing this step.
     assert hashlib.sha256(text.encode()).hexdigest() == (
-        "97d739c95a2d6cf2155bdac1ba171ded2ee52cfacdf26aa4daed41e86c84958e"
+        "e3d852d7643a1e6b0a91c4cc4fda4f91db52d6b1e69d90424dd46200ca05fde3"
     )
 
 
