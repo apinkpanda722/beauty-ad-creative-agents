@@ -1,0 +1,119 @@
+"""Deterministic vector retrieval and the existing-store corpus boundary."""
+
+import ast
+from datetime import UTC, datetime
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+from beautyads.domain.sync import SyncCreative, SyncLabel
+from beautyads.eval.vector_baseline import (
+    CORPUS_FIELDS,
+    MAX_DOC_CHARS,
+    CorpusDoc,
+    build_corpus,
+    cosine,
+    load_cache,
+    save_cache,
+    top_k,
+)
+
+
+@pytest.mark.parametrize(
+    "a,b,expected", [([1, 0], [0, 1], 0), ([1, 2], [1, 2], 1), ([0, 0], [1, 2], 0)]
+)
+def test_cosine(a, b, expected):
+    assert cosine(a, b) == pytest.approx(expected)
+
+
+def test_sorting_validation_and_clipping():
+    assert top_k([1, 0], [[1, 0], [1, 0], [0, 1]], ["b", "a", "c"], k=2) == ["a", "b"]
+    assert (
+        len(CorpusDoc("a", "x" * (MAX_DOC_CHARS + 1)).embedding_text) == MAX_DOC_CHARS
+    )
+    with pytest.raises(ValueError):
+        cosine([1], [1, 2])
+    with pytest.raises(ValueError):
+        top_k([1], [[1]], [])
+
+
+def test_cache_roundtrip_and_model_corpus_isolation(tmp_path):
+    docs = [CorpusDoc("a", "first"), CorpusDoc("b", "second")]
+    save_cache(tmp_path, "model/a", docs, [[1, 2], [3, 4]])
+    assert load_cache(tmp_path, "model/a", docs) == (["a", "b"], [[1, 2], [3, 4]])
+    assert load_cache(tmp_path, "model/b", docs) is None
+    assert load_cache(tmp_path, "model_a", docs) is None
+    assert load_cache(tmp_path, "model/a", [CorpusDoc("a", "changed")]) is None
+    assert any(p.suffix == ".bin" for p in tmp_path.iterdir())
+
+
+def test_existing_read_methods_only_and_reported_fields():
+    class Source:
+        def read_changed(self, **kw):
+            assert kw == {"since": None, "limit": None, "run_tag": "v1"}
+            return [
+                SyncCreative(
+                    {
+                        "source": "youtube",
+                        "source_id": "a",
+                        "brand": "test-brand",
+                        "ignored": "secret",
+                    },
+                    datetime.now(UTC),
+                )
+            ]
+
+        def read_labels(self, key, **kw):
+            return [
+                SyncLabel(
+                    "full@v1", "done", {"angle": "comparison", "ignored": "secret"}
+                )
+            ]
+
+    product = SimpleNamespace(
+        brand="brand",
+        source_url="https://example.invalid/p",
+        name_ko="name",
+        name_en=None,
+        category="sun_care",
+    )
+    products = SimpleNamespace(
+        read_changed=lambda **kw: [
+            SimpleNamespace(
+                product=product,
+                ingredients=[
+                    SimpleNamespace(status="resolved", standard_name="ingredient")
+                ],
+                certs=[SimpleNamespace(status="certified", kind="brightening")],
+            )
+        ]
+    )
+    docs = build_corpus(Source(), products)
+    assert {d.id for d in docs} == {
+        "youtube:a",
+        "product:brand:https://example.invalid/p",
+    }
+    assert "test-brand" in docs[-1].text
+    fields = {line.partition(": ")[0] for d in docs for line in d.text.splitlines()}
+    assert fields <= set(CORPUS_FIELDS)
+    assert {"brand", "angle", "name_ko", "ingredients", "certifications"} <= fields
+    assert all("secret" not in d.text for d in docs)
+
+
+def test_no_new_queries_or_forbidden_imports():
+    import beautyads.eval.vector_baseline as module
+
+    tree = ast.parse(Path(module.__file__).read_text())
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            names = (
+                [n.name for n in node.names]
+                if isinstance(node, ast.Import)
+                else [node.module]
+            )
+            assert all(n.split(".")[0] not in {"numpy", "litellm"} for n in names)
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            assert not any(
+                word in node.value.upper() for word in ("SELECT ", "MATCH (", "MERGE (")
+            )

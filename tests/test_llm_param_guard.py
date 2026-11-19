@@ -326,3 +326,41 @@ def test_supervisor_strict_decision_call_shape(tmp_path):
     assert calls[0]["response_format"]["json_schema"]["strict"] is True
     assert "temperature" not in calls[0]
     assert guard(calls) == 1
+
+
+def test_embedding_candidates_real_local_parameter_guard(tmp_path):
+    from beautyads.llm.embed import embed_texts
+    from beautyads.llm.prices import EMBEDDING_PRICES
+
+    calls = []
+
+    def capture(**kw):
+        calls.append(deepcopy(kw))
+        return {
+            "data": [{"index": 0, "embedding": [1.0]}],
+            "usage": {"prompt_tokens": 1},
+        }
+
+    for model in EMBEDDING_PRICES:
+        embed_texts(
+            ["synthetic"],
+            model=model,
+            ledger_path=tmp_path / "ledger",
+            caps={"openai": 10.0},
+            api_key=uuid4().hex,
+            embedding_fn=capture,
+        )
+    checked = set()
+    for call in calls:
+        provider, model = call["model"].split("/", 1)
+        optional = {
+            k: v
+            for k, v in call.items()
+            if k not in {"model", "input", "api_key", "timeout", "num_retries"}
+        }
+        assert not {"temperature", "dimensions", "reasoning_effort"} & optional.keys()
+        chat.litellm.utils.get_optional_params_embeddings(
+            model=model, custom_llm_provider=provider, **optional
+        )
+        checked.add(model)
+    assert checked and checked == set(EMBEDDING_PRICES)

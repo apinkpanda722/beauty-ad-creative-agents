@@ -31,6 +31,7 @@ from beautyads.llm.structured import (
 
 ROOT = Path(__file__).resolve().parents[1]
 GUARDED_MODULES = {
+    "eval/e3_live.py",
     "eval/e2_scoring.py",
     "eval/single_agent.py",
     "agents/research.py",
@@ -473,3 +474,16 @@ def test_actual_e2_scoring_specs_are_strict(tmp_path):
         assert strict_violations(spec.schema) == []
         checked += 1
     assert checked > 0, "No E2 scoring specs validated"
+
+
+def test_actual_e3_specs_and_messages_are_guarded():
+    from test_e3_live import arm_options, question
+
+    from beautyads.eval.e3_live import run
+
+    options, generator, calls = arm_options()
+    run([question()], **options)
+    assert guard_specs([generator]) > 0
+    guard_messages([kw for _, kw in generator.calls])
+    guard_messages([kw for kw in calls if "messages" in kw])
+    assert all(spec.name == "e3_answer" for spec, _ in generator.calls)

@@ -106,3 +106,7 @@ live-evalset:
 .PHONY: live-e2e5
 live-e2e5:
 	uv run python -m beautyads.eval.e2e5_live $(ARGS)
+
+.PHONY: live-e3
+live-e3:
+	uv run python -m beautyads.eval.e3_live $(ARGS)

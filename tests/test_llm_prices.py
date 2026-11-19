@@ -159,3 +159,10 @@ def test_native_anthropic_separate_cache_and_mixed_write_lifetimes():
         0.0000995,
         "price_table",
     )
+
+
+def test_embedding_price_candidates_are_positive():
+    from beautyads.llm.prices import EMBEDDING_PRICES
+
+    assert set(EMBEDDING_PRICES) == {"text-embedding-3-small", "text-embedding-3-large"}
+    assert all(model and rate > 0 for model, rate in EMBEDDING_PRICES.items())
