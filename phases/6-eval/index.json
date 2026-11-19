@@ -285,7 +285,16 @@
     {
       "step": 21,
       "name": "failure-as-worst",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-19T18:20:57+0900",
+      "summary": "E2·E5 실패 시 최저점 포함, 완전 사례 민감도·실패율·not_run 보고와 사전 등록 19번째 문장 구현. 합성 테스트 28건 추가, make verify 통과(5,702 tests). 실제 서비스 호출·추가 패키지 없음.",
+      "completed_at": "2026-11-19T18:29:16+0900",
+      "usage": {
+        "input_tokens": 1896115,
+        "cached_input_tokens": 1809408,
+        "output_tokens": 14775,
+        "attempts": 1
+      }
     }
   ],
   "created_at": "2026-11-19T12:16:24+0900"
