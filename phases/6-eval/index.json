@@ -215,13 +215,16 @@
     {
       "step": 16,
       "name": "tenant-isolation-asserts",
-      "status": "pending",
+      "status": "completed",
       "usage": {
-        "input_tokens": 276508,
-        "cached_input_tokens": 212096,
-        "output_tokens": 2670,
+        "input_tokens": 1163480,
+        "cached_input_tokens": 1070080,
+        "output_tokens": 7278,
         "attempts": 1
-      }
+      },
+      "started_at": "2026-11-19T17:13:09+0900",
+      "summary": "E3 코퍼스의 테넌트 데이터 배제·import 경계와 격리 setup의 쓰기·접근 범위를 고정하는 테스트 6건 추가. 소스 변경 없이 make verify 통과(5,498 tests), 실제 서비스 호출·추가 패키지 없음.",
+      "completed_at": "2026-11-19T17:18:14+0900"
     },
     {
       "step": 17,
