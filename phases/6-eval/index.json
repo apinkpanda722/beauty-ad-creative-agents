@@ -33,7 +33,16 @@
     {
       "step": 3,
       "name": "evalset-candidates",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-19T12:36:26+0900",
+      "summary": "결정적 평가셋 후보 생성기·정답 계산·검수 시트·해시 검증 finalize·live-evalset 구현. 실제 서비스 접속 없이 make verify 통과(5,067 tests), 추가 패키지 없음.",
+      "completed_at": "2026-11-19T12:46:25+0900",
+      "usage": {
+        "input_tokens": 1462545,
+        "cached_input_tokens": 1388416,
+        "output_tokens": 21564,
+        "attempts": 1
+      }
     },
     {
       "step": 4,
