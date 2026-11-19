@@ -1,12 +1,13 @@
 """Render offline preregistration and blank results; never commit or overwrite.
 
-The CLI reads the E3 dev measurement's selected_model and the finalized
+The CLI reads E3 dev measurement evidence and the finalized
 data/evalset/isolation_requests.jsonl. It does not run measurements or services.
 After set confirmation, use --print or --write with a new document path.
 """
 
 import argparse
 import json
+import re
 import sys
 from datetime import date
 from pathlib import Path
@@ -38,6 +39,175 @@ from beautyads.llm.prices import EMBEDDING_PRICES
 
 EMBEDDING_MEASUREMENT_PATH = e3_live.OUTPUT_DIR / "measurement.json"
 ISOLATION_REQUESTS_PATH = EVALSET_DIR / "isolation_requests.jsonl"
+
+DEV_MEASUREMENT_KEYS = {
+    "root": (
+        "selected_model",
+        "dev_question_hash",
+        "selection_rule",
+        "truncated_document_ratio",
+        "truncated_dev_evidence_ratio",
+        "n_set_questions_values_not_in_corpus",
+        "models",
+        "combinations",
+    ),
+    "models": (
+        "embedding_model",
+        "price_per_million",
+        "hit_at_k",
+        "recall_at_k",
+        "n_with_target",
+        "n_no_target",
+        "hit_at_k_all_questions",
+    ),
+    "combinations": (
+        "embedding_model",
+        "top_k",
+        "max_doc_chars",
+        "hit_at_k",
+        "recall_at_k",
+        "n_with_target",
+        "n_no_target",
+    ),
+}
+
+
+def validate_dev_measurement(measurement) -> None:
+    """Validate offline measurement evidence without replacing any file values."""
+    invalid = "PREREG_INPUT_INVALID"
+    if not isinstance(measurement, dict):
+        raise ValueError(invalid)  # noqa: TRY004 -- fixed public validation error
+    groups = {"root": [measurement]}
+    for name in ("models", "combinations"):
+        rows = measurement.get(name)
+        if not isinstance(rows, list) or not rows:
+            raise ValueError(invalid)
+        groups[name] = rows
+    for name, rows in groups.items():
+        for row in rows:
+            if not isinstance(row, dict) or not all(
+                key in row for key in DEV_MEASUREMENT_KEYS[name]
+            ):
+                raise ValueError(invalid)
+            for key in DEV_MEASUREMENT_KEYS[name]:
+                value = row.get(key)
+                if key in ("models", "combinations"):
+                    continue
+                if key in (
+                    "selected_model",
+                    "embedding_model",
+                    "dev_question_hash",
+                    "selection_rule",
+                ):
+                    if not isinstance(value, str) or ":" in value:
+                        raise ValueError(invalid)
+                elif key in ("top_k", "max_doc_chars"):
+                    if type(value) is not int or value <= 0:
+                        raise ValueError(invalid)
+                elif key in (
+                    "n_with_target",
+                    "n_no_target",
+                    "n_set_questions_values_not_in_corpus",
+                ):
+                    if type(value) is not int or value < 0:
+                        raise ValueError(invalid)
+                elif value is not None and type(value) not in (int, float):
+                    raise ValueError(invalid)
+            if name == "models" and row.get("embedding_model") not in EMBEDDING_PRICES:
+                raise ValueError(invalid)
+    selected = measurement.get("selected_model")
+    if (
+        selected not in EMBEDDING_PRICES
+        or selected not in {row.get("embedding_model") for row in groups["models"]}
+        or re.fullmatch(r"[0-9a-f]{64}", measurement.get("dev_question_hash")) is None
+    ):
+        raise ValueError(invalid)
+
+
+def _dev_measurement_lines(measurement):
+    def table(header, rows):
+        return [
+            "| " + " | ".join(header) + " |",
+            "| " + " | ".join("---" for _ in header) + " |",
+            *(
+                "| "
+                + " | ".join(
+                    "해당 없음" if value is None else str(value) for value in row
+                )
+                + " |"
+                for row in rows
+            ),
+            "",
+        ]
+
+    lines = [
+        "## E3 dev 측정 근거",
+        "",
+        (
+            "측정 파일의 값을 그대로 옮겼으며 모델 선택은 6번 문장의 규칙(hit@k 최고, 동률이면 저가)을 따른다. "
+            "TOP_K와 MAX_DOC_CHARS는 사용자가 사전 등록 전에 확정한다."
+        ),
+        "",
+    ]
+    for name, header in (
+        (
+            "models",
+            (
+                "모델",
+                "단가(100만 토큰당 USD)",
+                "hit@k",
+                "recall@k",
+                "대상 질문 수",
+                "대상 없는 질문 수",
+                "옛 정의 hit@k(전체 질문 기준)",
+            ),
+        ),
+        (
+            "combinations",
+            (
+                "모델",
+                "TOP_K",
+                "MAX_DOC_CHARS",
+                "hit@k",
+                "recall@k",
+                "대상 질문 수",
+                "대상 없는 질문 수",
+            ),
+        ),
+    ):
+        lines.extend(
+            table(
+                header,
+                (
+                    [row.get(key) for key in DEV_MEASUREMENT_KEYS[name]]
+                    for row in measurement.get(name)
+                ),
+            )
+        )
+    lines.extend(
+        table(
+            ("항목", "값"),
+            (
+                (label, measurement.get(key))
+                for label, key in (
+                    ("선택 모델", "selected_model"),
+                    ("선택 규칙", "selection_rule"),
+                    ("dev 질문 세트 해시", "dev_question_hash"),
+                    ("잘린 문서 비율", "truncated_document_ratio"),
+                    (
+                        "정답 근거 소재 문서 중 잘린 비율",
+                        "truncated_dev_evidence_ratio",
+                    ),
+                    (
+                        "정답 값이 코퍼스에 없는 집합 질문 수",
+                        "n_set_questions_values_not_in_corpus",
+                    ),
+                )
+            ),
+        )
+    )
+    return lines
+
 
 REQUIRED_SENTENCES = (
     (
@@ -146,9 +316,18 @@ REQUIRED_SENTENCES = (
 
 
 def render_preregistration(
-    *, request_hash, question_hash, extra, embedding, isolation_hash, today
+    *,
+    request_hash,
+    question_hash,
+    extra,
+    embedding,
+    isolation_hash,
+    today,
+    dev_measurement=None,
 ) -> str:
     """Render caller-supplied hashes and runner labels alongside current code."""
+    if dev_measurement is not None:
+        validate_dev_measurement(dev_measurement)
     values = {
         REQUEST_HASH_LABEL: request_hash,
         QUESTION_HASH_LABEL: question_hash,
@@ -191,6 +370,11 @@ def render_preregistration(
             for name, value in RequestLimits().model_dump().items()
         ),
         "",
+        *(
+            _dev_measurement_lines(dev_measurement)
+            if dev_measurement is not None
+            else []
+        ),
         "## 절차와 한계",
         "",
         *(f"{i}. {sentence}\n" for i, sentence in enumerate(REQUIRED_SENTENCES, 1)),
@@ -336,6 +520,7 @@ def main(argv=None, *, out=sys.stdout) -> int:
         "--write", type=Path, metavar="PATH", help=f"새 파일로 저장(예: {PREREG_PATH})"
     )
     actions.add_argument("--results-template", action="store_true")
+    parser.add_argument("--dev-measurement", type=Path, metavar="PATH")
     args = parser.parse_args(argv)
     if args.results_template:
         out.write(render_results_template())
@@ -352,12 +537,14 @@ def main(argv=None, *, out=sys.stdout) -> int:
         validate_set(
             requests, questions, answers, final=True, workspaces_path=WORKSPACES_PATH
         )
-        selection = json.loads(EMBEDDING_MEASUREMENT_PATH.read_text(encoding="utf-8"))
-        embedding = (
-            selection.get("selected_model") if isinstance(selection, dict) else None
+        measurement_path = (
+            args.dev_measurement
+            if args.dev_measurement is not None
+            else EMBEDDING_MEASUREMENT_PATH
         )
-        if not isinstance(embedding, str) or embedding not in EMBEDDING_PRICES:
-            raise ValueError("PREREG_INPUT_INVALID")
+        selection = json.loads(measurement_path.read_text(encoding="utf-8"))
+        validate_dev_measurement(selection)
+        embedding = selection.get("selected_model")
         isolation = read_jsonl(ISOLATION_REQUESTS_PATH)
         if not isolation:
             raise ValueError("PREREG_INPUT_INVALID")
@@ -368,6 +555,7 @@ def main(argv=None, *, out=sys.stdout) -> int:
             embedding=embedding,
             isolation_hash=request_set_hash(isolation),
             today=date.today(),
+            dev_measurement=selection,
         )
     except EvalsetError as exc:
         print(exc.code, file=out)

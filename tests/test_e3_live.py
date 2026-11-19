@@ -1143,6 +1143,26 @@ def test_measure_length_candidates_share_queries_and_isolate_caches(tmp_path):
     assert len(calls) == 1
 
 
+@pytest.mark.parametrize("no_target", [False, True])
+def test_measure_candidate_output_matches_prereg_consumer(tmp_path, no_target):
+    from beautyads.eval import prereg
+
+    docs, qs, path, embed, _ = measurement_inputs(tmp_path, no_target=no_target)
+    result = e3.measure(
+        docs,
+        qs,
+        answers_path=path,
+        models=list(e3.EMBEDDING_PRICES),
+        embed=embed,
+        cache_dir=tmp_path / "cache",
+        top_ks=[1, 2],
+        max_doc_chars=[2, 3],
+    )
+    assert len({row["top_k"] for row in result["combinations"]}) >= 2
+    assert len({row["max_doc_chars"] for row in result["combinations"]}) >= 2
+    assert prereg.validate_dev_measurement(result) is None
+
+
 @pytest.mark.parametrize(
     "command,mode",
     [

@@ -1,9 +1,12 @@
 """Preregistration rendering and CLI use temporary, synthetic inputs only."""
 
+import hashlib
 import io
 import json
 import re
+from copy import deepcopy
 from datetime import date
+from itertools import product
 from pathlib import Path
 
 import pytest
@@ -175,7 +178,40 @@ def test_rendered_procedure_values_follow_code(monkeypatch, render_inputs):
 
 
 @pytest.fixture
-def cli_inputs(tmp_path, monkeypatch, request):
+def dev_measurement():
+    """Invented metrics, prices and candidates, unrelated to live measurements."""
+    models = [
+        {
+            "embedding_model": model,
+            "price_per_million": price,
+            "hit_at_k": hit,
+            "recall_at_k": recall,
+            "n_with_target": 7,
+            "n_no_target": 2,
+            "hit_at_k_all_questions": old_hit,
+        }
+        for model, price, hit, recall, old_hit in (
+            ("text-embedding-3-large", 0.37, None, None, None),
+            ("text-embedding-3-small", 0.11, 0.625, 0.375, 0.25),
+        )
+    ]
+    return {
+        "selected_model": models[1]["embedding_model"],
+        "dev_question_hash": "abcdef01" * 8,
+        "selection_rule": "synthetic_selection_rule",
+        "truncated_document_ratio": 0.125,
+        "truncated_dev_evidence_ratio": None,
+        "n_set_questions_values_not_in_corpus": 4,
+        "models": models,
+        "combinations": [
+            {**model, "top_k": k, "max_doc_chars": length}
+            for model, k, length in product(models, (3, 17), (47, 83))
+        ],
+    }
+
+
+@pytest.fixture
+def cli_inputs(tmp_path, monkeypatch, request, dev_measurement):
     monkeypatch.chdir(tmp_path)
     rows = synthetic_set()
     for name, collection in zip(
@@ -188,9 +224,7 @@ def cli_inputs(tmp_path, monkeypatch, request):
         prereg, "WORKSPACES_PATH", request.getfixturevalue("workspace_config")
     )
     measurement = tmp_path / "measurement.json"
-    measurement.write_text(
-        json.dumps({"selected_model": "text-embedding-3-small"}), encoding="utf-8"
-    )
+    measurement.write_text(json.dumps(dev_measurement), encoding="utf-8")
     isolation = tmp_path / "isolation.jsonl"
     sets.write_jsonl(
         isolation,
@@ -400,3 +434,245 @@ def test_candidate_validity_limitations_are_appended(render_inputs):
     ):
         assert phrase in sentence
     assert "층화" not in sentence
+
+
+MEASUREMENT_KEYS = {
+    "root": (
+        "selected_model",
+        "dev_question_hash",
+        "selection_rule",
+        "truncated_document_ratio",
+        "truncated_dev_evidence_ratio",
+        "n_set_questions_values_not_in_corpus",
+        "models",
+        "combinations",
+    ),
+    "models": (
+        "embedding_model",
+        "price_per_million",
+        "hit_at_k",
+        "recall_at_k",
+        "n_with_target",
+        "n_no_target",
+        "hit_at_k_all_questions",
+    ),
+    "combinations": (
+        "embedding_model",
+        "top_k",
+        "max_doc_chars",
+        "hit_at_k",
+        "recall_at_k",
+        "n_with_target",
+        "n_no_target",
+    ),
+}
+
+
+def test_none_measurement_preserves_original_bytes(render_inputs):
+    text = prereg.render_preregistration(**render_inputs, dev_measurement=None)
+    assert text == prereg.render_preregistration(**render_inputs)
+    assert "E3 dev 측정 근거" not in text
+    # Captured from the unchanged renderer before implementing this step.
+    assert hashlib.sha256(text.encode()).hexdigest() == (
+        "d96b62169c8ddc9d4ae3a58e493e7d63defe609309ad9c281486577346a7aff4"
+    )
+
+
+def test_dev_measurement_tables_preserve_every_cell_and_order(
+    render_inputs, dev_measurement
+):
+    before = deepcopy(dev_measurement)
+    text = prereg.render_preregistration(
+        **render_inputs, dev_measurement=dev_measurement
+    )
+    section = text.split("## E3 dev 측정 근거\n", 1)[1].split("## 절차와 한계", 1)[0]
+    tables = [
+        block.splitlines() for block in section.split("\n\n") if block.startswith("| ")
+    ]
+    assert len(tables) == 3
+    for table, name in zip(tables, ("models", "combinations")):
+        assert len(table[2:]) == len(dev_measurement[name])
+        for line, row in zip(table[2:], dev_measurement[name], strict=True):
+            cells = [cell.strip() for cell in line.strip("|").split("|")]
+            assert cells == [
+                "해당 없음" if row[key] is None else str(row[key])
+                for key in MEASUREMENT_KEYS[name]
+            ]
+    value_rows = [
+        [cell.strip() for cell in line.strip("|").split("|")] for line in tables[2][2:]
+    ]
+    assert [row[0] for row in value_rows] == [
+        "선택 모델",
+        "선택 규칙",
+        "dev 질문 세트 해시",
+        "잘린 문서 비율",
+        "정답 근거 소재 문서 중 잘린 비율",
+        "정답 값이 코퍼스에 없는 집합 질문 수",
+    ]
+    assert [row[1] for row in value_rows] == [
+        str(dev_measurement[key]) if dev_measurement[key] is not None else "해당 없음"
+        for key in (
+            "selected_model",
+            "selection_rule",
+            "dev_question_hash",
+            "truncated_document_ratio",
+            "truncated_dev_evidence_ratio",
+            "n_set_questions_values_not_in_corpus",
+        )
+    ]
+    assert all(":" not in line for line in section.splitlines())
+    assert guard.parse_preregistration(text) == guard.parse_preregistration(
+        prereg.render_preregistration(**render_inputs)
+    )
+    assert text == prereg.render_preregistration(
+        **render_inputs, dev_measurement=dev_measurement
+    )
+    assert dev_measurement == before
+
+
+@pytest.mark.parametrize(
+    "scope,key",
+    [(scope, key) for scope, keys in MEASUREMENT_KEYS.items() for key in keys],
+)
+def test_dev_measurement_requires_every_key(dev_measurement, scope, key):
+    row = dev_measurement if scope == "root" else dev_measurement[scope][-1]
+    del row[key]
+    with pytest.raises(ValueError, match="^PREREG_INPUT_INVALID$"):
+        prereg.validate_dev_measurement(dev_measurement)
+
+
+@pytest.mark.parametrize("measurement", [None, [], "invalid", 7, True])
+def test_dev_measurement_requires_dict(measurement):
+    with pytest.raises(ValueError, match="^PREREG_INPUT_INVALID$"):
+        prereg.validate_dev_measurement(measurement)
+
+
+INVALID_MEASUREMENT_VALUES = (
+    [
+        ("root", "selected_model", value)
+        for value in ("unknown", [], None, "model:invalid")
+    ]
+    + [
+        ("root", key, value)
+        for key in ("models", "combinations")
+        for value in ([], {}, None, "invalid", [None], [[]])
+    ]
+    + [
+        ("root", "dev_question_hash", value)
+        for value in ("a" * 63, "a" * 65, "A" * 64, "g" * 64, "a" * 64 + "\n", None, 64)
+    ]
+    + [("root", "selection_rule", value) for value in ("rule:invalid", None, [])]
+    + [("models", "embedding_model", value) for value in ("unknown", None, [], "x:y")]
+    + [("combinations", "embedding_model", value) for value in (None, [], "x:y")]
+    + [
+        ("combinations", key, value)
+        for key in ("top_k", "max_doc_chars")
+        for value in (0, -1, "3", True, 1.5, None)
+    ]
+    + [
+        (scope, key, value)
+        for scope, key in (
+            ("root", "n_set_questions_values_not_in_corpus"),
+            ("models", "n_with_target"),
+            ("models", "n_no_target"),
+            ("combinations", "n_with_target"),
+            ("combinations", "n_no_target"),
+        )
+        for value in (-1, "2", True, 1.5, None)
+    ]
+    + [
+        (scope, key, value)
+        for scope, keys in (
+            ("root", ("truncated_document_ratio", "truncated_dev_evidence_ratio")),
+            (
+                "models",
+                (
+                    "price_per_million",
+                    "hit_at_k",
+                    "recall_at_k",
+                    "hit_at_k_all_questions",
+                ),
+            ),
+            ("combinations", ("hit_at_k", "recall_at_k")),
+        )
+        for key in keys
+        for value in (True, "0.5", [], {})
+    ]
+)
+
+
+@pytest.mark.parametrize("scope,key,value", INVALID_MEASUREMENT_VALUES)
+def test_invalid_dev_measurement_values_are_fixed_errors(
+    render_inputs, dev_measurement, scope, key, value
+):
+    row = dev_measurement if scope == "root" else dev_measurement[scope][-1]
+    row[key] = value
+    with pytest.raises(ValueError, match="^PREREG_INPUT_INVALID$"):
+        prereg.validate_dev_measurement(dev_measurement)
+    with pytest.raises(ValueError, match="^PREREG_INPUT_INVALID$"):
+        prereg.render_preregistration(**render_inputs, dev_measurement=dev_measurement)
+
+
+def test_selected_model_must_be_measured(dev_measurement):
+    dev_measurement["models"] = dev_measurement["models"][:1]
+    with pytest.raises(ValueError, match="^PREREG_INPUT_INVALID$"):
+        prereg.validate_dev_measurement(dev_measurement)
+
+
+def test_measurement_model_list_is_not_expanded_or_filtered(
+    render_inputs, dev_measurement
+):
+    dev_measurement["models"] = dev_measurement["models"][1:]
+    dev_measurement["combinations"] = dev_measurement["combinations"][-1:]
+    prereg.validate_dev_measurement(dev_measurement)
+    text = prereg.render_preregistration(
+        **render_inputs, dev_measurement=dev_measurement
+    )
+    section = text.split("## E3 dev 측정 근거", 1)[1].split("## 절차와 한계", 1)[0]
+    assert "text-embedding-3-large" not in section
+
+
+def test_cli_measurement_override_reads_once_and_prints_evidence(
+    cli_inputs, tmp_path, monkeypatch, dev_measurement
+):
+    path = prereg.EMBEDDING_MEASUREMENT_PATH
+    monkeypatch.setattr(prereg, "EMBEDDING_MEASUREMENT_PATH", tmp_path / "absent.json")
+    original_read = Path.read_text
+    reads = []
+
+    def read(path_, *args, **kwargs):
+        if path_ == path:
+            reads.append(path_)
+        return original_read(path_, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", read)
+    out = io.StringIO()
+    assert prereg.main(["--print", "--dev-measurement", str(path)], out=out) == 0
+    assert reads == [path]
+    assert "## E3 dev 측정 근거" in out.getvalue()
+    assert dev_measurement["dev_question_hash"] in out.getvalue()
+
+
+def test_cli_print_adds_evidence_without_writing(cli_inputs, tmp_path):
+    before = {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    out = io.StringIO()
+    assert prereg.main(["--print"], out=out) == 0
+    assert "## E3 dev 측정 근거" in out.getvalue()
+    assert {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()} == before
+
+
+@pytest.mark.parametrize("override", [False, True])
+def test_cli_incomplete_measurement_never_creates_document(
+    cli_inputs, tmp_path, dev_measurement, override
+):
+    del dev_measurement["models"][-1]["recall_at_k"]
+    path = prereg.EMBEDDING_MEASUREMENT_PATH
+    path.write_text(json.dumps(dev_measurement), encoding="utf-8")
+    target = tmp_path / "prereg.md"
+    args = ["--write", str(target)]
+    if override:
+        args.extend(["--dev-measurement", str(path)])
+    out = io.StringIO()
+    assert prereg.main(args, out=out) == 1
+    assert out.getvalue() == "PREREG_INPUT_INVALID\n"
+    assert not target.exists()
