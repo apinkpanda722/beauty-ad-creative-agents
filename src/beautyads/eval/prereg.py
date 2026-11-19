@@ -1,0 +1,369 @@
+"""Render offline preregistration and blank results; never commit or overwrite.
+
+The CLI reads the E3 dev measurement's selected_model and the finalized
+data/evalset/isolation_requests.jsonl. It does not run measurements or services.
+After set confirmation, use --print or --write with a new document path.
+"""
+
+import argparse
+import json
+import sys
+from datetime import date
+from pathlib import Path
+
+from beautyads.domain.research import ResearchBrief
+from beautyads.domain.supervisor import RequestLimits
+from beautyads.eval import e2_scoring, e2e5_live, e3_live
+from beautyads.eval.evalset import (
+    ANSWERS_PATH,
+    EVALSET_DIR,
+    QUESTIONS_PATH,
+    REQUESTS_PATH,
+    WORKSPACES_PATH,
+    EvalsetError,
+    question_set_hash,
+    read_jsonl,
+    request_set_hash,
+    validate_set,
+)
+from beautyads.eval.freeze_guard import (
+    PREREG_LINE_FORMAT,
+    PREREG_PATH,
+    QUESTION_HASH_LABEL,
+    REQUEST_HASH_LABEL,
+    frozen_values,
+)
+from beautyads.eval.single_agent import SINGLE_AGENT_PROMPT_VERSION
+from beautyads.llm.prices import EMBEDDING_PRICES
+
+EMBEDDING_MEASUREMENT_PATH = e3_live.OUTPUT_DIR / "measurement.json"
+ISOLATION_REQUESTS_PATH = EVALSET_DIR / "isolation_requests.jsonl"
+
+REQUIRED_SENTENCES = (
+    (
+        "기준 숫자는 `docs/EVAL.md` 그대로이고 이 문서는 절차 세부만 추가한다. "
+        "결과가 기준에 못 미쳐도 그대로 보고한다."
+    ),
+    (
+        'E2는 "한 에이전트 대 한 시스템" 비교다. 두 팔은 생성 모델(gpt-6.1-terra, reasoning_effort low), '
+        "도구 집합, 그래프, API 호출 재시도·구조화 교정 한도, 도구 호출 한도, 요청당 텍스트 비용 상한이 같다. "
+        "Supervisor 팔은 요청 해석, 리서치 분리, 코드가 만드는 보조 값(pattern_context, available_efficacy, "
+        "aggregates 검증), 루프 내 평가와 최대 2회 재작업 루프를 시스템으로서 함께 가진다. "
+        "단일 팔은 보조 값(pattern_context, available_efficacy)을 받지 않는다. "
+        "차이는 시스템 구성 전체의 효과이며 결과 문서에도 그렇게 적는다."
+    ),
+    (
+        "반복 횟수는 요청당 팔마다 1회(요청 20건), 쌍 비교 부트스트랩 10,000회(퍼센타일 95%), "
+        "시드는 코드 상수 값, 기준 판정은 CI가 0을 넘는지(하한 > 0)로 한다."
+    ),
+    (
+        "E2 채점은 Anthropic sonnet이고 팔 이름을 숨기고 순서를 섞고 시드를 고정하며 "
+        '루프 내 평가와 다른 루브릭·프롬프트를 쓴다. 사람 "claim 일치" 판정 약 200건은 '
+        "편향 점검용이며 주 판정이 아니다(1인 라벨링)."
+    ),
+    (
+        'E5 "끔"의 정의와 식별자 목록(우회: `trim_handoff`·`tool_result_payload` 이원화·원출력 비전달, '
+        "추가 전달: `sv_tool_outputs`를 `raw_tool_outputs` 필드로; "
+        "유지: `trim_message`·`_text_data`·`research_payload`·`MAX_ROWS` 표시; 불변: 상수·함수 정의), "
+        "입력 토큰은 요청 중 원장 증가분의 `input_tokens` 합이다. E5 (a)는 E2 Supervisor 실행을 재사용하며 "
+        "같은 코드 커밋·같은 세트 해시·같은 채점 실행일 때만 유효하고 "
+        "코드 커밋 해시와 사전 등록 커밋 해시를 결과 문서에 적는다. 이력 압축은 이 실험에 넣지 않는다."
+    ),
+    (
+        "E3: 코퍼스 필드(`CORPUS_FIELDS`), top-k(`TOP_K`), 문서 길이 자르기(`MAX_DOC_CHARS`), "
+        "답 프롬프트 버전(`ANSWER_PROMPT_VERSION`), 청크 방식(청크 분할 없음), "
+        "임베딩 모델과 선택 기준(dev 질문 hit@k 최고, 동률이면 저가)이 고정이다. "
+        "정답은 그래프 질의로 계산해 사람이 확인했다(그래프에 유리한 질문일 수 있다). "
+        "코퍼스에 test 브랜드 소재가 섞인다. 질문 40건과 단순 검색형 10건 부분집합을 따로 보고한다."
+    ),
+    (
+        "격리: 4경로·경로당 50건·합계 200건, 표식 문자열 검색을 코드가 판정, 노출 0건 기준, "
+        '정상 요청 응답률을 짝 지표로 보고한다. 경로 3은 "다른 테넌트의 thread_id 요청 거부 + 정상 요청 응답 확인"이며 '
+        "대화 압축 요약 경로는 미구현이라 대상이 아니다. 어디서도 대화 압축 격리를 검증했다고 쓰지 않는다. "
+        "재작업 경로(max_reworks=0)는 실행되지 않는다. 요청당 `max_plans=1`, `max_reworks=0`. "
+        "0건은 관측값이지 증명이 아니며 시도한 요청 유형의 범위를 결과와 함께 적는다."
+    ),
+    (
+        "층화 보조 분석: 요청·질문의 `axes_used`(세트 확정 때 고정)로 충족 축만 쓰는 항목과 "
+        "미충족 축(hook_type·angle·talent·has_proof_segment·is_vertical·has_text_overlay·cta_type·claims)을 "
+        "쓰는 항목을 나눠 따로 보고한다. 결론 근거가 아니며 층의 건수가 작으면 판정 불가로 적는다. "
+        '문항은 빼지 않는다. 미충족 축과 claims는 "라벨 신뢰도 낮음(κ x.xx)"로 표시하고 '
+        "κ 값은 E1 결과 문서에서 그대로 읽는다. 재검사 κ는 재현성 증거로 쓰지 않는다."
+    ),
+    (
+        "동결: 프롬프트 버전·상수·`_SYSTEM` sha256과 세트 해시가 위 줄과 같을 때만 "
+        "test 실행(와 격리 최종 실행)이 코드로 허용된다. 동결 뒤 프롬프트·상수·세트를 바꾸지 않는다."
+    ),
+    (
+        "E4는 선택이며 11-24까지 구현을 시작하지 못했으면 하지 않는다"
+        '(11-28까지 나머지 실험이 끝나지 않아도 하지 않는다). 하지 않은 경우 결과 문서에 "미수행"과 이유를 적는다.'
+    ),
+    (
+        '이미지 생성은 실험에서 끈다. 모든 사람 판정 수치에 "1인 라벨링"을 병기한다. '
+        "건수가 작으면 작다고 적는다. 기준을 못 넘긴 항목·판정 불가 항목도 같은 표에 넣는다. "
+        "정정은 기존 문장을 고치지 않고 정정 기록으로만 쌓는다."
+    ),
+    (
+        "비용 상한과 실행 순서: E3, E2, E5, 격리, E4(Anthropic 잔여 $1.5 이상일 때만). "
+        "호출 전 공급사별 누적액 검사는 유지한다."
+    ),
+    (
+        "변경 규칙: 사전 등록 이후 `src/`·`config/`·`data/evalset/`를 수정하면 "
+        "재등록(새 사전 등록 문서와 새 커밋)이 필요하다. "
+        "재등록 전에는 test와 격리 최종 실행이 코드로 막힌다."
+    ),
+    (
+        "커밋 절차: 사전 등록 커밋은 확정 세트(`data/evalset/`의 요청·질문·정답 파일)와 이 문서를 "
+        "함께 커밋한다(`data/evalset/`는 gitignore 대상이 아니며 최종 가드가 이 폴더의 작업 트리 변경을 차단한다)."
+    ),
+)
+
+
+def render_preregistration(
+    *, request_hash, question_hash, extra, embedding, isolation_hash, today
+) -> str:
+    """Render caller-supplied hashes and runner labels alongside current code."""
+    values = {
+        REQUEST_HASH_LABEL: request_hash,
+        QUESTION_HASH_LABEL: question_hash,
+        **frozen_values(),
+    }
+    # Extra labels belong to the runners. Do not rename or reconstruct them.
+    for label, value in sorted(extra.items()):
+        if label in values and values[label] != value:
+            raise ValueError("PREREG_INPUT_INVALID")
+        values[label] = value
+    values["격리 요청 세트 해시"] = isolation_hash
+    lines = [
+        f"# P6 사전 등록 ({today.isoformat()})",
+        "",
+        "상태: 생성됨. 확정 세트와 이 문서를 함께 커밋한 뒤에만 최종 실험을 실행한다.",
+        "기존 사전 등록 문장은 수정하지 않고 정정 기록을 추가한다.",
+        "",
+        "## 동결 값",
+        "",
+        *(PREREG_LINE_FORMAT.format(label=k, value=v) for k, v in values.items()),
+        "",
+        "## 코드에서 읽은 절차 값",
+        "",
+        "| 항목 | 값 |",
+        "| --- | --- |",
+        f"| 단일 에이전트 프롬프트 버전 | {SINGLE_AGENT_PROMPT_VERSION} |",
+        f"| E2 채점 프롬프트 버전 | {e2_scoring.E2_SCORING_PROMPT_VERSION} |",
+        f"| SCORING_SEED | {e2_scoring.SCORING_SEED} |",
+        f"| BOOTSTRAP_RESAMPLES | {e2_scoring.BOOTSTRAP_RESAMPLES} |",
+        f"| CI_CONFIDENCE | {e2_scoring.CI_CONFIDENCE} |",
+        f"| E2_SCORE_PURPOSE_CAP | {e2_scoring.E2_SCORE_PURPOSE_CAP} |",
+        f"| MIN_STRATUM_N | {e2_scoring.MIN_STRATUM_N} |",
+        f"| E5_MIN_TOKEN_REDUCTION | {e2_scoring.E5_MIN_TOKEN_REDUCTION} |",
+        f"| E5_MIN_VALIDITY_LOWER | {e2_scoring.E5_MIN_VALIDITY_LOWER} |",
+        f"| EMBED_PURPOSE_CAP | {e3_live.EMBED_PURPOSE_CAP} |",
+        f"| 임베딩 모델 | {embedding} |",
+        f"| 도구 호출 한도 | {ResearchBrief.model_fields['max_tool_calls'].default} |",
+        *(
+            f"| RequestLimits.{name} | {value} |"
+            for name, value in RequestLimits().model_dump().items()
+        ),
+        "",
+        "## 절차와 한계",
+        "",
+        *(f"{i}. {sentence}\n" for i, sentence in enumerate(REQUIRED_SENTENCES, 1)),
+        "## 정정 기록",
+        "",
+        "기존 문장 대신 날짜·이유·변경 범위·새 사전 등록 커밋을 추가 기록한다.",
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def _blank_table(header, rows):
+    width = len(header)
+    return [
+        "| " + " | ".join(header) + " |",
+        "| " + " | ".join(["---"] * width) + " |",
+        *("| " + " | ".join([row, *([""] * (width - 1))]) + " |" for row in rows),
+        "",
+    ]
+
+
+def render_results_template() -> str:
+    """Return blank reporting tables; no observation or decision is invented."""
+    lines = [
+        "# P6 실험 결과",
+        "",
+        "모든 수치에 건수·기준일·조건을 함께 적고 사람 판정은 1인 라벨링으로 표시한다.",
+        "기준 미달과 판정 불가 항목도 같은 표에 넣는다. 결과가 기준에 못 미쳐도 그대로 보고한다.",
+        "사전 등록 커밋은 확정 세트와 문서를 함께 커밋한 것이다.",
+        "",
+    ]
+    metrics = {
+        "E2": (
+            "근거 유효율(사람 claim 일치, 1인 라벨링)",
+            "요청 적합성·차별성",
+            "쌍 비교 차이·95% CI",
+            "비용·지연(p50·p95)·모델 호출 수",
+        ),
+        "E3": (
+            "정답률·쌍 비교 차이·95% CI",
+            "근거 소재 적중률",
+            "관계형 질문",
+            "단순 검색형 부분집합",
+            "임베딩 모델 선택(dev hit@k·가격)",
+        ),
+        "E4": ("AUC", "미수행", "이유"),
+        "E5": (
+            "입력 토큰 합계·감소율",
+            "근거 유효율 차이·95% CI 하한",
+            "품질 점수",
+            "비용·지연",
+            "E2 Supervisor 재사용 조건·채점 실행 식별자",
+        ),
+        "격리": ("표식 노출 건수", "정상 요청 응답률", "시도한 요청 유형의 범위"),
+    }
+    for experiment, rows in metrics.items():
+        lines.extend([f"## {experiment}", ""])
+        lines.extend(
+            _blank_table(
+                ("항목", "값"),
+                (
+                    "건수",
+                    "기준일",
+                    "조건",
+                    "코드 커밋 해시",
+                    "사전 등록 커밋 해시",
+                    "모델 ID",
+                    "판정 코드",
+                    "기준 미달 항목",
+                    "판정 불가 항목",
+                ),
+            )
+        )
+        lines.extend(
+            _blank_table(("지표", "건수", "측정값", "동결 기준", "판정 코드"), rows)
+        )
+        if experiment == "E2":
+            lines.extend([REQUIRED_SENTENCES[1], ""])
+        elif experiment == "격리":
+            lines.extend([REQUIRED_SENTENCES[6], ""])
+            lines.extend(
+                _blank_table(
+                    ("경로", "시도 건수", "표식 노출", "정상 요청 응답률"),
+                    (
+                        "그래프 도구",
+                        "피드백 메모리",
+                        "thread_id 요청 거부·정상 요청",
+                        "최종 응답",
+                    ),
+                )
+            )
+    lines.extend(["## 층화 보조 분석", "", REQUIRED_SENTENCES[7], ""])
+    lines.extend(
+        _blank_table(
+            ("층", "실험", "건수", "측정값·CI", "판정 코드"),
+            ("충족 축만 사용", "미충족 축·claims 사용"),
+        )
+    )
+    lines.extend(
+        _blank_table(
+            ("축", "E1 사람·모델 κ 원문 값", "라벨 신뢰도 표시"),
+            (
+                "hook_type",
+                "angle",
+                "talent",
+                "has_proof_segment",
+                "is_vertical",
+                "has_text_overlay",
+                "cta_type",
+                "claims",
+            ),
+        )
+    )
+    lines.extend(
+        [
+            "## 한계",
+            "",
+            "- 작은 표본과 판정 불가 항목의 범위를 적는다.",
+            "- 사람 판정은 1인 라벨링이며 재검사 κ는 재현성 증거로 쓰지 않는다.",
+            (
+                "- E3 정답은 그래프 질의로 계산해 사람이 확인했다. 그래프에 유리한 질문일 수 있고 "
+                "코퍼스에 test 브랜드 소재가 섞인다."
+            ),
+            "- E5는 이력 압축을 포함하지 않는다. 격리의 대화 압축 요약 경로는 미구현이다.",
+            "- 격리 노출이 없더라도 관측값이며 증명으로 쓰지 않는다.",
+            "",
+            "## 정정 기록",
+            "",
+            "기존 문장을 고치지 않고 날짜·이유·변경 범위를 추가한다.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def main(argv=None, *, out=sys.stdout) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    actions = parser.add_mutually_exclusive_group()
+    actions.add_argument(
+        "--print", action="store_true", help="사전 등록 문서 출력(기본)"
+    )
+    actions.add_argument(
+        "--write", type=Path, metavar="PATH", help=f"새 파일로 저장(예: {PREREG_PATH})"
+    )
+    actions.add_argument("--results-template", action="store_true")
+    args = parser.parse_args(argv)
+    if args.results_template:
+        out.write(render_results_template())
+        return 0
+    # lexists semantics also protect a dangling symlink; open('x') below closes
+    # the race between this read-only precheck and creating the new document.
+    if args.write is not None and (args.write.exists() or args.write.is_symlink()):
+        print("PREREG_FILE_EXISTS", file=out)
+        return 1
+    try:
+        requests, questions, answers = (
+            read_jsonl(path) for path in (REQUESTS_PATH, QUESTIONS_PATH, ANSWERS_PATH)
+        )
+        validate_set(
+            requests, questions, answers, final=True, workspaces_path=WORKSPACES_PATH
+        )
+        selection = json.loads(EMBEDDING_MEASUREMENT_PATH.read_text(encoding="utf-8"))
+        embedding = (
+            selection.get("selected_model") if isinstance(selection, dict) else None
+        )
+        if not isinstance(embedding, str) or embedding not in EMBEDDING_PRICES:
+            raise ValueError("PREREG_INPUT_INVALID")
+        isolation = read_jsonl(ISOLATION_REQUESTS_PATH)
+        if not isolation:
+            raise ValueError("PREREG_INPUT_INVALID")
+        text = render_preregistration(
+            request_hash=request_set_hash(requests),
+            question_hash=question_set_hash(questions, answers),
+            extra={**e2e5_live._extra_frozen(), **e3_live.extra_frozen(embedding)},
+            embedding=embedding,
+            isolation_hash=request_set_hash(isolation),
+            today=date.today(),
+        )
+    except EvalsetError as exc:
+        print(exc.code, file=out)
+        return 1
+    except (OSError, UnicodeError, ValueError, KeyError, TypeError):
+        print("PREREG_INPUT_INVALID", file=out)
+        return 1
+    if args.write is None:
+        out.write(text)
+        return 0
+    try:
+        with args.write.open("x", encoding="utf-8") as document:
+            document.write(text)
+    except FileExistsError:
+        print("PREREG_FILE_EXISTS", file=out)
+        return 1
+    except OSError:
+        print("PREREG_WRITE_FAILED", file=out)
+        return 1
+    print("사전 등록 커밋은 `data/evalset/`와 이 문서를 함께 커밋한다", file=out)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
