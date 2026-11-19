@@ -61,7 +61,16 @@
     {
       "step": 5,
       "name": "e2-scoring",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-19T12:53:50+0900",
+      "summary": "E2·E5 익명 채점기, ArmRecord, 사람 판정 시트·로더, 쌍 비교 부트스트랩·층화 분석 및 합성·스키마 가드 테스트 구현. make verify 통과(5,135 tests), 추가 패키지 없음.",
+      "completed_at": "2026-11-19T13:04:03+0900",
+      "usage": {
+        "input_tokens": 2525476,
+        "cached_input_tokens": 2423552,
+        "output_tokens": 21545,
+        "attempts": 1
+      }
     },
     {
       "step": 6,
