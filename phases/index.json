@@ -29,8 +29,8 @@
     },
     {
       "dir": "6-eval",
-      "status": "pending",
-      "blocked_at": "2026-11-19T13:32:36+0900"
+      "status": "blocked",
+      "blocked_at": "2026-11-19T17:08:38+0900"
     }
   ]
 }
