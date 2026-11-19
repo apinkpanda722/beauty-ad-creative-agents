@@ -183,7 +183,8 @@ def test_questions_counts_round_robin_and_disjoint_combinations(synthetic):
         sum(q.split == "test" and q.kind == "simple_search" for q in result.questions)
         == 15
     )
-    assert len(graph.calls) == result.query_count == len(result.questions)
+    assert result.query_count == len(graph.calls)
+    assert len(graph.calls) >= len(result.questions)
     assert len(result.answers) == len(result.questions)
     signatures = {
         (q.source_cq, json.dumps(q.cq_inputs, sort_keys=True)) for q in result.questions
@@ -216,8 +217,8 @@ def test_missing_pool_reports_shortages_without_duplicates(synthetic, monkeypatc
     )
     assert len(result.questions) == 1
     assert result.shortages == {
-        "questions_dev": 14,
-        "questions_test_graph": 45,
+        "questions_dev": 15,
+        "questions_test_graph": 44,
         "questions_test_simple_search": 15,
     }
 
@@ -893,4 +894,375 @@ def test_dev_instructions_added_before_unchanged_hash_lines(synthetic, tmp_path)
     assert (
         f"{candidates._QUESTION_HASH}: {sets.question_set_hash(bundle.questions, bundle.answers)}\n"
         in text
+    )
+
+
+@pytest.mark.parametrize(
+    "weights,total,expected",
+    [
+        ({"b": 1, "a": 1, "c": 1}, 2, {"a": 1, "b": 1, "c": 0}),
+        ({"a": 7, "b": 2, "c": 1}, 6, {"a": 4, "b": 1, "c": 1}),
+        ({"a": 1, "b": 0}, 9, {"a": 1, "b": 0}),
+        ({"a": 3, "b": 2}, 0, {"a": 0, "b": 0}),
+        ({"a": 0}, 3, {"a": 0}),
+        ({}, 3, {}),
+    ],
+)
+def test_apportion_preserves_total_caps_and_key_ties(weights, total, expected):
+    apportioned = candidates._apportion(weights, total)
+    assert apportioned == expected
+    assert sum(apportioned.values()) == min(total, sum(weights.values()))
+    assert all(0 <= value <= weights[key] for key, value in apportioned.items())
+    assert candidates._apportion(dict(reversed(weights.items())), total) == expected
+
+
+@pytest.mark.parametrize("empty", [True, False])
+def test_empty_and_oversize_answers_are_excluded(synthetic, empty):
+    size = 0 if empty else candidates.MAX_ANSWER_SET + 1
+    rows, workspaces = synthetic
+    graph = FakeGraph(rows=[{"product": f"synthetic:{i}"} for i in range(size)])
+    result = candidates.build_question_candidates(
+        rows[:1], workspaces, graph=graph, as_of=DAY
+    )
+    assert candidates.MAX_ANSWER_SET == 50
+    assert size == 0 or size == candidates.MAX_ANSWER_SET + 1
+    assert not result.questions and not result.answers
+    assert result.query_count == len(graph.calls) == 33
+    assert result.excluded == {
+        "empty": 33 if size == 0 else 0,
+        "oversize": 33 if size else 0,
+        "duplicate_answers": 0,
+    }
+    assert result.valid_pool == {"CQ-01": 0}
+    assert result.answer_sizes == {"CQ-01": {"le10": 0, "gt10": 0, "count": 0}}
+    assert result.final_shortages == {
+        "questions_dev": 10,
+        "questions_test_graph": 30,
+        "questions_test_simple_search": 10,
+    }
+
+
+class MixedGraph(FakeGraph):
+    def run(self, cypher, params):
+        self.calls.append((cypher, params))
+        # Sets: 22 valid + 11 empty; counts: 11 valid + 22 empty.
+        if cypher == "SYNTHETIC_GRAPH":
+            size = {"mask_pack": 0, "serum_ampoule": 10, "sun_care": 11}[
+                params["category"]
+            ]
+        elif cypher == "SYNTHETIC_COUNT":
+            size = (
+                candidates.MAX_ANSWER_SET + 1 if params["category"] == "sun_care" else 0
+            )
+        else:
+            size = 1
+        return SimpleNamespace(
+            records=[{"product": f"synthetic:{i}"} for i in range(size)]
+        )
+
+
+def test_mixed_pool_proportions_statistics_ids_and_answers(synthetic):
+    rows, workspaces = synthetic
+    graph = MixedGraph()
+    result = candidates.build_question_candidates(
+        rows, workspaces, graph=graph, as_of=DAY
+    )
+    assert result == candidates.build_question_candidates(
+        list(reversed(rows)), workspaces, graph=MixedGraph(), as_of=DAY
+    )
+    assert result.valid_pool == {"CQ-01": 22, "CQ-04": 11, "CQ-11": 22}
+    assert result.answer_sizes == {
+        "CQ-01": {"le10": 11, "gt10": 11, "count": 0},
+        "CQ-04": {"le10": 0, "gt10": 0, "count": 11},
+        "CQ-11": {"le10": 22, "gt10": 0, "count": 0},
+    }
+    assert result.excluded == {"empty": 33, "oversize": 0, "duplicate_answers": 51}
+    assert result.composition == {
+        "dev": {"CQ-01": 5, "CQ-04": 3, "CQ-11": 7},
+        "test": {"CQ-01": 17, "CQ-04": 8, "CQ-11": 15},
+    }
+    for cq in ("CQ-01", "CQ-04"):
+        assert (
+            abs(result.composition["dev"][cq] - result.composition["test"][cq] / 3) <= 1
+        )
+    assert result.final_shortages == {
+        "questions_dev": 0,
+        "questions_test_graph": 5,
+        "questions_test_simple_search": 0,
+    }
+    assert result.shortages == {
+        "questions_dev": 0,
+        "questions_test_graph": 20,
+        "questions_test_simple_search": 0,
+    }
+    assert result.query_count == len(graph.calls) == 66 + 22
+    assert [c for c, _ in graph.calls[:66]].count("SYNTHETIC_GRAPH") == 33
+    assert all(c == "SYNTHETIC_SIMPLE" for c, _ in graph.calls[66:])
+    assert len(
+        {
+            (q.source_cq, json.dumps(q.cq_inputs, sort_keys=True))
+            for q in result.questions
+        }
+    ) == len(result.questions)
+    for split in ("dev", "test"):
+        selected = [q for q in result.questions if q.split == split]
+        assert [q.id for q in selected] == [
+            f"q-{split}-{i:04d}" for i in range(1, len(selected) + 1)
+        ]
+        tenants = candidates._workspaces(workspaces, split)
+        assert [q.tenant_id for q in selected] == [
+            tenants[i % len(tenants)].tenant_id for i in range(len(selected))
+        ]
+    assert [a.question_id for a in result.answers] == [q.id for q in result.questions]
+    sets.validate_set([], result.questions, result.answers, final=False)
+
+
+def test_simple_search_reserved_for_test_before_dev_fallback(synthetic, monkeypatch):
+    rows, workspaces = synthetic
+    monkeypatch.setattr(
+        candidates,
+        "QUESTIONS",
+        {
+            "CQ-01": Question("SYNTHETIC_GRAPH", (), 2),
+            "CQ-11": Question("SYNTHETIC_SIMPLE", ("claim",), 1, ("claim",)),
+        },
+    )
+    result = candidates.build_question_candidates(
+        rows, workspaces, graph=FakeGraph(), as_of=DAY
+    )
+    assert Counter((q.split, q.kind) for q in result.questions) == {
+        ("test", "graph"): 1,
+        ("test", "simple_search"): 11,
+    }
+    assert result.final_shortages == {
+        "questions_dev": 10,
+        "questions_test_graph": 29,
+        "questions_test_simple_search": 0,
+    }
+    assert result.query_count == 12
+
+
+def test_simple_search_filters_invalid_answers_lazily(synthetic, monkeypatch):
+    rows, workspaces = synthetic
+    monkeypatch.setattr(
+        candidates,
+        "QUESTIONS",
+        {
+            "CQ-11": Question(
+                "SYNTHETIC_SIMPLE",
+                ("category", "claim", "concern"),
+                1,
+                ("category", "claim", "concern"),
+            ),
+        },
+    )
+
+    class SequenceGraph(FakeGraph):
+        def run(self, cypher, params):
+            self.calls.append((cypher, params))
+            size = (
+                0
+                if len(self.calls) == 1
+                else candidates.MAX_ANSWER_SET + 1
+                if len(self.calls) == 2
+                else 1
+            )
+            return SimpleNamespace(
+                records=[{"product": f"synthetic:{i}"} for i in range(size)]
+            )
+
+    graph = SequenceGraph()
+    result = candidates.build_question_candidates(
+        rows, workspaces, graph=graph, as_of=DAY
+    )
+    assert Counter((q.split, q.kind) for q in result.questions) == {
+        ("dev", "simple_search"): 15,
+        ("test", "simple_search"): 15,
+    }
+    assert result.excluded == {"empty": 1, "oversize": 1, "duplicate_answers": 29}
+    assert result.valid_pool == {"CQ-11": 30}
+    assert result.query_count == len(graph.calls) == 32
+    assert result.final_shortages["questions_test_graph"] == 30
+
+
+def test_full_pool_is_trimmed_proportionally_without_deduplicating_answers(synthetic):
+    rows, workspaces = synthetic
+    result = candidates.build_question_candidates(
+        rows, workspaces, graph=FakeGraph(), as_of=DAY
+    )
+    assert result.valid_pool == {"CQ-01": 33, "CQ-04": 33, "CQ-11": 15}
+    assert result.excluded == {"empty": 0, "oversize": 0, "duplicate_answers": 78}
+    assert result.composition["dev"] == {"CQ-01": 8, "CQ-04": 7}
+    assert result.composition["test"] == {"CQ-01": 22, "CQ-04": 23, "CQ-11": 15}
+    assert result.query_count == 81
+    assert not any(result.final_shortages.values())
+
+
+def test_offline_estimate_uses_same_apportionment_without_answers(
+    synthetic, monkeypatch
+):
+    rows, workspaces = synthetic
+    live = candidates.build_question_candidates(
+        rows, workspaces, graph=FakeGraph(), as_of=DAY
+    )
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("offline estimates must not compute answers")
+
+    monkeypatch.setattr(candidates, "compute_answer", forbidden)
+    result = candidates.build_question_candidates(rows, workspaces, as_of=DAY)
+    assert result.questions == live.questions
+    assert result.composition == live.composition
+    assert result.valid_pool == live.valid_pool
+    assert not result.answers
+    assert result.query_count == len(result.questions) == 75
+    assert result.excluded == {"empty": 0, "oversize": 0, "duplicate_answers": 0}
+
+
+@pytest.mark.parametrize(
+    "word,expected",
+    [("포맷", "을"), ("유형", "을"), ("각도", "를"), ("ABC", "을"), ("", "을")],
+)
+def test_object_particle_follows_final_consonant(word, expected):
+    assert candidates._object_particle(word) == expected
+
+
+def test_request_conditions_exclude_other_and_use_correct_particles(
+    synthetic, monkeypatch
+):
+    rows, workspaces = synthetic
+    for template, noun in (
+        ("format", "포맷"),
+        ("hook_type", "훅 유형"),
+        ("angle", "각도"),
+    ):
+        with monkeypatch.context() as patch:
+            patch.setattr(
+                candidates,
+                "_REQUEST_AXES",
+                {template: candidates._REQUEST_AXES[template]},
+            )
+            result = candidates.build_request_candidates(rows, workspaces)
+        assert result.requests
+        for item in result.requests:
+            assert candidates._LABELS[template]["other"] not in item.message
+            assert f"{noun}{candidates._object_particle(noun)} 지정해" in item.message
+            assert all(
+                bad not in item.message
+                for bad in ("포맷 포맷", "훅 훅", "각도 각도", "각도을")
+            )
+
+
+def test_request_label_suffix_is_not_repeated(synthetic, monkeypatch):
+    rows, workspaces = synthetic
+    monkeypatch.setattr(candidates, "_REQUEST_AXES", {"format": ["category", "format"]})
+    monkeypatch.setitem(
+        candidates._LABELS,
+        "format",
+        {key: "합성 포맷" for key in candidates._LABELS["format"]},
+    )
+    result = candidates.build_request_candidates(rows, workspaces)
+    assert result.requests
+    assert all(
+        "합성 포맷을 지정해" in item.message and "포맷 포맷" not in item.message
+        for item in result.requests
+    )
+
+
+def test_generation_json_contains_only_count_diagnostics(synthetic, tmp_path):
+    rows, workspaces = synthetic
+    out = io.StringIO()
+    assert (
+        candidates.main(
+            [],
+            cq_rows=rows,
+            workspaces=workspaces,
+            graph_factory=MixedGraph,
+            check=lambda: None,
+            candidate_dir=tmp_path,
+            as_of=DAY,
+            out=out,
+        )
+        == 0
+    )
+    summary = json.loads(out.getvalue().splitlines()[0])
+    result = candidates.build_question_candidates(
+        rows, workspaces, graph=MixedGraph(), as_of=DAY
+    )
+    for name in ("excluded", "valid_pool", "answer_sizes", "composition"):
+        assert summary[name] == getattr(result, name)
+    assert summary["final_shortages"] == {
+        "requests_dev": 0,
+        "requests_test": 0,
+        **result.final_shortages,
+    }
+    assert "synthetic:" not in out.getvalue()
+    text = (tmp_path / "review_instructions.md").read_text()
+    for phrase in (
+        str(candidates.MAX_ANSWER_SET),
+        "이미 제외",
+        "CQ-08",
+        "CQ-13",
+        "CQ-14",
+        "데이터 부재",
+        "final_shortages",
+    ):
+        assert phrase in text
+
+
+@pytest.mark.parametrize("size", [1, 50])
+def test_set_answer_boundary_uses_unique_values_not_row_count(synthetic, size):
+    rows, workspaces = synthetic
+    graph = FakeGraph(rows=[{"product": f"synthetic:{i}"} for i in range(size)] * 2)
+    result = candidates.build_question_candidates(
+        rows[:1], workspaces, graph=graph, as_of=DAY
+    )
+    assert result.valid_pool == {"CQ-01": 33}
+    assert len(result.questions) == len(result.answers) == 33
+    assert all(len(answer.value) == size for answer in result.answers)
+    assert result.excluded == {"empty": 0, "oversize": 0, "duplicate_answers": 32}
+    assert result.answer_sizes == {
+        "CQ-01": {
+            "le10": 33 if size <= 10 else 0,
+            "gt10": 33 if size > 10 else 0,
+            "count": 0,
+        }
+    }
+
+
+def test_count_answer_uses_result_rows_even_when_aggregate_cell_is_zero(synthetic):
+    rows, workspaces = synthetic
+    result = candidates.build_question_candidates(
+        rows[1:2], workspaces, graph=FakeGraph(rows=[{"aggregate": 0}]), as_of=DAY
+    )
+    assert result.valid_pool == {"CQ-04": 33}
+    assert all(answer.value == 1 for answer in result.answers)
+    assert result.answer_sizes == {"CQ-04": {"le10": 0, "gt10": 0, "count": 33}}
+    assert result.excluded["empty"] == result.excluded["oversize"] == 0
+
+
+def test_unequal_cq_pools_are_capped_before_dev_test_allocation(synthetic, monkeypatch):
+    rows, workspaces = synthetic
+    # A third graph CQ has category-only inputs: pool weights 33, 33, 3.
+    monkeypatch.setitem(
+        candidates.QUESTIONS,
+        "CQ-11",
+        Question("SYNTHETIC_THIRD", ("category",), 2, ("category",)),
+    )
+    result = candidates.build_question_candidates(
+        rows, workspaces, graph=FakeGraph(), as_of=DAY
+    )
+    assert result.valid_pool == {"CQ-01": 33, "CQ-04": 33, "CQ-11": 3}
+    assert result.composition == {
+        "dev": {"CQ-01": 7, "CQ-04": 7, "CQ-11": 1},
+        "test": {"CQ-01": 22, "CQ-04": 22, "CQ-11": 1},
+    }
+    assert result.query_count == 69
+    assert result.final_shortages == {
+        "questions_dev": 0,
+        "questions_test_graph": 0,
+        "questions_test_simple_search": 10,
+    }
+    assert (
+        sum(result.composition[split].get("CQ-11", 0) for split in ("dev", "test")) == 2
     )

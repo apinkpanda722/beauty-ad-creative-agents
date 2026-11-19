@@ -13,7 +13,7 @@ from pathlib import Path
 
 from beautyads.domain.research import ResearchBrief
 from beautyads.domain.supervisor import RequestLimits
-from beautyads.eval import e2_scoring, e2e5_live, e3_live
+from beautyads.eval import e2_scoring, e2e5_live, e3_live, evalset_candidates
 from beautyads.eval.evalset import (
     ANSWERS_PATH,
     EVALSET_DIR,
@@ -115,6 +115,13 @@ REQUIRED_SENTENCES = (
     (
         "커밋 절차: 사전 등록 커밋은 확정 세트(`data/evalset/`의 요청·질문·정답 파일)와 이 문서를 "
         "함께 커밋한다(`data/evalset/`는 gitignore 대상이 아니며 최종 가드가 이 폴더의 작업 트리 변경을 차단한다)."
+    ),
+    (
+        "E3 관계 질문 후보는 정답이 비었거나 정답 집합 크기가 "
+        f"{evalset_candidates.MAX_ANSWER_SET}을 넘는 질문을 제외했다. "
+        "CQ-08·CQ-13·CQ-14는 데이터 부재로 항상 빈 정답이라 제외된다. "
+        "관계 질문은 소수 CQ 유형의 닫힌 입력 조합에서 만든 것이므로 "
+        "질문 간 독립이 아니며 결과는 이 템플릿 범위에 한정한다."
     ),
 )
 

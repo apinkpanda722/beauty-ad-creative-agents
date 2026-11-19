@@ -36,7 +36,7 @@ def render_inputs():
 def test_all_fourteen_required_procedures_are_present(render_inputs):
     text = prereg.render_preregistration(**render_inputs)
     sentences = prereg.REQUIRED_SENTENCES
-    assert len(sentences) == len(set(sentences)) == 14
+    assert len(sentences) == len(set(sentences)) == 15
     checked = 0
     for sentence in sentences:
         assert sentence.strip()
@@ -337,3 +337,25 @@ def test_render_functions_perform_no_file_io(tmp_path, monkeypatch, render_input
     assert prereg.render_preregistration(**render_inputs)
     assert prereg.render_results_template()
     assert list(tmp_path.iterdir()) == []
+
+
+def test_candidate_validity_limitations_are_appended(render_inputs):
+    from beautyads.eval import evalset_candidates
+
+    sentence = prereg.REQUIRED_SENTENCES[-1]
+    text = prereg.render_preregistration(**render_inputs)
+    assert f"15. {sentence}" in text
+    for phrase in (
+        str(evalset_candidates.MAX_ANSWER_SET),
+        "정답",
+        "비었",
+        "넘는",
+        "CQ-08",
+        "CQ-13",
+        "CQ-14",
+        "데이터 부재",
+        "독립",
+        "템플릿 범위에 한정",
+    ):
+        assert phrase in sentence
+    assert "층화" not in sentence

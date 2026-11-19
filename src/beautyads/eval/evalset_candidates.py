@@ -42,6 +42,7 @@ from beautyads.settings import DEFAULT_ENV_FILE
 from beautyads.sources.workspaces import load_workspaces
 
 CANDIDATE_FACTOR = 1.5
+MAX_ANSWER_SET = 50
 CANDIDATE_DIR = Path("data/interim/evalset")
 DEV_SPLIT_DIR = CANDIDATE_DIR / "dev"
 DEV_SPLIT_CHANGED = "DEV_SPLIT_CHANGED"
@@ -178,6 +179,11 @@ class Candidates:
     shortages: dict[str, int] = field(default_factory=dict)
     errors: dict[str, int] = field(default_factory=dict)
     query_count: int = 0
+    excluded: dict[str, int] = field(default_factory=dict)
+    valid_pool: dict[str, int] = field(default_factory=dict)
+    answer_sizes: dict[str, dict[str, int]] = field(default_factory=dict)
+    composition: dict[str, dict[str, int]] = field(default_factory=dict)
+    final_shortages: dict[str, int] = field(default_factory=dict)
 
 
 class ReviewedSet(NamedTuple):
@@ -250,6 +256,26 @@ def _round_robin(groups, rng):
                 yield queue.popleft()
 
 
+def _apportion(weights: dict[str, int], total: int) -> dict[str, int]:
+    """Allocate capped integer quotas by largest remainder, breaking ties by key."""
+    available = sum(weights.values())
+    total = min(total, available)
+    if not available:
+        return dict.fromkeys(sorted(weights), 0)
+    quotas = {key: total * weight // available for key, weight in weights.items()}
+    order = sorted(weights, key=lambda key: (-(total * weights[key] % available), key))
+    for key in order[: total - sum(quotas.values())]:
+        quotas[key] += 1
+    return quotas
+
+
+def _object_particle(word) -> str:
+    """Choose the Korean object particle from the final Hangul syllable."""
+    if word and "가" <= word[-1] <= "힣":
+        return "을" if (ord(word[-1]) - ord("가")) % 28 else "를"
+    return "을"
+
+
 def build_request_candidates(cq_rows, workspaces, *, briefs=None) -> Candidates:
     briefs = BRIEFS if briefs is None else briefs
     cqs = [
@@ -284,13 +310,18 @@ def build_request_candidates(cq_rows, workspaces, *, briefs=None) -> Candidates:
                 else tuple(v.value for v in enums[template])
             )
             for value in values:
+                if value == "other":
+                    continue
                 if value is not None and value not in _LABELS[template]:
                     continue
-                condition = (
-                    ""
-                    if value is None
-                    else f" {_LABELS[template][value]} {'포맷' if template == 'format' else '훅 유형' if template == 'hook_type' else '각도'}을 지정해"
-                )
+                condition = ""
+                if value is not None:
+                    noun = {"format": "포맷", "hook_type": "훅 유형", "angle": "각도"}[
+                        template
+                    ]
+                    label = _LABELS[template][value]
+                    phrase = label if label.endswith(noun) else f"{label} {noun}"
+                    condition = f" {phrase}{_object_particle(phrase)} 지정해"
                 message = f"역량 질문 {cq['id']}의 근거를 바탕으로 {_LABELS['category'][category]} 제품의 {_LABELS['claim'][claim]} 광고를{condition} 기획안 1안으로 작성해 주세요."
                 signature = (workspace.tenant_id, message)
                 if signature in seen:
@@ -378,8 +409,15 @@ def build_question_candidates(cq_rows, workspaces, *, graph=None, as_of) -> Cand
             groups[kind].setdefault(qid, []).append(
                 (qid, inputs, _QUESTION_TEXT[qid].format(**labels))
             )
-    pools = {kind: iter(_round_robin(group, rng)) for kind, group in groups.items()}
-    result = Candidates()
+    result = Candidates(
+        excluded={"empty": 0, "oversize": 0, "duplicate_answers": 0},
+        valid_pool={qid: 0 for group in groups.values() for qid in sorted(group)},
+        answer_sizes={
+            qid: {"le10": 0, "gt10": 0, "count": 0}
+            for group in groups.values()
+            for qid in sorted(group)
+        },
+    )
     reader = _CountingGraph(graph) if graph is not None else None
     errors = Counter()
     targets = {
@@ -387,50 +425,134 @@ def build_question_candidates(cq_rows, workspaces, *, graph=None, as_of) -> Cand
         for key, value in _FINAL_TARGETS.items()
         if key.startswith("questions_")
     }
+    seen_answers = {qid: set() for qid in result.valid_pool}
     sequence = 0
-    for split, kind, limit in (
-        ("dev", "graph", targets["questions_dev"]),
-        ("test", "graph", targets["questions_test_graph"]),
-        ("test", "simple_search", targets["questions_test_simple_search"]),
+
+    def evaluate(entry, kind):
+        nonlocal sequence
+        qid, inputs, text = entry
+        sequence += 1
+        # Fixed queries read public data; split/tenant and final IDs are assigned
+        # only after answer validation and proportional allocation.
+        question = QuestionItem(
+            id=f"q-pending-{sequence:04d}",
+            split="dev",
+            tenant_id="dev-pending",
+            source_cq=qid,
+            axes_used=list(_CQ_AXES[qid]),
+            needs_human_review=True,
+            reviewed=False,
+            kind=kind,
+            text=text,
+            cq_inputs=inputs,
+            answer_type="count" if qid == "CQ-04" else "set",
+        )
+        answer = None
+        if reader is not None:
+            try:
+                answer = compute_answer(reader, question, as_of=as_of)
+            except Exception as error:  # noqa: BLE001 -- isolate failed candidates
+                errors[_failure_code(error)] += 1
+                return None
+            size = len(answer.value) if answer.answer_type == "set" else answer.value
+            if size == 0:
+                result.excluded["empty"] += 1
+                return None
+            if answer.answer_type == "set" and size > MAX_ANSWER_SET:
+                result.excluded["oversize"] += 1
+                return None
+            bucket = (
+                "count"
+                if answer.answer_type == "count"
+                else "le10"
+                if size <= 10
+                else "gt10"
+            )
+            result.answer_sizes[qid][bucket] += 1
+            signature = (
+                tuple(answer.value) if answer.answer_type == "set" else answer.value
+            )
+            if signature in seen_answers[qid]:
+                result.excluded["duplicate_answers"] += 1
+            seen_answers[qid].add(signature)
+        result.valid_pool[qid] += 1
+        return question, answer
+
+    # Evaluate every closed graph combination before capping or splitting.
+    valid_graph = {qid: [] for qid in sorted(groups["graph"])}
+    for entry in _round_robin(groups["graph"], rng):
+        candidate = evaluate(entry, "graph")
+        if candidate is not None:
+            valid_graph[entry[0]].append(candidate)
+    quotas = _apportion(
+        {qid: len(items) for qid, items in valid_graph.items()},
+        targets["questions_dev"] + targets["questions_test_graph"],
+    )
+    valid_graph = {qid: items[: quotas[qid]] for qid, items in valid_graph.items()}
+    pool_size = sum(quotas.values())
+    dev_share = min(
+        targets["questions_dev"],
+        round(
+            pool_size
+            * _FINAL_TARGETS["questions_dev"]
+            / (_FINAL_TARGETS["questions_dev"] + _FINAL_TARGETS["questions_test_graph"])
+        ),
+    )
+    dev_quotas = _apportion(quotas, dev_share)
+    selected = {"dev": [], "test": []}
+    for qid, items in valid_graph.items():
+        selected["dev"].extend(items[: dev_quotas[qid]])
+        selected["test"].extend(items[dev_quotas[qid] :])
+
+    # Reserve test simple searches first, then fill only the dev deficit. This
+    # iterator stops once both quotas are met, leaving remaining inputs unqueried.
+    simple_pool = iter(_round_robin(groups["simple_search"], rng))
+    for split, limit in (
+        ("test", targets["questions_test_simple_search"]),
+        ("dev", targets["questions_dev"] - len(selected["dev"])),
     ):
+        if not _workspaces(workspaces, split):
+            continue
+        accepted = 0
+        while accepted < limit:
+            entry = next(simple_pool, None)
+            if entry is None:
+                break
+            candidate = evaluate(entry, "simple_search")
+            if candidate is not None:
+                selected[split].append(candidate)
+                accepted += 1
+
+    for split in ("dev", "test"):
         tenants = _workspaces(workspaces, split)
         if not tenants:
             continue
-        accepted = 0
-        # Dev has no required kind. Use simple searches only if graph inputs run out.
-        kinds = (kind, "simple_search") if split == "dev" else (kind,)
-        for pool_kind in kinds:
-            while accepted < limit:
-                entry = next(pools[pool_kind], None)
-                if entry is None:
-                    break
-                qid, inputs, text = entry
-                sequence += 1
-                question = QuestionItem(
-                    id=f"q-{split}-{sequence:04d}",
-                    split=split,
-                    tenant_id=tenants[accepted % len(tenants)].tenant_id,
-                    source_cq=qid,
-                    axes_used=list(_CQ_AXES[qid]),
-                    needs_human_review=True,
-                    reviewed=False,
-                    kind=pool_kind,
-                    text=text,
-                    cq_inputs=inputs,
-                    answer_type="count" if qid == "CQ-04" else "set",
+        for index, (question, answer) in enumerate(selected[split], 1):
+            question = QuestionItem.model_validate(
+                {
+                    **question.model_dump(),
+                    "id": f"q-{split}-{index:04d}",
+                    "split": split,
+                    "tenant_id": tenants[(index - 1) % len(tenants)].tenant_id,
+                }
+            )
+            result.questions.append(question)
+            if answer is not None:
+                result.answers.append(
+                    AnswerItem.model_validate(
+                        {**answer.model_dump(), "question_id": question.id}
+                    )
                 )
-                if reader is not None:
-                    try:
-                        answer = compute_answer(reader, question, as_of=as_of)
-                    except Exception as error:  # noqa: BLE001 -- isolate failed candidates
-                        errors[_failure_code(error)] += 1
-                        continue
-                    result.answers.append(answer)
-                result.questions.append(question)
-                accepted += 1
     result.query_count = reader.count if reader is not None else len(result.questions)
     result.errors = dict(errors)
     result.shortages = _shortages([], result.questions, targets)
+    result.final_shortages = _shortages(
+        [], result.questions, {key: _FINAL_TARGETS[key] for key in targets}
+    )
+    result.composition = {
+        split: dict(Counter(q.source_cq for q in result.questions if q.split == split))
+        for split in ("dev", "test")
+    }
     return result
 
 
@@ -549,6 +671,13 @@ X로 제외하는 행도 포함해 모든 dev 행의 네 칸(decision·edited_te
 채워야 한다. 빈 칸 금지이며 test 행은 비워 둬도 된다.
 dev만 확정한 파일은 최종 사전 등록 세트가 아니다.
 test까지 검수를 끝낸 뒤 finalize로 전체를 확정한다.
+
+"""
+    instructions += f"""## 질문 후보 유효성과 부족 건수
+정답이 비었거나 정답 집합 크기가 {MAX_ANSWER_SET} 초과인 질문은 후보에서 이미 제외했다.
+count 정답은 결과 행 수가 0일 때 제외하며 집합 크기 상한은 적용하지 않는다.
+CQ-08·CQ-13·CQ-14는 데이터 부재로 항상 빈 정답이라 후보가 없다.
+후보가 부족하면 생성 출력의 final_shortages를 확인한다.
 
 """
     instructions += f"{_REQUEST_HASH}: {request_set_hash(candidates.requests)}\n"
@@ -867,6 +996,13 @@ def main(
             shortages={**requests.shortages, **questions.shortages},
             errors=questions.errors,
             query_count=questions.query_count,
+            excluded=questions.excluded,
+            valid_pool=questions.valid_pool,
+            answer_sizes=questions.answer_sizes,
+            composition=questions.composition,
+            final_shortages=_shortages(
+                requests.requests, questions.questions, _FINAL_TARGETS
+            ),
         )
         print(
             json.dumps(
@@ -875,6 +1011,11 @@ def main(
                     "questions": len(bundle.questions),
                     "shortages": bundle.shortages,
                     "errors": bundle.errors,
+                    "excluded": bundle.excluded,
+                    "valid_pool": bundle.valid_pool,
+                    "answer_sizes": bundle.answer_sizes,
+                    "composition": bundle.composition,
+                    "final_shortages": bundle.final_shortages,
                 },
                 ensure_ascii=False,
             ),
