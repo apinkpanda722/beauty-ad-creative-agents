@@ -48,6 +48,8 @@ from beautyads.llm.prices import EMBEDDING_PRICES
 from beautyads.llm.structured import StructuredSpec, make_structured
 from beautyads.obs.ledger import CostCapExceeded, check_cap, check_purpose_cap
 from beautyads.settings import get_setting, load_settings
+from beautyads.sources.claim_rules import load_claim_rules
+from beautyads.sources.config import ConfigError
 from beautyads.sources.workspaces import load_workspaces
 from beautyads.store.connection import connect, postgres_dsn
 from beautyads.store.layer1_source import PostgresLayer1Source
@@ -268,6 +270,18 @@ def target_ids(truth, doc_ids) -> set[str]:
     """Map answers to existing corpus IDs locally, without exposing values."""
     ids = set(doc_ids)
     return (set(truth.evidence_ids) & ids) | _value_target_ids(truth.value, ids)
+
+
+def is_reachable(truth, doc_ids) -> bool:
+    """Require every answer value and every evidence ID to map to the corpus."""
+    ids = set(doc_ids)
+    if not set(truth.evidence_ids) <= ids:
+        return False
+    if truth.answer_type == "set" and isinstance(truth.value, list):
+        return all(_value_target_ids([value], ids) for value in truth.value)
+    if truth.answer_type == "count":
+        return bool(truth.evidence_ids)
+    return False
 
 
 def _corpus_vectors(docs, model, embed, cache_dir, max_chars=None):
@@ -570,7 +584,7 @@ def _summary(questions, scores):
     }
 
 
-def report(records, questions, *, answers_path, split):
+def report(records, questions, *, answers_path, split, corpus_doc_ids=None):
     selected = [q for q in questions if q.split == split]
     truths = read_answers(
         answers_path, questions=selected, split=split, purpose="report"
@@ -617,6 +631,11 @@ def report(records, questions, *, answers_path, split):
         summary["decision"] = "undecidable"
         return summary
 
+    reachable = (
+        [q for q in selected if is_reachable(truths[q.id], corpus_doc_ids)]
+        if corpus_doc_ids is not None
+        else []
+    )
     return {
         "overall": _summary(selected, scores),
         "graph_questions": _summary([q for q in selected if q.kind == "graph"], scores),
@@ -643,6 +662,13 @@ def report(records, questions, *, answers_path, split):
                 [q for q in sets if sizes[q.id] > vector_baseline.TOP_K]
             ),
         },
+        "reachable_subset": {
+            "n_reachable": len(reachable),
+            "n_total": len(selected),
+            **descriptive(reachable),
+        }
+        if corpus_doc_ids is not None
+        else {"status": "corpus_ids_missing"},
     }
 
 
@@ -713,7 +739,13 @@ def build_calls(
 def load_corpus():
     conn = connect(postgres_dsn())
     try:
-        return build_corpus(PostgresGraphSyncSource(conn), PostgresLayer1Source(conn))
+        try:
+            rules = load_claim_rules(Path("config/claim_rules.yaml"))
+        except ConfigError:
+            raise E3Error("E3_CORPUS_RULES_INVALID") from None
+        return build_corpus(
+            PostgresGraphSyncSource(conn), PostgresLayer1Source(conn), rules=rules
+        )
     finally:
         conn.close()
 
@@ -859,12 +891,19 @@ def main(
             questions = questions[: args.limit]
         _questions(questions, args.mode)
         result_path = output_dir / f"{args.mode}_results.jsonl"
+        corpus_ids_path = output_dir / f"{args.mode}_corpus_ids.json"
         if args.command == "report":
+            corpus_doc_ids = (
+                json.loads(corpus_ids_path.read_text(encoding="utf-8")).get("ids")
+                if corpus_ids_path.exists()
+                else None
+            )
             result = report(
                 read_jsonl(result_path),
                 questions,
                 answers_path=answers_path,
                 split=split,
+                corpus_doc_ids=corpus_doc_ids,
             )
             _write_json(output_dir / f"{args.mode}_report.json", result)
         else:
@@ -878,6 +917,8 @@ def main(
             docs = (
                 corpus_loader() if args.command == "measure" or "vector" in arms else []
             )
+            if args.command == "run" and "vector" in arms:
+                _write_json(corpus_ids_path, {"ids": sorted(d.id for d in docs)})
             if args.dry_run:
                 result = measure(
                     docs,

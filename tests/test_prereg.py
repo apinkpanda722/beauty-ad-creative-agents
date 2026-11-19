@@ -36,7 +36,7 @@ def render_inputs():
 def test_all_fourteen_required_procedures_are_present(render_inputs):
     text = prereg.render_preregistration(**render_inputs)
     sentences = prereg.REQUIRED_SENTENCES
-    assert len(sentences) == len(set(sentences)) == 16
+    assert len(sentences) == len(set(sentences)) == 17
     checked = 0
     for sentence in sentences:
         assert sentence.strip()
@@ -61,13 +61,33 @@ def test_e3_reporting_procedure_is_appended(render_inputs):
         "MAX_DOC_CHARS",
         "evidence_ids",
         "대상이 없는 질문 수",
-        "표현 규칙 ID",
         "효능",
         "카테고리",
         "test 결과",
     ):
         assert phrase in sentence
     assert sentence in prereg.render_preregistration(**render_inputs)
+    assert "표현 규칙 ID" not in sentence
+
+
+def test_rule_corpus_procedure_is_seventeenth(render_inputs):
+    sentence = prereg.REQUIRED_SENTENCES[16]
+    for phrase in (
+        "규칙",
+        "APPLIES_TO",
+        "상속",
+        "참고용",
+        "전체 질문 기준",
+        "reachable_subset",
+        "graph_adopted",
+        "advisor_approved",
+        "confirmed",
+        "효능",
+        "카테고리",
+        "도달 가능 질문 수",
+    ):
+        assert phrase in sentence
+    assert f"17. {sentence}" in prereg.render_preregistration(**render_inputs)
 
 
 def test_approved_limitations_are_not_weakened(render_inputs):

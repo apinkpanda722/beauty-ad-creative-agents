@@ -9,6 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from beautyads.domain.claims import ClaimRule
 from beautyads.domain.sync import SyncCreative, SyncLabel
 from beautyads.eval.vector_baseline import (
     CORPUS_FIELDS,
@@ -92,6 +93,7 @@ def test_existing_read_methods_only_and_reported_fields():
         ]
     )
     docs = build_corpus(Source(), products)
+    assert docs == build_corpus(Source(), products, rules=())
     assert {d.id for d in docs} == {
         "youtube:a",
         "product:brand:https://example.invalid/p",
@@ -150,3 +152,105 @@ def test_length_specific_text_and_cache_preserve_legacy_format(tmp_path):
     assert _fingerprint([CorpusDoc("a", "x")], 2) != _fingerprint(
         [CorpusDoc("a", "x")], 3
     )
+
+
+def synthetic_rule(rule_id="CR-011", scopes=()):
+    return ClaimRule(
+        rule_id=rule_id,
+        rule_type="prohibited",
+        source_page=1,
+        law_basis="SENTINEL_BASIS",
+        group="synthetic group",
+        source_items=["SENTINEL_SOURCE"],
+        matchable=True,
+        terms_ko=["합성" * MAX_DOC_CHARS],
+        terms_en=["SENTINEL_ENGLISH"],
+        terms_en_added=[],
+        en_pending=False,
+        en_waived=False,
+        exception_note="SENTINEL_EXCEPTION",
+        exceptions=["SENTINEL_EXCEPTION"],
+        exception_refs=[],
+        applies_to=list(scopes),
+    )
+
+
+def test_rule_documents_keep_only_direct_approved_scopes_and_ordered_fields():
+    from beautyads.eval.vector_baseline import _RULE_FIELDS
+
+    expected_fields = ("rule_id", "rule_type", "group", "applies_to", "terms_ko")
+    assert _RULE_FIELDS == expected_fields
+    rules = [
+        synthetic_rule(
+            "CR-012",
+            [
+                {"kind": "category", "value": "sun_care", "status": "confirmed"},
+                {"kind": "efficacy", "value": "soothing", "status": "draft"},
+            ],
+        ),
+        synthetic_rule(
+            "CR-011",
+            [
+                {
+                    "kind": "efficacy",
+                    "value": "hydration",
+                    "status": "advisor_approved",
+                },
+                {"kind": "skin_concern", "value": "건조", "status": "confirmed"},
+            ],
+        ),
+    ]
+    source = SimpleNamespace(read_changed=lambda **kw: [])
+    docs = build_corpus(source, source, rules=rules)
+    assert [d.id for d in docs] == sorted(r.rule_id for r in rules)
+    assert build_corpus(source, source) == build_corpus(source, source, rules=()) == []
+    assert set(_RULE_FIELDS) <= set(CORPUS_FIELDS)
+    by_id = {r.rule_id: r for r in rules}
+    for doc in docs:
+        lines = [line.partition(": ") for line in doc.text.splitlines()]
+        assert tuple(key for key, _, _ in lines) == expected_fields
+        assert {key for key, _, _ in lines} <= set(CORPUS_FIELDS)
+        values = {key: json.loads(value) for key, _, value in lines}
+        rule = by_id[doc.id]
+        assert values == {
+            "rule_id": rule.rule_id,
+            "rule_type": rule.rule_type.value,
+            "group": rule.group,
+            "applies_to": [
+                f"{scope.kind}:{scope.value}"
+                for scope in rule.applies_to
+                if scope.status in {"confirmed", "advisor_approved"}
+            ],
+            "terms_ko": rule.terms_ko,
+        }
+        assert "SENTINEL" not in doc.text
+        assert len(doc.embedding_text) == MAX_DOC_CHARS
+        # ID and all direct scopes survive truncation of the final terms field.
+        prefix = doc.embedding_text.split("\nterms_ko: ")[0]
+        assert prefix == doc.text.split("\nterms_ko: ")[0]
+
+
+@pytest.mark.parametrize("duplicate", ["creative", "product", "rule"])
+def test_rule_id_collisions_use_existing_error(duplicate):
+    source = SimpleNamespace(
+        read_changed=lambda **kw: [
+            SyncCreative({"source": "youtube", "source_id": "a"}, datetime.now(UTC))
+        ],
+        read_labels=lambda *a, **kw: [],
+    )
+    product = SimpleNamespace(brand="brand", source_url="https://example.invalid/p")
+    products = SimpleNamespace(
+        read_changed=lambda **kw: [
+            SimpleNamespace(product=product, ingredients=[], certs=[])
+        ]
+    )
+    id_ = {
+        "creative": "youtube:a",
+        "product": f"product:{product.brand}:{product.source_url}",
+        "rule": "CR-011",
+    }[duplicate]
+    rules = [synthetic_rule(id_)]
+    if duplicate == "rule":
+        rules *= 2
+    with pytest.raises(ValueError, match="^CORPUS_ID_DUPLICATE$"):
+        build_corpus(source, products, rules=rules)

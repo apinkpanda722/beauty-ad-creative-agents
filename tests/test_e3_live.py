@@ -1273,3 +1273,289 @@ def test_measure_invalid_truth_never_exposes_answer_in_exception(tmp_path, capsy
     assert caught.value.__suppress_context__
     assert "SENTINEL" not in str(caught.value) + capsys.readouterr().out
     assert not (tmp_path / "cache").exists()
+
+
+@pytest.mark.parametrize(
+    "values,evidence,expected",
+    [
+        (["CR-011", "CR-012"], [], True),
+        (["https://example.invalid/p:1"], [], True),
+        (["youtube:a"], [], True),
+        (["CR-011"], ["youtube:a"], True),
+        (["hydration"], [], False),
+        (["sun_care"], [], False),
+        (["CR-011", "absent"], [], False),
+        (["CR-011"], ["youtube:a", "absent"], False),
+        (["https://example.invalid/p:1", "absent"], [], False),
+        (["absent"], ["youtube:a"], False),
+        (2, [], False),
+        (2, ["youtube:a"], True),
+        (2, ["youtube:a", "absent"], False),
+    ],
+)
+def test_reachability_requires_every_value_and_evidence_id(values, evidence, expected):
+    t = truth().model_copy(
+        update={
+            "answer_type": "set" if isinstance(values, list) else "count",
+            "value": values,
+            "evidence_ids": evidence,
+        }
+    )
+    ids = [
+        "CR-011",
+        "CR-012",
+        "youtube:a",
+        "product:brand:https://example.invalid/p:1",
+        "product:other:https://example.invalid/p:1",
+        "product:malformed",
+    ]
+    assert e3.is_reachable(t, ids) is expected
+    assert not e3.is_reachable(t.model_copy(update={"answer_type": "unknown"}), ids)
+
+
+def test_rule_id_targets_and_measurement_metrics_without_truth_leaks(tmp_path, capsys):
+    from test_vector_baseline import synthetic_rule
+
+    from beautyads.eval.vector_baseline import build_corpus
+
+    source = SimpleNamespace(read_changed=lambda **kw: [])
+    docs = build_corpus(
+        source, source, rules=[synthetic_rule("CR-012"), synthetic_rule("CR-011")]
+    )
+    qs = [question(i).model_copy(update={"answer_type": "set"}) for i in range(3)]
+    truths = [
+        truth(i).model_copy(
+            update={"answer_type": "set", "value": values, "evidence_ids": []}
+        )
+        for i, values in enumerate(
+            (["CR-011", "CR-012"], ["CR-012"], ["SENTINEL_TRUTH"])
+        )
+    ]
+    assert e3.target_ids(truths[0], [d.id for d in docs]) == {d.id for d in docs}
+    path = tmp_path / "answers"
+    write_jsonl(path, truths)
+    options, generator, calls = arm_options()
+    result = e3.measure(
+        docs,
+        qs,
+        answers_path=path,
+        models=[options["embedding_model"]],
+        embed=options["embed"],
+        cache_dir=tmp_path / "output",
+        top_ks=[1],
+    )
+    at_one = next(row for row in result["combinations"] if row["top_k"] == 1)
+    assert at_one["hit_at_k"] == 0.5
+    assert at_one["recall_at_k"] == 0.25
+    assert at_one["n_with_target"] == 2 and at_one["n_no_target"] == 1
+    assert result["models"][0]["hit_at_k"] == 1.0
+    assert result["models"][0]["recall_at_k"] == 1.0
+    assert result["n_set_questions_values_not_in_corpus"] == 1
+    e3._write_json(tmp_path / "output" / "measurement.json", result)
+    with pytest.raises(e3.E3Error, match="^ANSWER_SPLIT_FORBIDDEN$") as caught:
+        e3.measure(
+            docs,
+            qs,
+            answers_path=path,
+            models=[options["embedding_model"]],
+            embed=options["embed"],
+            split="test",
+            cache_dir=tmp_path / "output",
+        )
+    assert generator.calls == []
+    public = json.dumps(calls) + capsys.readouterr().out + str(caught.value)
+    public += "".join(p.read_text() for p in (tmp_path / "output").glob("*.json"))
+    assert "SENTINEL_TRUTH" not in public
+
+
+@pytest.mark.parametrize("n", [0, e3.MIN_STRATUM_N - 1, e3.MIN_STRATUM_N, 20])
+def test_reachable_report_is_descriptive_and_preserves_existing_summaries(tmp_path, n):
+    total = 24
+    qs = [
+        question(
+            i,
+            kind="simple_search" if i < 10 else "graph",
+            axes=["hook_type"] if i % 2 else ["category"],
+        ).model_copy(update={"answer_type": "set"})
+        for i in range(total)
+    ]
+    truths = [
+        truth(i).model_copy(
+            update={
+                "answer_type": "set",
+                "value": ["CR-011"] if i < n else ["hydration"],
+                "evidence_ids": [],
+            }
+        )
+        for i in range(total)
+    ]
+    path = tmp_path / "answers"
+    write_jsonl(path, truths)
+    rows = report_rows(qs, truths)
+    baseline = e3.report(rows, qs, answers_path=path, split="dev")
+    assert baseline["reachable_subset"] == {"status": "corpus_ids_missing"}
+    result = e3.report(
+        rows,
+        [*qs, question(100, "test")],
+        answers_path=path,
+        split="dev",
+        corpus_doc_ids=["CR-011"],
+    )
+    for key in (
+        "overall",
+        "graph_questions",
+        "simple_search",
+        "strata",
+        "size_strata",
+        "size_vs_top_k",
+    ):
+        assert result[key] == baseline[key]
+    scores = {
+        (row["question_id"], row["arm"]): {
+            **e3.score_answer(e3.E3Answer.model_validate(row["answer"]), t),
+            "set_f1": e3.set_f1(e3.E3Answer.model_validate(row["answer"]), t),
+        }
+        for q, t in zip(qs, truths, strict=True)
+        for row in rows
+        if row["question_id"] == q.id
+    }
+    assert result["reachable_subset"] == {
+        **e3._summary(qs[:n], scores),
+        "n_reachable": n,
+        "n_total": total,
+        "status": "undecidable" if n < e3.MIN_STRATUM_N else "descriptive_only",
+        "decision": "undecidable",
+    }
+    assert result["overall"]["decision"] == "graph_adopted"
+    empty = e3.report(rows, qs, answers_path=path, split="dev", corpus_doc_ids=[])
+    assert empty["reachable_subset"]["n_reachable"] == 0
+
+
+@pytest.mark.parametrize("mode", ["dev", "final"])
+@pytest.mark.parametrize("arms", ["graph", "vector", "graph,vector"])
+def test_cli_corpus_ids_only_for_loaded_corpus_and_report_forwarding(
+    tmp_path, monkeypatch, capsys, mode, arms
+):
+    from pathlib import Path
+
+    injected, options, generator, calls, _ = fake_cli_options(tmp_path)
+    options["docs"] += [CorpusDoc("CR-011", "SENTINEL_PUBLIC_DOCUMENT")]
+    qs = [
+        question(
+            i,
+            "dev" if mode == "dev" else "test",
+            "simple_search" if i < 10 else "graph",
+        ).model_copy(update={"answer_type": "set"})
+        for i in range(1 if mode == "dev" else 40)
+    ]
+    questions_path, answers_path = tmp_path / "questions", tmp_path / "answers"
+    write_jsonl(questions_path, qs)
+    write_jsonl(
+        answers_path,
+        [
+            truth(i).model_copy(
+                update={"answer_type": "set", "value": ["SENTINEL_TRUTH"]}
+            )
+            for i in range(len(qs))
+        ],
+    )
+    injected.update(questions_path=questions_path, answers_path=answers_path)
+    original_open, original_report, original_read = (
+        Path.open,
+        e3.report,
+        e3.read_answers,
+    )
+    answer_opens, forwarded, reads, loaded = [], [], [], []
+
+    def watched(path, *a, **kw):
+        if path == answers_path:
+            answer_opens.append(path)
+        return original_open(path, *a, **kw)
+
+    def report_spy(*a, **kw):
+        forwarded.append(kw["corpus_doc_ids"])
+        return original_report(*a, **kw)
+
+    def answers_spy(*a, **kw):
+        reads.append(kw["purpose"])
+        return original_read(*a, **kw)
+
+    def corpus_loader():
+        loaded.append(True)
+        return options["docs"]
+
+    injected["corpus_loader"] = corpus_loader
+    monkeypatch.setattr(Path, "open", watched)
+    monkeypatch.setattr(e3, "report", report_spy)
+    monkeypatch.setattr(e3, "read_answers", answers_spy)
+    assert e3.main(["run", "--mode", mode, "--arms", arms], **injected) == 0
+    assert not answer_opens and not reads
+    ids_path = injected["output_dir"] / f"{mode}_corpus_ids.json"
+    if "vector" in arms:
+        expected_ids = sorted(d.id for d in options["docs"])
+        assert json.loads(ids_path.read_text()) == {"ids": expected_ids}
+        assert loaded == [True]
+        if arms == "vector":
+            # Reports require paired arms; supply a synthetic graph counterpart.
+            result_path = injected["output_dir"] / f"{mode}_results.jsonl"
+            rows = e3.read_jsonl(result_path)
+            write_jsonl(result_path, [*rows, *({**r, "arm": "graph"} for r in rows)])
+        assert e3.main(["report", "--mode", mode], **injected) == 0
+        assert forwarded == [expected_ids]
+        assert reads == ["report"] and len(answer_opens) == 1
+        # The missing-file report remains usable for older runs.
+        ids_path.unlink()
+        assert e3.main(["report", "--mode", mode], **injected) == 0
+        assert forwarded[-1] is None
+    else:
+        assert not ids_path.exists() and not loaded
+    public = json.dumps(calls) + json.dumps([kw for _, kw in generator.calls])
+    public += capsys.readouterr().out
+    public += "".join(p.read_text() for p in injected["output_dir"].glob("*.json*"))
+    assert "SENTINEL_TRUTH" not in public
+    if ids_path.exists():
+        assert "SENTINEL_PUBLIC_DOCUMENT" not in ids_path.read_text()
+
+
+@pytest.mark.parametrize("invalid", [False, True])
+def test_load_corpus_reuses_claim_rule_reader_and_sanitizes_failure(
+    monkeypatch, invalid
+):
+    from pathlib import Path
+
+    from test_vector_baseline import synthetic_rule
+
+    from beautyads.sources.config import ConfigError
+
+    closed, reads, builds = [], [], []
+    conn = SimpleNamespace(close=lambda: closed.append(True))
+    creative_source, product_source = object(), object()
+    rules = [synthetic_rule()]
+
+    def load(path):
+        reads.append(path)
+        if invalid:
+            raise ConfigError("/SENTINEL_PRIVATE_PATH/SENTINEL_TRUTH")
+        return rules
+
+    def build(creative, product, **kw):
+        builds.append((creative, product, kw))
+        return [CorpusDoc(rules[0].rule_id, "synthetic")]
+
+    monkeypatch.setattr(e3, "postgres_dsn", lambda: "synthetic")
+    monkeypatch.setattr(e3, "connect", lambda dsn: conn)
+    monkeypatch.setattr(e3, "PostgresGraphSyncSource", lambda c: creative_source)
+    monkeypatch.setattr(e3, "PostgresLayer1Source", lambda c: product_source)
+    monkeypatch.setattr(e3, "load_claim_rules", load)
+    monkeypatch.setattr(e3, "build_corpus", build)
+    if invalid:
+        with pytest.raises(e3.E3Error, match="^E3_CORPUS_RULES_INVALID$") as caught:
+            e3.load_corpus()
+        assert caught.value.__suppress_context__
+        assert "SENTINEL" not in str(caught.value)
+        assert builds == []
+    else:
+        assert [d.id for d in e3.load_corpus()] == [r.rule_id for r in rules]
+        assert builds == [(creative_source, product_source, {"rules": rules})]
+    assert reads == [Path("config/claim_rules.yaml")]
+    assert closed == [True]

@@ -1,4 +1,4 @@
-"""One document per public creative/product; deterministic stdlib retrieval."""
+"""One document per public creative/product/rule; deterministic stdlib retrieval."""
 
 import hashlib
 import json
@@ -32,7 +32,10 @@ _PRODUCT_FIELDS = (
     "ingredients",
     "certifications",
 )
-CORPUS_FIELDS = tuple(dict.fromkeys((*_CREATIVE_FIELDS, *_PRODUCT_FIELDS)))
+_RULE_FIELDS = ("rule_id", "rule_type", "group", "applies_to", "terms_ko")
+CORPUS_FIELDS = tuple(
+    dict.fromkeys((*_CREATIVE_FIELDS, *_PRODUCT_FIELDS, *_RULE_FIELDS))
+)
 
 
 @dataclass(frozen=True)
@@ -80,7 +83,7 @@ def _document(id_, values, fields):
     )
 
 
-def build_corpus(creative_source, product_source, *, run_tag="v1"):
+def build_corpus(creative_source, product_source, *, run_tag="v1", rules=()):
     """Reuse the graph's PostgreSQL readers, without brand/split filtering."""
     docs = []
     for row in creative_source.read_changed(since=None, limit=None, run_tag=run_tag):
@@ -118,6 +121,24 @@ def build_corpus(creative_source, product_source, *, run_tag="v1"):
         ]
         docs.append(
             _document(f"product:{p.brand}:{p.source_url}", values, _PRODUCT_FIELDS)
+        )
+    for rule in rules:
+        docs.append(
+            _document(
+                rule.rule_id,
+                {
+                    "rule_id": rule.rule_id,
+                    "rule_type": rule.rule_type.value,
+                    "group": rule.group,
+                    "applies_to": [
+                        f"{scope.kind}:{scope.value}"
+                        for scope in rule.applies_to
+                        if scope.status in {"advisor_approved", "confirmed"}
+                    ],
+                    "terms_ko": rule.terms_ko,
+                },
+                _RULE_FIELDS,
+            )
         )
     docs.sort(key=lambda d: d.id)
     if len({d.id for d in docs}) != len(docs):
