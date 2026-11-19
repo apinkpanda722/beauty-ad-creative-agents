@@ -145,7 +145,16 @@
     {
       "step": 11,
       "name": "dev-split",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-19T15:48:56+0900",
+      "summary": "dev 독립 확정·해시 변경 경고와 E3 dev 경로 옵션·final 차단·측정 해시 구현. 합성 테스트 38건 추가, make verify 통과(5,380 tests). 실제 서비스 호출·추가 패키지 없음.",
+      "completed_at": "2026-11-19T15:55:10+0900",
+      "usage": {
+        "input_tokens": 1165393,
+        "cached_input_tokens": 1082112,
+        "output_tokens": 12065,
+        "attempts": 1
+      }
     }
   ],
   "created_at": "2026-11-19T12:16:24+0900"
