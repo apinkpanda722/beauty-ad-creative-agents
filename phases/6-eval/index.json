@@ -257,10 +257,7 @@
     {
       "step": 19,
       "name": "top-k-50",
-      "status": "blocked",
-      "started_at": "2026-11-19T18:04:32+0900",
-      "blocked_reason": "선점검에서 충돌을 확인했습니다. 지시 \"TOP_K = 50\"을 적용하면 tests/test_prereg.py의 test_none_measurement_preserves_original_bytes가 단언하는 SHA-256이 d96b6216…에서 97d739c9…로 바뀝니다(합성 입력으로 확인). 그러나 \"기존 테스트의 단언을 약화하지 마라(픽스처에 동결 조합 항목을 더하는 갱신만 허용).\"가 기존 해시 기대값 갱신을 허용하지 않습니다. 해당 기대값 갱신을 허용해 주세요. 파일 수정 없이 중단했으며 make verify는 실행하지 않았습니다.",
-      "blocked_at": "2026-11-19T18:06:18+0900",
+      "status": "pending",
       "usage": {
         "input_tokens": 280394,
         "cached_input_tokens": 222976,

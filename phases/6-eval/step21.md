@@ -9,7 +9,7 @@
 **상수 단언 grep**: `tests/test_e2_scoring.py`에서 이 step이 값을 바꾸는 단언은 다음뿐이다.
 - `:439-456 test_exclusions_are_per_metric_and_small_sample_undecidable`: `metrics["evidence_validity"]["n"] == 10`·`["excluded"] == 2`·`metrics["request_fit"]["n"] == 9`·`["excluded"] == 3`·`verdict_e2 == "undecidable"`·`result["e2"]["excluded_no_plan"] == 1`은 **완전 사례 분석의 값**이다. 이 단언들을 새 키 `e2_complete_case`(같은 키 이름)로 옮겨 값은 그대로 유지하고, 같은 합성 입력의 주(최저점 포함) 결과를 **손으로 센 값으로 새로 단언**한다(n·excluded·`not_run`·`imputed_no_plan`; 부트스트랩이 판정에 개입하면 `bootstrap_ci`를 `monkeypatch`로 고정한다, `:491-524`의 방식). 약화가 아니라 의미가 갈라진 두 분석을 각각 단언하는 것이다.
 - `:422-436 test_e2_verdict_branches`·`:470-524` E5 테스트(`verdict_e5`·`token_reduction`): 합성 입력에 기획 실패가 없으므로 주 결과와 완전 사례 결과가 같아 **불변**이다.
-- `tests/test_prereg.py`의 문장 수(`== 18`)는 `== 19`로 갱신한다. 결과 틀 테스트에 새 행의 빈 칸 단언을 더한다.
+- `tests/test_prereg.py`의 문장 수(`== 18`)는 `== 19`로 갱신한다. 결과 틀 테스트에 새 행의 빈 칸 단언을 더한다. **`tests/test_prereg.py:471-477 test_none_measurement_preserves_original_bytes`는 `dev_measurement=None` 렌더링 전체 바이트의 SHA-256(`d96b6216…`)을 고정한다.** 이 문서에는 동결 줄(`동결 E3 TOP_K` 등)과 `REQUIRED_SENTENCES` 전체가 들어 있어 19번째 문장이 더해져 해시가 바뀐다(선점검에서 합성 입력으로 확인된 사실). **이 기대 해시 한 줄만 새 렌더러 출력의 해시로 갱신한다**(`uv run python`으로 합성 입력 `render_inputs`에서 계산). 그 테스트의 나머지 단언(`None`이면 인자 생략과 같고 "E3 dev 측정 근거" 절이 없다)은 그대로 유지한다. 이는 의도된 변경에 따른 값 갱신이지 단언의 약화가 아니다.
 - `eval/e2e5_live.py`의 `_report`는 `analyze` 결과의 모든 키를 출력하므로 새 키가 자동으로 출력된다(수정하지 않는다; `tests/test_e2e5_live.py`의 보고 테스트가 키 전체의 정확 일치를 단언하는지 확인하고 그렇다면 `blocked`로 보고한다).
 
 **새 칸 대응표**: `WORST_REQUEST_FIT`·`WORST_DISTINCTIVENESS`·`WORST_EVIDENCE_VALIDITY`(상수 → 주 판정의 최저점 → 사전 등록 문장), `e2`·`e5`의 `not_run`·`imputed_no_plan`(`analyze` → 보고), `failure_rates`(기록 상태 → 보고), `e2_complete_case`·`e5_complete_case`·`verdict_*_complete_case`·`verdicts_agree`(완전 사례 민감도 → 보고 → 두 판정이 다르면 그대로 적는 사전 등록 문장).
@@ -96,4 +96,4 @@ make verify   # lint + test 통과
 - 판정 임계값(`MIN_E2_PAIRS`·`E5_MIN_TOKEN_REDUCTION`·`E5_MIN_VALIDITY_LOWER`·`CI_CONFIDENCE`·`BOOTSTRAP_RESAMPLES`·`SCORING_SEED`)과 E5 토큰 합계·감소율 계산, `blind_items`·`score_plans`·`reveal_scores`·`bootstrap_ci`·`evidence_validity`의 동작을 바꾸지 마라. 이유: 동결된 기준이며 이 step은 결측 처리 규칙만 정한다.
 - 기획안이 없는 시도를 제외하는 기존 동작을 주 판정으로 되돌리거나, 채점 실패를 최저점으로 처리하거나, 기록이 없는 항목을 최저점으로 채우지 마라. 이유: 최저점은 시도했으나 기획안을 내지 못한 경우에만 쓴다(사전 등록 규칙).
 - `eval/e2e5_live.py`·`eval/e3_live.py`·`eval/evalset*.py`·`Makefile`을 수정하거나 새 의존성을 추가하지 마라. 이유: 허용 범위 밖이다(필요하면 `blocked`로 보고).
-- `REQUIRED_SENTENCES`의 기존 문장을 고치거나 기존 테스트의 단언을 약화하지 마라(위 "상수 단언 grep"에 적힌 의미가 갈라진 단언의 이동·새 단언 추가만 허용). 이유: 사전 등록 문장은 기존 항목을 고치지 않고(B-FP-043) 이미 통과한 step의 계약이다.
+- `REQUIRED_SENTENCES`의 기존 문장을 고치거나 기존 테스트의 단언을 약화하지 마라(위 "상수 단언 grep"에 적힌 의미가 갈라진 단언의 이동·새 단언 추가·위 해시 기대값 한 줄 갱신만 허용). 이유: 사전 등록 문장은 기존 항목을 고치지 않고(B-FP-043) 이미 통과한 step의 계약이다.
