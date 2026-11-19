@@ -5,7 +5,16 @@
     {
       "step": 1,
       "name": "step-scope-check",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-19T12:16:24+0900",
+      "summary": "읽기 전용 step_scope_check 도구와 합성 테스트, README 도구 한 줄 추가. make verify 통과(4,934 tests), 추가 패키지 없음.",
+      "completed_at": "2026-11-19T12:26:18+0900",
+      "usage": {
+        "input_tokens": 1838836,
+        "cached_input_tokens": 1773312,
+        "output_tokens": 18856,
+        "attempts": 1
+      }
     },
     {
       "step": 2,
@@ -52,5 +61,6 @@
       "name": "isolation-live",
       "status": "pending"
     }
-  ]
+  ],
+  "created_at": "2026-11-19T12:16:24+0900"
 }
