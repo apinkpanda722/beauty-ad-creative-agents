@@ -42,6 +42,7 @@ from beautyads.graph.values import to_json_safe
 from beautyads.llm.structured import StructuredFailure, StructuredSpec, make_structured
 
 SUPERVISOR_REASONING_EFFORT = "none"
+CONTEXT_MODES = ("on", "off")
 _MODEL = "gpt-6-luna"
 _RECURSION_LIMIT = 32
 _DEFAULT_LIMITS = RequestLimits()
@@ -272,6 +273,7 @@ def build_supervisor_graph(
     limits=_DEFAULT_LIMITS,
     on_event=None,
     claims_fn=None,
+    context_mode="on",
 ):
     """Inject service adapters; plan_eval_fn accepts max_reworks like 6c.
 
@@ -279,6 +281,8 @@ def build_supervisor_graph(
     over ctx and services. plan_eval_fn adapts the four dictionaries and the
     max_reworks keyword to run_plan_eval; it owns checks and image prechecks.
     """
+    if context_mode not in CONTEXT_MODES:
+        raise ValueError("CONTEXT_MODE_INVALID")
     validate_tenant_id(ctx.tenant_id)
     raw_store = {}
     profile, feedback = _copy_json(profile), _copy_json(feedback)
@@ -349,7 +353,9 @@ def build_supervisor_graph(
             return Command(update=state, goto=END)
         try:
             handoff = ResearchHandoff.model_validate(
-                research_fn(deepcopy(state["sv_brief"]), raw_store)
+                research_fn(deepcopy(state["sv_brief"]), raw_store, context_mode="off")
+                if context_mode == "off"
+                else research_fn(deepcopy(state["sv_brief"]), raw_store)
             ).model_dump(mode="json")
             aggregates = handoff["aggregates"]
             if not all(isinstance(value, str) for value in aggregates.values()):
@@ -433,7 +439,11 @@ def build_supervisor_graph(
         target = min(state["sv_decision"]["plan_count"], limits.max_plans, 3)
         if state["sv_index"] >= target or not before(state):
             return Command(update=state, goto=END)
-        bounded, trims = trim_handoff(state["sv_handoff"], limits)
+        if context_mode == "off":
+            bounded, trims = deepcopy(state["sv_handoff"]), []
+            bounded["raw_tool_outputs"] = deepcopy(state["sv_tool_outputs"])
+        else:
+            bounded, trims = trim_handoff(state["sv_handoff"], limits)
         for trim in trims:
             if trim not in state["sv_trims"]:
                 state["sv_trims"].append(trim)
@@ -506,8 +516,11 @@ def run_request(
     limits=_DEFAULT_LIMITS,
     on_event=None,
     claims_fn=None,
+    context_mode="on",
 ) -> dict:
     """Run one request, accounting for 텍스트 모델 비용, 이미지 제외."""
+    if context_mode not in CONTEXT_MODES:
+        raise ValueError("CONTEXT_MODE_INVALID")
     state = initial_supervisor_state(message, limits)
     graph = build_supervisor_graph(
         ctx=ctx,
@@ -520,6 +533,7 @@ def run_request(
         limits=limits,
         on_event=on_event,
         claims_fn=claims_fn,
+        context_mode=context_mode,
     )
     try:
         for snapshot in graph.stream(
@@ -597,5 +611,6 @@ def run_request(
             "tool_outputs": state["sv_tool_outputs"],
             "event_errors": status["event_errors"],
             "disclaimer": CLAIM_CHECK_DISCLAIMER,
+            **({"context_mode": "off"} if context_mode == "off" else {}),
         }
     )

@@ -147,6 +147,9 @@ def make_plan(
         if rework is not None
         else None,
     }
+    raw = handoff.get("raw_tool_outputs")
+    if raw is not None:
+        payload["raw_tool_outputs"] = _text_data(raw)
     result = generator.generate(
         StructuredSpec(
             "plan",

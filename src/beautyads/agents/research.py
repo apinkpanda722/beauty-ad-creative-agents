@@ -32,6 +32,7 @@ from beautyads.domain.tools import ToolContext, ToolFailure, ToolKind, ToolResul
 from beautyads.llm.structured import StructuredGenerator, StructuredSpec
 
 RESEARCH_REASONING_EFFORT = "none"
+CONTEXT_MODES = ("on", "off")
 _MODEL = "gpt-6-luna"
 _RECURSION_LIMIT = 32
 _NO_EVIDENCE = "조건에 맞는 근거 소재가 없다. 근거를 지어내지 않는다."
@@ -97,6 +98,7 @@ def build_research_graph(
     tool_runner,
     structured: StructuredGenerator,
     raw_store: MutableMapping[str, dict] | None = None,
+    context_mode="on",
 ):
     """Build one request's graph. Raw output lives in its closure, never state.
 
@@ -104,6 +106,8 @@ def build_research_graph(
     The caller supplies the server-resolved ToolContext, never the model/brief.
     StructuredGenerator owns schema validation and its single correction attempt.
     """
+    if context_mode not in CONTEXT_MODES:
+        raise ValueError("CONTEXT_MODE_INVALID")
     validate_tenant_id(ctx.tenant_id)
     raw_store = {} if raw_store is None else raw_store
     names = {tool.name for tool in TOOLS if tool.kind != ToolKind.display}
@@ -117,7 +121,11 @@ def build_research_graph(
         observations = []
         for entry, ref in zip(state["tool_log"], state["raw_refs"], strict=True):
             raw = raw_store[ref]
-            observations.append(tool_result_payload(entry["name"], raw))
+            observations.append(
+                deepcopy(raw)
+                if context_mode == "off"
+                else tool_result_payload(entry["name"], raw)
+            )
         return [
             {"role": "system", "content": _SYSTEM},
             {
@@ -315,8 +323,11 @@ def run_research(
     tool_runner,
     structured: StructuredGenerator,
     raw_store: MutableMapping[str, dict] | None = None,
+    context_mode="on",
 ) -> dict:
     """Map a supervisor brief to a handoff, without sharing parent state keys."""
+    if context_mode not in CONTEXT_MODES:
+        raise ValueError("CONTEXT_MODE_INVALID")
     state = initial_research_state(brief)
     graph = build_research_graph(
         ctx=ctx,
@@ -324,5 +335,6 @@ def run_research(
         tool_runner=tool_runner,
         structured=structured,
         raw_store=raw_store,
+        context_mode=context_mode,
     )
     return graph.invoke(state, {"recursion_limit": _RECURSION_LIMIT})["handoff"]

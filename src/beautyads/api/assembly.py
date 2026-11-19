@@ -273,7 +273,16 @@ async def assemble_full(
                     except Exception:  # noqa: BLE001 -- never expose rollback diagnostics
                         raise RuntimeError("ASSEMBLY_HYDRATE_FAILED") from None
 
-            def ask(message, ctx, profile, feedback, with_image, on_event=None):
+            def ask(
+                message,
+                ctx,
+                profile,
+                feedback,
+                with_image,
+                on_event=None,
+                *,
+                context_mode="on",
+            ):
                 profile = {**profile, "product_name": product_names.get(ctx.tenant_id)}
                 started_at, started = datetime.now(UTC), monotonic()
                 generators = []
@@ -317,7 +326,7 @@ async def assemble_full(
                         guard()
                         return chat(**options)
 
-                    def research_fn(brief, raw_store):
+                    def research_fn(brief, raw_store, context_mode="on"):
                         return run_research(
                             brief,
                             ctx=ctx,
@@ -325,6 +334,11 @@ async def assemble_full(
                             tool_runner=runner,
                             structured=structured("gpt-6-luna"),
                             raw_store=raw_store,
+                            **(
+                                {"context_mode": context_mode}
+                                if context_mode != "on"
+                                else {}
+                            ),
                         )
 
                     def claims_fn(profile: dict) -> tuple[list[str], str]:
@@ -476,6 +490,11 @@ async def assemble_full(
                         limits=limits,
                         on_event=on_event,
                         claims_fn=claims_fn,
+                        **(
+                            {"context_mode": context_mode}
+                            if context_mode != "on"
+                            else {}
+                        ),
                     )
                     return result
                 except BaseException as exc:
