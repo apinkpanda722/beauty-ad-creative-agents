@@ -103,13 +103,16 @@
     {
       "step": 8,
       "name": "embed-vector-e3",
-      "status": "pending",
+      "status": "completed",
       "usage": {
-        "input_tokens": 189614,
-        "cached_input_tokens": 138624,
-        "output_tokens": 1409,
+        "input_tokens": 4355994,
+        "cached_input_tokens": 4204672,
+        "output_tokens": 31283,
         "attempts": 1
-      }
+      },
+      "started_at": "2026-11-19T13:35:00+0900",
+      "summary": "임베딩 래퍼·벡터 기준선·E3 measure/run/report와 정답 분리·동결·예산 가드, 합성 테스트 51건 및 live-e3 타깃 구현. 실제 서비스 호출 없이 make verify 통과(5,275 tests), 추가 패키지 없음.",
+      "completed_at": "2026-11-19T13:48:50+0900"
     },
     {
       "step": 10,
