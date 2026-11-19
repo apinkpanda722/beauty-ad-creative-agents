@@ -24,6 +24,7 @@ from beautyads.eval.evalset import (
     WORKSPACES_PATH,
     AnswerItem,
     QuestionItem,
+    question_set_hash,
     read_jsonl,
     stratum,
     write_jsonl,
@@ -56,6 +57,7 @@ ANSWER_PROMPT_VERSION = "2026-11-19-1"
 ANSWER_MODEL = "gpt-6-luna"
 EMBED_PURPOSE_CAP = 1.0
 ANSWER_SPLIT_FORBIDDEN = "ANSWER_SPLIT_FORBIDDEN"
+E3_PATH_OPTION_FORBIDDEN = "E3_PATH_OPTION_FORBIDDEN"
 OUTPUT_DIR = Path("data/interim/e3")
 _SYSTEM = (
     "질문에 근거 데이터만 사용해 답한다. 집계 답은 count, 목록 답은 items에 넣는다. "
@@ -300,6 +302,7 @@ def measure(
     )
     return {
         "models": measured,
+        "dev_question_hash": question_set_hash(dev, list(truths.values())),
         "selected_model": selected["embedding_model"],
         "truncated_document_ratio": sum(len(d.text) > MAX_DOC_CHARS for d in docs)
         / len(docs)
@@ -638,12 +641,23 @@ def main(
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("measure", "run", "report"))
     parser.add_argument("--mode", choices=("dev", "final"), default="dev")
+    parser.add_argument("--questions", type=Path)
+    parser.add_argument("--answers", type=Path)
     parser.add_argument("--arms", default="graph,vector")
     parser.add_argument("--models", default=None)
     parser.add_argument("--limit", type=int)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
     try:
+        if args.mode == "final" and (
+            args.questions is not None or args.answers is not None
+        ):
+            raise E3Error(E3_PATH_OPTION_FORBIDDEN)
+        if args.mode == "dev":
+            questions_path = (
+                args.questions if args.questions is not None else questions_path
+            )
+            answers_path = args.answers if args.answers is not None else answers_path
         arms = args.arms.split(",")
         models = (
             args.models.split(",")

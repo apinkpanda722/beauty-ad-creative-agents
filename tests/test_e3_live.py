@@ -8,6 +8,7 @@ from typing import get_type_hints
 
 import pytest
 from test_evalset import workspaces_path as workspace_config  # noqa: F401 -- shared synthetic fixture
+from test_evalset_candidates import synthetic as candidate_synthetic  # noqa: F401 -- shared synthetic fixture
 
 from beautyads.domain.tools import ToolContext
 from beautyads.eval import e3_live as e3
@@ -570,3 +571,263 @@ def test_stratified_description_never_makes_adoption_decision(tmp_path):
     assert result["overall"]["decision"] == "graph_adopted"
     assert result["strata"]["unreliable"]["status"] == "descriptive_only"
     assert result["strata"]["unreliable"]["decision"] == "undecidable"
+
+
+@pytest.mark.parametrize("command", ["measure", "run", "report"])
+@pytest.mark.parametrize(
+    "flags",
+    [
+        ["--questions", "SENTINEL_PATH"],
+        ["--answers", "SENTINEL_PATH"],
+        ["--questions", "SENTINEL_Q", "--answers", "SENTINEL_A"],
+    ],
+)
+def test_final_path_options_rejected_before_any_work(
+    monkeypatch, capsys, command, flags
+):
+    from pathlib import Path
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("path option must be rejected before I/O or dispatch")
+
+    monkeypatch.setattr(Path, "open", forbidden)
+    assert (
+        e3.main(
+            [command, "--mode", "final", *flags],
+            check_fn=forbidden,
+            corpus_loader=forbidden,
+            runtime_factory=forbidden,
+            settings_fn=forbidden,
+        )
+        == 1
+    )
+    assert json.loads(capsys.readouterr().out) == {"code": "E3_PATH_OPTION_FORBIDDEN"}
+
+
+def fake_cli_options(tmp_path):
+    from contextlib import contextmanager
+
+    from beautyads.settings import Settings
+
+    options, generator, calls = arm_options()
+    guards = []
+
+    def guard(**kwargs):
+        guards.append(kwargs)
+        return IDENTITY
+
+    @contextmanager
+    def runtime(*args, **kwargs):
+        yield SimpleNamespace(
+            **{
+                name: options[name]
+                for name in (
+                    "embed",
+                    "chat",
+                    "structured",
+                    "tool_runner",
+                    "context_factory",
+                )
+            }
+        )
+
+    return (
+        {
+            "output_dir": tmp_path / "output",
+            "check_fn": guard,
+            "corpus_loader": lambda: options["docs"],
+            "runtime_factory": runtime,
+            "settings_fn": lambda: Settings(ledger_path=tmp_path / "ledger"),
+        },
+        options,
+        generator,
+        calls,
+        guards,
+    )
+
+
+def test_final_default_paths_only_with_synthetic_file_routing(tmp_path, monkeypatch):
+    from pathlib import Path
+
+    paths = {
+        e3.QUESTIONS_PATH: tmp_path / "questions",
+        e3.ANSWERS_PATH: tmp_path / "answers",
+    }
+    write_jsonl(
+        paths[e3.QUESTIONS_PATH],
+        [
+            question(i, "test", "simple_search" if i < 10 else "graph")
+            for i in range(40)
+        ],
+    )
+    write_jsonl(paths[e3.ANSWERS_PATH], [truth(i) for i in range(40)])
+    injected, _, _, _, guards = fake_cli_options(tmp_path)
+    original = Path.open
+    opened = []
+
+    def routed(path, *args, **kwargs):
+        if path in paths:
+            opened.append(path)
+            return original(paths[path], *args, **kwargs)
+        assert "data/" not in str(path)
+        return original(path, *args, **kwargs)
+
+    def guard(**kwargs):
+        guards.append(kwargs)
+        # Stand in for check_run's final answer read, without any real data.
+        with kwargs["answers_path"].open() as source:
+            assert source.read()
+        return IDENTITY
+
+    injected["check_fn"] = guard
+    monkeypatch.setattr(Path, "open", routed)
+    assert e3.main(["run", "--mode", "final"], **injected) == 0
+    assert opened == [e3.QUESTIONS_PATH, e3.ANSWERS_PATH]
+    assert guards[0]["questions_path"] == e3.QUESTIONS_PATH
+    assert guards[0]["answers_path"] == e3.ANSWERS_PATH
+
+
+@pytest.mark.parametrize("selected", ["questions", "answers", "both"])
+def test_dev_cli_uses_optional_paths_and_keeps_injected_defaults(
+    tmp_path, monkeypatch, capsys, selected
+):
+    from pathlib import Path
+
+    from beautyads.eval.evalset import question_set_hash
+
+    injected, _, _, _, guards = fake_cli_options(tmp_path)
+    flags = []
+    expected = {}
+    for name, rows in (("questions", [question()]), ("answers", [truth()])):
+        path = tmp_path / name
+        write_jsonl(path, rows)
+        expected[name + "_path"] = path
+        if selected in (name, "both"):
+            flags.extend(["--" + name, str(path)])
+            injected[name + "_path"] = tmp_path / ("unused_" + name)
+        else:
+            injected[name + "_path"] = path
+    original = Path.open
+    opened = []
+
+    def watched(path, *args, **kwargs):
+        assert path not in {e3.QUESTIONS_PATH, e3.ANSWERS_PATH}
+        assert not path.name.startswith("unused_")
+        if path in expected.values():
+            opened.append(path)
+        return original(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", watched)
+    assert e3.main(["measure", *flags], **injected) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["dev_question_hash"] == question_set_hash([question()], [truth()])
+    assert opened == [expected["questions_path"], expected["answers_path"]]
+    assert all(guards[0][key] == value for key, value in expected.items())
+    measurement = json.loads((tmp_path / "output" / "measurement.json").read_text())
+    assert measurement == result
+
+
+def test_dev_finalize_and_measure_hash_match_without_model_input_leaks(
+    request, tmp_path, capsys
+):
+    import io
+
+    from test_evalset_candidates import (
+        generate_files,
+        split_review_rows,
+        write_review_csv,
+    )
+
+    from beautyads.eval import evalset as sets
+    from beautyads.eval import evalset_candidates as candidates
+
+    candidate_dir = tmp_path / "candidates"
+    generate_files(request.getfixturevalue("candidate_synthetic"), candidate_dir)
+    bundle = candidates.load_candidates(candidate_dir)
+    bundle.questions = [
+        q.model_copy(update={"answer_type": "set"}) if q.split == "dev" else q
+        for q in bundle.questions
+    ]
+    dev_ids = {q.id for q in bundle.questions if q.split == "dev"}
+    bundle.answers = [
+        a.model_copy(
+            update={
+                "answer_type": "set",
+                "value": ["SENTINEL_DEV_TRUTH"],
+                "evidence_ids": ["SENTINEL_DEV_EVIDENCE"],
+            }
+        )
+        if a.question_id in dev_ids
+        else a
+        for a in bundle.answers
+    ]
+    for name, rows in (
+        ("requests", bundle.requests),
+        ("questions", bundle.questions),
+        ("answers", bundle.answers),
+    ):
+        write_jsonl(candidate_dir / f"{name}_candidates.jsonl", rows)
+    candidates.write_review_sheet(bundle, candidate_dir)
+    write_review_csv(
+        candidate_dir / "review_sheet.csv", split_review_rows(bundle, dev_only=True)
+    )
+    out = io.StringIO()
+    assert (
+        candidates.main(
+            ["finalize", "--split", "dev"],
+            candidate_dir=candidate_dir,
+            final_dir=tmp_path / "final",
+            out=out,
+        )
+        == 0
+    )
+    hashes = json.loads(out.getvalue().splitlines()[1])
+    dev_dir = candidate_dir / "dev"
+    qs = [
+        QuestionItem.model_validate(r)
+        for r in sets.read_jsonl(dev_dir / "questions.jsonl")
+    ]
+    answers = [
+        AnswerItem.model_validate(r) for r in sets.read_jsonl(dev_dir / "answers.jsonl")
+    ]
+    injected, options, generator, calls, _ = fake_cli_options(tmp_path)
+    assert (
+        e3.main(
+            [
+                "measure",
+                "--questions",
+                str(dev_dir / "questions.jsonl"),
+                "--answers",
+                str(dev_dir / "answers.jsonl"),
+            ],
+            **injected,
+        )
+        == 0
+    )
+    measured = json.loads(capsys.readouterr().out)
+    assert (
+        measured["dev_question_hash"]
+        == hashes["dev_question_hash"]
+        == sets.question_set_hash(qs, answers)
+    )
+    e3.run(qs, **options)
+    inputs = json.dumps([calls, [kw for _, kw in generator.calls]])
+    assert "SENTINEL_DEV" not in inputs
+    assert all(value not in inputs for value in hashes.values())
+
+
+def test_measure_dry_run_never_reads_answers_or_emits_hash(tmp_path, monkeypatch):
+    def forbidden(*args, **kwargs):
+        pytest.fail("dry-run must not read answers")
+
+    monkeypatch.setattr(e3, "read_answers", forbidden)
+    result = e3.measure(
+        [],
+        [question()],
+        answers_path=tmp_path / "absent",
+        models=["text-embedding-3-small"],
+        embed=forbidden,
+        dry_run=True,
+        cache_dir=tmp_path,
+    )
+    assert "dev_question_hash" not in result

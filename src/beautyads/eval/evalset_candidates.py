@@ -43,6 +43,8 @@ from beautyads.sources.workspaces import load_workspaces
 
 CANDIDATE_FACTOR = 1.5
 CANDIDATE_DIR = Path("data/interim/evalset")
+DEV_SPLIT_DIR = CANDIDATE_DIR / "dev"
+DEV_SPLIT_CHANGED = "DEV_SPLIT_CHANGED"
 WORKSPACE_CATEGORY = {
     "dev-mixsoon": "serum_ampoule",
     "dev-cosrx": "sun_care",
@@ -163,6 +165,7 @@ _FINAL_TARGETS = {
     "questions_test_graph": 30,
     "questions_test_simple_search": 10,
 }
+DEV_TARGETS = {key: _FINAL_TARGETS[key] for key in ("requests_dev", "questions_dev")}
 _REQUEST_HASH = "후보 요청 sha256"
 _QUESTION_HASH = "후보 질문 sha256"
 
@@ -540,23 +543,36 @@ CSV를 UTF-8로 저장한다. 생성 시 비어 있는 decision·edited_text·an
 검수 후 python -m beautyads.eval.evalset_candidates finalize (또는 --finalize)를 실행한다.
 --dry-run은 접속·파일 쓰기 없이 건수와 부족 건수만 확인한다.
 
+## dev 먼저 확정
+dev 행만 먼저 기록하고 finalize --split dev로 dev만 별도로 확정할 수 있다.
+X로 제외하는 행도 포함해 모든 dev 행의 네 칸(decision·edited_text·answer_confirmed·note)을
+채워야 한다. 빈 칸 금지이며 test 행은 비워 둬도 된다.
+dev만 확정한 파일은 최종 사전 등록 세트가 아니다.
+test까지 검수를 끝낸 뒤 finalize로 전체를 확정한다.
+
 """
     instructions += f"{_REQUEST_HASH}: {request_set_hash(candidates.requests)}\n"
     instructions += f"{_QUESTION_HASH}: {question_set_hash(candidates.questions, candidates.answers)}\n"
     (out_dir / "review_instructions.md").write_text(instructions, encoding="utf-8")
 
 
-def apply_review(candidates, sheet_rows) -> ReviewedSet:
-    expected = {row["item_id"]: row for row in review_rows(candidates)}
+def apply_review(candidates, sheet_rows, *, split=None) -> ReviewedSet:
+    items = [*candidates.requests, *candidates.questions]
+    known_ids = {item.id for item in items}
+    expected = {
+        row["item_id"]: row
+        for row in review_rows(candidates)
+        if split is None or row["split"] == split
+    }
     reviews = {}
     editable = {"decision", "edited_text", "answer_confirmed", "note"}
     for row in sheet_rows:
         item_id = row.get("item_id")
-        if (
-            item_id not in expected
-            or item_id in reviews
-            or set(row) != set(REVIEW_COLUMNS)
-        ):
+        if item_id not in known_ids:
+            raise EvalsetError("REVIEW_INVALID")
+        if item_id not in expected:
+            continue
+        if item_id in reviews or set(row) != set(REVIEW_COLUMNS):
             raise EvalsetError("REVIEW_INVALID")
         if any(
             row.get(key) != expected[item_id][key]
@@ -581,7 +597,9 @@ def apply_review(candidates, sheet_rows) -> ReviewedSet:
         raise EvalsetError("REVIEW_INCOMPLETE")
     requests, questions, answers = [], [], []
     by_question = {a.question_id: a for a in candidates.answers}
-    for item in [*candidates.requests, *candidates.questions]:
+    for item in items:
+        if split is not None and item.split != split:
+            continue
         row = reviews[item.id]
         if row["decision"] == "X":
             continue
@@ -647,10 +665,7 @@ def _verify_hashes(bundle, out_dir):
             raise EvalsetError("EVALSET_HASH_MISMATCH")
 
 
-def _finalize(candidate_dir, final_dir, *, dry_run, out):
-    bundle = load_candidates(candidate_dir)
-    validate_set(bundle.requests, bundle.questions, bundle.answers, final=False)
-    _verify_hashes(bundle, candidate_dir)
+def _read_review(bundle, candidate_dir, *, split=None):
     try:
         with (candidate_dir / "review_sheet.csv").open(
             encoding="utf-8", newline=""
@@ -658,9 +673,79 @@ def _finalize(candidate_dir, final_dir, *, dry_run, out):
             reader = csv.DictReader(stream)
             if tuple(reader.fieldnames or ()) != REVIEW_COLUMNS:
                 raise EvalsetError("REVIEW_INVALID")
-            reviewed = apply_review(bundle, list(reader))
+            return apply_review(bundle, list(reader), split=split)
     except (OSError, UnicodeError, csv.Error):
         raise EvalsetError("EVALSET_READ_INVALID") from None
+
+
+def _dev_hashes(reviewed):
+    requests = [r for r in reviewed.requests if r.split == "dev"]
+    questions = [q for q in reviewed.questions if q.split == "dev"]
+    ids = {q.id for q in questions}
+    answers = [a for a in reviewed.answers if a.question_id in ids]
+    return {
+        "dev_request_hash": request_set_hash(requests),
+        "dev_question_hash": question_set_hash(questions, answers),
+    }
+
+
+def _dev_split_changed(dev_dir, reviewed):
+    try:
+        paths = [
+            dev_dir / name
+            for name in ("requests.jsonl", "questions.jsonl", "answers.jsonl")
+        ]
+        if not all(path.is_file() for path in paths):
+            return False
+        saved = ReviewedSet(
+            *(
+                [model.model_validate(row) for row in read_jsonl(path)]
+                for model, path in zip(
+                    (RequestItem, QuestionItem, AnswerItem), paths, strict=True
+                )
+            )
+        )
+        return _dev_hashes(saved) != _dev_hashes(reviewed)
+    except (EvalsetError, OSError, UnicodeError, ValueError):
+        return False
+
+
+def _finalize_dev(candidate_dir, dev_dir, *, dry_run, out):
+    bundle = load_candidates(candidate_dir)
+    validate_set(bundle.requests, bundle.questions, bundle.answers, final=False)
+    _verify_hashes(bundle, candidate_dir)
+    reviewed = _read_review(bundle, candidate_dir, split="dev")
+    if any(item.split != "dev" for item in [*reviewed.requests, *reviewed.questions]):
+        raise EvalsetError("EVALSET_SPLIT_INVALID")
+    shortages = _shortages(reviewed.requests, reviewed.questions, DEV_TARGETS)
+    print(
+        json.dumps(
+            {
+                "requests": len(reviewed.requests),
+                "questions": len(reviewed.questions),
+                "shortages": shortages,
+            }
+        ),
+        file=out,
+    )
+    if dry_run:
+        return 0
+    if any(shortages.values()):
+        return 3
+    validate_set(*reviewed, final=False)
+    for filename, items in zip(
+        ("requests.jsonl", "questions.jsonl", "answers.jsonl"), reviewed, strict=True
+    ):
+        write_jsonl(dev_dir / filename, items)
+    print(json.dumps(_dev_hashes(reviewed)), file=out)
+    return 0
+
+
+def _finalize(candidate_dir, final_dir, *, dry_run, out):
+    bundle = load_candidates(candidate_dir)
+    validate_set(bundle.requests, bundle.questions, bundle.answers, final=False)
+    _verify_hashes(bundle, candidate_dir)
+    reviewed = _read_review(bundle, candidate_dir)
     if not dry_run and not any(reviewed.shortages.values()):
         validate_set(*reviewed, final=True)
     print(
@@ -679,6 +764,8 @@ def _finalize(candidate_dir, final_dir, *, dry_run, out):
         return 0
     if any(reviewed.shortages.values()):
         return 3
+    if _dev_split_changed(candidate_dir / "dev", reviewed):
+        print(DEV_SPLIT_CHANGED, file=out)
     for filename, items in zip(
         ("requests.jsonl", "questions.jsonl", "answers.jsonl"), reviewed, strict=True
     ):
@@ -726,11 +813,18 @@ def main(
     )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--finalize", action="store_true")
+    parser.add_argument("--split", choices=("dev",))
     graph = None
     try:
         args = parser.parse_args(argv)
         if args.command == "finalize" or args.finalize:
+            if args.split == "dev":
+                return _finalize_dev(
+                    candidate_dir, candidate_dir / "dev", dry_run=args.dry_run, out=out
+                )
             return _finalize(candidate_dir, final_dir, dry_run=args.dry_run, out=out)
+        if args.split is not None:
+            raise _ArgumentError
         rows = (
             parse_cq_table(
                 Path("docs/COMPETENCY_QUESTIONS.md").read_text(encoding="utf-8")

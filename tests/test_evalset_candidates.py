@@ -638,3 +638,259 @@ def test_only_documented_questions_and_json_safe_answers(synthetic, monkeypatch)
     answer = candidates.compute_answer(graph, result.questions[0], as_of=DAY)
     assert seen == [graph.rows]
     assert answer.value == ["synthetic-value"] and not answer.evidence_ids
+
+
+def split_review_rows(bundle, *, dev_only=False):
+    rows = review_rows(bundle)
+    counts = Counter()
+    for row in rows:
+        if dev_only and row["split"] != "dev":
+            for key in ("decision", "edited_text", "answer_confirmed", "note"):
+                row[key] = ""
+            continue
+        key = (
+            f"requests_{row['split']}"
+            if row["kind"] == "request"
+            else "questions_dev"
+            if row["split"] == "dev"
+            else f"questions_test_{row['kind']}"
+        )
+        counts[key] += 1
+        if counts[key] > candidates._FINAL_TARGETS[key]:
+            row["decision"] = "X"
+    return rows
+
+
+def test_dev_targets_share_final_source():
+    assert candidates.DEV_SPLIT_DIR == candidates.CANDIDATE_DIR / "dev"
+    assert candidates.DEV_TARGETS == {
+        key: candidates._FINAL_TARGETS[key] for key in ("requests_dev", "questions_dev")
+    }
+
+
+@pytest.mark.parametrize("test_rows", ["blank", "complete", "broken", "absent"])
+def test_finalize_dev_isolated_files_counts_hashes(
+    synthetic, tmp_path, monkeypatch, test_rows
+):
+    generate_files(synthetic, tmp_path)
+    bundle = candidates.load_candidates(tmp_path)
+    rows = split_review_rows(bundle, dev_only=test_rows != "complete")
+    if test_rows == "broken":
+        for row in rows:
+            if row["split"] == "test":
+                for key in candidates.REVIEW_COLUMNS:
+                    if key != "item_id":
+                        row[key] = "SENTINEL_TEST_BROKEN"
+    elif test_rows == "absent":
+        rows = [row for row in rows if row["split"] == "dev"]
+    write_review_csv(tmp_path / "review_sheet.csv", rows)
+    validations = []
+    original = candidates.validate_set
+
+    def validate(*args, **kwargs):
+        validations.append((len(args[0]), len(args[1]), kwargs["final"]))
+        return original(*args, **kwargs)
+
+    def forbidden():
+        pytest.fail("dev finalize must not connect")
+
+    monkeypatch.setattr(candidates, "validate_set", validate)
+    out = io.StringIO()
+    final_dir = tmp_path / "final"
+    assert (
+        candidates.main(
+            ["finalize", "--split", "dev"],
+            candidate_dir=tmp_path,
+            final_dir=final_dir,
+            out=out,
+            check=forbidden,
+            graph_factory=forbidden,
+        )
+        == 0
+    )
+    assert not final_dir.exists()
+    dev_dir = tmp_path / "dev"
+    assert {p.name for p in dev_dir.iterdir()} == {
+        "requests.jsonl",
+        "questions.jsonl",
+        "answers.jsonl",
+    }
+    requests, questions, answers = (
+        sets.read_jsonl(dev_dir / name)
+        for name in ("requests.jsonl", "questions.jsonl", "answers.jsonl")
+    )
+    assert len(requests) == candidates.DEV_TARGETS["requests_dev"]
+    assert len(questions) == candidates.DEV_TARGETS["questions_dev"]
+    assert all(r["split"] == "dev" for r in requests + questions)
+    assert {a["question_id"] for a in answers} == {q["id"] for q in questions}
+    count_line, hash_line = map(json.loads, out.getvalue().splitlines())
+    assert count_line == {
+        "requests": len(requests),
+        "questions": len(questions),
+        "shortages": dict.fromkeys(candidates.DEV_TARGETS, 0),
+    }
+    assert hash_line == {
+        "dev_request_hash": sets.request_set_hash(requests),
+        "dev_question_hash": sets.question_set_hash(questions, answers),
+    }
+    assert validations == [
+        (len(bundle.requests), len(bundle.questions), False),
+        (len(requests), len(questions), False),
+    ]
+    assert "SENTINEL_TEST" not in out.getvalue()
+
+
+@pytest.mark.parametrize("change", ["blank", "missing", "excluded_blank", "unknown"])
+def test_dev_review_incomplete_and_unknown_are_safe(synthetic, tmp_path, change):
+    generate_files(synthetic, tmp_path)
+    rows = split_review_rows(candidates.load_candidates(tmp_path), dev_only=True)
+    row = next(r for r in rows if r["split"] == "dev" and r["decision"] == "X")
+    if change == "missing":
+        rows.remove(row)
+    elif change == "unknown":
+        next(r for r in rows if r["split"] == "test")["item_id"] = (
+            "SENTINEL_TEST_UNKNOWN"
+        )
+    else:
+        row["note" if change == "excluded_blank" else "decision"] = ""
+    write_review_csv(tmp_path / "review_sheet.csv", rows)
+    out = io.StringIO()
+    assert (
+        candidates.main(
+            ["finalize", "--split", "dev"],
+            candidate_dir=tmp_path,
+            final_dir=tmp_path / "final",
+            out=out,
+        )
+        == 2
+    )
+    assert out.getvalue().strip() == (
+        "REVIEW_INVALID" if change == "unknown" else "REVIEW_INCOMPLETE"
+    )
+    assert not (tmp_path / "dev").exists()
+    assert not (tmp_path / "final").exists()
+
+
+@pytest.mark.parametrize("dry_run", [False, True])
+@pytest.mark.parametrize("shortage", [False, True])
+def test_dev_shortage_and_dry_run_write_nothing(synthetic, tmp_path, dry_run, shortage):
+    generate_files(synthetic, tmp_path)
+    bundle = candidates.load_candidates(tmp_path)
+    rows = split_review_rows(bundle, dev_only=True)
+    if shortage:
+        next(r for r in rows if r["split"] == "dev" and r["kind"] == "request")[
+            "decision"
+        ] = "X"
+    write_review_csv(tmp_path / "review_sheet.csv", rows)
+    args = ["finalize", "--split", "dev"] + (["--dry-run"] if dry_run else [])
+    out = io.StringIO()
+    assert candidates.main(
+        args,
+        candidate_dir=tmp_path,
+        final_dir=tmp_path / "final",
+        out=out,
+    ) == (3 if shortage and not dry_run else 0)
+    counts = json.loads(out.getvalue().splitlines()[0])
+    assert counts["shortages"] == {"requests_dev": int(shortage), "questions_dev": 0}
+    assert counts["requests"] == candidates.DEV_TARGETS["requests_dev"] - int(shortage)
+    if dry_run or shortage:
+        assert len(out.getvalue().splitlines()) == 1
+        assert not (tmp_path / "dev").exists()
+    assert not (tmp_path / "final").exists()
+
+
+@pytest.mark.parametrize(
+    "args", [["finalize", "--split", "test"], ["generate", "--split", "dev"]]
+)
+def test_split_argument_rejected_before_io(tmp_path, args):
+    out = io.StringIO()
+    assert candidates.main(args, candidate_dir=tmp_path, out=out) == 2
+    assert out.getvalue().strip() == "ARGUMENT_ERROR"
+    assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize(
+    "saved",
+    [
+        "same",
+        "request_changed",
+        "question_changed",
+        "answer_changed",
+        "absent",
+        "partial",
+        "unreadable",
+    ],
+)
+def test_full_finalize_dev_comparison_is_only_warning(synthetic, tmp_path, saved):
+    generate_files(synthetic, tmp_path)
+    bundle = candidates.load_candidates(tmp_path)
+    rows = split_review_rows(bundle)
+    reviewed = candidates.apply_review(bundle, rows)
+    requests = [r.model_dump() for r in reviewed.requests if r.split == "dev"]
+    questions = [q.model_dump() for q in reviewed.questions if q.split == "dev"]
+    ids = {q["id"] for q in questions}
+    answers = [a.model_dump() for a in reviewed.answers if a.question_id in ids]
+    if saved == "request_changed":
+        requests[0]["message"] += " SENTINEL_DEV_CHANGE"
+    elif saved == "question_changed":
+        questions[0]["text"] += " SENTINEL_DEV_CHANGE"
+    elif saved == "answer_changed":
+        answers[0]["evidence_ids"].append("SENTINEL_DEV_CHANGE")
+    if saved != "absent":
+        for name, items in zip(
+            ("requests", "questions", "answers"),
+            (requests, questions, answers),
+            strict=True,
+        ):
+            if saved != "partial" or name == "requests":
+                sets.write_jsonl(tmp_path / "dev" / f"{name}.jsonl", items)
+    if saved == "unreadable":
+        (tmp_path / "dev" / "answers.jsonl").write_text("SENTINEL_UNREADABLE")
+    write_review_csv(tmp_path / "review_sheet.csv", rows)
+    out = io.StringIO()
+    assert (
+        candidates.main(
+            ["finalize"],
+            candidate_dir=tmp_path,
+            final_dir=tmp_path / "final",
+            out=out,
+        )
+        == 0
+    )
+    warnings = [
+        line for line in out.getvalue().splitlines() if line == "DEV_SPLIT_CHANGED"
+    ]
+    assert len(warnings) == int(saved.endswith("changed"))
+    assert "SENTINEL" not in out.getvalue()
+    assert sets.read_jsonl(tmp_path / "final" / "requests.jsonl") == [
+        r.model_dump() for r in sorted(reviewed.requests, key=lambda r: r.id)
+    ]
+
+
+def test_dev_instructions_added_before_unchanged_hash_lines(synthetic, tmp_path):
+    bundle = combined(synthetic)
+    candidates.write_review_sheet(bundle, tmp_path)
+    text = (tmp_path / "review_instructions.md").read_text()
+    for term in (
+        "dev 먼저 확정",
+        "finalize --split dev",
+        "X",
+        "네 칸",
+        "빈 칸 금지",
+        "test",
+        "사전 등록",
+        "칸의 뜻",
+        "기준",
+        "예시",
+        "기록 방법",
+    ):
+        assert term in text
+    assert text.index("dev 먼저 확정") < text.index(candidates._REQUEST_HASH)
+    assert (
+        f"{candidates._REQUEST_HASH}: {sets.request_set_hash(bundle.requests)}\n"
+        in text
+    )
+    assert (
+        f"{candidates._QUESTION_HASH}: {sets.question_set_hash(bundle.questions, bundle.answers)}\n"
+        in text
+    )
