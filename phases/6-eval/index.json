@@ -327,7 +327,16 @@
     {
       "step": 24,
       "name": "fixed-axes-pattern",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-19T19:11:11+0900",
+      "summary": "brief 지정 축을 지배·약한 축에서 제외하는 fixed_axes와 합성 테스트 15건 구현. 미지정 동작·동결 프롬프트·상수 유지, make verify 통과(5,767 tests). 실제 서비스 호출·추가 패키지 없음.",
+      "completed_at": "2026-11-19T19:16:18+0900",
+      "usage": {
+        "input_tokens": 1299565,
+        "cached_input_tokens": 1230976,
+        "output_tokens": 6493,
+        "attempts": 1
+      }
     },
     {
       "step": 25,
