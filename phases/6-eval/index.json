@@ -1,0 +1,56 @@
+{
+  "project": "beauty-ad-creative-agents",
+  "phase": "6-eval",
+  "steps": [
+    {
+      "step": 1,
+      "name": "step-scope-check",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "evalset-freeze-guard",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "evalset-candidates",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "single-agent",
+      "status": "pending"
+    },
+    {
+      "step": 5,
+      "name": "e2-scoring",
+      "status": "pending"
+    },
+    {
+      "step": 6,
+      "name": "context-mode",
+      "status": "pending"
+    },
+    {
+      "step": 7,
+      "name": "e2e5-live",
+      "status": "pending"
+    },
+    {
+      "step": 8,
+      "name": "embed-vector-e3",
+      "status": "pending"
+    },
+    {
+      "step": 10,
+      "name": "prereg-template",
+      "status": "pending"
+    },
+    {
+      "step": 9,
+      "name": "isolation-live",
+      "status": "pending"
+    }
+  ]
+}
