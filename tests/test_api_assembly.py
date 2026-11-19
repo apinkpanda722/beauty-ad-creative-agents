@@ -1365,3 +1365,32 @@ def test_product_identity_and_contrast_flow_uses_graph_and_profile_only(
 
     asyncio.run(run())
     assert private not in caplog.text + str(capsys.readouterr())
+
+
+def test_assembly_injects_axis_glossary_into_decide(rig, monkeypatch):
+    from beautyads.analysis.prompts import axis_glossary
+
+    calls = []
+
+    def decision(text, *, structured, **kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(ok=True, decision={})
+
+    def request(**options):
+        options["decide_fn"]("synthetic")
+        return {}
+
+    monkeypatch.setattr(assembly, "decide", decision)
+    monkeypatch.setattr(assembly, "run_request", request)
+
+    async def run():
+        services = await rig.start()
+        try:
+            invoke(services)
+            assert len(calls) == 1
+            assert calls[0]["glossary"] == axis_glossary()
+            assert calls[0]["as_of"] == services.as_of
+        finally:
+            await services.close()
+
+    asyncio.run(run())

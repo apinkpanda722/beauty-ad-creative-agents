@@ -5,52 +5,382 @@
     {
       "step": 1,
       "name": "step-scope-check",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-19T12:16:24+0900",
+      "summary": "읽기 전용 step_scope_check 도구와 합성 테스트, README 도구 한 줄 추가. make verify 통과(4,934 tests), 추가 패키지 없음.",
+      "completed_at": "2026-11-19T12:26:18+0900",
+      "usage": {
+        "input_tokens": 1838836,
+        "cached_input_tokens": 1773312,
+        "output_tokens": 18856,
+        "attempts": 1
+      }
     },
     {
       "step": 2,
       "name": "evalset-freeze-guard",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-19T12:26:18+0900",
+      "summary": "평가셋 모델·검증·해시와 사전 등록·코드 동결 가드 및 합성 테스트 구현. make verify 통과(5,033 tests), 추가 패키지 없음.",
+      "completed_at": "2026-11-19T12:36:26+0900",
+      "usage": {
+        "input_tokens": 2953046,
+        "cached_input_tokens": 2833920,
+        "output_tokens": 21439,
+        "attempts": 1
+      }
     },
     {
       "step": 3,
       "name": "evalset-candidates",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-19T12:36:26+0900",
+      "summary": "결정적 평가셋 후보 생성기·정답 계산·검수 시트·해시 검증 finalize·live-evalset 구현. 실제 서비스 접속 없이 make verify 통과(5,067 tests), 추가 패키지 없음.",
+      "completed_at": "2026-11-19T12:46:25+0900",
+      "usage": {
+        "input_tokens": 1462545,
+        "cached_input_tokens": 1388416,
+        "output_tokens": 21564,
+        "attempts": 1
+      }
     },
     {
       "step": 4,
       "name": "single-agent",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-19T12:46:25+0900",
+      "summary": "E2 순수 단일 에이전트 팔·E3 공용 도구 루프와 합성·스키마·메시지 가드 테스트 구현. make verify 통과(5,099 tests), 추가 패키지 없음.",
+      "completed_at": "2026-11-19T12:53:50+0900",
+      "usage": {
+        "input_tokens": 2023900,
+        "cached_input_tokens": 1922432,
+        "output_tokens": 13891,
+        "attempts": 1
+      }
     },
     {
       "step": 5,
       "name": "e2-scoring",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-19T12:53:50+0900",
+      "summary": "E2·E5 익명 채점기, ArmRecord, 사람 판정 시트·로더, 쌍 비교 부트스트랩·층화 분석 및 합성·스키마 가드 테스트 구현. make verify 통과(5,135 tests), 추가 패키지 없음.",
+      "completed_at": "2026-11-19T13:04:03+0900",
+      "usage": {
+        "input_tokens": 2525476,
+        "cached_input_tokens": 2423552,
+        "output_tokens": 21545,
+        "attempts": 1
+      }
     },
     {
       "step": 6,
       "name": "context-mode",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-19T13:04:03+0900",
+      "summary": "E5 context_mode on/off 경로와 합성 테스트 41건 구현. 기본 동작·동결 프롬프트 유지, 모드는 off 결과 dict에만 기록(trace 불변). make verify 통과(5,176 tests), 추가 패키지 없음.",
+      "completed_at": "2026-11-19T13:09:14+0900",
+      "usage": {
+        "input_tokens": 1964882,
+        "cached_input_tokens": 1865600,
+        "output_tokens": 8527,
+        "attempts": 1
+      }
     },
     {
       "step": 7,
       "name": "e2e5-live",
-      "status": "pending"
+      "status": "completed",
+      "usage": {
+        "input_tokens": 3200348,
+        "cached_input_tokens": 3093632,
+        "output_tokens": 32631,
+        "attempts": 1
+      },
+      "started_at": "2026-11-19T13:13:29+0900",
+      "summary": "E2·E5 공용 러너(run/score/sheet/report), 동결·예산·재개 가드, 합성 테스트 48건과 live-e2e5 타깃 구현. 실제 서비스 접속 없이 make verify 통과(5,224 tests), 추가 패키지 없음.",
+      "completed_at": "2026-11-19T13:27:31+0900"
     },
     {
       "step": 8,
       "name": "embed-vector-e3",
-      "status": "pending"
+      "status": "completed",
+      "usage": {
+        "input_tokens": 4355994,
+        "cached_input_tokens": 4204672,
+        "output_tokens": 31283,
+        "attempts": 1
+      },
+      "started_at": "2026-11-19T13:35:00+0900",
+      "summary": "임베딩 래퍼·벡터 기준선·E3 measure/run/report와 정답 분리·동결·예산 가드, 합성 테스트 51건 및 live-e3 타깃 구현. 실제 서비스 호출 없이 make verify 통과(5,275 tests), 추가 패키지 없음.",
+      "completed_at": "2026-11-19T13:48:50+0900"
     },
     {
       "step": 10,
       "name": "prereg-template",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-19T15:03:42+0900",
+      "summary": "코드 값 기반 사전 등록 생성기·빈 결과 문서 틀·덮어쓰기 방지 CLI와 합성 테스트 25건 구현. make verify 통과(5,300 tests), 추가 패키지 없음.",
+      "completed_at": "2026-11-19T15:11:41+0900",
+      "usage": {
+        "input_tokens": 2111464,
+        "cached_input_tokens": 2008576,
+        "output_tokens": 16321,
+        "attempts": 1
+      }
     },
     {
       "step": 9,
       "name": "isolation-live",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-19T15:11:41+0900",
+      "summary": "격리 작업 공간 2개와 setup/run/report 실행기, 4경로 200건 요청·표식 판정·동결·예산 가드 및 합성 테스트 42건 구현. 실제 서비스 호출 없이 make verify 통과(5,342 tests), 추가 패키지 없음.",
+      "completed_at": "2026-11-19T15:23:59+0900",
+      "usage": {
+        "input_tokens": 2926512,
+        "cached_input_tokens": 2819712,
+        "output_tokens": 24303,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 11,
+      "name": "dev-split",
+      "status": "completed",
+      "started_at": "2026-11-19T15:48:56+0900",
+      "summary": "dev 독립 확정·해시 변경 경고와 E3 dev 경로 옵션·final 차단·측정 해시 구현. 합성 테스트 38건 추가, make verify 통과(5,380 tests). 실제 서비스 호출·추가 패키지 없음.",
+      "completed_at": "2026-11-19T15:55:10+0900",
+      "usage": {
+        "input_tokens": 1165393,
+        "cached_input_tokens": 1082112,
+        "output_tokens": 12065,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 12,
+      "name": "candidate-validity",
+      "status": "completed",
+      "started_at": "2026-11-19T16:13:23+0900",
+      "summary": "빈·과대 정답 제외, CQ별 비례 배정·부족 보고, 요청 조사 교정과 사전 등록 한계 문장 구현. 합성 테스트 26건 추가, make verify 통과(5,406 tests). 실제 서비스 호출·추가 패키지 없음.",
+      "completed_at": "2026-11-19T16:24:01+0900",
+      "usage": {
+        "input_tokens": 3027754,
+        "cached_input_tokens": 2902016,
+        "output_tokens": 17483,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 13,
+      "name": "e3-reporting",
+      "status": "completed",
+      "started_at": "2026-11-19T16:28:43+0900",
+      "summary": "E3 참고용 F1·정답 크기 층화, 대상 문서 기반 적중률·재현율, k·길이 후보 측정과 캐시 격리, 사전 등록 16번째 문장 구현. make verify 통과(5,450 tests), 실제 서비스 호출·추가 패키지 없음.",
+      "completed_at": "2026-11-19T16:36:42+0900",
+      "usage": {
+        "input_tokens": 1796508,
+        "cached_input_tokens": 1701120,
+        "output_tokens": 15728,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 14,
+      "name": "request-wording",
+      "status": "completed",
+      "started_at": "2026-11-19T16:38:16+0900",
+      "summary": "요청 문장 자연화·으로/로 조사·작업 공간별 선택·source_cq 순환 배정·검수 지침과 합성 테스트 11건 추가. 질문 생성 불변, make verify 통과(5,461 tests). 실제 서비스 호출·추가 패키지 없음.",
+      "completed_at": "2026-11-19T16:43:30+0900",
+      "usage": {
+        "input_tokens": 1915518,
+        "cached_input_tokens": 1798144,
+        "output_tokens": 6957,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 15,
+      "name": "rule-corpus",
+      "status": "completed",
+      "started_at": "2026-11-19T16:47:37+0900",
+      "summary": "E3 표현 규칙 코퍼스·도달 가능 부분집합 보고·사전 등록 문장과 합성 테스트 31건 구현. 기존 판정 유지, make verify 통과(5,492 tests). 실제 서비스 호출·추가 패키지 없음.",
+      "completed_at": "2026-11-19T16:55:14+0900",
+      "usage": {
+        "input_tokens": 2428355,
+        "cached_input_tokens": 2310400,
+        "output_tokens": 12648,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 16,
+      "name": "tenant-isolation-asserts",
+      "status": "completed",
+      "usage": {
+        "input_tokens": 1163480,
+        "cached_input_tokens": 1070080,
+        "output_tokens": 7278,
+        "attempts": 1
+      },
+      "started_at": "2026-11-19T17:13:09+0900",
+      "summary": "E3 코퍼스의 테넌트 데이터 배제·import 경계와 격리 setup의 쓰기·접근 범위를 고정하는 테스트 6건 추가. 소스 변경 없이 make verify 통과(5,498 tests), 실제 서비스 호출·추가 패키지 없음.",
+      "completed_at": "2026-11-19T17:18:14+0900"
+    },
+    {
+      "step": 17,
+      "name": "dev-budget-cap",
+      "status": "completed",
+      "started_at": "2026-11-19T17:18:14+0900",
+      "summary": "dev 예산 상수를 0.40으로 변경하고 경계·기본값·final 동작 합성 테스트 6건 추가, 채점 상한 6 유지 확인. make verify 통과(5,504 tests), 실제 서비스 호출·추가 패키지 없음.",
+      "completed_at": "2026-11-19T17:22:06+0900",
+      "usage": {
+        "input_tokens": 836128,
+        "cached_input_tokens": 770176,
+        "output_tokens": 3419,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 18,
+      "name": "prereg-dev-evidence",
+      "status": "completed",
+      "started_at": "2026-11-19T17:23:56+0900",
+      "summary": "E3 dev 측정 검증기·사전 등록 근거 표·--dev-measurement 옵션과 합성 테스트 139건 구현. 기존 출력·상수·문장 유지, make verify 통과(5,643 tests). 실제 서비스 호출·추가 패키지 없음.",
+      "completed_at": "2026-11-19T17:36:07+0900",
+      "usage": {
+        "input_tokens": 1093067,
+        "cached_input_tokens": 928512,
+        "output_tokens": 10299,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 19,
+      "name": "top-k-50",
+      "status": "completed",
+      "usage": {
+        "input_tokens": 1388320,
+        "cached_input_tokens": 1292416,
+        "output_tokens": 6675,
+        "attempts": 1
+      },
+      "started_at": "2026-11-19T18:07:47+0900",
+      "summary": "TOP_K 50 변경, 사전 등록 동결 조합 근거 검사·값 표 추가 및 합성 테스트 15건 구현. make verify 통과(5,658 tests), 실제 서비스 호출·추가 패키지 없음.",
+      "completed_at": "2026-11-19T18:12:57+0900"
+    },
+    {
+      "step": 20,
+      "name": "e2e5-records",
+      "status": "completed",
+      "started_at": "2026-11-19T18:12:57+0900",
+      "summary": "E2·E5 목적별 토큰·호출 수와 brief·지배 축 기록, 보조 보고 표·JSON, 사전 등록 18번째 문장과 합성 테스트 16건 구현. 판정 로직 유지, make verify 통과(5,674 tests). 실제 서비스 호출·추가 패키지 없음.",
+      "completed_at": "2026-11-19T18:20:57+0900",
+      "usage": {
+        "input_tokens": 1574410,
+        "cached_input_tokens": 1482880,
+        "output_tokens": 14645,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 21,
+      "name": "failure-as-worst",
+      "status": "completed",
+      "started_at": "2026-11-19T18:20:57+0900",
+      "summary": "E2·E5 실패 시 최저점 포함, 완전 사례 민감도·실패율·not_run 보고와 사전 등록 19번째 문장 구현. 합성 테스트 28건 추가, make verify 통과(5,702 tests). 실제 서비스 호출·추가 패키지 없음.",
+      "completed_at": "2026-11-19T18:29:16+0900",
+      "usage": {
+        "input_tokens": 1896115,
+        "cached_input_tokens": 1809408,
+        "output_tokens": 14775,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 22,
+      "name": "e2e5-repeats",
+      "status": "completed",
+      "usage": {
+        "input_tokens": 2113796,
+        "cached_input_tokens": 2012160,
+        "output_tokens": 15209,
+        "attempts": 1
+      },
+      "started_at": "2026-11-19T18:35:07+0900",
+      "summary": "E2·E5 반복 실행·채점·요청별 평균 집계와 사전 등록 20개 문장 반영, 합성 테스트 37건 추가. 반복 1 결과 불변 확인, make verify 통과(5,739 tests). 실제 서비스 호출·추가 패키지 없음.",
+      "completed_at": "2026-11-19T18:42:53+0900"
+    },
+    {
+      "step": 23,
+      "name": "test-questions-37",
+      "status": "completed",
+      "started_at": "2026-11-19T18:56:12+0900",
+      "summary": "test 질문 목표 37건(관계 27·단순 검색 10), 공용 상수·소비처·사전 등록 21번째 문장 및 합성 테스트 13건 반영. 판정·dev 규칙 유지, make verify 통과(5,752 tests). 실제 서비스 호출·추가 패키지 없음.",
+      "completed_at": "2026-11-19T19:02:46+0900",
+      "usage": {
+        "input_tokens": 1763719,
+        "cached_input_tokens": 1661568,
+        "output_tokens": 10743,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 24,
+      "name": "fixed-axes-pattern",
+      "status": "completed",
+      "started_at": "2026-11-19T19:11:11+0900",
+      "summary": "brief 지정 축을 지배·약한 축에서 제외하는 fixed_axes와 합성 테스트 15건 구현. 미지정 동작·동결 프롬프트·상수 유지, make verify 통과(5,767 tests). 실제 서비스 호출·추가 패키지 없음.",
+      "completed_at": "2026-11-19T19:16:18+0900",
+      "usage": {
+        "input_tokens": 1299565,
+        "cached_input_tokens": 1230976,
+        "output_tokens": 6493,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 25,
+      "name": "interpretation-glossary",
+      "status": "completed",
+      "started_at": "2026-11-19T19:53:38+0900",
+      "summary": "해석 프롬프트·닫힌 값 대응표 주입·동결 3항목·과채움 보고와 합성 테스트 32건 구현. 요청 문장·기존 기준 유지, make verify 통과(5,799 tests). 실제 서비스 호출·추가 패키지 없음.",
+      "completed_at": "2026-11-19T20:00:27+0900",
+      "usage": {
+        "input_tokens": 1627430,
+        "cached_input_tokens": 1517440,
+        "output_tokens": 11415,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 26,
+      "name": "prereg-adherence-sentence",
+      "status": "completed",
+      "started_at": "2026-11-19T20:28:18+0900",
+      "summary": "사전 등록 24번째 문장에 해석 한계·준수율·과채움 보조 지표와 dev 관찰 근거 추가. 기존 23개 문장·결과 틀 불변, 합성 테스트 2건 추가, make verify 통과(5,801 tests). 실제 서비스 호출·추가 패키지 없음.",
+      "completed_at": "2026-11-19T20:32:45+0900",
+      "usage": {
+        "input_tokens": 1192286,
+        "cached_input_tokens": 1136640,
+        "output_tokens": 3330,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 27,
+      "name": "review-fixes",
+      "status": "completed",
+      "started_at": "2026-11-19T20:42:31+0900",
+      "summary": "리뷰 지적 4건 수정 및 합성 테스트 59건 추가. 사전 등록 24문장·동결 값 유지, make verify 통과(5,860 tests). 실제 호출·추가 패키지 없음. 옛 중단 failed 기록은 완료로 취급되므로 옛 dev 스모크 run은 폐기하고 final은 새 --run-id로 시작해야 함.",
+      "completed_at": "2026-11-19T20:49:58+0900",
+      "usage": {
+        "input_tokens": 2623608,
+        "cached_input_tokens": 2522880,
+        "output_tokens": 11649,
+        "attempts": 1
+      }
     }
-  ]
+  ],
+  "created_at": "2026-11-19T12:16:24+0900",
+  "completed_at": "2026-11-19T20:49:58+0900"
 }

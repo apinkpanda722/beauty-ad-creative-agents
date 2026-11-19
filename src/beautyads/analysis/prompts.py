@@ -18,6 +18,7 @@ from beautyads.domain import (
     StructureFlags,
     Talent,
 )
+from beautyads.domain.labels import ANGLE_NAMES, FORMAT_NAMES, HOOK_TYPE_NAMES
 
 HOOK_PROMPT_VERSION = "hook-v1"
 
@@ -108,6 +109,26 @@ _CLAIM_CRITERIA = {
     Claim.texture_finish: "제형·마무리감",
     Claim.other: "위 목록에 해당하지 않는 명시된 효능",
 }
+
+
+def axis_glossary() -> dict:
+    """Return fresh, ordered interpretation data from the frozen taxonomy."""
+    return {
+        axis: [
+            {
+                "value": member.value,
+                "name": names[member],
+                "definition": definitions[member],
+            }
+            for member in enum
+            if member is not enum.other
+        ]
+        for axis, enum, names, definitions in (
+            ("hook_type", HookType, HOOK_TYPE_NAMES, _HOOK_CRITERIA),
+            ("angle", Angle, ANGLE_NAMES, _ANGLE_CRITERIA),
+            ("format", Format, FORMAT_NAMES, _FORMAT_CRITERIA),
+        )
+    }
 
 
 def _criteria(enum: type[StrEnum], descriptions: Mapping[StrEnum, str]) -> str:

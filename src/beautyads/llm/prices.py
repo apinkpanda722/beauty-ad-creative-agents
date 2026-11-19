@@ -8,6 +8,10 @@ from typing import Any, Literal, NamedTuple
 from .errors import ErrorKind, LlmCallError
 
 PRICE_TABLE_CHECKED_ON = "2026-11-17"
+# 출처: litellm 1.103.3 model_cost, 조회일 2026-11-19.
+# Local lookup: litellm.model_cost.get(model).get("input_cost_per_token") * 1e6
+# (LITELLM_LOCAL_MODEL_COST_MAP=True; no remote lookup or API dispatch).
+EMBEDDING_PRICES = {"text-embedding-3-small": 0.02, "text-embedding-3-large": 0.13}
 CostSource = Literal["response_cost", "price_table"]
 
 

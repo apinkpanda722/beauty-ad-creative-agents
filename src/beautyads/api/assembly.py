@@ -27,6 +27,7 @@ from beautyads.agents.research import run_research
 from beautyads.agents.skeleton import build_graph
 from beautyads.agents.supervisor import decide, run_request
 from beautyads.agents.tools import run_tool
+from beautyads.analysis.prompts import axis_glossary
 from beautyads.api.app import Assembly
 from beautyads.api.ask_view import json_copy
 from beautyads.api.checkpointer import (
@@ -135,7 +136,7 @@ async def assemble_full(
     """
     if evaluation_model not in {"claude-haiku-5-5", "claude-sonnet-5-5"}:
         raise ValueError("EVALUATION_MODEL_INVALID")
-    if group not in {"dev", "test"}:
+    if group not in {"dev", "test", "isolation"}:
         raise ValueError("WORKSPACE_GROUP_INVALID")
     model_calls = {
         "chat": chat_complete,
@@ -273,7 +274,16 @@ async def assemble_full(
                     except Exception:  # noqa: BLE001 -- never expose rollback diagnostics
                         raise RuntimeError("ASSEMBLY_HYDRATE_FAILED") from None
 
-            def ask(message, ctx, profile, feedback, with_image, on_event=None):
+            def ask(
+                message,
+                ctx,
+                profile,
+                feedback,
+                with_image,
+                on_event=None,
+                *,
+                context_mode="on",
+            ):
                 profile = {**profile, "product_name": product_names.get(ctx.tenant_id)}
                 started_at, started = datetime.now(UTC), monotonic()
                 generators = []
@@ -308,6 +318,7 @@ async def assemble_full(
                             as_of=ctx.as_of,
                             structured=structured("gpt-6-luna"),
                             limits=limits,
+                            glossary=axis_glossary(),
                         )
                         if not result.ok:
                             raise RuntimeError("SUPERVISOR_DECISION_FAILED")
@@ -317,7 +328,7 @@ async def assemble_full(
                         guard()
                         return chat(**options)
 
-                    def research_fn(brief, raw_store):
+                    def research_fn(brief, raw_store, context_mode="on"):
                         return run_research(
                             brief,
                             ctx=ctx,
@@ -325,6 +336,11 @@ async def assemble_full(
                             tool_runner=runner,
                             structured=structured("gpt-6-luna"),
                             raw_store=raw_store,
+                            **(
+                                {"context_mode": context_mode}
+                                if context_mode != "on"
+                                else {}
+                            ),
                         )
 
                     def claims_fn(profile: dict) -> tuple[list[str], str]:
@@ -476,6 +492,11 @@ async def assemble_full(
                         limits=limits,
                         on_event=on_event,
                         claims_fn=claims_fn,
+                        **(
+                            {"context_mode": context_mode}
+                            if context_mode != "on"
+                            else {}
+                        ),
                     )
                     return result
                 except BaseException as exc:

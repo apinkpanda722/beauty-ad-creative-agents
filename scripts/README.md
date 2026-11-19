@@ -19,6 +19,7 @@
 | `Makefile` | `make verify` — Stop hook, execute.py, step AC가 공통으로 부르는 검증 진입점 |
 | `scripts/execute.py` | step 순차 실행기 (Codex 호출, 검증, 재시도, 커밋) |
 | `scripts/step_file_checks.py`, `scripts/test_step_files.py` | step 파일 형식 v2 기계 검사: 열람 금지 ↔ 읽기 목록, 실행 금지 대상 명시, 수정할 파일 ↔ 수정 허용 경로, 소비자 테스트 경고(`python scripts/step_file_checks.py phases/<phase>/step*.md`) |
+| `scripts/step_scope_check.py` | step 허용 범위와 본문의 경로·좌표·식별자·상수 단언·소비자 테스트 충돌 점검 — 경고만, 읽기 전용, 하네스 비연결 |
 | `scripts/step-result.schema.json` | Codex 최종 응답 스키마 (`status`, `summary`, `reason`) |
 | `scripts/hooks/` | 위험 명령 차단, `make verify` Stop hook (스택 중립) |
 | `.codex/config.toml`, `.claude/settings.json` | 두 도구가 같은 hook 스크립트를 가리킨다 |

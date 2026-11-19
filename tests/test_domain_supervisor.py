@@ -387,3 +387,98 @@ def test_pattern_context_combines_same_axis_counts_and_repeated_totals_once():
             "share": 1.0,
         }
     ]
+
+
+def test_pattern_context_empty_fixed_axes_preserves_legacy_result():
+    import json
+
+    from beautyads.domain.supervisor import pattern_context
+
+    outputs = [comparison_rows(("demo", 5), total=8)]
+    original = pattern_context(outputs, ["yt:a"])
+    assert set(original) == {
+        "pool_size",
+        "pool_basis",
+        "thin_pool",
+        "min_dominant_share",
+        "thin_pool_max",
+        "dominant_axes",
+        "weak_axes",
+        "distribution",
+    }
+    for empty in ((), [], iter(())):
+        context = pattern_context(outputs, ["yt:a"], fixed_axes=empty)
+        assert context == original
+        assert json.dumps(context, allow_nan=False) == json.dumps(
+            original, allow_nan=False
+        )
+
+
+@pytest.mark.parametrize(
+    "fixed_axes",
+    [("format",), ("angle",), ("hook_type",), ("hook_type", "angle", "format")],
+)
+def test_pattern_context_fixed_axes_only_exclude_classification(fixed_axes):
+    import json
+    from fractions import Fraction
+
+    from beautyads.domain.supervisor import MIN_DOMINANT_SHARE, pattern_context
+
+    boundary = Fraction(str(MIN_DOMINANT_SHARE))
+    outputs = [
+        comparison_rows(("question", boundary.numerator), total=boundary.denominator),
+        comparison_rows(("desire", 1), total=100),
+        comparison_rows(("demo", 5), total=8),
+    ]
+    ids = ["yt:a", "yt:a"]
+    before = deepcopy((outputs, ids))
+    original = pattern_context(outputs, ids)
+    assert {item["axis"] for item in original["dominant_axes"]} == {
+        "hook_type",
+        "format",
+    }
+    assert original["weak_axes"] == ["angle"]
+    context = pattern_context(outputs, ids, fixed_axes=fixed_axes)
+    assert context == {
+        **original,
+        "dominant_axes": [
+            item for item in original["dominant_axes"] if item["axis"] not in fixed_axes
+        ],
+        "weak_axes": [axis for axis in original["weak_axes"] if axis not in fixed_axes],
+        "fixed_axes": sorted(fixed_axes),
+    }
+    assert set(fixed_axes) <= {item["axis"] for item in context["distribution"]}
+    assert (outputs, ids) == before
+    json.dumps(context, allow_nan=False)
+
+
+@pytest.mark.parametrize("observed", [False, True])
+def test_pattern_context_retains_unobserved_fixed_axes(observed):
+    from beautyads.domain.supervisor import pattern_context
+
+    outputs = [comparison_rows(("question", 1), total=1)] if observed else []
+    original = pattern_context(outputs, ["yt:a"])
+    context = pattern_context(outputs, ["yt:a"], fixed_axes=("format", "angle"))
+    assert context == {**original, "fixed_axes": ["angle", "format"]}
+
+
+@pytest.mark.parametrize("fixed_axes", [("unknown",), ("format", "unknown"), ("",)])
+def test_pattern_context_rejects_unknown_fixed_axes_without_mutation(fixed_axes):
+    from beautyads.domain.supervisor import pattern_context
+
+    outputs = [comparison_rows(("demo", 5), total=8)]
+    ids = ["yt:a"]
+    before = deepcopy((outputs, ids))
+    with pytest.raises(ValueError, match="^PATTERN_FIXED_AXES_INVALID$"):
+        pattern_context(outputs, ids, fixed_axes=fixed_axes)
+    assert (outputs, ids) == before
+
+
+def test_pattern_context_fixed_axes_are_sorted_unique_for_iterables():
+    from beautyads.domain.supervisor import pattern_context
+
+    axes = ("hook_type", "format", "angle", "format")
+    expected = pattern_context([], [], fixed_axes=("angle", "format", "hook_type"))
+    assert expected["fixed_axes"] == sorted(set(axes))
+    for fixed_axes in (axes, list(reversed(axes)), set(axes), (axis for axis in axes)):
+        assert pattern_context([], [], fixed_axes=fixed_axes) == expected

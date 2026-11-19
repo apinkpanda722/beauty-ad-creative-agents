@@ -31,6 +31,9 @@ from beautyads.llm.structured import (
 
 ROOT = Path(__file__).resolve().parents[1]
 GUARDED_MODULES = {
+    "eval/e3_live.py",
+    "eval/e2_scoring.py",
+    "eval/single_agent.py",
     "agents/research.py",
     "agents/planning.py",
     "agents/evaluation.py",
@@ -436,3 +439,72 @@ def test_actual_supervisor_specs_are_guarded():
     generator = CaptureStructured("gpt-6-luna")
     decide("synthetic", as_of=CTX.as_of, structured=generator, limits=RequestLimits())
     assert guard_specs([generator]) == 1
+
+
+def test_actual_single_agent_specs_are_guarded():
+    from test_single_agent import execute_single
+
+    generator = CaptureStructured("gpt-6.1-terra")
+    execute_single(Chat([reply([call()]), reply()]), generator)
+    assert guard_specs([generator]) == 1
+    assert generator.calls[0][0].name == "single_agent_plan"
+
+
+def test_actual_single_agent_chat_messages():
+    from test_single_agent import execute_single
+
+    chat = Chat([reply([call(), call()]), reply()])
+    execute_single(chat, CaptureStructured("gpt-6.1-terra"))
+    assert len(chat.calls) == 2
+    guard_messages(chat.calls)
+
+
+def test_actual_e2_scoring_specs_are_strict(tmp_path):
+    from test_e2_scoring import blind
+
+    from beautyads.eval.e2_scoring import score_plans
+
+    generator = CaptureStructured("claude-sonnet-5-5")
+    items, _ = blind(1)
+    score_plans(items, structured=generator, ledger_path=tmp_path / "ledger")
+    assert generator.calls, "No E2 scoring specs captured"
+    checked = 0
+    for spec, _ in generator.calls:
+        assert spec.name == "e2_scores"
+        assert strict_violations(spec.schema) == []
+        checked += 1
+    assert checked > 0, "No E2 scoring specs validated"
+
+
+def test_actual_e3_specs_and_messages_are_guarded():
+    from test_e3_live import arm_options, question
+
+    from beautyads.eval.e3_live import run
+
+    options, generator, calls = arm_options()
+    run([question()], **options)
+    assert guard_specs([generator]) > 0
+    guard_messages([kw for _, kw in generator.calls])
+    guard_messages([kw for kw in calls if "messages" in kw])
+    assert all(spec.name == "e3_answer" for spec, _ in generator.calls)
+
+
+def test_actual_supervisor_messages_with_axes_are_guarded():
+    import json
+
+    from beautyads.agents.supervisor import decide
+    from beautyads.analysis.prompts import axis_glossary
+    from beautyads.domain.supervisor import RequestLimits
+
+    generator = CaptureStructured("gpt-6-luna")
+    decide(
+        "synthetic",
+        as_of=CTX.as_of,
+        structured=generator,
+        limits=RequestLimits(),
+        glossary=axis_glossary(),
+    )
+    assert guard_specs([generator]) == 1
+    calls = [options for _, options in generator.calls]
+    assert json.loads(calls[0]["messages"][1]["content"])["axes"] == axis_glossary()
+    guard_messages(calls)
