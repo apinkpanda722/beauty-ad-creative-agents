@@ -269,33 +269,40 @@ def _apportion(weights: dict[str, int], total: int) -> dict[str, int]:
     return quotas
 
 
-def _object_particle(word) -> str:
-    """Choose the Korean object particle from the final Hangul syllable."""
+def _instrumental_particle(word) -> str:
+    """Choose 으로/로, treating a final ㄹ like an open Hangul syllable."""
     if word and "가" <= word[-1] <= "힣":
-        return "을" if (ord(word[-1]) - ord("가")) % 28 else "를"
-    return "을"
+        final = (ord(word[-1]) - ord("가")) % 28
+        return "으로" if final not in {0, 8} else "로"
+    return "로"
 
 
 def build_request_candidates(cq_rows, workspaces, *, briefs=None) -> Candidates:
     briefs = BRIEFS if briefs is None else briefs
-    cqs = [
-        row
-        for row in _eligible(cq_rows)
-        if "기획" in row["usage"] or "리서치" in row["usage"]
-    ]
+    cqs = sorted(
+        (
+            row
+            for row in _eligible(cq_rows)
+            if "기획" in row["usage"] or "리서치" in row["usage"]
+        ),
+        key=lambda row: row["id"],
+    )
     targets = {
         key: math.ceil(value * CANDIDATE_FACTOR)
         for key, value in _FINAL_TARGETS.items()
         if key.startswith("requests_")
     }
     result = Candidates()
+    if not cqs:
+        result.shortages = _shortages([], [], targets)
+        return result
     rng = random.Random(20261119)
     enums = {"format": Format, "hook_type": HookType, "angle": Angle}
     for split in ("dev", "test"):
         pools = {"reliable": {}, "unreliable": {}}
         seen = set()
-        for workspace, cq, brief, template in product(
-            _workspaces(workspaces, split), cqs, briefs, _REQUEST_AXES
+        for workspace, brief, template in product(
+            _workspaces(workspaces, split), briefs, _REQUEST_AXES
         ):
             category, claim = brief.get("category"), brief.get("claim")
             if (
@@ -321,8 +328,8 @@ def build_request_candidates(cq_rows, workspaces, *, briefs=None) -> Candidates:
                     ]
                     label = _LABELS[template][value]
                     phrase = label if label.endswith(noun) else f"{label} {noun}"
-                    condition = f" {phrase}{_object_particle(phrase)} 지정해"
-                message = f"역량 질문 {cq['id']}의 근거를 바탕으로 {_LABELS['category'][category]} 제품의 {_LABELS['claim'][claim]} 광고를{condition} 기획안 1안으로 작성해 주세요."
+                    condition = f" {phrase}{_instrumental_particle(phrase)}"
+                message = f"{_LABELS['category'][category]} 제품의 {_LABELS['claim'][claim]} 광고 기획안 1안을{condition} 작성해 주세요."
                 signature = (workspace.tenant_id, message)
                 if signature in seen:
                     continue
@@ -332,13 +339,13 @@ def build_request_candidates(cq_rows, workspaces, *, briefs=None) -> Candidates:
                     id=f"req-{split}-{len(seen):04d}",
                     split=split,
                     tenant_id=workspace.tenant_id,
-                    source_cq=cq["id"],
+                    source_cq=cqs[0]["id"],
                     axes_used=axes,
                     needs_human_review=True,
                     reviewed=False,
                     message=message,
                 )
-                pools[stratum(axes)].setdefault(cq["id"], []).append(item)
+                pools[stratum(axes)].setdefault(workspace.tenant_id, []).append(item)
         limit = targets[f"requests_{split}"]
         reliable = list(_round_robin(pools["reliable"], rng))
         unreliable = list(_round_robin(pools["unreliable"], rng))
@@ -348,7 +355,13 @@ def build_request_candidates(cq_rows, workspaces, *, briefs=None) -> Candidates:
         selected += (reliable[reliable_count:] + unreliable[limit - reliable_count :])[
             : limit - len(selected)
         ]
-        result.requests.extend(selected)
+        # Display-only CQ links follow split selection order, not pool membership.
+        result.requests.extend(
+            RequestItem.model_validate(
+                {**item.model_dump(), "source_cq": cqs[i % len(cqs)]["id"]}
+            )
+            for i, item in enumerate(selected)
+        )
     result.shortages = _shortages(result.requests, [], targets)
     return result
 
@@ -641,6 +654,7 @@ def write_review_sheet(candidates, out_dir=CANDIDATE_DIR):
 - split: dev는 기준 조정용, test는 최종 측정용. 작업 공간·카테고리 대응의 사실을 확인한다.
 - text: CQ와 맞고 명확한 한국어인지 확인한다. 요청은 기획안 1안이어야 한다.
 - source_cq: 근거 CQ. axes_used: 코드가 정한 축. 두 칸은 수정하지 않는다.
+요청의 source_cq는 문장에 나타나지 않는 표시용 연결이며 수정하지 않는다.
 - answer_summary: 고정 질의 정답의 유형·값·근거 소재 ID. count는 결과 행 수,
   set은 각 행 첫 문자열 열의 중복 제거·정렬 집합이다. 집계 셀의 숫자가 아니다.
   그래프 질의 요약과 대조해 정답을 확인한다. 요청은 해당 없음(-).

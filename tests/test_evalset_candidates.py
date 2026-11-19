@@ -144,10 +144,92 @@ def test_request_counts_strata_split_and_determinism(synthetic):
         assert all(r.tenant_id.startswith(split + "-") for r in items)
     for r in result.requests:
         assert "기획안 1안" in r.message
+        assert all(
+            term not in r.message for term in ("역량 질문", "CQ-", "근거를 바탕으로")
+        )
         assert r.needs_human_review and not r.reviewed
         assert set(r.axes_used) <= set(sets.AXIS_NAMES)
         assert r.source_cq != "CQ-12"
     assert not any(result.shortages.values())
+    assert len({(r.tenant_id, r.message) for r in result.requests}) == len(
+        result.requests
+    )
+
+
+@pytest.mark.parametrize("cq_count", [2, 3])
+def test_request_source_cq_cycles_after_selection_and_tenants_alternate(
+    synthetic, cq_count
+):
+    rows, workspaces = synthetic
+    rows = rows[:cq_count] + rows[-1:]
+    result = candidates.build_request_candidates(rows, workspaces)
+    assert result == candidates.build_request_candidates(
+        list(reversed(rows)), workspaces
+    )
+    eligible_ids = sorted(row["id"] for row in rows if row["id"] != "CQ-12")
+    for split in ("dev", "test"):
+        items = [r for r in result.requests if r.split == split]
+        assert [r.source_cq for r in items] == [
+            eligible_ids[i % len(eligible_ids)] for i in range(len(items))
+        ]
+        counts = Counter(r.source_cq for r in items)
+        assert set(counts) == set(eligible_ids)
+        assert max(counts.values()) - min(counts.values()) <= 1
+        tenants = sorted(w.tenant_id for w in workspaces if w.group == split)
+        for stratum in ("reliable", "unreliable"):
+            selected = [r for r in items if sets.stratum(r.axes_used) == stratum]
+            assert [r.tenant_id for r in selected] == [
+                tenants[i % len(tenants)] for i in range(len(selected))
+            ]
+    single_cq = candidates.build_request_candidates(rows[:1], workspaces)
+    assert [r.model_dump(exclude={"source_cq"}) for r in result.requests] == [
+        r.model_dump(exclude={"source_cq"}) for r in single_cq.requests
+    ]
+
+
+@pytest.mark.parametrize("usage", ["기획", "리서치", "컨텍스트"])
+def test_request_cq_eligibility_uses_usage_and_excludes_context(synthetic, usage):
+    rows, workspaces = synthetic
+    selected = [{**row, "usage": usage} for row in rows[:1]] + rows[-1:]
+    result = candidates.build_request_candidates(selected, workspaces)
+    if usage == "컨텍스트":
+        assert not result.requests
+        assert result.shortages == {"requests_dev": 15, "requests_test": 30}
+    else:
+        assert result.requests
+        assert {r.source_cq for r in result.requests} == {rows[0]["id"]}
+
+
+@pytest.mark.parametrize("template", ["basic", "format", "hook_type", "angle"])
+def test_request_wording_preserves_conditions_and_axes(
+    synthetic, monkeypatch, template
+):
+    rows, workspaces = synthetic
+    axes = candidates._REQUEST_AXES[template]
+    monkeypatch.setattr(candidates, "_REQUEST_AXES", {template: axes})
+    brief = {"category": "sun_care", "claim": "soothing"}
+    result = candidates.build_request_candidates(rows, workspaces, briefs=[brief])
+    stem = (
+        f"{candidates._LABELS['category'][brief['category']]} 제품의 "
+        f"{candidates._LABELS['claim'][brief['claim']]} 광고 기획안 1안을"
+    )
+    endings = {" 작성해 주세요."}
+    if template != "basic":
+        noun = {"format": "포맷", "hook_type": "훅 유형", "angle": "각도"}[template]
+        phrases = [
+            label if label.endswith(noun) else f"{label} {noun}"
+            for value, label in candidates._LABELS[template].items()
+            if value != "other"
+        ]
+        endings = {
+            f" {phrase}{candidates._instrumental_particle(phrase)} 작성해 주세요."
+            for phrase in phrases
+        }
+    assert result.requests
+    for item in result.requests:
+        assert item.axes_used == axes
+        assert item.message in {stem + ending for ending in endings}
+        assert candidates._LABELS["claim"]["other"] not in item.message
 
 
 def test_request_unknown_values_and_ineligible_rows_are_not_invented(synthetic):
@@ -376,6 +458,10 @@ def test_sheet_columns_instructions_and_hash_guard(synthetic, tmp_path):
     )
     assert sets.request_set_hash(bundle.requests) in instructions
     assert sets.question_set_hash(bundle.questions, bundle.answers) in instructions
+    assert (
+        "요청의 source_cq는 문장에 나타나지 않는 표시용 연결이며 수정하지 않는다."
+        in instructions.splitlines()
+    )
 
 
 def test_dry_run_never_checks_or_connects(synthetic, tmp_path):
@@ -1121,10 +1207,18 @@ def test_offline_estimate_uses_same_apportionment_without_answers(
 
 @pytest.mark.parametrize(
     "word,expected",
-    [("포맷", "을"), ("유형", "을"), ("각도", "를"), ("ABC", "을"), ("", "을")],
+    [
+        ("포맷", "으로"),
+        ("유형", "으로"),
+        ("훅 유형", "으로"),
+        ("각도", "로"),
+        ("달", "로"),
+        ("ABC", "로"),
+        ("", "로"),
+    ],
 )
-def test_object_particle_follows_final_consonant(word, expected):
-    assert candidates._object_particle(word) == expected
+def test_instrumental_particle_follows_final_consonant(word, expected):
+    assert candidates._instrumental_particle(word) == expected
 
 
 def test_request_conditions_exclude_other_and_use_correct_particles(
@@ -1146,10 +1240,13 @@ def test_request_conditions_exclude_other_and_use_correct_particles(
         assert result.requests
         for item in result.requests:
             assert candidates._LABELS[template]["other"] not in item.message
-            assert f"{noun}{candidates._object_particle(noun)} 지정해" in item.message
+            assert (
+                f"{noun}{candidates._instrumental_particle(noun)} 작성해 주세요"
+                in item.message
+            )
             assert all(
                 bad not in item.message
-                for bad in ("포맷 포맷", "훅 훅", "각도 각도", "각도을")
+                for bad in ("포맷 포맷", "훅 훅", "각도 각도", "각도을", "각도으로")
             )
 
 
@@ -1164,7 +1261,8 @@ def test_request_label_suffix_is_not_repeated(synthetic, monkeypatch):
     result = candidates.build_request_candidates(rows, workspaces)
     assert result.requests
     assert all(
-        "합성 포맷을 지정해" in item.message and "포맷 포맷" not in item.message
+        "합성 포맷으로 작성해 주세요" in item.message
+        and "포맷 포맷" not in item.message
         for item in result.requests
     )
 
