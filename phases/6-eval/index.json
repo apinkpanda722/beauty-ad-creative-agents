@@ -229,7 +229,16 @@
     {
       "step": 17,
       "name": "dev-budget-cap",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-19T17:18:14+0900",
+      "summary": "dev 예산 상수를 0.40으로 변경하고 경계·기본값·final 동작 합성 테스트 6건 추가, 채점 상한 6 유지 확인. make verify 통과(5,504 tests), 실제 서비스 호출·추가 패키지 없음.",
+      "completed_at": "2026-11-19T17:22:06+0900",
+      "usage": {
+        "input_tokens": 836128,
+        "cached_input_tokens": 770176,
+        "output_tokens": 3419,
+        "attempts": 1
+      }
     }
   ],
   "created_at": "2026-11-19T12:16:24+0900"
