@@ -110,3 +110,7 @@ live-e2e5:
 .PHONY: live-e3
 live-e3:
 	uv run python -m beautyads.eval.e3_live $(ARGS)
+
+.PHONY: live-isolation
+live-isolation:
+	uv run python -m beautyads.eval.isolation_live $(ARGS)

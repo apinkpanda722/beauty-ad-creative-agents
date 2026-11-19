@@ -135,7 +135,7 @@ async def assemble_full(
     """
     if evaluation_model not in {"claude-haiku-5-5", "claude-sonnet-5-5"}:
         raise ValueError("EVALUATION_MODEL_INVALID")
-    if group not in {"dev", "test"}:
+    if group not in {"dev", "test", "isolation"}:
         raise ValueError("WORKSPACE_GROUP_INVALID")
     model_calls = {
         "chat": chat_complete,

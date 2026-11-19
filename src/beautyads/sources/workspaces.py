@@ -13,7 +13,7 @@ from beautyads.domain.tenant import (
 
 
 class Workspace(WorkspaceProfile):
-    group: Literal["dev", "test"]
+    group: Literal["dev", "test", "isolation"]
     forbidden_terms: list[str] = []  # noqa: RUF012 -- Pydantic copies model field defaults
 
 

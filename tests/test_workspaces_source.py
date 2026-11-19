@@ -28,7 +28,7 @@ def test_config_workspace_invariants():
     assert items
     ids = [item.tenant_id for item in items]
     assert len(ids) == len(set(ids))
-    assert {item.group for item in items} == {"dev", "test"}
+    assert {item.group for item in items} == {"dev", "test", "isolation"}
     for item in items:
         assert isinstance(item, Workspace)
         assert WorkspaceProfile.model_validate(item.model_dump(exclude={"group"}))

@@ -31,3 +31,21 @@
   forbidden_terms: []
   price_band_pct: 30
   group: test
+- tenant_id: iso-alpha
+  display_name: 격리 A 작업 공간
+  brand: mixsoon
+  own_product_url: https://mixsoon.co.kr/product/detail.html?product_no=921
+  tone: 친근하고 간결한 말투
+  forbidden_terms:
+  - ISOA-forbidden-e9c6da7b
+  price_band_pct: 30
+  group: isolation
+- tenant_id: iso-beta
+  display_name: 격리 B 작업 공간
+  brand: cosrx
+  own_product_url: https://www.cosrx.co.kr/product/%EC%9A%B8%ED%8A%B8%EB%9D%BC-%EB%9D%BC%EC%9D%B4%ED%8A%B8-%EC%9D%B8%EB%B9%84%EC%A0%80%EB%B8%94-%EC%84%A0%EC%84%B8%EB%9F%BC-50ml/740/category/57/display/1/
+  tone: 명료하고 차분한 말투
+  forbidden_terms:
+  - ISOB-forbidden-34267296
+  price_band_pct: 30
+  group: isolation
