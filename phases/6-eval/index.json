@@ -215,16 +215,13 @@
     {
       "step": 16,
       "name": "tenant-isolation-asserts",
-      "status": "blocked",
+      "status": "pending",
       "usage": {
         "input_tokens": 276508,
         "cached_input_tokens": 212096,
         "output_tokens": 2670,
         "attempts": 1
-      },
-      "started_at": "2026-11-19T17:09:55+0900",
-      "blocked_reason": "현재 api/ask.py의 /ask 경로는 services.price_bands를 무조건 읽습니다. 따라서 요구된 “setup이 읽은 Assembly 속성 집합이 tenants·ask·allowed_tenants·workspaces·as_of·last_collected_at·hydrate의 부분집합”이라는 단언은 실패하며, “소스 코드(src/ 아래 모든 파일)와 기존 테스트의 단언·상수를 수정하지 마라”도 준수해야 하므로 진행할 수 없습니다. price_bands를 허용 속성 집합에 포함하도록 step 수정이 필요합니다. 파일 수정과 make verify는 실행하지 않았습니다.",
-      "blocked_at": "2026-11-19T17:12:07+0900"
+      }
     },
     {
       "step": 17,
