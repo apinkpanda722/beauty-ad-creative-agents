@@ -5,7 +5,16 @@
     {
       "step": 1,
       "name": "clarify-core",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-20T14:14:24+0900",
+      "summary": "효능 선택 정책·입력 검증·되묻기 상태와 assembly 전달 구현, 합성 시계 고정 완료. make verify 5,918개 테스트 통과, 패키지 설치 없음.",
+      "completed_at": "2026-11-20T14:22:24+0900",
+      "usage": {
+        "input_tokens": 2306085,
+        "cached_input_tokens": 2197248,
+        "output_tokens": 14159,
+        "attempts": 1
+      }
     },
     {
       "step": 2,
