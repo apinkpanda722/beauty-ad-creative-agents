@@ -203,7 +203,7 @@ def test_planning_prompt_distinguishes_internal_rework_from_external_data():
     assert fake.model == "gpt-6.1-terra"
     assert options["reasoning_effort"] == "low"
     assert spec.schema == strict_plan_schema()
-    assert planning.PLANNING_PROMPT_VERSION == "2026-11-18-3"
+    assert planning.PLANNING_PROMPT_VERSION == "2026-11-20-1"
 
 
 def test_fp_c14_planning_receives_pattern_context_and_scene_copy_instructions():
@@ -290,4 +290,86 @@ def test_single_cut_and_code_confirmed_efficacy_are_top_level_planning_input(
     assert options["reasoning_effort"] == "low"
     assert fake.model == "gpt-6.1-terra"
     assert spec.schema == strict_plan_schema()
-    assert planning.PLANNING_PROMPT_VERSION == "2026-11-18-3"
+    assert planning.PLANNING_PROMPT_VERSION == "2026-11-20-1"
+
+
+@pytest.mark.parametrize(
+    "choice",
+    [
+        None,
+        {},
+        {
+            "mode": "selected",
+            "claims": ["hydration", "soothing"],
+            "requested_claim": "hydration",
+        },
+        {"mode": "keep_requested", "claims": [], "requested_claim": "other"},
+        {"mode": "none", "claims": [], "requested_claim": None},
+    ],
+)
+def test_fp_c14_claim_choice_is_filtered_top_level_input_and_preserves_handoff(choice):
+    fake = Structured()
+    handoff = {
+        "available_efficacy": ["hydration", "soothing"],
+        "evidence_ids": ["yt:a"],
+    }
+    if choice is not None:
+        handoff["claim_choice"] = (
+            {**choice, "private": "SYNTHETIC_EXTRA"} if choice else {}
+        )
+    original = deepcopy(handoff)
+    make_plan(
+        brief={"claim": "hydration"},
+        handoff=handoff,
+        profile={},
+        feedback=None,
+        rework=None,
+        structured=fake,
+    )
+    system, user = fake.calls[0][1]["messages"]
+    payload = json.loads(user["content"])
+    assert set(payload) == {
+        "brief",
+        "research",
+        "available_efficacy",
+        "claim_choice",
+        "profile",
+        "feedback",
+        "rework",
+    }
+    assert payload["claim_choice"] == (choice or None)
+    if choice:
+        assert set(payload["claim_choice"]) == {"mode", "claims", "requested_claim"}
+        payload["claim_choice"]["claims"].append("barrier")
+    else:
+        assert payload["brief"]["claim"] == "hydration"
+        assert payload["available_efficacy"] == ["hydration", "soothing"]
+    assert set(payload["research"]) == {
+        "conclusion",
+        "evidence_ids",
+        "aggregates",
+        "result_counts",
+        "basis_notes",
+        "unresolved",
+        "pattern_context",
+    }
+    assert "SYNTHETIC_EXTRA" not in user["content"]
+    for phrase in (
+        "claim_choice",
+        "keep_requested",
+        "selected",
+        "none",
+        "단정",
+        "소구 방향",
+        "claimed_efficacy",
+        "available_efficacy",
+        "확인된 효능",
+        "빈 목록",
+        "사실처럼 암시",
+        "지어내지 않는다",
+        "brief.claim이 있고",
+        "중심",
+    ):
+        assert phrase in system["content"]
+    assert planning.PLANNING_PROMPT_VERSION == "2026-11-20-1"
+    assert handoff == original

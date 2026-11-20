@@ -11,6 +11,7 @@ from typing import NamedTuple, TypedDict
 from langgraph.errors import GraphRecursionError
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command
+from pydantic import ValidationError
 
 from beautyads.agents.evaluation import EVALUATION_PROMPT_VERSION
 from beautyads.agents.planning import PLANNING_PROMPT_VERSION
@@ -25,6 +26,7 @@ from beautyads.domain.supervisor import (
     NO_EVIDENCE_TEXT,
     OUT_OF_SCOPE_TEXT,
     THIN_POOL_NOTE,
+    ClaimChoice,
     Intent,
     RequestLimits,
     SupervisorDecision,
@@ -32,6 +34,7 @@ from beautyads.domain.supervisor import (
     numbers_in_results,
     pattern_alignment,
     pattern_context,
+    resolve_claim_policy,
     trim_handoff,
     trim_message,
     verify_aggregates,
@@ -154,6 +157,10 @@ class SupervisorState(TypedDict):
     sv_trims: list[dict]
     sv_tool_outputs: list[dict]
     sv_spent: float
+    sv_efficacy: dict
+    sv_claim_choice: dict
+    sv_clarification: dict
+    sv_efficacy_unavailable: dict
 
 
 def _copy_json(value):
@@ -192,6 +199,10 @@ def initial_supervisor_state(message: str, limits: RequestLimits) -> SupervisorS
         else [],
         "sv_tool_outputs": [],
         "sv_spent": 0.0,
+        "sv_efficacy": {"available": [], "status": "skipped"},
+        "sv_claim_choice": {},
+        "sv_clarification": {},
+        "sv_efficacy_unavailable": {},
     }
 
 
@@ -271,6 +282,27 @@ def _tool_outputs(raw_store):
     return outputs
 
 
+def _lookup_efficacy(claims_fn, profile):
+    available, status = [], "skipped"
+    try:
+        values, status = claims_fn(deepcopy(profile))
+        if status not in {"ok", "failed", "skipped"}:
+            raise ValueError("CLAIMS_STATUS_INVALID")
+        if status == "ok":
+            available = list(
+                dict.fromkeys(
+                    value
+                    for value in values
+                    if isinstance(value, str)
+                    and value
+                    in {claim.value for claim in Claim if claim != Claim.other}
+                )
+            )
+    except Exception:  # noqa: BLE001 -- lookup diagnostics never enter results
+        available, status = [], "failed"
+    return {"available": available, "status": status}
+
+
 def build_supervisor_graph(
     *,
     ctx,
@@ -284,6 +316,7 @@ def build_supervisor_graph(
     on_event=None,
     claims_fn=None,
     context_mode="on",
+    claim_choice=None,
 ):
     """Inject service adapters; plan_eval_fn accepts max_reworks like 6c.
 
@@ -293,6 +326,13 @@ def build_supervisor_graph(
     """
     if context_mode not in CONTEXT_MODES:
         raise ValueError("CONTEXT_MODE_INVALID")
+    if claim_choice is not None:
+        try:
+            claim_choice = ClaimChoice.model_validate(claim_choice).model_dump(
+                mode="json"
+            )
+        except ValidationError:
+            raise ValueError("CLAIM_CHOICE_INVALID") from None
     validate_tenant_id(ctx.tenant_id)
     raw_store = {}
     profile, feedback = _copy_json(profile), _copy_json(feedback)
@@ -326,6 +366,34 @@ def build_supervisor_graph(
             if decision["intent"] == "boundary" or decision["category"] is None:
                 state["sv_status"]["kind"] = "out_of_scope"
                 return Command(update=state, goto=END)
+            if claims_fn is not None and decision["intent"] == "plan":
+                if (
+                    claim_choice is not None
+                    and claim_choice["requested_claim"] is not None
+                ):
+                    decision["claim"] = claim_choice["requested_claim"]
+                efficacy = _lookup_efficacy(claims_fn, profile)
+                state["sv_efficacy"] = efficacy
+                policy = resolve_claim_policy(
+                    requested=decision["claim"],
+                    available=efficacy["available"],
+                    status=efficacy["status"],
+                    choice=claim_choice,
+                )
+                if policy["action"] == "unavailable":
+                    state["sv_efficacy_unavailable"] = policy["unavailable"]
+                    state["sv_status"]["kind"] = "efficacy_unavailable"
+                    return Command(update=state, goto=END)
+                if policy["action"] == "invalid":
+                    state["sv_status"]["kind"] = "claim_choice_invalid"
+                    return Command(update=state, goto=END)
+                if policy["action"] == "clarify":
+                    state["sv_clarification"] = policy["clarification"]
+                    state["sv_status"]["kind"] = "needs_clarification"
+                    return Command(update=state, goto=END)
+                state["sv_claim_choice"] = policy["claim_choice"]
+                decision["claim"] = policy["claim"]
+                state["sv_decision"] = decision
             state["sv_brief"] = ResearchBrief.model_validate(
                 {
                     **{
@@ -400,26 +468,8 @@ def build_supervisor_graph(
                 and handoff["evidence_ids"]
                 and claims_fn is not None
             ):
-                try:
-                    values, efficacy_status = claims_fn(deepcopy(profile))
-                    if efficacy_status not in {"ok", "failed", "skipped"}:
-                        raise ValueError("CLAIMS_STATUS_INVALID")
-                    if efficacy_status == "ok":
-                        available = list(
-                            dict.fromkeys(
-                                value
-                                for value in values
-                                if isinstance(value, str)
-                                and value
-                                in {
-                                    claim.value
-                                    for claim in Claim
-                                    if claim != Claim.other
-                                }
-                            )
-                        )
-                except Exception:  # noqa: BLE001 -- lookup diagnostics never enter results
-                    available, efficacy_status = [], "failed"
+                available = state["sv_efficacy"]["available"]
+                efficacy_status = state["sv_efficacy"]["status"]
             handoff["available_efficacy"] = available
             handoff["available_efficacy_status"] = efficacy_status
             state["sv_handoff"] = _copy_json(handoff)
@@ -459,6 +509,8 @@ def build_supervisor_graph(
             bounded["raw_tool_outputs"] = deepcopy(state["sv_tool_outputs"])
         else:
             bounded, trims = trim_handoff(state["sv_handoff"], limits)
+        if state["sv_claim_choice"]:
+            bounded["claim_choice"] = deepcopy(state["sv_claim_choice"])
         for trim in trims:
             if trim not in state["sv_trims"]:
                 state["sv_trims"].append(trim)
@@ -532,6 +584,7 @@ def run_request(
     on_event=None,
     claims_fn=None,
     context_mode="on",
+    claim_choice=None,
 ) -> dict:
     """Run one request, accounting for 텍스트 모델 비용, 이미지 제외."""
     if context_mode not in CONTEXT_MODES:
@@ -549,6 +602,7 @@ def run_request(
         on_event=on_event,
         claims_fn=claims_fn,
         context_mode=context_mode,
+        claim_choice=claim_choice,
     )
     try:
         for snapshot in graph.stream(
@@ -574,10 +628,17 @@ def run_request(
             "intent": state["sv_decision"].get("intent"),
             "brief": state["sv_brief"],
             "handoff": state["sv_handoff"],
-            "available_efficacy": state["sv_handoff"].get("available_efficacy", []),
-            "available_efficacy_status": state["sv_handoff"].get(
-                "available_efficacy_status", "skipped"
-            ),
+            "clarification": state["sv_clarification"],
+            "efficacy_unavailable": state["sv_efficacy_unavailable"],
+            "claim_choice": state["sv_claim_choice"],
+            "available_efficacy": state["sv_efficacy"]["available"]
+            if kind
+            in {"needs_clarification", "claim_choice_invalid", "efficacy_unavailable"}
+            else state["sv_handoff"].get("available_efficacy", []),
+            "available_efficacy_status": state["sv_efficacy"]["status"]
+            if kind
+            in {"needs_clarification", "claim_choice_invalid", "efficacy_unavailable"}
+            else state["sv_handoff"].get("available_efficacy_status", "skipped"),
             "product_display": {
                 key: profile.get(key)
                 for key in ("brand", "display_name", "product_name")
@@ -614,7 +675,10 @@ def run_request(
                 "max_text_cost_usd": limits.max_text_cost_usd,
             },
             "incomplete": status["incomplete"],
-            "text": OUT_OF_SCOPE_TEXT
+            "text": ""
+            if kind
+            in {"needs_clarification", "claim_choice_invalid", "efficacy_unavailable"}
+            else OUT_OF_SCOPE_TEXT
             if kind == "out_of_scope"
             else NO_EVIDENCE_TEXT
             if kind == "no_evidence"

@@ -394,6 +394,8 @@ def invoke(services, *, with_image=False, on_event=None):
         {},
         with_image,
         on_event=on_event,
+        # These tests exercise planning after the marketer accepts no efficacy.
+        claim_choice={"mode": "none"},
     )
 
 
@@ -1184,6 +1186,7 @@ def test_assembled_claims_function_uses_only_existing_support_query(
                 profile,
                 {},
                 False,
+                claim_choice={"mode": "none"},
             )
             expected = (
                 (["hydration"], "ok")
@@ -1195,7 +1198,34 @@ def test_assembled_claims_function_uses_only_existing_support_query(
                 result["available_efficacy"],
                 result["available_efficacy_status"],
             ) == expected
-            assert result["plans"][0]["status"] == "done"
+            if mode == "ok":
+                assert (
+                    result["kind"] == "plan" and result["plans"][0]["status"] == "done"
+                )
+            else:
+                assert result["kind"] == "efficacy_unavailable"
+                assert result["efficacy_unavailable"] == {
+                    "reason": "no_product" if mode in {"empty", "missing"} else "failed"
+                }
+                assert result["plans"] == []
+                assert [
+                    name for name, _ in rig.calls if name in {"plan", "research"}
+                ] == []
+                from beautyads.obs.trace import TraceRecord, read_traces
+
+                traces = read_traces(rig.settings.ledger_path.with_name("traces.jsonl"))
+                assert traces.skipped_lines == 0 and len(traces.records) == 1
+                trace = traces.records[0]
+                assert (
+                    isinstance(trace, TraceRecord)
+                    and trace.kind == "efficacy_unavailable"
+                )
+                assert trace.tenant_id == tenant
+                assert trace.efficacy_unavailable.model_dump() == {
+                    **result["efficacy_unavailable"],
+                    "brand": profile.get("brand"),
+                    "product_name": profile.get("product_name"),
+                }
             if mode in {"empty", "missing"}:
                 assert support_queries == []
                 assert direct_queries == [[]]
@@ -1213,13 +1243,14 @@ def test_assembled_claims_function_uses_only_existing_support_query(
                 assert all(params["claim"] != "other" for _, params in support_queries)
                 assert direct_queries == [support_queries]
             assert "SYNTH_PRIVATE_GRAPH_DIAGNOSTIC" not in json.dumps(result)
-            payload = next(
-                json.loads(options["messages"][-1]["content"])
-                for name, options in rig.calls
-                if name == "plan"
-            )
-            assert payload["available_efficacy"] == expected[0]
-            assert "available_efficacy" not in payload["research"]
+            if mode == "ok":
+                payload = next(
+                    json.loads(options["messages"][-1]["content"])
+                    for name, options in rig.calls
+                    if name == "plan"
+                )
+                assert payload["available_efficacy"] == expected[0]
+                assert "available_efficacy" not in payload["research"]
         finally:
             await services.close()
 
@@ -1301,6 +1332,7 @@ def test_product_identity_and_contrast_flow_uses_graph_and_profile_only(
                 caller,
                 {},
                 True,
+                claim_choice={"mode": "none"},
             )
             graph_name = (
                 "공식 합성 세럼 50ml"
@@ -1394,3 +1426,36 @@ def test_assembly_injects_axis_glossary_into_decide(rig, monkeypatch):
             await services.close()
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("choice", [None, {"mode": "none"}])
+def test_assembly_forwards_claim_choice_only_when_supplied(rig, monkeypatch, choice):
+    calls = []
+
+    def request(**options):
+        calls.append(options)
+        return {}
+
+    monkeypatch.setattr(assembly, "run_request", request)
+
+    async def run():
+        services = await rig.start()
+        try:
+            tenant = next(iter(services.allowed_tenants))
+            services.ask(
+                "synthetic",
+                ToolContext(tenant_id=tenant, as_of=services.as_of),
+                services.workspaces[tenant],
+                {},
+                False,
+                claim_choice=choice,
+            )
+        finally:
+            await services.close()
+
+    asyncio.run(run())
+    assert len(calls) == 1
+    if choice is None:
+        assert "claim_choice" not in calls[0]
+    else:
+        assert calls[0]["claim_choice"] == choice

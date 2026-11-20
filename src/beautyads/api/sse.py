@@ -3,7 +3,15 @@
 import json
 from typing import Literal
 
-EventName = Literal["step", "tool_start", "token", "ui_command", "error"]
+EventName = Literal[
+    "step",
+    "tool_start",
+    "token",
+    "ui_command",
+    "error",
+    "needs_clarification",
+    "efficacy_unavailable",
+]
 
 
 def encode_event(name: EventName, body: dict) -> str:

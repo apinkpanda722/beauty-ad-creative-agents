@@ -291,3 +291,21 @@
 - **원인**: 상수 값 grep에는 `0.28`·`0.12` 리터럴과 비율 상수 이름만 보고 **상수에서 파생한 영역 표현식**(상수를 조합한 좌표)은 찾지 않았다.
 - **해결**: 해당 블록을 `layout_regions(1024, 1024)["cta"]` 기준으로 바꾸는 줄 단위 허용을 명시했다. 영역·레이아웃 상수를 바꾸는 작업은 상수 이름뿐 아니라 그 상수를 조합한 좌표 표현식(`1024 - margin - int(…)`)을 `grep`하도록 점검 항목을 확장한다.
 - **근거**: `phases/5-agents/step9h.md`, `tests/test_design_compose.py`.
+
+## 2026-11-20 고정 시계와 실제 UTC 날짜가 달라 격리 테스트가 실패했다
+- **문제**: UTC 날짜가 넘어가면 변경 없는 main에서도 `tests/test_isolation_live.py`에서 13건 이상 실패했다.
+- **원인**: 테스트의 `NOW = 2026-11-19` 고정 시계와 코드의 `datetime.now(UTC)`가 서로 다른 날짜를 사용했다.
+- **해결**: autouse 시계 고정 픽스처를 추가해 합성 시계를 고정했다.
+- **근거**: 효능 되묻기 step 1(`clarify-core`), `tests/test_isolation_live.py`.
+
+## 2026-11-20 프롬프트 변경 step이 렌더링 전체 해시 단언의 허용 누락으로 blocked됐다
+- **문제**: 프롬프트·버전을 바꾸는 step이 `tests/test_prereg.py::test_none_measurement_preserves_original_bytes`를 깨지만 해당 테스트를 수정 허용 목록에 넣지 못해 blocked됐다.
+- **원인**: 해당 테스트는 동결 줄을 포함한 렌더링 전체 해시를 검사하므로 프롬프트·버전 변경의 영향을 받았다.
+- **해결**: step 3에서 문서·렌더링 해시를 갱신했다.
+- **근거**: 효능 되묻기 step 3(`clarify-prompts`), `tests/test_prereg.py::test_none_measurement_preserves_original_bytes`.
+
+## 2026-11-20 효능 조회 실패에도 기획을 진행하던 초기 설계를 변경했다
+- **문제**: 효능 조회 `failed`·`skipped`를 "효능 없이 진행"으로 둔 초기 설계가 근거 없는 기획안을 만들 수 있었다.
+- **원인**: 효능 근거를 조회하지 못했거나 제품이 등록되지 않은 상태에서도 기획 단계로 넘어가도록 설계했다.
+- **해결**: 사용자 결정에 따라 조회 실패·제품 미등록은 차단하고, 확인 효능 0개는 되묻도록 변경했다.
+- **근거**: 효능 되묻기 step 4(`efficacy-outcomes`), 이슈 #55.

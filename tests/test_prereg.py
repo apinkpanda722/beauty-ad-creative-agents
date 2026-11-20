@@ -564,8 +564,9 @@ def test_none_measurement_preserves_original_bytes(render_inputs):
     assert text == prereg.render_preregistration(**render_inputs)
     assert "E3 dev 측정 근거" not in text
     # 이 step에서 동결 줄과 25번째 문장 추가로 갱신.
+    # 2026-11-20 6b-clarify step 3: 프롬프트 동결 줄 변경으로 갱신
     assert hashlib.sha256(text.encode()).hexdigest() == (
-        "d15ebcbc981097230e3878d67ebb4c101c0743929e5a292bbcea08cd405e5a1c"
+        "27e8ba2d58a4730d7ef02abad30f24e12968e21c6f56c3d99cfcee9545b3d040"
     )
 
 

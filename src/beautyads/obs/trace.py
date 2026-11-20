@@ -127,6 +127,12 @@ class TraceStructured(_TraceModel):
     )
 
 
+class TraceEfficacyUnavailable(_TraceModel):
+    reason: Literal["failed", "no_product"]
+    brand: Annotated[str, StringConstraints(max_length=200)] | None
+    product_name: Annotated[str, StringConstraints(max_length=200)] | None
+
+
 class TraceRecord(_TraceModel):
     trace_id: str = Field(
         default_factory=lambda: uuid4().hex, pattern=r"^[0-9a-f]{32}$"
@@ -138,9 +144,20 @@ class TraceRecord(_TraceModel):
     error_class: str | None = None
     error_code: str | None = None
     kind: (
-        Literal["research", "plan", "out_of_scope", "no_evidence", "failed"] | None
+        Literal[
+            "research",
+            "plan",
+            "out_of_scope",
+            "no_evidence",
+            "failed",
+            "needs_clarification",
+            "claim_choice_invalid",
+            "efficacy_unavailable",
+        ]
+        | None
     ) = None
     intent: Literal["pattern", "relation", "plan", "boundary"] | None = None
+    efficacy_unavailable: TraceEfficacyUnavailable | None = None
     message_chars: Count
     message_trimmed: bool = False
     steps: list[TraceStep] = Field(default_factory=list)
@@ -290,6 +307,13 @@ def build_trace(
         error_class=failure.get("class") if failure is not None else None,
         error_code=failure.get("code") if failure is not None else None,
         kind=result.get("kind"),
+        efficacy_unavailable=TraceEfficacyUnavailable(
+            reason=result["efficacy_unavailable"]["reason"],
+            brand=result.get("product_display", {}).get("brand"),
+            product_name=result.get("product_display", {}).get("product_name"),
+        )
+        if result.get("kind") == "efficacy_unavailable"
+        else None,
         intent=result.get("intent"),
         message_chars=len(message),
         message_trimmed=len(message) > _DECIDE_MAX_CHARS

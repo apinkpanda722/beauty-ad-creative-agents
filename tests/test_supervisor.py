@@ -350,6 +350,10 @@ def test_private_state_is_json_and_disjoint_from_all_other_graphs():
         "sv_trims",
         "sv_tool_outputs",
         "sv_spent",
+        "sv_efficacy",
+        "sv_claim_choice",
+        "sv_clarification",
+        "sv_efficacy_unavailable",
     }
     for other in (AgentState, ResearchState, PlanEvalState):
         assert not keys & set(other.__annotations__)
@@ -713,11 +717,12 @@ def test_claims_lookup_only_runs_once_for_plan_with_evidence(case):
     calls = []
     profile = {"tone": "synthetic", "own_product_url": "https://example.invalid/own"}
     decision = decision_data(
+        claim="hydration",
         intent="boundary"
         if case == "out_of_scope"
         else "plan"
         if case == "no_evidence"
-        else case
+        else case,
     )
     f = Fakes(
         decision=decision,
@@ -732,7 +737,7 @@ def test_claims_lookup_only_runs_once_for_plan_with_evidence(case):
 
     result = supervisor.run_request(**f.args(profile=profile, claims_fn=claims))
     expected = ["hydration", "soothing"] if case == "plan" else []
-    assert calls == ([profile] if case == "plan" else [])
+    assert calls == ([profile] if case in {"plan", "no_evidence"} else [])
     assert result["available_efficacy"] == expected
     assert result["available_efficacy_status"] == (
         "ok" if case == "plan" else "skipped"
@@ -765,7 +770,11 @@ def test_claims_status_is_safe_and_never_changes_evaluation_decisions(mode):
             raise RuntimeError("SYNTH_PRIVATE_CLAIMS_DIAGNOSTIC")
         return ["hydration"], mode
 
-    f = Fakes(decision=decision_data(plan_count=1))
+    f = Fakes(
+        decision=decision_data(
+            plan_count=1, **({"claim": "hydration"} if mode == "ok" else {})
+        )
+    )
     base = supervisor.run_request(**f.args(plan_eval_fn=planning))
     result = supervisor.run_request(
         **f.args(plan_eval_fn=planning, claims_fn=None if mode == "none" else claims)
@@ -774,9 +783,16 @@ def test_claims_status_is_safe_and_never_changes_evaluation_decisions(mode):
     assert result["available_efficacy_status"] == status
     assert result["available_efficacy"] == (["hydration"] if mode == "ok" else [])
     assert "SYNTH_PRIVATE_CLAIMS_DIAGNOSTIC" not in json.dumps(result)
-    for field in ("status", "rework_count", "attempts"):
-        assert result["plans"][0][field] == base["plans"][0][field]
-    assert result["kind"] == base["kind"]
+    if mode in {"failed", "skipped", "exception"}:
+        assert result["kind"] == "efficacy_unavailable"
+        assert result["plans"] == []
+        assert result["efficacy_unavailable"] == {
+            "reason": "no_product" if mode == "skipped" else "failed"
+        }
+    else:
+        for field in ("status", "rework_count", "attempts"):
+            assert result["plans"][0][field] == base["plans"][0][field]
+        assert result["kind"] == base["kind"]
 
 
 def test_product_display_includes_only_server_profile_product_name():
@@ -867,3 +883,348 @@ def test_decide_rejects_output_outside_closed_axis_values(axis):
     )
     assert not answer.ok and answer.decision is None
     assert answer.failure == "SUPERVISOR_DECISION_FAILED"
+
+
+@pytest.mark.parametrize(
+    "requested,available,expected",
+    [
+        (
+            "brightening",
+            ["hydration"],
+            {
+                "reason": "requested_not_confirmed",
+                "requested_claim": "brightening",
+                "available_efficacy": ["hydration"],
+                "available_status": "ok",
+                "options": ["keep_requested", "select_confirmed", "none"],
+            },
+        ),
+        (
+            "brightening",
+            [],
+            {
+                "reason": "requested_not_confirmed",
+                "requested_claim": "brightening",
+                "available_efficacy": [],
+                "available_status": "ok",
+                "options": ["keep_requested", "none"],
+            },
+        ),
+        (
+            None,
+            ["hydration"],
+            {
+                "reason": "no_claim_requested",
+                "requested_claim": None,
+                "available_efficacy": ["hydration"],
+                "available_status": "ok",
+                "options": ["select_one", "select_many", "none"],
+            },
+        ),
+        *[
+            (
+                "other",
+                available,
+                {
+                    "reason": "requested_not_confirmed",
+                    "requested_claim": "other",
+                    "available_efficacy": available,
+                    "available_status": "ok",
+                    "options": ["keep_requested"]
+                    + (["select_confirmed"] if available else [])
+                    + ["none"],
+                },
+            )
+            for available in (["hydration"], [])
+        ],
+    ],
+)
+def test_clarification_stops_before_research_and_planning(
+    requested, available, expected
+):
+    f = Fakes(decision=decision_data(claim=requested))
+
+    def claims(profile):
+        f.order.append("claims")
+        return available, "ok"
+
+    result = supervisor.run_request(**f.args(claims_fn=claims))
+    assert result["kind"] == "needs_clarification"
+    assert result["clarification"] == expected
+    assert f.research_calls == f.plan_calls == []
+    assert result["handoff"] == {}
+    assert result["available_efficacy"] == available
+    assert result["available_efficacy_status"] == "ok"
+    assert result["claim_choice"] == {} and result["efficacy_unavailable"] == {}
+    assert not result["incomplete"] and result["text"] == ""
+    assert "research" not in f.order and "plan" not in f.order
+    assert f.order.count("claims") == 1
+    assert [item for item in f.order if isinstance(item, str) and item != "spent"] == [
+        "decide",
+        "claims",
+    ]
+    assert primitive(result)
+
+
+@pytest.mark.parametrize("requested", [None, "hydration", "other"])
+def test_absent_claim_lookup_preserves_every_existing_result_field(requested):
+    f = Fakes(decision=decision_data(claim=requested))
+    baseline = supervisor.run_request(**f.args())
+    repeated = supervisor.run_request(
+        **f.args(claims_fn=None, claim_choice={"mode": "none"})
+    )
+    assert repeated == baseline
+    assert repeated["kind"] == "plan"
+    assert repeated["brief"]["claim"] == requested
+    assert repeated["clarification"] == repeated["claim_choice"] == {}
+    assert repeated["efficacy_unavailable"] == {}
+
+
+def test_confirmed_request_proceeds_and_lookup_runs_before_research_once():
+    f = Fakes(decision=decision_data(claim="hydration"))
+
+    def claims(profile):
+        f.order.append("claims")
+        profile.clear()
+        return ["hydration", "other", "bogus", "hydration", "soothing"], "ok"
+
+    result = supervisor.run_request(**f.args(claims_fn=claims))
+    assert result["kind"] == "plan"
+    assert result["claim_choice"] == {
+        "mode": "selected",
+        "claims": ["hydration"],
+        "requested_claim": "hydration",
+    }
+    assert result["brief"]["claim"] == f.research_calls[0]["claim"] == "hydration"
+    assert result["clarification"] == {} and result["efficacy_unavailable"] == {}
+    calls = [item for item in f.order if isinstance(item, str) and item != "spent"]
+    assert calls == ["decide", "claims", "research", "plan", "plan", "plan"]
+    assert result["available_efficacy"] == ["hydration", "soothing"]
+    assert all(call["profile"] == {"tone": "synthetic"} for call in f.plan_calls)
+
+
+@pytest.mark.parametrize(
+    "choice,expected_claim,kind",
+    [
+        (
+            {
+                "mode": "selected",
+                "claims": ["soothing", "hydration"],
+                "requested_claim": "brightening",
+            },
+            "soothing",
+            "plan",
+        ),
+        (
+            {"mode": "selected", "claims": ["hydration", "brightening"]},
+            None,
+            "claim_choice_invalid",
+        ),
+        (
+            {"mode": "keep_requested", "requested_claim": "brightening"},
+            "brightening",
+            "plan",
+        ),
+        ({"mode": "none"}, None, "plan"),
+    ],
+)
+def test_claim_choice_rechecks_support_and_overrides_nondeterministic_decide(
+    choice, expected_claim, kind
+):
+    f = Fakes(decision=decision_data(claim="barrier"))
+    result = supervisor.run_request(
+        **f.args(
+            claims_fn=lambda _: (["hydration", "soothing"], "ok"), claim_choice=choice
+        )
+    )
+    assert result["kind"] == kind
+    assert not result["incomplete"] and result["text"] == ""
+    assert result["clarification"] == {} and result["efficacy_unavailable"] == {}
+    assert result["available_efficacy"] == ["hydration", "soothing"]
+    assert result["available_efficacy_status"] == "ok"
+    if kind == "claim_choice_invalid":
+        assert f.research_calls == f.plan_calls == []
+        assert "research" not in f.order and "plan" not in f.order
+        assert result["handoff"] == result["claim_choice"] == {}
+    else:
+        assert (
+            f.research_calls[0]["claim"] == result["brief"]["claim"] == expected_claim
+        )
+        assert all(call["brief"]["claim"] == expected_claim for call in f.plan_calls)
+        assert result["claim_choice"] == {
+            "mode": choice["mode"],
+            "claims": choice.get("claims", []),
+            "requested_claim": choice.get("requested_claim"),
+        }
+        assert all(
+            call["handoff"]["claim_choice"] == result["claim_choice"]
+            and "claim_choice" not in call["brief"]
+            for call in f.plan_calls
+        )
+
+
+@pytest.mark.parametrize("entry", ["run_request", "build_supervisor_graph"])
+@pytest.mark.parametrize(
+    "choice",
+    [
+        {"mode": "selected"},
+        {"mode": "none", "tenant_id": "synthetic"},
+    ],
+)
+def test_structurally_invalid_choice_fails_before_graph_calls(entry, choice):
+    f = Fakes()
+    args = f.args(claim_choice=choice)
+    if entry == "build_supervisor_graph":
+        args.pop("message")
+    with pytest.raises(ValueError, match="^CLAIM_CHOICE_INVALID$"):
+        getattr(supervisor, entry)(**args)
+    assert f.order == []
+
+
+@pytest.mark.parametrize("mode", ["failed", "skipped", "exception", "invalid-status"])
+@pytest.mark.parametrize("requested", ["brightening", "other", None])
+@pytest.mark.parametrize(
+    "choice", [None, {"mode": "selected", "claims": ["hydration"]}, {"mode": "none"}]
+)
+def test_lookup_failure_stops_without_exposing_diagnostics(mode, requested, choice):
+    f = Fakes(decision=decision_data(claim=requested))
+
+    def claims(profile):
+        if mode == "exception":
+            raise RuntimeError("SYNTH_PRIVATE_CLAIMS_DIAGNOSTIC")
+        return ["hydration"], mode
+
+    result = supervisor.run_request(**f.args(claims_fn=claims, claim_choice=choice))
+    assert result["kind"] == "efficacy_unavailable"
+    assert f.research_calls == [] and f.plan_calls == []
+    assert result["plans"] == [] and result["handoff"] == {}
+    assert result["text"] == "" and not result["incomplete"]
+    assert not result["limit_hit"] and result["limit_kinds"] == []
+    assert result["clarification"] == {}
+    assert result["efficacy_unavailable"] == {
+        "reason": "no_product" if mode == "skipped" else "failed"
+    }
+    assert result["available_efficacy"] == []
+    assert result["available_efficacy_status"] == (
+        mode if mode in {"failed", "skipped"} else "failed"
+    )
+    assert result["brief"] == {} and result["claim_choice"] == {}
+    assert "SYNTH_PRIVATE_CLAIMS_DIAGNOSTIC" not in json.dumps(result)
+    assert "invalid-status" not in json.dumps(result)
+
+
+def test_no_requested_or_confirmed_claim_clarifies_then_proceeds_on_none():
+    f = Fakes()
+    result = supervisor.run_request(**f.args(claims_fn=lambda _: ([], "ok")))
+    assert result["kind"] == "needs_clarification"
+    assert result["clarification"] == {
+        "reason": "no_efficacy_confirmed",
+        "requested_claim": None,
+        "available_efficacy": [],
+        "available_status": "ok",
+        "options": ["none", "cancel"],
+    }
+    assert result["efficacy_unavailable"] == {} and result["claim_choice"] == {}
+    assert result["plans"] == [] and f.research_calls == [] and f.plan_calls == []
+    result = supervisor.run_request(
+        **f.args(claims_fn=lambda _: ([], "ok"), claim_choice={"mode": "none"})
+    )
+    assert result["kind"] == "plan" and result["brief"]["claim"] is None
+    assert f.research_calls[0]["claim"] is None and f.plan_calls
+    assert result["efficacy_unavailable"] == {}
+    assert result["claim_choice"] == {
+        "mode": "none",
+        "claims": [],
+        "requested_claim": None,
+    }
+
+
+def test_claim_choice_override_is_saved_in_json_decision_state():
+    f = Fakes(decision=decision_data(claim="barrier"))
+    args = f.args(
+        claims_fn=lambda _: (["hydration"], "ok"),
+        claim_choice={"mode": "keep_requested", "requested_claim": "brightening"},
+    )
+    args.pop("message")
+    graph = supervisor.build_supervisor_graph(**args)
+    state = graph.invoke(
+        supervisor.initial_supervisor_state("synthetic", RequestLimits())
+    )
+    assert state["sv_decision"]["claim"] == state["sv_brief"]["claim"] == "brightening"
+    assert state["sv_efficacy"] == {"available": ["hydration"], "status": "ok"}
+    assert primitive(state)
+
+
+def test_new_supervisor_state_defaults_are_json_and_empty():
+    state = supervisor.initial_supervisor_state("synthetic", RequestLimits())
+    assert state["sv_efficacy"] == {"available": [], "status": "skipped"}
+    assert state["sv_claim_choice"] == state["sv_clarification"] == {}
+    assert state["sv_efficacy_unavailable"] == {}
+    assert primitive(state)
+
+
+@pytest.mark.parametrize("mode", ["on", "off"])
+@pytest.mark.parametrize("lookup", [False, True])
+def test_claim_choice_is_copied_from_state_after_trimming(mode, lookup):
+    f = Fakes(research=handoff(evidence_ids=["yt:a", "yt:b", "yt:c"]))
+    limits = RequestLimits(handoff_max_evidence_ids=1, handoff_max_aggregates=1)
+    choice = {
+        "mode": "selected",
+        "claims": ["soothing", "hydration"],
+        "requested_claim": None,
+    }
+
+    def research_fn(brief, raw_store, **kwargs):
+        return f.research(brief, raw_store)
+
+    def planning(*args, **kwargs):
+        result = f.planning(*args, **kwargs)
+        if lookup:
+            args[1]["claim_choice"]["claims"].clear()
+        return result
+
+    args = f.args(
+        research_fn=research_fn,
+        plan_eval_fn=planning,
+        limits=limits,
+        claims_fn=(lambda _: (["hydration", "soothing"], "ok")) if lookup else None,
+        claim_choice=choice,
+        context_mode=mode,
+    )
+    args.pop("message")
+    graph = supervisor.build_supervisor_graph(**args)
+    state = graph.invoke(supervisor.initial_supervisor_state("synthetic", limits))
+    assert state["sv_status"]["kind"] == "plan"
+    assert state["sv_claim_choice"] == (choice if lookup else {})
+    assert "claim_choice" not in state["sv_handoff"]
+    for call in f.plan_calls:
+        if lookup:
+            assert call["handoff"]["claim_choice"] == state["sv_claim_choice"]
+        else:
+            assert "claim_choice" not in call["handoff"]
+    assert state["sv_trims"] == (
+        [
+            {"field": "evidence_ids", "kept": 1, "total": 3},
+            {"field": "aggregates", "kept": 1, "total": 2},
+        ]
+        if mode == "on"
+        else []
+    )
+
+
+@pytest.mark.parametrize("mode", ["on", "off"])
+def test_keep_requested_other_recall_proceeds_with_original_research_claim(mode):
+    f = Fakes(decision=decision_data(claim="hydration"))
+    choice = {"mode": "keep_requested", "claims": [], "requested_claim": "other"}
+    result = supervisor.run_request(
+        **f.args(
+            research_fn=lambda brief, raw_store, **kwargs: f.research(brief, raw_store),
+            claims_fn=lambda _: (["hydration"], "ok"),
+            claim_choice=choice,
+        ),
+        context_mode=mode,
+    )
+    assert result["kind"] == "plan"
+    assert result["claim_choice"] == choice
+    assert f.research_calls[0]["claim"] == result["brief"]["claim"] == "other"
+    assert all(call["handoff"]["claim_choice"] == choice for call in f.plan_calls)

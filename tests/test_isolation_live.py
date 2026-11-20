@@ -14,7 +14,7 @@ from test_api_chat import Tenants
 from test_evalset import workspaces_path as workspace_config  # noqa: F401 -- shared fixture
 from test_freeze_guard import frozen_run  # noqa: F401 -- shared synthetic freeze fixture
 
-from beautyads.api import chat_client
+from beautyads.api import chat_client, feedback
 from beautyads.api.app import Assembly, create_app
 from beautyads.domain.tenant import TenantMismatch
 from beautyads.eval import isolation_live as iso
@@ -25,6 +25,17 @@ from beautyads.sources.workspaces import load_workspaces
 
 NOW = datetime(2026, 11, 19, tzinfo=UTC)
 IDENTITY = RunIdentity("a" * 40, "b" * 40, None, None)
+
+
+@pytest.fixture(autouse=True)
+def synthetic_clock(monkeypatch):
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return NOW.astimezone(tz) if tz is not None else NOW.replace(tzinfo=None)
+
+    monkeypatch.setattr(feedback, "datetime", Clock)
+    monkeypatch.setattr(iso, "datetime", Clock)
 
 
 class Memory(Tenants):

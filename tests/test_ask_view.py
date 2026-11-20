@@ -9,8 +9,17 @@ from beautyads.api.ask_view import build_view
 from beautyads.domain.claims import CLAIM_CHECK_DISCLAIMER
 from beautyads.domain.supervisor import (
     AGGREGATES_LABEL,
+    CLARIFY_REQUESTED_NO_CONFIRMED_TEXT,
+    CLARIFY_REQUESTED_TEXT,
+    CLARIFY_UNSPECIFIED_TEXT,
+    EFFICACY_UNAVAILABLE_TEXT,
     LIMIT_REACHED_TEXT,
     NO_EVIDENCE_TEXT,
+    OPTION_KEEP_REQUESTED,
+    OPTION_NONE,
+    OPTION_SELECT_CONFIRMED,
+    OPTION_SELECT_MANY,
+    OPTION_SELECT_ONE,
     OUT_OF_SCOPE_TEXT,
 )
 
@@ -375,3 +384,214 @@ def test_product_identity_is_separate_from_model_plan_and_cta_type_is_preserved(
     assert data["plan"]["cta_type"] == raw["plans"][0]["plan"]["cta_type"]
     assert data["product_display"] == raw["product_display"]
     assert "product_display" not in data["plan"]
+
+
+@pytest.mark.parametrize(
+    "requested,available,template,options",
+    [
+        (
+            "anti_aging",
+            ["hydration", "soothing"],
+            CLARIFY_REQUESTED_TEXT,
+            [
+                ("keep_requested", OPTION_KEEP_REQUESTED),
+                ("select_confirmed", OPTION_SELECT_CONFIRMED),
+                ("none", OPTION_NONE),
+            ],
+        ),
+        (
+            "anti_aging",
+            [],
+            CLARIFY_REQUESTED_NO_CONFIRMED_TEXT,
+            [("keep_requested", OPTION_KEEP_REQUESTED), ("none", OPTION_NONE)],
+        ),
+        (
+            None,
+            ["hydration", "soothing"],
+            CLARIFY_UNSPECIFIED_TEXT,
+            [
+                ("select_one", OPTION_SELECT_ONE),
+                ("select_many", OPTION_SELECT_MANY),
+                ("none", OPTION_NONE),
+            ],
+        ),
+    ],
+)
+def test_clarification_text_options_and_no_screen_commands(
+    requested, available, template, options
+):
+    from beautyads.analysis.prompts import CLAIM_DISPLAY_NAMES
+    from beautyads.domain.labels import Claim
+
+    reason = "requested_not_confirmed" if requested else "no_claim_requested"
+    clarification = {
+        "reason": reason,
+        "requested_claim": requested,
+        "available_efficacy": available,
+        "available_status": "ok",
+        "options": [option for option, _ in options],
+    }
+    # Even unrelated result data must not create cards, plans or distributions.
+    raw = {**result(), "kind": "needs_clarification", "clarification": clarification}
+    before = deepcopy(raw)
+    view = build_view(
+        raw,
+        plan_ids=[],
+        hydrate=lambda ids: pytest.fail("clarification must not hydrate evidence"),
+    )
+    requested_label = CLAIM_DISPLAY_NAMES[Claim(requested)] if requested else None
+    expected_text = template.format(
+        requested=requested_label,
+        available=", ".join(CLAIM_DISPLAY_NAMES[Claim(value)] for value in available),
+    )
+    assert view.answer_text == expected_text
+    assert view.ui_commands == [] and view.error_code is None
+    assert view.clarification == {
+        "reason": reason,
+        "requested_claim": requested,
+        "requested_label": requested_label,
+        "available": [
+            {"claim": value, "label": CLAIM_DISPLAY_NAMES[Claim(value)]}
+            for value in available
+        ],
+        "options": [
+            {"id": option, "label": label.format(requested=requested_label)}
+            for option, label in options
+        ],
+        "text": expected_text,
+    }
+    assert raw == before
+    view.clarification["options"].clear()
+    assert raw == before
+
+
+def test_claim_display_alias_and_mapping_exclude_other():
+    from beautyads.analysis.prompts import _CLAIM_CRITERIA, CLAIM_DISPLAY_NAMES
+    from beautyads.api.ask_view import _CLAIM_DISPLAY
+    from beautyads.domain.labels import Claim
+
+    assert CLAIM_DISPLAY_NAMES is _CLAIM_CRITERIA
+    assert _CLAIM_DISPLAY == {
+        claim.value: CLAIM_DISPLAY_NAMES[claim]
+        for claim in Claim
+        if claim != Claim.other
+    }
+    assert Claim.other.value not in _CLAIM_DISPLAY
+
+
+@pytest.mark.parametrize("notice", ["legacy_notice", None, "unknown_notice"])
+@pytest.mark.parametrize(
+    "kind", ["research", "plan", "out_of_scope", "no_evidence", "failed", "limit_hit"]
+)
+def test_legacy_efficacy_notice_is_ignored(notice, kind):
+    raw = {**result(), "kind": kind}
+    baseline = build_view(raw, plan_ids=["id"], hydrate=hydrate)
+    raw["efficacy_notice"] = notice
+    assert build_view(raw, plan_ids=["id"], hydrate=hydrate) == baseline
+
+
+@pytest.mark.parametrize(
+    "reason,expected",
+    [("failed", "failed"), ("no_product", "no_product"), ("unknown", "failed")],
+)
+def test_efficacy_unavailable_has_only_fixed_text_and_no_commands(reason, expected):
+    raw = {
+        **result(),
+        "kind": "efficacy_unavailable",
+        "efficacy_unavailable": {"reason": reason},
+    }
+    before = deepcopy(raw)
+    view = build_view(
+        raw,
+        plan_ids=[],
+        hydrate=lambda ids: pytest.fail("unavailable must not hydrate"),
+    )
+    assert view.answer_text == EFFICACY_UNAVAILABLE_TEXT[expected]
+    assert view.ui_commands == []
+    assert view.clarification is view.error_code is None
+    assert view.efficacy_unavailable == {
+        "reason": expected,
+        "text": EFFICACY_UNAVAILABLE_TEXT[expected],
+    }
+    assert raw == before
+
+
+def test_no_confirmed_efficacy_view_asks_to_proceed_or_cancel():
+    from beautyads.domain.supervisor import CLARIFY_NO_CONFIRMED_TEXT
+
+    raw = {
+        **result(),
+        "kind": "needs_clarification",
+        "clarification": {
+            "reason": "no_efficacy_confirmed",
+            "requested_claim": None,
+            "available_efficacy": [],
+            "available_status": "ok",
+            "options": ["none", "cancel"],
+        },
+    }
+    view = build_view(
+        raw, plan_ids=[], hydrate=lambda ids: pytest.fail("must not hydrate")
+    )
+    assert view.answer_text == CLARIFY_NO_CONFIRMED_TEXT
+    assert view.clarification == {
+        "reason": "no_efficacy_confirmed",
+        "requested_claim": None,
+        "requested_label": None,
+        "available": [],
+        "text": CLARIFY_NO_CONFIRMED_TEXT,
+        "options": [
+            {"id": "none", "label": "효능 강조 없이 진행"},
+            {"id": "cancel", "label": "중단"},
+        ],
+    }
+    assert view.ui_commands == [] and view.efficacy_unavailable is None
+
+
+def test_invalid_claim_choice_has_only_error_code():
+    view = build_view(
+        {**result(), "kind": "claim_choice_invalid"},
+        plan_ids=[],
+        hydrate=lambda ids: pytest.fail("invalid choice must not hydrate evidence"),
+    )
+    assert view.error_code == "CLAIM_CHOICE_INVALID"
+    assert view.answer_text == "" and view.ui_commands == []
+    assert view.clarification is None
+
+
+def test_view_two_argument_constructor_is_compatible():
+    from beautyads.api.ask_view import View
+
+    commands = [{"kind": "show_graph_fragment", "data": {"evidence_ids": []}}]
+    view = View("synthetic", commands)
+    assert view.answer_text == "synthetic" and view.ui_commands == commands
+    assert view.clarification is view.error_code is None
+
+
+@pytest.mark.parametrize("available", [["hydration"], []])
+def test_other_requested_label_is_none_and_generic_copy_is_used(available):
+    from beautyads.domain.supervisor import clarification_texts
+
+    clarification = {
+        "reason": "requested_not_confirmed",
+        "requested_claim": "other",
+        "available_efficacy": available,
+        "available_status": "ok",
+        "options": ["keep_requested"]
+        + (["select_confirmed"] if available else [])
+        + ["none"],
+    }
+    raw = {"kind": "needs_clarification", "clarification": clarification}
+    before = deepcopy(raw)
+    view = build_view(raw, plan_ids=[], hydrate=None)
+    rendered = clarification_texts(clarification, {"hydration": "보습"})
+    assert view.clarification == {
+        "reason": "requested_not_confirmed",
+        "requested_claim": "other",
+        "requested_label": None,
+        "available": [{"claim": claim, "label": "보습"} for claim in available],
+        **rendered,
+    }
+    assert "other" not in view.answer_text
+    assert view.ui_commands == [] and view.error_code is None
+    assert raw == before

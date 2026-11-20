@@ -220,7 +220,7 @@ def test_fp_c14_evaluation_receives_closed_plan_values_and_anchored_scale():
         not {"evidence_exists", "forbidden_terms", "efficacy_status"}
         & payload["plan"].keys()
     )
-    assert evaluation.EVALUATION_PROMPT_VERSION == "2026-11-18-2"
+    assert evaluation.EVALUATION_PROMPT_VERSION == "2026-11-20-1"
 
 
 def test_fp_c14_evaluation_context_and_korean_copy_are_in_actual_messages():
@@ -249,3 +249,66 @@ def test_fp_c14_evaluation_context_and_korean_copy_are_in_actual_messages():
         assert phrase in system["content"]
     for phrase in ("한국어 광고 카피", "번역투", "설명조", "실제 상황", "구어체"):
         assert phrase in payload["criteria"]["fit"]
+
+
+@pytest.mark.parametrize(
+    "choice",
+    [
+        None,
+        {},
+        {
+            "mode": "selected",
+            "claims": ["hydration", "soothing"],
+            "requested_claim": "hydration",
+        },
+        {"mode": "keep_requested", "claims": [], "requested_claim": "other"},
+        {"mode": "none", "claims": [], "requested_claim": None},
+    ],
+)
+@pytest.mark.parametrize("status", ["supported", "unknown", "unsupported"])
+def test_fp_c14_claim_choice_reaches_scorer_without_changing_checks(choice, status):
+    handoff = {"evidence_ids": plan_data()["evidence_ids"]}
+    reports = []
+    for include_choice in (False, True):
+        fake = Scorer("claude-haiku-5-5")
+        if include_choice and choice is not None:
+            handoff["claim_choice"] = (
+                {**choice, "private": "SYNTHETIC_EXTRA"} if choice else {}
+            )
+        original = deepcopy(handoff)
+        reports.append(
+            evaluate_plan(
+                plan=plan_data(claimed_efficacy=["hydration"]),
+                brief={},
+                handoff=handoff,
+                rules=[synthetic_rule()],
+                evidence_index=FakeEvidence(),
+                support=Support({"hydration": status}),
+                certs=FakeCerts(),
+                structured=fake,
+            )
+        )
+        system, user = fake.calls[0][1]["messages"]
+        payload = json.loads(user["content"])
+        assert set(payload) == {"plan", "brief", "research", "criteria", "claim_choice"}
+        assert payload["claim_choice"] == ((choice or None) if include_choice else None)
+        if include_choice and choice:
+            assert set(payload["claim_choice"]) == {"mode", "claims", "requested_claim"}
+            payload["claim_choice"]["claims"].append("barrier")
+        assert "claim_choice" not in payload["research"]
+        assert "SYNTHETIC_EXTRA" not in user["content"]
+        for phrase in (
+            "claim_choice",
+            "keep_requested",
+            "감점하지 않는다",
+            "요청 적합성",
+        ):
+            assert phrase in system["content"]
+        assert handoff == original
+    assert reports[0].check_report == reports[1].check_report
+    assert (
+        reports[0].efficacy_status
+        == reports[1].efficacy_status
+        == {"hydration": status}
+    )
+    assert evaluation.EVALUATION_PROMPT_VERSION == "2026-11-20-1"
