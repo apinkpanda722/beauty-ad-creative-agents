@@ -62,11 +62,13 @@ class AskOutcome:
 
 
 def run_ask_once(
-    app, *, tenant_id, message, with_image=False, thread_id=None
+    app, *, tenant_id, message, with_image=False, thread_id=None, claim_choice=None
 ) -> AskOutcome:
     body = {"message": message, "with_image": with_image}
     if thread_id is not None:
         body["thread_id"] = thread_id
+    if claim_choice is not None:
+        body["claim_choice"] = claim_choice
     with TestClient(app) as client:
         response = client.post("/ask", headers={"X-Tenant-Id": tenant_id}, json=body)
         events = parse_sse(response.text) if response.status_code == 200 else []

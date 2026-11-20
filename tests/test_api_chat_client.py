@@ -135,3 +135,23 @@ def test_ask_client_rejection_and_lifespan():
     )
     assert outcome.status_code == 403 and outcome.events == []
     assert outcome.final_text == "" and outcome.ui_commands == []
+
+
+def test_ask_client_optional_claim_choice_preserves_wire_body():
+    from fastapi import Request
+
+    from beautyads.api.chat_client import run_ask_once
+
+    app = FastAPI()
+    seen = []
+
+    @app.post("/ask")
+    async def ask(request: Request):
+        seen.append(await request.json())
+        return StreamingResponse(iter([]))
+
+    choice = {"mode": "none", "claims": [], "requested_claim": None}
+    for extra in ({}, {"claim_choice": None}, {"claim_choice": choice}):
+        run_ask_once(app, tenant_id="demo-a", message="synthetic", **extra)
+    original = {"message": "synthetic", "with_image": False}
+    assert seen == [original, original, {**original, "claim_choice": choice}]

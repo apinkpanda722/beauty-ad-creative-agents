@@ -114,3 +114,7 @@ live-e3:
 .PHONY: live-isolation
 live-isolation:
 	uv run python -m beautyads.eval.isolation_live $(ARGS)
+
+.PHONY: demo-clarify
+demo-clarify:
+	uv run python -m beautyads.eval.clarify_demo $(ARGS)
