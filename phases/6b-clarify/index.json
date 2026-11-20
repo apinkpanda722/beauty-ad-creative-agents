@@ -46,6 +46,11 @@
     },
     {
       "step": 4,
+      "name": "efficacy-outcomes",
+      "status": "pending"
+    },
+    {
+      "step": 5,
       "name": "clarify-demo",
       "status": "pending"
     }
