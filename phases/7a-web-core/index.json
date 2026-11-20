@@ -1,0 +1,13 @@
+{
+  "project": "beauty-ad-creative-agents",
+  "phase": "7a-web-core",
+  "steps": [
+    { "step": 1, "name": "serve-entry", "status": "pending" },
+    { "step": 2, "name": "graph-api", "status": "pending" },
+    { "step": 3, "name": "view-contract", "status": "pending" },
+    { "step": 4, "name": "web-scaffold", "status": "pending" },
+    { "step": 5, "name": "web-chat", "status": "pending" },
+    { "step": 6, "name": "web-evidence-plan", "status": "pending" },
+    { "step": 7, "name": "web-graph", "status": "pending" }
+  ]
+}

@@ -37,6 +37,10 @@
       "dir": "6b-clarify",
       "status": "completed",
       "completed_at": "2026-11-20T16:08:39+0900"
+    },
+    {
+      "dir": "7a-web-core",
+      "status": "pending"
     }
   ]
 }
