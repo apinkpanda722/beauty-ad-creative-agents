@@ -14,6 +14,7 @@ from test_ask_view import result
 
 from beautyads.api.app import create_app
 from beautyads.api.chat_client import parse_sse
+from beautyads.domain.supervisor import clarification_texts
 
 
 class AskTenants(FeedbackTenants):
@@ -558,3 +559,214 @@ def test_design_composed_symlink_cannot_escape_root(tmp_path):
         post(client)
         response = client.get("/design/request/0", headers={"X-Tenant-Id": "demo-a"})
         assert response.status_code == 404 and b"private" not in response.content
+
+
+@pytest.mark.parametrize("body", [{}, {"claim_choice": None}])
+def test_absent_claim_choice_preserves_ask_arguments(tmp_path, body):
+    calls = []
+
+    def ask(message, ctx, profile, feedback, with_image, *, on_event, **kwargs):
+        calls.append((message, ctx, profile, feedback, with_image, on_event, kwargs))
+        return {"kind": "no_evidence"}
+
+    initial = services(ask)
+    initial.design_dir = tmp_path
+    with TestClient(create_app(lambda: initial)) as client:
+        response = post(client, **body)
+    assert response.status_code == 200
+    assert len(calls) == 1
+    message, ctx, profile, feedback, with_image, on_event, kwargs = calls[0]
+    assert message == "synthetic" and ctx.tenant_id == "demo-a"
+    assert profile == initial.workspaces["demo-a"]
+    assert feedback["approved"]["count"] == 0
+    assert with_image is False and callable(on_event)
+    assert kwargs == {}
+
+
+@pytest.mark.parametrize(
+    "choice,expected",
+    [
+        (
+            {"mode": "selected", "claims": ["hydration", "soothing"]},
+            {
+                "mode": "selected",
+                "claims": ["hydration", "soothing"],
+                "requested_claim": None,
+            },
+        ),
+        (
+            {"mode": "keep_requested", "requested_claim": "anti_aging"},
+            {"mode": "keep_requested", "claims": [], "requested_claim": "anti_aging"},
+        ),
+        ({"mode": "none"}, {"mode": "none", "claims": [], "requested_claim": None}),
+    ],
+)
+def test_create_app_forwards_claim_choice_to_assembly_ask(tmp_path, choice, expected):
+    calls, built = [], []
+
+    def ask(message, ctx, profile, feedback, with_image, *, on_event, **kwargs):
+        calls.append((ctx, kwargs))
+        return {"kind": "no_evidence"}
+
+    initial = services(ask)
+    initial.design_dir = tmp_path
+
+    def assemble():
+        built.append(True)
+        return initial
+
+    with TestClient(create_app(assemble)) as client:
+        assert built == [True] and client.app.state.assembly is initial
+        response = post(client, claim_choice=choice)
+    assert response.status_code == 200
+    assert len(calls) == 1 and calls[0][0].tenant_id == "demo-a"
+    assert calls[0][1] == {"claim_choice": expected}
+    assert initial.graph.calls == []
+    assert [name for name, _ in parse_sse(response.text)] == ["token"]
+
+
+@pytest.mark.parametrize(
+    "choice",
+    [
+        {"mode": "selected", "claims": ["not_a_claim"]},
+        {"mode": "selected", "claims": ["other"]},
+        {"mode": "keep_requested", "requested_claim": "other"},
+        {"mode": "keep_requested", "requested_claim": "not_a_claim"},
+        {"mode": "selected", "claims": []},
+        {"mode": "keep_requested"},
+        {"mode": "none", "claims": ["hydration"]},
+        {
+            "mode": "keep_requested",
+            "claims": ["hydration"],
+            "requested_claim": "soothing",
+        },
+        {"mode": "none", "extra": True},
+        {"mode": "none", "tenant_id": "demo-b"},
+        {"mode": "invalid_mode"},
+    ],
+)
+def test_structurally_invalid_claim_choice_is_422_before_ask(tmp_path, choice):
+    calls = []
+    initial = services(lambda *args, **kwargs: calls.append((args, kwargs)))
+    initial.design_dir = tmp_path
+    with TestClient(create_app(lambda: initial)) as client:
+        response = post(client, claim_choice=choice)
+    assert response.status_code == 422 and calls == []
+    assert initial.tenants.saved == []
+
+
+@pytest.mark.parametrize("empty_plans", [False, True])
+@pytest.mark.parametrize("requested", [None, "anti_aging"])
+def test_create_app_streams_clarification_then_token_without_saving_plans(
+    tmp_path, empty_plans, requested
+):
+    from beautyads.analysis.prompts import CLAIM_DISPLAY_NAMES
+    from beautyads.domain.labels import Claim
+
+    calls = []
+    clarification = {
+        "reason": "requested_not_confirmed" if requested else "no_claim_requested",
+        "requested_claim": requested,
+        "available_efficacy": ["hydration", "soothing"],
+        "available_status": "ok",
+        "options": (
+            ["keep_requested", "select_confirmed", "none"]
+            if requested
+            else ["select_one", "select_many", "none"]
+        ),
+    }
+    raw = {"kind": "needs_clarification", "clarification": clarification}
+    if empty_plans:
+        raw["plans"] = []
+
+    def ask(*args, **kwargs):
+        calls.append((args, kwargs))
+        return raw
+
+    initial = services(ask)
+    initial.design_dir = tmp_path
+    initial.hydrate = lambda ids: pytest.fail("clarification must not hydrate cards")
+    with TestClient(create_app(lambda: initial)) as client:
+        assert client.app.state.assembly is initial
+        response = post(client)
+    assert response.status_code == 200
+    assert len(calls) == 1 and initial.graph.calls == []
+    assert response.headers["X-Thread-Id"].startswith("demo-a:")
+    assert response.headers["X-Thread-Id"] in initial.tenants.threads
+    events = parse_sse(response.text)
+    assert [name for name, _ in events] == ["needs_clarification", "token"]
+    payload = events[0][1]
+    assert set(payload) == {
+        "reason",
+        "requested_claim",
+        "requested_label",
+        "available",
+        "options",
+        "text",
+    }
+    display = {
+        claim.value: label
+        for claim, label in CLAIM_DISPLAY_NAMES.items()
+        if claim != Claim.other
+    }
+    rendered = clarification_texts(clarification, display)
+    assert payload == {
+        "reason": clarification["reason"],
+        "requested_claim": requested,
+        "requested_label": display[requested] if requested else None,
+        "available": [
+            {"claim": claim, "label": display[claim]}
+            for claim in clarification["available_efficacy"]
+        ],
+        **rendered,
+    }
+    assert events[1] == ("token", {"text": rendered["text"]})
+    assert initial.tenants.saved == []
+
+
+@pytest.mark.parametrize("existing_thread", [False, True])
+def test_invalid_claim_choice_streams_only_error_and_keeps_thread_header(
+    tmp_path, existing_thread
+):
+    calls = []
+
+    def ask(*args, **kwargs):
+        calls.append(kwargs)
+        return {"kind": "claim_choice_invalid"}
+
+    initial = services(ask)
+    initial.design_dir = tmp_path
+    body = {}
+    if existing_thread:
+        initial.tenants.register_thread("demo-a", "demo-a:existing")
+        body["thread_id"] = "demo-a:existing"
+    choice = {"mode": "selected", "claims": ["hydration"]}
+    with TestClient(create_app(lambda: initial)) as client:
+        response = post(client, claim_choice=choice, **body)
+    assert response.status_code == 200 and len(calls) == 1
+    assert response.headers["X-Thread-Id"].startswith("demo-a:")
+    if existing_thread:
+        assert response.headers["X-Thread-Id"] == body["thread_id"]
+    assert parse_sse(response.text) == [("error", {"code": "CLAIM_CHOICE_INVALID"})]
+    assert initial.tenants.saved == []
+
+
+@pytest.mark.parametrize(
+    "tenant,body,status,detail",
+    [
+        (None, {}, 400, "TENANT_CONTEXT_MISSING"),
+        ("outside", {}, 403, "TENANT_NOT_ALLOWED"),
+        ("demo-a", {"thread_id": "demo-b:existing"}, 403, "TENANT_MISMATCH"),
+    ],
+)
+def test_claim_choice_cannot_bypass_session_checks(
+    tmp_path, tenant, body, status, detail
+):
+    calls = []
+    initial = services(lambda *args, **kwargs: calls.append((args, kwargs)))
+    initial.design_dir = tmp_path
+    initial.tenants.register_thread("demo-b", "demo-b:existing")
+    with TestClient(create_app(lambda: initial)) as client:
+        response = post(client, tenant=tenant, claim_choice={"mode": "none"}, **body)
+    assert response.status_code == status and response.json()["detail"] == detail
+    assert calls == [] and initial.tenants.saved == []

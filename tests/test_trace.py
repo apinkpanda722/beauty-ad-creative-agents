@@ -56,7 +56,16 @@ def ledger(purpose="planning", cost=0.02):
 
 
 @pytest.mark.parametrize(
-    "kind", ["research", "plan", "out_of_scope", "no_evidence", "failed"]
+    "kind",
+    [
+        "research",
+        "plan",
+        "out_of_scope",
+        "no_evidence",
+        "failed",
+        "needs_clarification",
+        "claim_choice_invalid",
+    ],
 )
 def test_build_projects_only_metadata_and_integer_scores(kind):
     result = {

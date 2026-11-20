@@ -109,6 +109,7 @@ _CLAIM_CRITERIA = {
     Claim.texture_finish: "제형·마무리감",
     Claim.other: "위 목록에 해당하지 않는 명시된 효능",
 }
+CLAIM_DISPLAY_NAMES = _CLAIM_CRITERIA
 
 
 def axis_glossary() -> dict:

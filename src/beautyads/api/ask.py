@@ -15,6 +15,7 @@ from beautyads.api.ask_view import IMAGE_MIMES, build_view, image_reference, jso
 from beautyads.api.feedback import feedback_for_prompt
 from beautyads.api.session import resolve_session, resolve_tenant
 from beautyads.api.sse import encode_event
+from beautyads.domain.supervisor import ClaimChoice
 from beautyads.domain.tenant import PlanRecord
 from beautyads.domain.tools import ToolContext
 
@@ -25,6 +26,7 @@ class AskRequest(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
     thread_id: str | None = Field(default=None, min_length=1)
     with_image: bool = False
+    claim_choice: ClaimChoice | None = None
 
 
 def _event(event):
@@ -96,6 +98,11 @@ def register_ask(app: FastAPI) -> None:
                 feedback,
                 body.with_image,
                 on_event=on_event,
+                **(
+                    {"claim_choice": body.claim_choice.model_dump(mode="json")}
+                    if body.claim_choice is not None
+                    else {}
+                ),
             )
             plan_ids = []
             references = []
@@ -160,6 +167,13 @@ def register_ask(app: FastAPI) -> None:
                     yield encode_event(name, data)
                 if failure is not None:
                     yield encode_event("error", failure)
+                    return
+                if outcome.error_code is not None:
+                    yield encode_event("error", {"code": outcome.error_code})
+                    return
+                if outcome.clarification is not None:
+                    yield encode_event("needs_clarification", outcome.clarification)
+                    yield encode_event("token", {"text": outcome.answer_text})
                     return
                 for command in outcome.ui_commands:
                     yield encode_event("ui_command", command)

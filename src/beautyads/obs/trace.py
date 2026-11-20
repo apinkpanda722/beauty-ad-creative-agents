@@ -138,7 +138,16 @@ class TraceRecord(_TraceModel):
     error_class: str | None = None
     error_code: str | None = None
     kind: (
-        Literal["research", "plan", "out_of_scope", "no_evidence", "failed"] | None
+        Literal[
+            "research",
+            "plan",
+            "out_of_scope",
+            "no_evidence",
+            "failed",
+            "needs_clarification",
+            "claim_choice_invalid",
+        ]
+        | None
     ) = None
     intent: Literal["pattern", "relation", "plan", "boundary"] | None = None
     message_chars: Count

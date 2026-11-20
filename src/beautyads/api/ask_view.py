@@ -7,15 +7,19 @@ from dataclasses import dataclass
 from datetime import date, datetime
 
 from beautyads.agents.tools import get_tool
+from beautyads.analysis.prompts import CLAIM_DISPLAY_NAMES
 from beautyads.domain.claims import CLAIM_CHECK_DISCLAIMER
+from beautyads.domain.labels import Claim
 from beautyads.domain.plan import Plan
 from beautyads.domain.research import count_label
 from beautyads.domain.supervisor import (
     AGGREGATES_LABEL,
     DESIGN_IMAGE_DISCLAIMER,
+    EFFICACY_NOTICE_TEXT,
     LIMIT_REACHED_TEXT,
     NO_EVIDENCE_TEXT,
     OUT_OF_SCOPE_TEXT,
+    clarification_texts,
 )
 from beautyads.domain.tools import ToolKind
 
@@ -31,12 +35,19 @@ _CARD_FIELDS = (
     "view_count",
     "like_count",
 )
+_CLAIM_DISPLAY = {
+    claim.value: name
+    for claim, name in CLAIM_DISPLAY_NAMES.items()
+    if claim != Claim.other
+}
 
 
 @dataclass(frozen=True)
 class View:
     answer_text: str
     ui_commands: list[dict]
+    clarification: dict | None = None
+    error_code: str | None = None
 
 
 def json_copy(value):
@@ -102,7 +113,32 @@ def build_view(result, *, plan_ids, hydrate) -> View:
     """
     handoff = result.get("handoff") or {}
     kind = result.get("kind")
+    if kind == "needs_clarification":
+        clarification = result["clarification"]
+        rendered = clarification_texts(clarification, _CLAIM_DISPLAY)
+        requested = clarification.get("requested_claim")
+        return View(
+            answer_text=rendered["text"],
+            ui_commands=[],
+            clarification={
+                "reason": clarification["reason"],
+                "requested_claim": requested,
+                "requested_label": _CLAIM_DISPLAY.get(requested)
+                if requested is not None
+                else None,
+                "available": [
+                    {"claim": claim, "label": _CLAIM_DISPLAY[claim]}
+                    for claim in clarification.get("available_efficacy", [])
+                ],
+                **rendered,
+            },
+        )
+    if kind == "claim_choice_invalid":
+        return View("", [], error_code="CLAIM_CHOICE_INVALID")
     commands, text = [], []
+    notice = EFFICACY_NOTICE_TEXT.get(result.get("efficacy_notice"))
+    if notice is not None:
+        text.append(notice)
     fixed = {
         "out_of_scope": OUT_OF_SCOPE_TEXT,
         "no_evidence": NO_EVIDENCE_TEXT,
