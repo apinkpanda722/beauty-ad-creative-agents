@@ -103,7 +103,16 @@
     {
       "step": 8,
       "name": "web-polish",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-20T19:41:02+0900",
+      "summary": "화면 수정 9건·드리프트 가드·회귀 테스트 추가. make verify(Python 6,217개·웹 125개)와 프로덕션 빌드 통과, 서버 계약·계층 경계 유지, 패키지 설치 없음.",
+      "completed_at": "2026-11-20T19:49:20+0900",
+      "usage": {
+        "input_tokens": 2502367,
+        "cached_input_tokens": 2388864,
+        "output_tokens": 14057,
+        "attempts": 1
+      }
     }
   ],
   "created_at": "2026-11-20T17:36:03+0900"
