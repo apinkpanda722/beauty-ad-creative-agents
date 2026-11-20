@@ -121,6 +121,18 @@ live-isolation:
 demo-clarify:
 	uv run python -m beautyads.eval.clarify_demo $(ARGS)
 
+.PHONY: obs-up obs-down obs-check
+obs-up:
+	uv run python -m beautyads.obs.langfuse_check preflight
+	$(COMPOSE) --profile obs up -d
+
+obs-down:
+	$(COMPOSE) --profile obs stop
+	$(COMPOSE) --profile obs rm -f
+
+obs-check:
+	uv run python -m beautyads.obs.langfuse_check
+
 # make serve; make serve BEAUTYADS_GROUP=test BEAUTYADS_EVAL_MODEL=claude-sonnet-5-5 BEAUTYADS_WITH_IMAGE=1
 .PHONY: serve
 serve:

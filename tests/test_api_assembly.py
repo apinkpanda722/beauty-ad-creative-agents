@@ -1577,3 +1577,84 @@ def test_hydrate_adds_optional_labels_with_one_bound_query(
 
     asyncio.run(run())
     assert "PRIVATE_LABEL_DIAGNOSTIC" not in caplog.text + str(capsys.readouterr())
+
+
+def test_ask_without_langfuse_configuration_does_not_export(rig, monkeypatch):
+    def forbidden(*args, **kwargs):
+        pytest.fail("unconfigured Langfuse was called")
+
+    monkeypatch.setattr(assembly, "export_trace", forbidden)
+
+    async def run():
+        services = await rig.start()
+        try:
+            assert invoke(services)["kind"] == "plan"
+        finally:
+            await services.close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("raises", [False, True])
+def test_ask_exports_after_local_append_in_daemon_without_affecting_result(
+    rig, monkeypatch, raises, capsys, caplog
+):
+    from threading import Event, current_thread
+
+    from beautyads.obs.trace import read_traces
+    from beautyads.settings import LangfuseSettings
+
+    entered, release, finished = Event(), Event(), Event()
+    observed = []
+    config = LangfuseSettings(
+        public_key="synthetic-public", secret_key="synthetic-secret"
+    )
+    reads = []
+
+    def settings(**kwargs):
+        reads.append(kwargs)
+        return config
+
+    def export(record, *, settings):
+        try:
+            observed.append(
+                (
+                    record,
+                    settings,
+                    current_thread().daemon,
+                    read_traces(rig.settings.ledger_path.with_name("traces.jsonl")),
+                )
+            )
+            entered.set()
+            assert release.wait(5)
+            if raises:
+                raise RuntimeError("SYNTHETIC_PRIVATE_EXPORT_DIAGNOSTIC")
+            return True
+        finally:
+            finished.set()
+
+    monkeypatch.setattr(assembly, "langfuse_settings", settings)
+    monkeypatch.setattr(assembly, "export_trace", export)
+
+    async def run():
+        services = await rig.start()
+        try:
+            result = invoke(services)
+            assert result["kind"] == "plan"
+            assert entered.wait(5)
+            assert not finished.is_set()  # ask returned while the exporter was blocked.
+            assert len(reads) == 1  # Read once at assembly, never on the request path.
+        finally:
+            release.set()
+            assert finished.wait(5)
+            await services.close()
+
+    asyncio.run(run())
+    assert len(observed) == 1
+    record, settings, daemon, local = observed[0]
+    assert settings is config and daemon is True
+    assert local.records == [record] and local.skipped_lines == 0
+    assert record.tenant_id == next(iter(rig.profiles))
+    assert "SYNTHETIC_PRIVATE_EXPORT_DIAGNOSTIC" not in caplog.text + str(
+        capsys.readouterr()
+    )

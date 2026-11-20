@@ -29,8 +29,131 @@ services:
     volumes:
       - beautyads_neo4j_data:/data
 
+  langfuse-worker:
+    image: langfuse/langfuse-worker:3.225.11
+    container_name: beautyads-langfuse-worker
+    profiles: ["obs"]
+    depends_on: &langfuse-dependencies
+      langfuse-postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    environment: &langfuse-environment
+      DATABASE_URL: postgresql://langfuse:${LANGFUSE_PG_PASSWORD:-}@langfuse-postgres:5432/langfuse
+      NEXTAUTH_URL: http://127.0.0.1:3001
+      SALT: ${LANGFUSE_SALT:-}
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:-}
+      TELEMETRY_ENABLED: "false"
+      CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_USER: langfuse
+      CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-}
+      CLICKHOUSE_CLUSTER_ENABLED: "false"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_AUTH: ${LANGFUSE_REDIS_AUTH:-}
+      REDIS_TLS_ENABLED: "false"
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${LANGFUSE_MINIO_PASSWORD:-}
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+
+  langfuse-web:
+    image: langfuse/langfuse:3.225.11
+    container_name: beautyads-langfuse-web
+    profiles: ["obs"]
+    depends_on: *langfuse-dependencies
+    ports:
+      - "127.0.0.1:3001:3000"
+    environment:
+      <<: *langfuse-environment
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-}
+      LANGFUSE_INIT_ORG_ID: beautyads
+      LANGFUSE_INIT_ORG_NAME: beautyads
+      LANGFUSE_INIT_PROJECT_ID: beautyads
+      LANGFUSE_INIT_PROJECT_NAME: beautyads
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-}
+      LANGFUSE_INIT_USER_NAME: beautyads
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:-}
+
+  langfuse-postgres:
+    image: postgres:17.11
+    container_name: beautyads-langfuse-postgres
+    profiles: ["obs"]
+    environment:
+      POSTGRES_USER: langfuse
+      POSTGRES_DB: langfuse
+      POSTGRES_PASSWORD: ${LANGFUSE_PG_PASSWORD:-}
+    volumes:
+      - beautyads_langfuse_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "langfuse", "-d", "langfuse"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.12.9.61
+    container_name: beautyads-clickhouse
+    profiles: ["obs"]
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: langfuse
+      CLICKHOUSE_PASSWORD: ${LANGFUSE_CLICKHOUSE_PASSWORD:-}
+    volumes:
+      - beautyads_langfuse_clickhouse_data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7.4.11
+    container_name: beautyads-redis
+    profiles: ["obs"]
+    environment:
+      REDIS_AUTH: ${LANGFUSE_REDIS_AUTH:-}
+    command: ["sh", "-c", 'exec redis-server --requirepass "$$REDIS_AUTH" --appendonly yes --maxmemory-policy noeviction']
+    volumes:
+      - beautyads_langfuse_redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", 'REDISCLI_AUTH="$$REDIS_AUTH" redis-cli ping | grep -q PONG']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: cgr.dev/chainguard/minio@sha256:4cf4831a2bbcf13ddca09c1cbcc9faff716dd3c4247e0babc32864b8ee8e0034
+    container_name: beautyads-minio
+    profiles: ["obs"]
+    entrypoint: sh
+    command: ["-c", 'mkdir -p /data/langfuse && exec minio server --address ":9000" --console-address ":9001" /data']
+    environment:
+      MINIO_ROOT_USER: langfuse
+      MINIO_ROOT_PASSWORD: ${LANGFUSE_MINIO_PASSWORD:-}
+    volumes:
+      - beautyads_langfuse_minio_data:/data
+
 volumes:
   beautyads_pgdata:
     name: beautyads_pgdata
   beautyads_neo4j_data:
     name: beautyads_neo4j_data
+  beautyads_langfuse_pgdata:
+    name: beautyads_langfuse_pgdata
+  beautyads_langfuse_clickhouse_data:
+    name: beautyads_langfuse_clickhouse_data
+  beautyads_langfuse_redis_data:
+    name: beautyads_langfuse_redis_data
+  beautyads_langfuse_minio_data:
+    name: beautyads_langfuse_minio_data

@@ -153,3 +153,80 @@ def test_graph_reset_requires_confirmation_before_removing_only_graph(makefile):
 def test_verify_remains_offline(makefile):
     for line in recipe(makefile, "verify"):
         assert not any(prefix in line for prefix in ("db-", "graph-", "live-"))
+
+
+OBS_IMAGES = {
+    "langfuse-web": "langfuse/langfuse:3.225.11",
+    "langfuse-worker": "langfuse/langfuse-worker:3.225.11",
+    "langfuse-postgres": "postgres:17.11",
+    "clickhouse": "clickhouse/clickhouse-server:25.12.9.61",
+    "redis": "redis:7.4.11",
+    "minio": "cgr.dev/chainguard/minio@sha256:4cf4831a2bbcf13ddca09c1cbcc9faff716dd3c4247e0babc32864b8ee8e0034",
+}
+
+
+def test_obs_is_optional_and_images_are_pinned(compose):
+    for name, image in OBS_IMAGES.items():
+        assert compose["services"][name]["profiles"] == ["obs"]
+        assert compose["services"][name]["image"] == image
+    for name in ("postgres", "neo4j"):
+        assert "profiles" not in compose["services"][name]
+    assert compose["services"]["langfuse-web"]["ports"] == ["127.0.0.1:3001:3000"]
+
+
+def test_obs_secrets_are_optional_references_and_postgres_is_separate(compose):
+    references = set()
+    for name in OBS_IMAGES:
+        service = compose["services"][name]
+        encoded = str(service)
+        assert ":?" not in encoded
+        for value in service.get("environment", {}).values():
+            for variable in re.findall(r"\$\{([^}:]+):([^}]*)\}", str(value)):
+                assert variable[1] == "-"
+                references.add(variable[0])
+    assert {
+        "LANGFUSE_PUBLIC_KEY",
+        "LANGFUSE_SECRET_KEY",
+        "LANGFUSE_INIT_USER_EMAIL",
+        "LANGFUSE_INIT_USER_PASSWORD",
+        "LANGFUSE_NEXTAUTH_SECRET",
+        "LANGFUSE_SALT",
+        "LANGFUSE_ENCRYPTION_KEY",
+        "LANGFUSE_PG_PASSWORD",
+        "LANGFUSE_CLICKHOUSE_PASSWORD",
+        "LANGFUSE_REDIS_AUTH",
+        "LANGFUSE_MINIO_PASSWORD",
+    } <= references
+    pg = compose["services"]["langfuse-postgres"]
+    assert pg["environment"]["POSTGRES_DB"] == "langfuse"
+    assert pg["volumes"] == ["beautyads_langfuse_pgdata:/var/lib/postgresql/data"]
+    assert "beautyads_pgdata" not in str(pg)
+    assert (
+        compose["volumes"]["beautyads_langfuse_pgdata"]["name"]
+        == "beautyads_langfuse_pgdata"
+    )
+
+
+def test_obs_make_targets_are_separate_and_preserve_volumes(makefile):
+    assert ".PHONY: obs-up obs-down obs-check\n" in makefile
+    assert recipe(makefile, "obs-up") == [
+        "uv run python -m beautyads.obs.langfuse_check preflight",
+        "$(COMPOSE) --profile obs up -d",
+    ]
+    assert recipe(makefile, "obs-check") == [
+        "uv run python -m beautyads.obs.langfuse_check"
+    ]
+    down = recipe(makefile, "obs-down")
+    assert down == ["$(COMPOSE) --profile obs stop", "$(COMPOSE) --profile obs rm -f"]
+    assert all("volume rm" not in line and "down -v" not in line for line in down)
+    assert all("obs-" not in line for line in recipe(makefile, "verify"))
+
+
+def test_obs_minio_initializes_event_bucket_and_redis_preserves_queue(compose):
+    minio = compose["services"]["minio"]
+    assert minio["entrypoint"] == "sh"
+    command = " ".join(minio["command"])
+    assert "mkdir -p /data/langfuse" in command and "exec minio server" in command
+    assert minio["volumes"] == ["beautyads_langfuse_minio_data:/data"]
+    redis = compose["services"]["redis"]
+    assert "--maxmemory-policy noeviction" in " ".join(redis["command"])
