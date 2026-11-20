@@ -5,7 +5,7 @@ import type { EvidenceCard, UiCommand } from "../lib/types";
 import { ctaName, talentName, taxonomyNames } from "../lib/taxonomy";
 import type { TaxonomyNames } from "../lib/taxonomy";
 
-function safeLink(value: string | null): string | undefined {
+export function safeLink(value: string | null): string | undefined {
   if (!value) return;
   try { const url = new URL(value); if (url.protocol === "https:" || url.protocol === "http:") return url.href; } catch { /* Missing or invalid URLs have no link. */ }
 }

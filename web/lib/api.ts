@@ -124,3 +124,12 @@ export async function postFeedback(args: {
   }));
   return response.json();
 }
+
+export async function getGraphFragment(tenantId: string, ids: string[]): Promise<import("./types").GraphFragment> {
+  if (ids.length < 1 || ids.length > 30) throw new ApiError(422, "GRAPH_IDS_INVALID");
+  const response = await requireSuccess(await fetch(
+    `/api/graph/fragment?ids=${ids.map(id => encodeURIComponent(id)).join(",")}`,
+    { headers: { "X-Tenant-Id": tenantId } },
+  ));
+  return response.json();
+}

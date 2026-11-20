@@ -71,3 +71,14 @@ th, td { padding: .6rem; text-align: left; border-bottom: 1px solid #dce1e3; }
 .design-image figcaption { margin-top: .5rem; }
 .cost-line { border-top: 1px solid #dce1e3; padding-top: .75rem; }
 @media (max-width: 600px) { .plan-card { padding: .85rem; } }
+.view-tabs { display: flex; gap: .6rem; margin-bottom: 1.3rem; }
+.view-tabs [aria-selected="true"] { background: #e8f1ee; border-color: #376454; }
+.graph-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(12rem, 15rem); gap: 1rem; }
+.graph-canvas { width: 100%; border: 1px solid #dce1e3; border-radius: .6rem; background: white; }
+.graph-legend { display: flex; flex-wrap: wrap; gap: .7rem 1rem; padding: 0; list-style: none; font-size: .8rem; }
+.graph-legend li { display: flex; align-items: center; gap: .4rem; }
+.graph-legend span { width: .8rem; height: .8rem; border-radius: 50%; }
+.node-detail { min-width: 0; padding: 0 .9rem; border: 1px solid #dce1e3; border-radius: .6rem; overflow-wrap: anywhere; }
+.node-detail dt { color: #565e64; font-size: .8rem; margin-top: .8rem; }
+.node-detail dd { margin: .3rem 0 .8rem; white-space: pre-wrap; }
+@media (max-width: 700px) { .graph-layout { grid-template-columns: minmax(0, 1fr); } }

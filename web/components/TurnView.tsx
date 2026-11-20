@@ -1,18 +1,24 @@
+"use client";
+import { useContext, useState } from "react";
 import type { Turn } from "../lib/reducer";
 import type { ClaimChoice } from "../lib/types";
 import { ClarifyCard } from "./ClarifyCard";
-import { CommandSlot } from "./CommandSlot";
+import { CommandSlot, CommandTenantContext } from "./CommandSlot";
+import { GraphPanel } from "./GraphPanel";
 import { Notice } from "./Notice";
 import { StepBar } from "./StepBar";
 export function TurnView({ turn, busy, onChoice, onCancel, onRetry }: {
   turn: Turn; busy: boolean; onChoice: (choice: ClaimChoice, label: string) => void;
   onCancel: () => void; onRetry: () => void;
 }) {
+  const tenantId = useContext(CommandTenantContext);
+  const [graphIds, setGraphIds] = useState<string[] | null>(null);
   return <article className="turn" aria-label={`요청 ${turn.id}`}>
     <p className="user-message">{turn.message}</p>
     {turn.choiceLabel && <p className="muted">선택: {turn.choiceLabel}</p>}
     <StepBar stepEvents={turn.stepEvents} turnStatus={turn.status} />
-    <CommandSlot commands={turn.commands} />
+    <CommandSlot commands={turn.commands} onOpenGraph={tenantId ? setGraphIds : undefined} />
+    {tenantId && graphIds && <GraphPanel tenantId={tenantId} ids={graphIds} />}
     {turn.displayText && <p className="answer">{turn.displayText}</p>}
     {turn.clarification && <ClarifyCard clarification={turn.clarification} disabled={busy || turn.status !== "needs_choice"}
       onSubmit={onChoice} onCancel={onCancel} />}

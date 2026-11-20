@@ -173,3 +173,16 @@ export type EvaluationAttempt = {
   final_passed?: boolean | null;
   cost_usd?: number | null;
 };
+
+// Read-only projection from graph/fragment_queries.py.
+export type GraphNode = {
+  id: string;
+  label: string;
+  name: string | null;
+  props: Record<string, unknown>;
+};
+export type GraphFragment = {
+  nodes: GraphNode[];
+  edges: { source: string; target: string; type: string }[];
+  missing: string[];
+};

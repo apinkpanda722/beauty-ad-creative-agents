@@ -11,7 +11,7 @@ import { WorkspacePicker } from "./WorkspacePicker";
 import { CommandTenantContext } from "./CommandSlot";
 import { FeedbackSession } from "./FeedbackBar";
 
-export function Chat({ workspaces, imageEnabled }: { workspaces: Workspace[]; imageEnabled: boolean }) {
+export function Chat({ workspaces, imageEnabled, onWorkspaceChange }: { workspaces: Workspace[]; imageEnabled: boolean; onWorkspaceChange?: (tenantId: string | null) => void }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [message, setMessage] = useState("");
   const [withImage, setWithImage] = useState(true);
@@ -60,6 +60,7 @@ export function Chat({ workspaces, imageEnabled }: { workspaces: Workspace[]; im
       if (state.tenantId === tenantId) return;
       controller.current?.abort(); controller.current = null;
       dispatch({ type: "workspace_selected", tenantId }); setMessage(""); setWithImage(true);
+      onWorkspaceChange?.(tenantId);
     }} />
     <section className="conversation" aria-label="대화">
       {state.turns.map(turn => <TurnView key={turn.id} turn={turn} busy={busy}
