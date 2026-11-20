@@ -19,7 +19,16 @@
     {
       "step": 2,
       "name": "clarify-api",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-20T14:22:24+0900",
+      "summary": "claim_choice API 입력·422 검증, 되묻기·선택 오류 SSE, 효능 안내 및 trace kind 확장 구현 완료. make verify 5,975개 테스트 통과, 패키지 설치 없음.",
+      "completed_at": "2026-11-20T14:29:03+0900",
+      "usage": {
+        "input_tokens": 2142244,
+        "cached_input_tokens": 2037376,
+        "output_tokens": 10039,
+        "attempts": 1
+      }
     },
     {
       "step": 3,
