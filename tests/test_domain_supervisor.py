@@ -575,38 +575,30 @@ def test_claim_policy_table_is_exact_and_pure():
                 "clarification": {},
             },
         ),
-        (
-            "other",
-            ["hydration"],
-            "ok",
-            None,
-            {
-                "action": "clarify",
-                "claim": None,
-                "claim_choice": {},
-                "notice": None,
-                "clarification": {
-                    "reason": "no_claim_requested",
-                    "requested_claim": None,
-                    "available_efficacy": ["hydration"],
-                    "available_status": "ok",
-                    "options": ["select_one", "select_many", "none"],
+        *[
+            (
+                "other",
+                available,
+                "ok",
+                None,
+                {
+                    "action": "clarify",
+                    "claim": None,
+                    "claim_choice": {},
+                    "notice": None,
+                    "clarification": {
+                        "reason": "requested_not_confirmed",
+                        "requested_claim": "other",
+                        "available_efficacy": available,
+                        "available_status": "ok",
+                        "options": ["keep_requested"]
+                        + (["select_confirmed"] if available else [])
+                        + ["none"],
+                    },
                 },
-            },
-        ),
-        (
-            "other",
-            [],
-            "ok",
-            None,
-            {
-                "action": "proceed",
-                "claim": None,
-                "claim_choice": {"mode": "none", "claims": [], "requested_claim": None},
-                "notice": "none_confirmed",
-                "clarification": {},
-            },
-        ),
+            )
+            for available in (["hydration"], [])
+        ],
         (
             "brightening",
             ["hydration", "soothing"],
@@ -696,11 +688,15 @@ def test_claim_policy_table_is_exact_and_pure():
             "other",
             [],
             "ok",
-            {"mode": "keep_requested", "claims": [], "requested_claim": "brightening"},
+            {"mode": "keep_requested", "claims": [], "requested_claim": "other"},
             {
-                "action": "invalid",
-                "claim": None,
-                "claim_choice": {},
+                "action": "proceed",
+                "claim": "other",
+                "claim_choice": {
+                    "mode": "keep_requested",
+                    "claims": [],
+                    "requested_claim": "other",
+                },
                 "notice": None,
                 "clarification": {},
             },
@@ -763,6 +759,26 @@ def test_claim_policy_table_is_exact_and_pure():
                 ),
             ]
         )
+    for status in ("failed", "skipped"):
+        cases.append(
+            (
+                "other",
+                [],
+                status,
+                None,
+                {
+                    "action": "proceed",
+                    "claim": "other",
+                    "claim_choice": {
+                        "mode": "keep_requested",
+                        "claims": [],
+                        "requested_claim": "other",
+                    },
+                    "notice": "lookup_unconfirmed",
+                    "clarification": {},
+                },
+            )
+        )
     checked = 0
     for requested, available, status, choice, expected in cases:
         before = deepcopy((available, choice))
@@ -791,7 +807,6 @@ def test_claim_policy_table_is_exact_and_pure():
         {"mode": "selected", "claims": ["other"]},
         {"mode": "selected", "claims": ["hydration", "hydration"]},
         {"mode": "selected", "claims": ["unknown"]},
-        {"mode": "selected", "claims": ["hydration"], "requested_claim": "other"},
         {"mode": "keep_requested"},
         {
             "mode": "keep_requested",
@@ -826,6 +841,14 @@ def test_claim_choice_rejects_each_structure_violation(value):
         (
             {"mode": "keep_requested", "requested_claim": "hydration"},
             {"mode": "keep_requested", "claims": [], "requested_claim": "hydration"},
+        ),
+        (
+            {"mode": "selected", "claims": ["hydration"], "requested_claim": "other"},
+            {"mode": "selected", "claims": ["hydration"], "requested_claim": "other"},
+        ),
+        (
+            {"mode": "keep_requested", "requested_claim": "other"},
+            {"mode": "keep_requested", "claims": [], "requested_claim": "other"},
         ),
         ({"mode": "none"}, {"mode": "none", "claims": [], "requested_claim": None}),
     ],
@@ -949,3 +972,49 @@ def test_clarification_copy_is_fixed_and_rendered_with_display_names():
             }
         ],
     }
+
+
+@pytest.mark.parametrize("available", [["hydration"], []])
+@pytest.mark.parametrize("display_other", [False, True])
+def test_other_clarification_uses_fixed_generic_copy(available, display_other):
+    from beautyads.domain import supervisor as policy
+
+    assert (
+        policy.CLARIFY_REQUESTED_GENERIC_TEXT
+        == "요청하신 효능은 이 제품의 성분·인증으로 근거가 확인되지 않았습니다. 확인된 효능은 {available}입니다. 어떻게 진행할까요?"
+    )
+    assert (
+        policy.CLARIFY_REQUESTED_GENERIC_NO_CONFIRMED_TEXT
+        == "요청하신 효능은 이 제품의 성분·인증으로 근거가 확인되지 않았습니다. 이 제품에서 근거가 확인된 효능이 없습니다. 어떻게 진행할까요?"
+    )
+    assert (
+        policy.OPTION_KEEP_REQUESTED_GENERIC
+        == "요청하신 효능으로 진행 (효능을 단정하는 표현은 제한됩니다)"
+    )
+    clarification = policy.resolve_claim_policy(
+        requested="other",
+        available=available,
+        status="ok",
+        choice=None,
+    )["clarification"]
+    display = {
+        "hydration": "보습",
+        **({"other": "OTHER_SENTINEL"} if display_other else {}),
+    }
+    rendered = policy.clarification_texts(clarification, display)
+    template = (
+        policy.CLARIFY_REQUESTED_GENERIC_TEXT
+        if available
+        else policy.CLARIFY_REQUESTED_GENERIC_NO_CONFIRMED_TEXT
+    )
+    assert rendered["text"] == template.format(available="보습")
+    assert rendered["options"] == [
+        {"id": "keep_requested", "label": policy.OPTION_KEEP_REQUESTED_GENERIC},
+        *(
+            [{"id": "select_confirmed", "label": policy.OPTION_SELECT_CONFIRMED}]
+            if available
+            else []
+        ),
+        {"id": "none", "label": policy.OPTION_NONE},
+    ]
+    assert "other" not in str(rendered) and "OTHER_SENTINEL" not in str(rendered)

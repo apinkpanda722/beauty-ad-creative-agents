@@ -914,6 +914,22 @@ def test_decide_rejects_output_outside_closed_axis_values(axis):
                 "options": ["select_one", "select_many", "none"],
             },
         ),
+        *[
+            (
+                "other",
+                available,
+                {
+                    "reason": "requested_not_confirmed",
+                    "requested_claim": "other",
+                    "available_efficacy": available,
+                    "available_status": "ok",
+                    "options": ["keep_requested"]
+                    + (["select_confirmed"] if available else [])
+                    + ["none"],
+                },
+            )
+            for available in (["hydration"], [])
+        ],
     ],
 )
 def test_clarification_stops_before_research_and_planning(
@@ -1034,7 +1050,7 @@ def test_claim_choice_rechecks_support_and_overrides_nondeterministic_decide(
             "requested_claim": choice.get("requested_claim"),
         }
         assert all(
-            "claim_choice" not in call["handoff"]
+            call["handoff"]["claim_choice"] == result["claim_choice"]
             and "claim_choice" not in call["brief"]
             for call in f.plan_calls
         )
@@ -1046,7 +1062,6 @@ def test_claim_choice_rechecks_support_and_overrides_nondeterministic_decide(
     [
         {"mode": "selected"},
         {"mode": "none", "tenant_id": "synthetic"},
-        {"mode": "keep_requested", "requested_claim": "other"},
     ],
 )
 def test_structurally_invalid_choice_fails_before_graph_calls(entry, choice):
@@ -1060,7 +1075,7 @@ def test_structurally_invalid_choice_fails_before_graph_calls(entry, choice):
 
 
 @pytest.mark.parametrize("mode", ["failed", "skipped", "exception", "invalid-status"])
-@pytest.mark.parametrize("requested", ["brightening", None])
+@pytest.mark.parametrize("requested", ["brightening", "other", None])
 def test_lookup_failure_proceeds_safely_without_exposing_diagnostics(mode, requested):
     f = Fakes(decision=decision_data(claim=requested))
 
@@ -1125,3 +1140,70 @@ def test_new_supervisor_state_defaults_are_json_and_empty():
     assert state["sv_claim_choice"] == state["sv_clarification"] == {}
     assert state["sv_efficacy_notice"] is None
     assert primitive(state)
+
+
+@pytest.mark.parametrize("mode", ["on", "off"])
+@pytest.mark.parametrize("lookup", [False, True])
+def test_claim_choice_is_copied_from_state_after_trimming(mode, lookup):
+    f = Fakes(research=handoff(evidence_ids=["yt:a", "yt:b", "yt:c"]))
+    limits = RequestLimits(handoff_max_evidence_ids=1, handoff_max_aggregates=1)
+    choice = {
+        "mode": "selected",
+        "claims": ["soothing", "hydration"],
+        "requested_claim": None,
+    }
+
+    def research_fn(brief, raw_store, **kwargs):
+        return f.research(brief, raw_store)
+
+    def planning(*args, **kwargs):
+        result = f.planning(*args, **kwargs)
+        if lookup:
+            args[1]["claim_choice"]["claims"].clear()
+        return result
+
+    args = f.args(
+        research_fn=research_fn,
+        plan_eval_fn=planning,
+        limits=limits,
+        claims_fn=(lambda _: (["hydration", "soothing"], "ok")) if lookup else None,
+        claim_choice=choice,
+        context_mode=mode,
+    )
+    args.pop("message")
+    graph = supervisor.build_supervisor_graph(**args)
+    state = graph.invoke(supervisor.initial_supervisor_state("synthetic", limits))
+    assert state["sv_status"]["kind"] == "plan"
+    assert state["sv_claim_choice"] == (choice if lookup else {})
+    assert "claim_choice" not in state["sv_handoff"]
+    for call in f.plan_calls:
+        if lookup:
+            assert call["handoff"]["claim_choice"] == state["sv_claim_choice"]
+        else:
+            assert "claim_choice" not in call["handoff"]
+    assert state["sv_trims"] == (
+        [
+            {"field": "evidence_ids", "kept": 1, "total": 3},
+            {"field": "aggregates", "kept": 1, "total": 2},
+        ]
+        if mode == "on"
+        else []
+    )
+
+
+@pytest.mark.parametrize("mode", ["on", "off"])
+def test_keep_requested_other_recall_proceeds_with_original_research_claim(mode):
+    f = Fakes(decision=decision_data(claim="hydration"))
+    choice = {"mode": "keep_requested", "claims": [], "requested_claim": "other"}
+    result = supervisor.run_request(
+        **f.args(
+            research_fn=lambda brief, raw_store, **kwargs: f.research(brief, raw_store),
+            claims_fn=lambda _: (["hydration"], "ok"),
+            claim_choice=choice,
+        ),
+        context_mode=mode,
+    )
+    assert result["kind"] == "plan"
+    assert result["claim_choice"] == choice
+    assert f.research_calls[0]["claim"] == result["brief"]["claim"] == "other"
+    assert all(call["handoff"]["claim_choice"] == choice for call in f.plan_calls)

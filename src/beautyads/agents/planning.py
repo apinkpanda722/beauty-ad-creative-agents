@@ -1,6 +1,7 @@
 """One text-only plan per call, using a bounded research handoff."""
 
 import json
+from copy import deepcopy
 from pathlib import Path
 from typing import NamedTuple
 
@@ -14,7 +15,7 @@ from beautyads.llm.structured import (
 )
 
 PLANNING_REASONING_EFFORT = "low"
-PLANNING_PROMPT_VERSION = "2026-11-18-3"
+PLANNING_PROMPT_VERSION = "2026-11-20-1"
 _MODEL = "gpt-6.1-terra"
 _SYSTEM = (
     "리서치와 브랜드 프로필·피드백을 근거로 기획안 1안만 만든다. "
@@ -27,8 +28,13 @@ _SYSTEM = (
     "한계는 코드가 basis_notes에 적었다. "
     "product_url은 profile.own_product_url 값을 그대로 쓴다. "
     "claimed_efficacy에는 입력의 available_efficacy(코드가 확인한 효능)에 있는 값만 넣는다. "
-    "확인된 효능이 목록에 없으면 주장하지 않고 빈 목록으로 둔다. "
-    "목록이 비어 있으면 빈 목록이다. "
+    "확인된 효능이 아닌 값은 어떤 경우에도 넣지 않고, 확인된 효능이 없으면 빈 목록이다. "
+    "소구 방향과 claimed_efficacy는 따로 정한다. 소구 방향은 마케터가 정한 claim_choice를 따르고, claimed_efficacy는 코드가 확인한 효능만 담는다. "
+    "요청한 효능이 확인된 효능이 아니어도 요청 효능을 근거 있는 다른 효능으로 바꾸지 않는다. 소구 방향은 요청 효능으로 두고, claimed_efficacy에만 확인된 값을 넣는다. "
+    "claim_choice.mode가 keep_requested이면 마케터가 근거가 확인되지 않은 효능을 요청했다. 요청한 효능(claim_choice.requested_claim, 그 값이 other이면 brief.goal의 효능 표현)을 hook_text·copy_lines의 소구 방향으로 살린다. 단 그 효능이 제품에서 확인된 것처럼 단정하는 표현(효과가 입증됐다·확실하다·보장한다·치료한다 등)은 쓰지 않고 사용 장면과 느낌을 말하는 표현을 쓴다. claimed_efficacy에는 요청한 효능을 넣지 않고 available_efficacy 안의 값만 넣으며 없으면 빈 목록이다. 효능을 사실처럼 암시하는 표현도 쓰지 않는다. "
+    "claim_choice.mode가 selected이면 claims의 효능이 소구의 중심이다. claims가 여러 개이면 한 안에서 모두 다루되 첫 번째 효능을 앞세운다. claimed_efficacy에는 claims를 그대로 넣는다(모두 available_efficacy 안의 값이다). "
+    "claim_choice.mode가 none이면 효능을 강조하지 않고 제품 자체(사용감·제형·사용 장면·브랜드)를 홍보한다. 입력과 그래프에서 확인되지 않은 사용감·제형·성분은 지어내지 않는다. 효능 이름을 앞세운 카피를 쓰지 않고 claimed_efficacy는 빈 목록이다. "
+    "claim_choice가 null이면 위 규칙을 쓰지 않는다. brief.claim이 있고 그 값이 available_efficacy 안에 있으면 그 효능을 소구와 claimed_efficacy의 중심으로 하고, 그렇지 않으면 available_efficacy에 있는 값만 claimed_efficacy에 넣는다. "
     "image_brief는 하나의 핵심 장면(단일 컷)의 장면 묘사만 쓴다. "
     "여러 장면·콜라주·자막·문구·따옴표 문장을 쓰지 않는다. "
     "scenes는 영상 장면 목록이며 이미지에는 쓰이지 않는다. "
@@ -129,6 +135,7 @@ def make_plan(
     generator = structured if structured is not None else make_structured(_MODEL)
     if getattr(generator, "model", _MODEL) != _MODEL:
         raise ValueError("PLANNING_MODEL_INVALID")
+    claim_choice = handoff.get("claim_choice") or None
     payload = {
         "brief": _text_data(brief),
         "research": research_payload(handoff),
@@ -138,6 +145,12 @@ def make_plan(
             if isinstance(value, str)
             and value in {claim.value for claim in Claim if claim != Claim.other}
         ],
+        "claim_choice": {
+            key: deepcopy(claim_choice.get(key))
+            for key in ("mode", "claims", "requested_claim")
+        }
+        if claim_choice is not None
+        else None,
         "profile": {
             key: profile.get(key)
             for key in ("brand", "tone", "forbidden_terms", "own_product_url")

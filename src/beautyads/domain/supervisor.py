@@ -24,9 +24,14 @@ THIN_POOL_NOTE = "근거 소재가 {n}건으로 얇아 차별성 판단에 한�
 DESIGN_IMAGE_DISCLAIMER = "생성 시안은 참고용이며 라벨 글자가 부정확할 수 있다"
 CLARIFY_REQUESTED_TEXT = "요청하신 '{requested}' 효능은 이 제품의 성분·인증으로 근거가 확인되지 않았습니다. 확인된 효능은 {available}입니다. 어떻게 진행할까요?"
 CLARIFY_REQUESTED_NO_CONFIRMED_TEXT = "요청하신 '{requested}' 효능은 이 제품의 성분·인증으로 근거가 확인되지 않았습니다. 이 제품에서 근거가 확인된 효능이 없습니다. 어떻게 진행할까요?"
+CLARIFY_REQUESTED_GENERIC_TEXT = "요청하신 효능은 이 제품의 성분·인증으로 근거가 확인되지 않았습니다. 확인된 효능은 {available}입니다. 어떻게 진행할까요?"
+CLARIFY_REQUESTED_GENERIC_NO_CONFIRMED_TEXT = "요청하신 효능은 이 제품의 성분·인증으로 근거가 확인되지 않았습니다. 이 제품에서 근거가 확인된 효능이 없습니다. 어떻게 진행할까요?"
 CLARIFY_UNSPECIFIED_TEXT = "효능을 지정하지 않으셨습니다. 이 제품에서 근거가 확인된 효능은 {available}입니다. 어떤 효능을 강조할까요?"
 OPTION_KEEP_REQUESTED = (
     "요청하신 '{requested}'로 진행 (효능을 단정하는 표현은 제한됩니다)"
+)
+OPTION_KEEP_REQUESTED_GENERIC = (
+    "요청하신 효능으로 진행 (효능을 단정하는 표현은 제한됩니다)"
 )
 OPTION_SELECT_CONFIRMED = "확인된 효능 중에서 선택"
 OPTION_SELECT_ONE = "한 가지 효능 선택"
@@ -60,7 +65,7 @@ class ClaimChoice(BaseModel):
 
     @model_validator(mode="after")
     def validate_choice(self) -> "ClaimChoice":
-        if Claim.other in self.claims or self.requested_claim == Claim.other:
+        if Claim.other in self.claims:
             raise ValueError("CLAIM_CHOICE_OTHER")
         if len(self.claims) != len(set(self.claims)):
             raise ValueError("CLAIM_CHOICE_DUPLICATE")
@@ -77,8 +82,6 @@ def resolve_claim_policy(
     *, requested: str | None, available: list[str], status: str, choice: dict | None
 ) -> dict:
     """Resolve confirmed efficacy and an optional marketer choice without I/O."""
-    if requested == Claim.other:
-        requested = None
     result = {
         "action": "proceed",
         "claim": None,
@@ -165,8 +168,16 @@ def clarification_texts(clarification: dict, display: Mapping[str, str]) -> dict
         if available
         else CLARIFY_REQUESTED_NO_CONFIRMED_TEXT
     )
+    if requested == Claim.other:
+        template = (
+            CLARIFY_REQUESTED_GENERIC_TEXT
+            if available
+            else CLARIFY_REQUESTED_GENERIC_NO_CONFIRMED_TEXT
+        )
     labels = {
-        ClarifyOption.keep_requested.value: OPTION_KEEP_REQUESTED,
+        ClarifyOption.keep_requested.value: OPTION_KEEP_REQUESTED_GENERIC
+        if requested == Claim.other
+        else OPTION_KEEP_REQUESTED,
         ClarifyOption.select_confirmed.value: OPTION_SELECT_CONFIRMED,
         ClarifyOption.select_one.value: OPTION_SELECT_ONE,
         ClarifyOption.select_many.value: OPTION_SELECT_MANY,

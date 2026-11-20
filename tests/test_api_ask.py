@@ -598,6 +598,14 @@ def test_absent_claim_choice_preserves_ask_arguments(tmp_path, body):
             {"mode": "keep_requested", "requested_claim": "anti_aging"},
             {"mode": "keep_requested", "claims": [], "requested_claim": "anti_aging"},
         ),
+        (
+            {"mode": "keep_requested", "requested_claim": "other"},
+            {"mode": "keep_requested", "claims": [], "requested_claim": "other"},
+        ),
+        (
+            {"mode": "selected", "claims": ["hydration"], "requested_claim": "other"},
+            {"mode": "selected", "claims": ["hydration"], "requested_claim": "other"},
+        ),
         ({"mode": "none"}, {"mode": "none", "claims": [], "requested_claim": None}),
     ],
 )
@@ -630,7 +638,6 @@ def test_create_app_forwards_claim_choice_to_assembly_ask(tmp_path, choice, expe
     [
         {"mode": "selected", "claims": ["not_a_claim"]},
         {"mode": "selected", "claims": ["other"]},
-        {"mode": "keep_requested", "requested_claim": "other"},
         {"mode": "keep_requested", "requested_claim": "not_a_claim"},
         {"mode": "selected", "claims": []},
         {"mode": "keep_requested"},
@@ -656,7 +663,7 @@ def test_structurally_invalid_claim_choice_is_422_before_ask(tmp_path, choice):
 
 
 @pytest.mark.parametrize("empty_plans", [False, True])
-@pytest.mark.parametrize("requested", [None, "anti_aging"])
+@pytest.mark.parametrize("requested", [None, "anti_aging", "other"])
 def test_create_app_streams_clarification_then_token_without_saving_plans(
     tmp_path, empty_plans, requested
 ):
@@ -713,7 +720,9 @@ def test_create_app_streams_clarification_then_token_without_saving_plans(
     assert payload == {
         "reason": clarification["reason"],
         "requested_claim": requested,
-        "requested_label": display[requested] if requested else None,
+        "requested_label": display[requested]
+        if requested not in {None, "other"}
+        else None,
         "available": [
             {"claim": claim, "label": display[claim]}
             for claim in clarification["available_efficacy"]

@@ -515,3 +515,32 @@ def test_view_two_argument_constructor_is_compatible():
     view = View("synthetic", commands)
     assert view.answer_text == "synthetic" and view.ui_commands == commands
     assert view.clarification is view.error_code is None
+
+
+@pytest.mark.parametrize("available", [["hydration"], []])
+def test_other_requested_label_is_none_and_generic_copy_is_used(available):
+    from beautyads.domain.supervisor import clarification_texts
+
+    clarification = {
+        "reason": "requested_not_confirmed",
+        "requested_claim": "other",
+        "available_efficacy": available,
+        "available_status": "ok",
+        "options": ["keep_requested"]
+        + (["select_confirmed"] if available else [])
+        + ["none"],
+    }
+    raw = {"kind": "needs_clarification", "clarification": clarification}
+    before = deepcopy(raw)
+    view = build_view(raw, plan_ids=[], hydrate=None)
+    rendered = clarification_texts(clarification, {"hydration": "보습"})
+    assert view.clarification == {
+        "reason": "requested_not_confirmed",
+        "requested_claim": "other",
+        "requested_label": None,
+        "available": [{"claim": claim, "label": "보습"} for claim in available],
+        **rendered,
+    }
+    assert "other" not in view.answer_text
+    assert view.ui_commands == [] and view.error_code is None
+    assert raw == before

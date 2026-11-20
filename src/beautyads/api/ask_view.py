@@ -124,7 +124,7 @@ def build_view(result, *, plan_ids, hydrate) -> View:
                 "reason": clarification["reason"],
                 "requested_claim": requested,
                 "requested_label": _CLAIM_DISPLAY.get(requested)
-                if requested is not None
+                if requested not in {None, Claim.other}
                 else None,
                 "available": [
                     {"claim": claim, "label": _CLAIM_DISPLAY[claim]}

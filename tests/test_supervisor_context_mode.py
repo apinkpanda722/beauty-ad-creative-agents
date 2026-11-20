@@ -133,6 +133,7 @@ def test_planning_payload_preserves_bytes_and_adds_raw_only_when_present(raw):
         "brief": {"goal": "합성"},
         "research": research_payload(source),
         "available_efficacy": ["hydration"],
+        "claim_choice": None,
         "profile": {
             "brand": "synthetic",
             "tone": None,
@@ -158,7 +159,15 @@ def test_planning_payload_preserves_bytes_and_adds_raw_only_when_present(raw):
         {"role": "system", "content": _SYSTEM},
         {"role": "user", "content": json.dumps(expected, ensure_ascii=False)},
     ]
-    keys = {"brief", "research", "available_efficacy", "profile", "feedback", "rework"}
+    keys = {
+        "brief",
+        "research",
+        "available_efficacy",
+        "claim_choice",
+        "profile",
+        "feedback",
+        "rework",
+    }
     assert set(json.loads(messages[1]["content"])) == (
         keys if raw is None else keys | {"raw_tool_outputs"}
     )
@@ -383,3 +392,63 @@ def test_evaluator_model_input_ignores_raw_tool_outputs():
         )
         messages.append(scorer.calls[0][1]["messages"])
     assert messages[0] == messages[1]
+
+
+@pytest.mark.parametrize("mode", ["on", "off"])
+@pytest.mark.parametrize(
+    "choice",
+    [
+        {
+            "mode": "selected",
+            "claims": ["hydration", "soothing"],
+            "requested_claim": None,
+        },
+        {"mode": "keep_requested", "claims": [], "requested_claim": "other"},
+        {"mode": "none", "claims": [], "requested_claim": None},
+    ],
+)
+def test_claim_choice_reaches_planning_and_evaluation_messages_in_both_modes(
+    mode, choice
+):
+    from beautyads.agents.plan_eval import run_plan_eval
+
+    fake = Fakes(decision=decision_data(plan_count=1))
+    planner, scorer = Planner(), Scorer("claude-haiku-5-5")
+
+    def research_fn(brief, raw_store, **kwargs):
+        return fake.research(brief, raw_store)
+
+    def plan_eval_fn(brief, handoff, profile, feedback, **kwargs):
+        return run_plan_eval(
+            brief=brief,
+            handoff=handoff,
+            profile=profile,
+            feedback=feedback,
+            plan_fn=lambda **options: make_plan(**options, structured=planner),
+            evaluate_fn=lambda **options: evaluate_plan(
+                **options,
+                rules=[],
+                evidence_index=FakeEvidence(),
+                support=Support(),
+                certs=FakeCerts(),
+                structured=scorer,
+            ),
+            **kwargs,
+        )
+
+    result = supervisor.run_request(
+        **fake.args(
+            research_fn=research_fn,
+            plan_eval_fn=plan_eval_fn,
+            claims_fn=lambda _: (["hydration", "soothing"], "ok"),
+            claim_choice=choice,
+        ),
+        context_mode=mode,
+    )
+    assert result["kind"] == "plan"
+    for generator in (planner, scorer):
+        assert generator.calls
+        for _, options in generator.calls:
+            payload = json.loads(options["messages"][1]["content"])
+            assert payload["claim_choice"] == choice
+            assert "claim_choice" not in payload["research"]

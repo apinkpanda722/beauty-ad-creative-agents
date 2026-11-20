@@ -506,6 +506,8 @@ def build_supervisor_graph(
             bounded["raw_tool_outputs"] = deepcopy(state["sv_tool_outputs"])
         else:
             bounded, trims = trim_handoff(state["sv_handoff"], limits)
+        if state["sv_claim_choice"]:
+            bounded["claim_choice"] = deepcopy(state["sv_claim_choice"])
         for trim in trims:
             if trim not in state["sv_trims"]:
                 state["sv_trims"].append(trim)
