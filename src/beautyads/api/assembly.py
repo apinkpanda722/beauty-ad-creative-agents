@@ -44,10 +44,18 @@ from beautyads.domain.tenant import WorkspaceProfile, price_band
 from beautyads.domain.tools import EVIDENCE_ID_PATTERN
 from beautyads.graph.connection import connect_graph
 from beautyads.graph.evidence_queries import (
+    card_labels_by_id,
+    creative_labels_parameters,
+    creative_labels_query,
     product_name_parameters,
     product_name_query,
     product_unit_price_parameters,
     product_unit_price_query,
+)
+from beautyads.graph.fragment_queries import (
+    build_fragment,
+    fragment_parameters,
+    fragment_query,
 )
 from beautyads.llm.chat import chat_complete
 from beautyads.llm.image import generate_image
@@ -235,6 +243,11 @@ async def assemble_full(
                 except Exception:  # noqa: BLE001 -- no model/credential diagnostics in public errors
                     raise RuntimeError("ASSEMBLY_MODEL_FAILED") from None
 
+            def graph_fragment(ids):
+                params = fragment_parameters(ids)
+                rows = graph_connection.run(fragment_query(), params).records
+                return build_fragment(params["ids"], rows)
+
             def hydrate(ids):
                 try:
                     cards = []
@@ -263,6 +276,31 @@ async def assemble_full(
                                 },
                                 "view_count": row.get("latest_view_count"),
                                 "like_count": row.get("latest_like_count"),
+                            }
+                        )
+                    labels = {}
+                    if cards:
+                        try:
+                            labels = card_labels_by_id(
+                                graph_connection.run(
+                                    creative_labels_query(),
+                                    creative_labels_parameters(
+                                        [card["evidence_id"] for card in cards]
+                                    ),
+                                ).records
+                            )
+                        except Exception:  # noqa: BLE001 -- optional labels must not block cards or leak diagnostics
+                            labels = {}
+                    for card in cards:
+                        card.update(
+                            labels.get(card["evidence_id"])
+                            or {
+                                "hook_type": None,
+                                "angle": None,
+                                "format": None,
+                                "talent": None,
+                                "cta_type": None,
+                                "claims": [],
                             }
                         )
                     return json_copy(cards)
@@ -579,6 +617,8 @@ async def assemble_full(
                 hydrate=hydrate,
                 design_dir=_DESIGN_DIR,
                 image_enabled=with_image_enabled,
+                graph_fragment=graph_fragment,
+                product_names=product_names,
                 close=stack.aclose,
             )
             result.close = stack.pop_all().aclose

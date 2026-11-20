@@ -245,3 +245,57 @@ def product_name_parameters(*, brand, url) -> dict:
     if any(not isinstance(value, str) or not value.strip() for value in (brand, url)):
         raise ValueError("PRODUCT_NAME_INPUT_INVALID")
     return {"brand": brand, "url": url}
+
+
+_CREATIVE_LABELS_QUERY = """
+    MATCH (c:Creative)
+    WHERE c.source + ':' + c.source_id IN $ids
+    OPTIONAL MATCH (c)-[:USES_HOOK]->(h:Hook)
+    OPTIONAL MATCH (c)-[:HAS_ANGLE]->(a:Angle)
+    OPTIONAL MATCH (c)-[:HAS_FORMAT]->(f:Format)
+    OPTIONAL MATCH (c)-[:FEATURES]->(t:Talent)
+    OPTIONAL MATCH (c)-[:HAS_CTA]->(cta:CtaType)
+    OPTIONAL MATCH (c)-[:CLAIMS]->(e:Efficacy)
+    RETURN c.source + ':' + c.source_id AS creative_id,
+           h.value AS hook_type, a.value AS angle, f.value AS format,
+           t.value AS talent, cta.value AS cta_type,
+           collect(DISTINCT e.value) AS claims
+"""
+
+
+def creative_labels_query() -> str:
+    """Read optional analysis labels without dropping unlabelled creatives."""
+    return _CREATIVE_LABELS_QUERY
+
+
+def creative_labels_parameters(ids) -> dict:
+    """Bind at most thirty validated evidence keys, preserving their order."""
+    import re
+
+    from beautyads.domain.tools import EVIDENCE_ID_PATTERN
+
+    if (
+        not isinstance(ids, list)
+        or not 1 <= len(ids) <= 30
+        or any(
+            not isinstance(eid, str) or not re.fullmatch(EVIDENCE_ID_PATTERN, eid)
+            for eid in ids
+        )
+    ):
+        raise ValueError("CREATIVE_LABELS_IDS_INVALID")
+    return {"ids": list(dict.fromkeys(ids))}
+
+
+def card_labels_by_id(rows) -> dict[str, dict]:
+    """Missing classification relationships are normal, not missing creatives."""
+    return {
+        row.get("creative_id"): {
+            **{
+                field: row.get(field)
+                for field in ("hook_type", "angle", "format", "talent", "cta_type")
+            },
+            "claims": list(row.get("claims") or []),
+        }
+        for row in rows
+        if isinstance(row.get("creative_id"), str)
+    }

@@ -272,3 +272,70 @@ def test_product_name_validates_inputs_without_diagnostics(field, value):
         product_name_parameters(
             **{"brand": "synthetic", "url": "https://example.invalid/p", field: value}
         )
+
+
+def test_creative_labels_is_fixed_public_read_query():
+    from beautyads.graph.evidence_queries import creative_labels_query
+    from beautyads.graph.load import AXES
+
+    query = creative_labels_query()
+    assert query == creative_labels_query()
+    assert set(re.findall(r"\$(\w+)", query)) == {"ids"}
+    assert not re.search(
+        r"Feedback|tenant|\b(CREATE|MERGE|SET|DELETE)\b", query, re.IGNORECASE
+    )
+    assert "c.source + ':' + c.source_id IN $ids" in query
+    assert "collect(DISTINCT e.value) AS claims" in query
+    for field, label, relationship, _ in AXES:
+        assert f":{relationship}" in query and f":{label}" in query
+        assert f"AS {field}" in query
+    assert ":CLAIMS" in query and ":Efficacy" in query
+
+
+@pytest.mark.parametrize(
+    "ids",
+    [
+        [],
+        "youtube:synthetic",
+        None,
+        [None],
+        ["invalid"],
+        ["youtube:x\n"],
+        [f"youtube:{i}" for i in range(31)],
+    ],
+)
+def test_creative_labels_parameters_reject_invalid_ids(ids):
+    from beautyads.graph.evidence_queries import creative_labels_parameters
+
+    with pytest.raises(ValueError):
+        creative_labels_parameters(ids)
+
+
+def test_card_labels_group_by_id_and_preserve_absent_axes():
+    from beautyads.graph.evidence_queries import (
+        card_labels_by_id,
+        creative_labels_parameters,
+    )
+
+    eid = "youtube:synthetic"
+    values = {
+        field: f"synthetic-{field}"
+        for field in ("hook_type", "angle", "format", "talent", "cta_type")
+    }
+    claims = ["synthetic-efficacy-a", "synthetic-efficacy-b"]
+    empty = dict.fromkeys(values)
+    assert creative_labels_parameters([eid, "instagram:bare", eid]) == {
+        "ids": [eid, "instagram:bare"]
+    }
+    assert card_labels_by_id(
+        [
+            {"creative_id": eid, **values, "claims": claims},
+            {"creative_id": "instagram:bare", **empty, "claims": None},
+            {"creative_id": "tiktok:bare"},
+        ]
+    ) == {
+        eid: {**values, "claims": claims},
+        "instagram:bare": {**empty, "claims": []},
+        "tiktok:bare": {**empty, "claims": []},
+    }
+    assert card_labels_by_id([]) == {}

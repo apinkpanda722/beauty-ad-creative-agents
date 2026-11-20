@@ -630,8 +630,16 @@ def test_hydrate_uses_seven_columns_and_bound_keys_and_json_dates(rig):
         assert value[0]["evidence_id"] == EID
         assert value[0]["published_at"] == COLLECTED.isoformat()
         assert value[0]["view_count"] == 123 and value[0]["like_count"] is None
-        assert len(rig.queries) == 1
-        query, params = rig.queries[0]
+        from beautyads.graph.evidence_queries import creative_labels_query
+
+        assert len(rig.queries) == 2
+        postgres_queries = [
+            (q, p) for q, p in rig.queries if q.lstrip().startswith("SELECT")
+        ]
+        label_queries = [(q, p) for q, p in rig.queries if q == creative_labels_query()]
+        assert len(postgres_queries) == 1
+        assert label_queries == [(creative_labels_query(), {"ids": [EID]})]
+        query, params = postgres_queries[0]
         columns = query.split("SELECT", 1)[1].split("FROM", 1)[0]
         assert [s.strip() for s in columns.split(",")] == [
             "source",
@@ -1459,3 +1467,113 @@ def test_assembly_forwards_claim_choice_only_when_supplied(rig, monkeypatch, cho
         assert "claim_choice" not in calls[0]
     else:
         assert calls[0]["claim_choice"] == choice
+
+
+def test_public_graph_services_are_lazy_and_expose_official_product_names(
+    rig, monkeypatch
+):
+    from beautyads.graph.evidence_queries import product_name_query
+    from beautyads.graph.fragment_queries import fragment_parameters, fragment_query
+
+    original = rig.graph.run
+
+    def graph(query, params):
+        if query == product_name_query():
+            return SimpleNamespace(
+                records=[{"product_name": "synthetic official name"}]
+            )
+        if query == fragment_query():
+            rig.queries.append((query, params))
+            return SimpleNamespace(
+                records=[{"creative_id": EID, "creative": {"source": "youtube"}}]
+            )
+        return original(query, params)
+
+    monkeypatch.setattr(rig.graph, "run", graph)
+
+    async def run():
+        services = await rig.start()
+        try:
+            assert callable(services.graph_fragment)
+            assert services.product_names == dict.fromkeys(
+                services.allowed_tenants, "synthetic official name"
+            )
+            assert all(query != fragment_query() for query, _ in rig.queries)
+            rig.queries.clear()
+            result = services.graph_fragment([EID])
+            assert rig.queries == [(fragment_query(), fragment_parameters([EID]))]
+            assert result == {
+                "nodes": [
+                    {
+                        "id": f"creative:{EID}",
+                        "label": "Creative",
+                        "name": EID,
+                        "props": {"source": "youtube"},
+                    }
+                ],
+                "edges": [],
+                "missing": [],
+            }
+        finally:
+            await services.close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("mode", ["labels", "missing", "null", "error"])
+def test_hydrate_adds_optional_labels_with_one_bound_query(
+    rig, monkeypatch, mode, caplog, capsys
+):
+    from beautyads.graph.evidence_queries import creative_labels_query
+
+    fields = ("hook_type", "angle", "format", "talent", "cta_type")
+    labels = {field: f"synthetic-{field}" for field in fields}
+    labels["claims"] = ["synthetic-efficacy-a", "synthetic-efficacy-b"]
+    blank = {**dict.fromkeys(fields), "claims": []}
+    calls = []
+    original = rig.graph.run
+
+    def graph(query, params):
+        if query != creative_labels_query():
+            return original(query, params)
+        calls.append((query, params))
+        if mode == "error":
+            raise RuntimeError("PRIVATE_LABEL_DIAGNOSTIC")
+        rows = (
+            []
+            if mode == "missing"
+            else [
+                {
+                    "creative_id": EID,
+                    **(
+                        labels
+                        if mode == "labels"
+                        else dict.fromkeys((*fields, "claims"))
+                    ),
+                }
+            ]
+        )
+        return SimpleNamespace(records=rows)
+
+    monkeypatch.setattr(rig.graph, "run", graph)
+
+    async def run():
+        services = await rig.start()
+        try:
+            cards = services.hydrate([EID, "instagram:other", EID, "invalid"])
+            assert calls == [
+                (creative_labels_query(), {"ids": [EID, "instagram:other"]})
+            ]
+            assert len(cards) == 2
+            assert {key: cards[0][key] for key in (*fields, "claims")} == (
+                labels if mode == "labels" else blank
+            )
+            assert {key: cards[1][key] for key in (*fields, "claims")} == blank
+            assert cards[0]["evidence_id"] == EID and cards[0]["view_count"] == 123
+            assert "PRIVATE_LABEL_DIAGNOSTIC" not in json.dumps(cards)
+            assert rig.seen[-1] == "rollback"
+        finally:
+            await services.close()
+
+    asyncio.run(run())
+    assert "PRIVATE_LABEL_DIAGNOSTIC" not in caplog.text + str(capsys.readouterr())
