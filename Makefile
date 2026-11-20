@@ -118,3 +118,8 @@ live-isolation:
 .PHONY: demo-clarify
 demo-clarify:
 	uv run python -m beautyads.eval.clarify_demo $(ARGS)
+
+# make serve; make serve BEAUTYADS_GROUP=test BEAUTYADS_EVAL_MODEL=claude-sonnet-5-5 BEAUTYADS_WITH_IMAGE=1
+.PHONY: serve
+serve:
+	uv run python -m beautyads.api.main
