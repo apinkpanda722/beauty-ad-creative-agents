@@ -61,7 +61,16 @@
     {
       "step": 5,
       "name": "web-chat",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-20T18:12:22+0900",
+      "summary": "작업 공간 선택·SSE 대화·단계 표시·효능 선택/중단·오류 재시도·IME 입력·예시 칩·CommandSlot 구현. make verify 통과(Python 6,212개·웹 63개), 기존 계약·테스트 유지, 패키지 설치 없음.",
+      "completed_at": "2026-11-20T18:23:50+0900",
+      "usage": {
+        "input_tokens": 1763785,
+        "cached_input_tokens": 1689984,
+        "output_tokens": 23969,
+        "attempts": 1
+      }
     },
     {
       "step": 6,
