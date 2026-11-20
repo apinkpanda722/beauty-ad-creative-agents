@@ -600,7 +600,8 @@ def test_cert_page_cap_is_pending_not_failed(tmp_path):
     assert not dep.store.certs
 
 
-def test_model_contract_cost_summary_and_bytes_never_written(tmp_path):
+def test_model_contract_cost_summary_and_bytes_never_written(tmp_path, monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "fake-key")
     from io import BytesIO
 
     from PIL import Image
