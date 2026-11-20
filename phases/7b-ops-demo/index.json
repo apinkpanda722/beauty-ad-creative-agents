@@ -2,10 +2,40 @@
   "project": "beauty-ad-creative-agents",
   "phase": "7b-ops-demo",
   "steps": [
-    { "step": 1, "name": "ci-verify", "status": "pending" },
-    { "step": 2, "name": "trace-time", "status": "pending" },
-    { "step": 3, "name": "langfuse-sink", "status": "pending" },
-    { "step": 4, "name": "k3d-deploy", "status": "pending" },
-    { "step": 5, "name": "demo-kit", "status": "pending" }
-  ]
+    {
+      "step": 1,
+      "name": "ci-verify",
+      "status": "completed",
+      "started_at": "2026-11-20T19:58:49+0900",
+      "summary": "SHA 고정 verify 워크플로와 구조 테스트 추가, 지정 테스트에 키 주입 완료. make verify 통과(Python 6,223건·웹 125건), .env 없이 env -u GEMINI_API_KEY 단독 테스트 통과. 워크플로 구조 검증 통과, 실제 러너 실행은 미확인. 패키지 설치 없음.",
+      "completed_at": "2026-11-20T20:03:31+0900",
+      "usage": {
+        "input_tokens": 748077,
+        "cached_input_tokens": 696448,
+        "output_tokens": 4771,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 2,
+      "name": "trace-time",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "langfuse-sink",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "k3d-deploy",
+      "status": "pending"
+    },
+    {
+      "step": 5,
+      "name": "demo-kit",
+      "status": "pending"
+    }
+  ],
+  "created_at": "2026-11-20T19:58:49+0900"
 }
