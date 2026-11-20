@@ -16,6 +16,8 @@
 - `tests/test_api_assembly.py::test_assembled_claims_function_uses_only_existing_support_query`: `mode="ok"`는 새 규칙에서 ③ 되묻기(요청 효능 없음 + 확인 효능 있음)가 된다 → 그 테스트에서 `services.ask(..., claim_choice={"mode": "none"})`로 호출하게 갱신한다(이 step에서 `assembly.ask`가 `claim_choice`를 받는다). 단언(쿼리 목록·`available_efficacy`·`plans[0]["status"] == "done"`)은 그대로 둔다.
 - `tests/test_supervisor_context_mode.py`와 그 밖의 테스트 중 `claims_fn`을 넘기지 않는 것은 **동작이 바뀌지 않아야 한다**(`claims_fn is None`이면 새 규칙을 전혀 적용하지 않는다).
 
+**사전 결함(이미 확인함, 이 step과 무관)**: `tests/test_isolation_live.py`는 `NOW = datetime(2026, 11, 19, tzinfo=UTC)`(`:26`)로 기준일을 고정하는데 코드(`api/feedback.py:67 created_at=datetime.now(UTC)`, `eval/isolation_live.py:172·580`)는 실제 시계를 쓴다. 실행일이 2026-11-20(UTC)로 넘어가면서 피드백 생성일이 기준일보다 뒤가 되어 **변경 없는 main 코드에서도** 이 파일의 테스트 13건 이상이 `SETUP_INCOMPLETE`로 실패한다(`make verify` 실패). 그래서 이 step의 허용 목록에 이 파일을 **합성 시계 고정에 한해** 넣는다: 테스트 안에서 `datetime.now`를 쓰는 모듈(`beautyads.api.feedback`·`beautyads.eval.isolation_live`)의 시계를 `NOW`로 고정하는 방식(모듈 속성 교체)을 쓰고, `src/`는 바꾸지 않으며 기존 단언은 약화하지 않는다.
+
 ## 읽어야 할 파일
 
 먼저 아래 파일들을 읽고 프로젝트의 아키텍처와 설계 의도를 파악하라:
@@ -27,11 +29,11 @@
 
 ## 작업
 
-**수정할 파일**: `src/beautyads/domain/supervisor.py`, `src/beautyads/agents/supervisor.py`, `src/beautyads/api/assembly.py`, `tests/test_domain_supervisor.py`, `tests/test_supervisor.py`, `tests/test_supervisor_context_mode.py`, `tests/test_api_assembly.py`
+**수정할 파일**: `src/beautyads/domain/supervisor.py`, `src/beautyads/agents/supervisor.py`, `src/beautyads/api/assembly.py`, `tests/test_domain_supervisor.py`, `tests/test_supervisor.py`, `tests/test_supervisor_context_mode.py`, `tests/test_api_assembly.py`, `tests/test_isolation_live.py`
 
 열람 금지 경로: `data/interim/`
 열람 금지의 범위: 이 금지는 **Codex 세션이 해당 경로의 파일을 직접 열람·출력·인용하는 것**에 대한 것이다. 이 step의 코드가 런타임에 그 경로를 다루는 것(예: 기본 출력 경로)은 대상이 아니다. 테스트가 그 경로의 실제 파일 **내용**을 읽는 것은 여전히 금지이며 테스트는 임시 디렉터리와 합성 데이터만 쓴다.
-수정 허용 경로: `src/beautyads/domain/supervisor.py`, `src/beautyads/agents/supervisor.py`, `src/beautyads/api/assembly.py`, `tests/test_domain_supervisor.py`, `tests/test_supervisor.py`, `tests/test_supervisor_context_mode.py`, `tests/test_api_assembly.py`
+수정 허용 경로: `src/beautyads/domain/supervisor.py`, `src/beautyads/agents/supervisor.py`, `src/beautyads/api/assembly.py`, `tests/test_domain_supervisor.py`, `tests/test_supervisor.py`, `tests/test_supervisor_context_mode.py`, `tests/test_api_assembly.py`, `tests/test_isolation_live.py`
 
 Supervisor가 `decide` 직후(같은 `interpret` 노드 안)에 요청 효능과 확인된 효능을 비교해 ①②③을 가르고, 되묻기 상태를 결과에 싣는다. **새 노드·새 모델 호출 없음. 테스트를 먼저 쓴다(TDD).**
 
@@ -106,4 +108,5 @@ make verify   # lint + test 통과
 - `agents/planning.py`·`agents/evaluation.py`·`agents/plan_eval.py`를 수정하거나 `plan()`에서 기획·평가 입력에 `claim_choice`를 싣지 마라. 이유: 입력·프롬프트 변경은 step 3의 몫이고 프롬프트 버전 단언(`tests/test_planning.py`·`tests/test_evaluation.py`)이 걸려 있다(FP-C11).
 - `claims_fn is None`인 호출에는 새 규칙(되묻기·안내·`claim_choice`)을 적용하지 마라. 이유: `claims_fn`을 넘기지 않는 기존 테스트와 평가 경로의 결과를 바이트 단위로 보존해야 한다. 되묻기 경로(`needs_clarification`·`claim_choice_invalid`)는 리서치·기획 모델 호출이 0회임을 테스트가 호출 기록으로 단언해야 하며, 검사한 사례가 0건이면 실패다(B-FP-069).
 - 요청 입력·`ClaimChoice`·상태·결과에 테넌트·사용자·오늘 날짜 칸을 만들지 마라. 사용자 확정 문구 상수(`CLARIFY_REQUESTED_TEXT`·`CLARIFY_UNSPECIFIED_TEXT`·`OPTION_*`·`lookup_unconfirmed` 문구)의 글자를 바꾸지 마라. 이유: 테넌트는 세션에서만 나온다(ADR-009). 문구는 사용자가 확정했다.
+- `tests/test_isolation_live.py`는 시계 고정에 한해서만 고쳐라(`NOW`를 오늘 날짜로 바꾸거나 단언·기대값·건수를 바꾸지 마라). 이유: 사전 결함이 날짜에 따라 다시 깨지지 않게 고정하는 것이 목적이고 격리 검사의 판정 규칙은 건드리지 않는다.
 - 기존 테스트의 단언을 약화하지 마라. 허용: `SupervisorState` 키 집합에 새 키 4개를 더하는 갱신(정확 일치 유지), 위에 적은 `claims_fn` 테스트 두 개와 `test_assembled_claims_function_uses_only_existing_support_query`의 호출·기대 갱신. 이유: 새 키·새 호출 위치가 만드는 정확 일치 충돌이다(FP-C11). 모델이 만든 문장·분류 값을 기대값으로 굳히지 않는다(FP-C03).
