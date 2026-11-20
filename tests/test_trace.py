@@ -65,12 +65,19 @@ def ledger(purpose="planning", cost=0.02):
         "failed",
         "needs_clarification",
         "claim_choice_invalid",
+        "efficacy_unavailable",
     ],
 )
 def test_build_projects_only_metadata_and_integer_scores(kind):
     result = {
         "kind": kind,
         "intent": "plan",
+        "efficacy_unavailable": {"reason": "failed", "diagnostic": SECRET},
+        "product_display": {
+            "brand": "synthetic brand",
+            "product_name": "synthetic product",
+            "goal": SECRET,
+        },
         "brief": {"goal": SECRET},
         "handoff": {
             "conclusion": SECRET,
@@ -130,6 +137,14 @@ def test_build_projects_only_metadata_and_integer_scores(kind):
         structured=structured,
     )
     assert record.kind == kind and record.intent == "plan"
+    if kind == "efficacy_unavailable":
+        assert record.efficacy_unavailable.model_dump() == {
+            "reason": "failed",
+            "brand": "synthetic brand",
+            "product_name": "synthetic product",
+        }
+    else:
+        assert record.efficacy_unavailable is None
     assert record.outcome == "ok"
     assert record.message_chars == len(SECRET) and not record.message_trimmed
     assert record.steps[0].model_dump() == result["steps"][0]
@@ -579,3 +594,52 @@ def test_trace_contrast_projects_only_image_metadata_and_roundtrips(tmp_path):
     append_trace(path, record)
     assert read_traces(path).records[0] == record
     assert SECRET not in path.read_text()
+
+
+@pytest.mark.parametrize("reason", ["failed", "no_product"])
+@pytest.mark.parametrize("names", [None, "x" * 200])
+def test_unavailable_trace_has_only_workspace_product_and_closed_reason(reason, names):
+    from beautyads.obs.trace import TraceEfficacyUnavailable
+
+    record = make_trace(
+        result={
+            "kind": "efficacy_unavailable",
+            "efficacy_unavailable": {"reason": reason, "exception": SECRET},
+            "product_display": {
+                "brand": names,
+                "product_name": names,
+                "display_name": SECRET,
+            },
+            "goal": SECRET,
+            "request_body": SECRET,
+            "diagnostic": SECRET,
+        }
+    )
+    assert record.tenant_id == "tenant_a"
+    assert isinstance(record.efficacy_unavailable, TraceEfficacyUnavailable)
+    assert record.efficacy_unavailable.model_dump() == {
+        "reason": reason,
+        "brand": names,
+        "product_name": names,
+    }
+    assert SECRET not in record.model_dump_json()
+    assert TraceRecord.model_validate_json(record.model_dump_json()) == record
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        {"reason": "invalid"},
+        {"brand": "x" * 201},
+        {"product_name": "x" * 201},
+        {"goal": SECRET},
+        {"tenant_id": "tenant_a"},
+    ],
+)
+def test_unavailable_trace_schema_is_closed_and_names_are_bounded(extra):
+    from beautyads.obs.trace import TraceEfficacyUnavailable
+
+    with pytest.raises(ValidationError):
+        TraceEfficacyUnavailable.model_validate(
+            {"reason": "failed", "brand": None, "product_name": None, **extra}
+        )

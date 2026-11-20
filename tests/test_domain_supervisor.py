@@ -501,7 +501,7 @@ def test_claim_policy_table_is_exact_and_pure():
                     "claims": ["hydration"],
                     "requested_claim": "hydration",
                 },
-                "notice": None,
+                "unavailable": {},
                 "clarification": {},
             },
         ),
@@ -514,7 +514,7 @@ def test_claim_policy_table_is_exact_and_pure():
                 "action": "clarify",
                 "claim": None,
                 "claim_choice": {},
-                "notice": None,
+                "unavailable": {},
                 "clarification": {
                     "reason": "requested_not_confirmed",
                     "requested_claim": "brightening",
@@ -533,7 +533,7 @@ def test_claim_policy_table_is_exact_and_pure():
                 "action": "clarify",
                 "claim": None,
                 "claim_choice": {},
-                "notice": None,
+                "unavailable": {},
                 "clarification": {
                     "reason": "requested_not_confirmed",
                     "requested_claim": "brightening",
@@ -552,7 +552,7 @@ def test_claim_policy_table_is_exact_and_pure():
                 "action": "clarify",
                 "claim": None,
                 "claim_choice": {},
-                "notice": None,
+                "unavailable": {},
                 "clarification": {
                     "reason": "no_claim_requested",
                     "requested_claim": None,
@@ -568,11 +568,17 @@ def test_claim_policy_table_is_exact_and_pure():
             "ok",
             None,
             {
-                "action": "proceed",
+                "action": "clarify",
                 "claim": None,
-                "claim_choice": {"mode": "none", "claims": [], "requested_claim": None},
-                "notice": "none_confirmed",
-                "clarification": {},
+                "claim_choice": {},
+                "unavailable": {},
+                "clarification": {
+                    "reason": "no_efficacy_confirmed",
+                    "requested_claim": None,
+                    "available_efficacy": [],
+                    "available_status": "ok",
+                    "options": ["none", "cancel"],
+                },
             },
         ),
         *[
@@ -585,7 +591,7 @@ def test_claim_policy_table_is_exact_and_pure():
                     "action": "clarify",
                     "claim": None,
                     "claim_choice": {},
-                    "notice": None,
+                    "unavailable": {},
                     "clarification": {
                         "reason": "requested_not_confirmed",
                         "requested_claim": "other",
@@ -616,7 +622,7 @@ def test_claim_policy_table_is_exact_and_pure():
                     "claims": ["soothing", "hydration"],
                     "requested_claim": "brightening",
                 },
-                "notice": None,
+                "unavailable": {},
                 "clarification": {},
             },
         ),
@@ -633,7 +639,7 @@ def test_claim_policy_table_is_exact_and_pure():
                     "claims": ["hydration"],
                     "requested_claim": None,
                 },
-                "notice": None,
+                "unavailable": {},
                 "clarification": {},
             },
         ),
@@ -650,7 +656,7 @@ def test_claim_policy_table_is_exact_and_pure():
                 "action": "invalid",
                 "claim": None,
                 "claim_choice": {},
-                "notice": None,
+                "unavailable": {},
                 "clarification": {},
             },
         ),
@@ -667,7 +673,7 @@ def test_claim_policy_table_is_exact_and_pure():
                     "claims": [],
                     "requested_claim": "brightening",
                 },
-                "notice": None,
+                "unavailable": {},
                 "clarification": {},
             },
         ),
@@ -680,7 +686,7 @@ def test_claim_policy_table_is_exact_and_pure():
                 "action": "invalid",
                 "claim": None,
                 "claim_choice": {},
-                "notice": None,
+                "unavailable": {},
                 "clarification": {},
             },
         ),
@@ -697,7 +703,7 @@ def test_claim_policy_table_is_exact_and_pure():
                     "claims": [],
                     "requested_claim": "other",
                 },
-                "notice": None,
+                "unavailable": {},
                 "clarification": {},
             },
         ),
@@ -710,75 +716,75 @@ def test_claim_policy_table_is_exact_and_pure():
                 "action": "proceed",
                 "claim": None,
                 "claim_choice": {"mode": "none", "claims": [], "requested_claim": None},
-                "notice": None,
+                "unavailable": {},
                 "clarification": {},
             },
         ),
     ]
-    # Failed/skipped lookups take precedence even over a confirmed selection.
-    for status in ("failed", "skipped"):
-        cases.extend(
-            [
-                (
-                    "brightening",
-                    [],
-                    status,
-                    {
-                        "mode": "selected",
-                        "claims": ["hydration"],
-                        "requested_claim": None,
-                    },
-                    {
-                        "action": "proceed",
-                        "claim": "brightening",
-                        "claim_choice": {
-                            "mode": "keep_requested",
-                            "claims": [],
-                            "requested_claim": "brightening",
-                        },
-                        "notice": "lookup_unconfirmed",
-                        "clarification": {},
-                    },
-                ),
-                (
-                    None,
-                    [],
-                    status,
-                    None,
-                    {
-                        "action": "proceed",
-                        "claim": None,
-                        "claim_choice": {
-                            "mode": "none",
-                            "claims": [],
-                            "requested_claim": None,
-                        },
-                        "notice": "lookup_unconfirmed",
-                        "clarification": {},
-                    },
-                ),
-            ]
-        )
-    for status in ("failed", "skipped"):
-        cases.append(
-            (
-                "other",
-                [],
-                status,
+    # Unavailable lookups take precedence over any request or choice.
+    unavailable_checked = 0
+    for status, reason in (
+        ("failed", "failed"),
+        ("skipped", "no_product"),
+        ("invalid", "failed"),
+    ):
+        for requested in (None, "brightening", "other"):
+            for choice in (
                 None,
+                {"mode": "selected", "claims": ["hydration"]},
+                {"mode": "none"},
+            ):
+                cases.append(
+                    (
+                        requested,
+                        ["hydration"],
+                        status,
+                        choice,
+                        {
+                            "action": "unavailable",
+                            "claim": None,
+                            "claim_choice": {},
+                            "clarification": {},
+                            "unavailable": {"reason": reason},
+                        },
+                    )
+                )
+                unavailable_checked += 1
+    assert unavailable_checked == 27
+    cases.extend(
+        [
+            (
+                None,
+                [],
+                "ok",
+                {"mode": "none"},
                 {
                     "action": "proceed",
-                    "claim": "other",
+                    "claim": None,
                     "claim_choice": {
-                        "mode": "keep_requested",
+                        "mode": "none",
                         "claims": [],
-                        "requested_claim": "other",
+                        "requested_claim": None,
                     },
-                    "notice": "lookup_unconfirmed",
                     "clarification": {},
+                    "unavailable": {},
                 },
-            )
-        )
+            ),
+            (
+                None,
+                [],
+                "ok",
+                {"mode": "selected", "claims": ["hydration"]},
+                {
+                    "action": "invalid",
+                    "claim": None,
+                    "claim_choice": {},
+                    "clarification": {},
+                    "unavailable": {},
+                },
+            ),
+        ]
+    )
     checked = 0
     for requested, available, status, choice, expected in cases:
         before = deepcopy((available, choice))
@@ -789,7 +795,7 @@ def test_claim_policy_table_is_exact_and_pure():
             "action",
             "claim",
             "claim_choice",
-            "notice",
+            "unavailable",
             "clarification",
         }
         assert result == expected
@@ -803,6 +809,7 @@ def test_claim_policy_table_is_exact_and_pure():
     [
         {},
         {"mode": "invalid"},
+        {"mode": "cancel"},
         {"mode": "selected"},
         {"mode": "selected", "claims": ["other"]},
         {"mode": "selected", "claims": ["hydration", "hydration"]},
@@ -861,6 +868,7 @@ def test_claim_choice_has_only_json_request_fields(value, expected):
     assert {item.value for item in ClarifyReason} == {
         "requested_not_confirmed",
         "no_claim_requested",
+        "no_efficacy_confirmed",
     }
     assert {item.value for item in ClarifyOption} == {
         "keep_requested",
@@ -868,6 +876,7 @@ def test_claim_choice_has_only_json_request_fields(value, expected):
         "select_one",
         "select_many",
         "none",
+        "cancel",
     }
 
 
@@ -894,11 +903,29 @@ def test_clarification_copy_is_fixed_and_rendered_with_display_names():
     assert policy.OPTION_SELECT_ONE == "한 가지 효능 선택"
     assert policy.OPTION_SELECT_MANY == "여러 효능 선택"
     assert policy.OPTION_NONE == "효능 강조 없이 제품 홍보"
-    assert policy.EFFICACY_NOTICE_TEXT == {
-        "lookup_unconfirmed": "효능 근거를 확인하지 못해 효능 강조 없이 작성했습니다.",
-        "none_confirmed": "이 제품에서 근거가 확인된 효능이 없어 효능 강조 없이 작성했습니다.",
+    assert policy.EFFICACY_UNAVAILABLE_TEXT == {
+        "failed": "이 제품의 효능 근거를 조회하지 못해 기획을 진행할 수 없습니다. 관리자에게 이 문제를 알려 주세요.",
+        "no_product": "이 작업 공간에 제품 정보가 없어 효능 근거를 확인할 수 없습니다. 관리자에게 제품 등록을 요청해 주세요.",
     }
+    assert (
+        policy.CLARIFY_NO_CONFIRMED_TEXT
+        == "이 제품에서 근거가 확인된 효능이 없습니다. 효능을 강조하지 않고 제품 자체를 홍보하는 방향으로 진행할까요?"
+    )
+    assert policy.OPTION_PROCEED_WITHOUT_EFFICACY == "효능 강조 없이 진행"
+    assert policy.OPTION_CANCEL == "중단"
+    assert not hasattr(policy, "EFFICACY_NOTICE_TEXT")
     cases = [
+        (
+            None,
+            [],
+            {
+                "text": policy.CLARIFY_NO_CONFIRMED_TEXT,
+                "options": [
+                    {"id": "none", "label": "효능 강조 없이 진행"},
+                    {"id": "cancel", "label": "중단"},
+                ],
+            },
+        ),
         (
             "brightening",
             ["hydration", "soothing"],

@@ -12,7 +12,7 @@ from beautyads.domain.supervisor import (
     CLARIFY_REQUESTED_NO_CONFIRMED_TEXT,
     CLARIFY_REQUESTED_TEXT,
     CLARIFY_UNSPECIFIED_TEXT,
-    EFFICACY_NOTICE_TEXT,
+    EFFICACY_UNAVAILABLE_TEXT,
     LIMIT_REACHED_TEXT,
     NO_EVIDENCE_TEXT,
     OPTION_KEEP_REQUESTED,
@@ -479,22 +479,73 @@ def test_claim_display_alias_and_mapping_exclude_other():
     assert Claim.other.value not in _CLAIM_DISPLAY
 
 
-@pytest.mark.parametrize(
-    "notice", ["lookup_unconfirmed", "none_confirmed", None, "unknown_notice"]
-)
+@pytest.mark.parametrize("notice", ["legacy_notice", None, "unknown_notice"])
 @pytest.mark.parametrize(
     "kind", ["research", "plan", "out_of_scope", "no_evidence", "failed", "limit_hit"]
 )
-def test_efficacy_notice_is_first_line_and_preserves_existing_view(notice, kind):
+def test_legacy_efficacy_notice_is_ignored(notice, kind):
     raw = {**result(), "kind": kind}
     baseline = build_view(raw, plan_ids=["id"], hydrate=hydrate)
     raw["efficacy_notice"] = notice
-    view = build_view(raw, plan_ids=["id"], hydrate=hydrate)
-    prefix = EFFICACY_NOTICE_TEXT.get(notice)
-    expected = f"{prefix}\n{baseline.answer_text}" if prefix else baseline.answer_text
-    assert view.answer_text.encode() == expected.encode()
-    assert view.ui_commands == baseline.ui_commands
+    assert build_view(raw, plan_ids=["id"], hydrate=hydrate) == baseline
+
+
+@pytest.mark.parametrize(
+    "reason,expected",
+    [("failed", "failed"), ("no_product", "no_product"), ("unknown", "failed")],
+)
+def test_efficacy_unavailable_has_only_fixed_text_and_no_commands(reason, expected):
+    raw = {
+        **result(),
+        "kind": "efficacy_unavailable",
+        "efficacy_unavailable": {"reason": reason},
+    }
+    before = deepcopy(raw)
+    view = build_view(
+        raw,
+        plan_ids=[],
+        hydrate=lambda ids: pytest.fail("unavailable must not hydrate"),
+    )
+    assert view.answer_text == EFFICACY_UNAVAILABLE_TEXT[expected]
+    assert view.ui_commands == []
     assert view.clarification is view.error_code is None
+    assert view.efficacy_unavailable == {
+        "reason": expected,
+        "text": EFFICACY_UNAVAILABLE_TEXT[expected],
+    }
+    assert raw == before
+
+
+def test_no_confirmed_efficacy_view_asks_to_proceed_or_cancel():
+    from beautyads.domain.supervisor import CLARIFY_NO_CONFIRMED_TEXT
+
+    raw = {
+        **result(),
+        "kind": "needs_clarification",
+        "clarification": {
+            "reason": "no_efficacy_confirmed",
+            "requested_claim": None,
+            "available_efficacy": [],
+            "available_status": "ok",
+            "options": ["none", "cancel"],
+        },
+    }
+    view = build_view(
+        raw, plan_ids=[], hydrate=lambda ids: pytest.fail("must not hydrate")
+    )
+    assert view.answer_text == CLARIFY_NO_CONFIRMED_TEXT
+    assert view.clarification == {
+        "reason": "no_efficacy_confirmed",
+        "requested_claim": None,
+        "requested_label": None,
+        "available": [],
+        "text": CLARIFY_NO_CONFIRMED_TEXT,
+        "options": [
+            {"id": "none", "label": "효능 강조 없이 진행"},
+            {"id": "cancel", "label": "중단"},
+        ],
+    }
+    assert view.ui_commands == [] and view.efficacy_unavailable is None
 
 
 def test_invalid_claim_choice_has_only_error_code():

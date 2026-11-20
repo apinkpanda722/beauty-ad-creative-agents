@@ -175,6 +175,12 @@ def register_ask(app: FastAPI) -> None:
                     yield encode_event("needs_clarification", outcome.clarification)
                     yield encode_event("token", {"text": outcome.answer_text})
                     return
+                if outcome.efficacy_unavailable is not None:
+                    yield encode_event(
+                        "efficacy_unavailable", outcome.efficacy_unavailable
+                    )
+                    yield encode_event("token", {"text": outcome.answer_text})
+                    return
                 for command in outcome.ui_commands:
                     yield encode_event("ui_command", command)
                 yield encode_event("token", {"text": outcome.answer_text})

@@ -37,15 +37,19 @@ OPTION_SELECT_CONFIRMED = "확인된 효능 중에서 선택"
 OPTION_SELECT_ONE = "한 가지 효능 선택"
 OPTION_SELECT_MANY = "여러 효능 선택"
 OPTION_NONE = "효능 강조 없이 제품 홍보"
-EFFICACY_NOTICE_TEXT = {
-    "lookup_unconfirmed": "효능 근거를 확인하지 못해 효능 강조 없이 작성했습니다.",
-    "none_confirmed": "이 제품에서 근거가 확인된 효능이 없어 효능 강조 없이 작성했습니다.",
+EFFICACY_UNAVAILABLE_TEXT = {
+    "failed": "이 제품의 효능 근거를 조회하지 못해 기획을 진행할 수 없습니다. 관리자에게 이 문제를 알려 주세요.",
+    "no_product": "이 작업 공간에 제품 정보가 없어 효능 근거를 확인할 수 없습니다. 관리자에게 제품 등록을 요청해 주세요.",
 }
+CLARIFY_NO_CONFIRMED_TEXT = "이 제품에서 근거가 확인된 효능이 없습니다. 효능을 강조하지 않고 제품 자체를 홍보하는 방향으로 진행할까요?"
+OPTION_PROCEED_WITHOUT_EFFICACY = "효능 강조 없이 진행"
+OPTION_CANCEL = "중단"
 
 
 class ClarifyReason(StrEnum):
     requested_not_confirmed = "requested_not_confirmed"
     no_claim_requested = "no_claim_requested"
+    no_efficacy_confirmed = "no_efficacy_confirmed"
 
 
 class ClarifyOption(StrEnum):
@@ -54,6 +58,7 @@ class ClarifyOption(StrEnum):
     select_one = "select_one"
     select_many = "select_many"
     none = "none"
+    cancel = "cancel"
 
 
 class ClaimChoice(BaseModel):
@@ -86,21 +91,14 @@ def resolve_claim_policy(
         "action": "proceed",
         "claim": None,
         "claim_choice": {},
-        "notice": None,
+        "unavailable": {},
         "clarification": {},
     }
     no_claim = {"mode": "none", "claims": [], "requested_claim": None}
     if status != "ok":
         result.update(
-            claim=requested,
-            claim_choice={
-                "mode": "keep_requested",
-                "claims": [],
-                "requested_claim": requested,
-            }
-            if requested
-            else no_claim,
-            notice="lookup_unconfirmed",
+            action="unavailable",
+            unavailable={"reason": "no_product" if status == "skipped" else "failed"},
         )
     elif choice is not None:
         mode = choice["mode"]
@@ -152,7 +150,16 @@ def resolve_claim_policy(
             },
         )
     else:
-        result.update(claim_choice=no_claim, notice="none_confirmed")
+        result.update(
+            action="clarify",
+            clarification={
+                "reason": ClarifyReason.no_efficacy_confirmed.value,
+                "requested_claim": None,
+                "available_efficacy": [],
+                "available_status": "ok",
+                "options": [ClarifyOption.none.value, ClarifyOption.cancel.value],
+            },
+        )
     return result
 
 
@@ -161,8 +168,11 @@ def clarification_texts(clarification: dict, display: Mapping[str, str]) -> dict
     requested = clarification.get("requested_claim")
     requested_name = display.get(requested, requested)
     available = clarification.get("available_efficacy", [])
+    no_confirmed = clarification.get("reason") == ClarifyReason.no_efficacy_confirmed
     template = (
-        CLARIFY_UNSPECIFIED_TEXT
+        CLARIFY_NO_CONFIRMED_TEXT
+        if no_confirmed
+        else CLARIFY_UNSPECIFIED_TEXT
         if clarification.get("reason") == ClarifyReason.no_claim_requested
         else CLARIFY_REQUESTED_TEXT
         if available
@@ -181,7 +191,10 @@ def clarification_texts(clarification: dict, display: Mapping[str, str]) -> dict
         ClarifyOption.select_confirmed.value: OPTION_SELECT_CONFIRMED,
         ClarifyOption.select_one.value: OPTION_SELECT_ONE,
         ClarifyOption.select_many.value: OPTION_SELECT_MANY,
-        ClarifyOption.none.value: OPTION_NONE,
+        ClarifyOption.none.value: OPTION_PROCEED_WITHOUT_EFFICACY
+        if no_confirmed
+        else OPTION_NONE,
+        ClarifyOption.cancel.value: OPTION_CANCEL,
     }
     return {
         "text": template.format(

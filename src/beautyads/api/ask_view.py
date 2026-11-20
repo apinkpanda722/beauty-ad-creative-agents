@@ -15,7 +15,7 @@ from beautyads.domain.research import count_label
 from beautyads.domain.supervisor import (
     AGGREGATES_LABEL,
     DESIGN_IMAGE_DISCLAIMER,
-    EFFICACY_NOTICE_TEXT,
+    EFFICACY_UNAVAILABLE_TEXT,
     LIMIT_REACHED_TEXT,
     NO_EVIDENCE_TEXT,
     OUT_OF_SCOPE_TEXT,
@@ -48,6 +48,7 @@ class View:
     ui_commands: list[dict]
     clarification: dict | None = None
     error_code: str | None = None
+    efficacy_unavailable: dict | None = None
 
 
 def json_copy(value):
@@ -113,6 +114,16 @@ def build_view(result, *, plan_ids, hydrate) -> View:
     """
     handoff = result.get("handoff") or {}
     kind = result.get("kind")
+    if kind == "efficacy_unavailable":
+        reason = result["efficacy_unavailable"].get("reason")
+        if reason not in EFFICACY_UNAVAILABLE_TEXT:
+            reason = "failed"
+        text = EFFICACY_UNAVAILABLE_TEXT[reason]
+        return View(
+            answer_text=text,
+            ui_commands=[],
+            efficacy_unavailable={"reason": reason, "text": text},
+        )
     if kind == "needs_clarification":
         clarification = result["clarification"]
         rendered = clarification_texts(clarification, _CLAIM_DISPLAY)
@@ -136,9 +147,6 @@ def build_view(result, *, plan_ids, hydrate) -> View:
     if kind == "claim_choice_invalid":
         return View("", [], error_code="CLAIM_CHOICE_INVALID")
     commands, text = [], []
-    notice = EFFICACY_NOTICE_TEXT.get(result.get("efficacy_notice"))
-    if notice is not None:
-        text.append(notice)
     fixed = {
         "out_of_scope": OUT_OF_SCOPE_TEXT,
         "no_evidence": NO_EVIDENCE_TEXT,

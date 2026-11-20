@@ -123,6 +123,7 @@ def test_lifespan_current_services_context_feedback_and_plan_storage():
             "ui_command",
             "token",
             "error",
+            "efficacy_unavailable",
         }
         assert [body["phase"] for name, body in events if name == "step"] == [
             "start",
@@ -779,3 +780,92 @@ def test_claim_choice_cannot_bypass_session_checks(
         response = post(client, tenant=tenant, claim_choice={"mode": "none"}, **body)
     assert response.status_code == status and response.json()["detail"] == detail
     assert calls == [] and initial.tenants.saved == []
+
+
+@pytest.mark.parametrize("reason", ["failed", "no_product"])
+@pytest.mark.parametrize("entry", ["register_ask", "create_app"])
+@pytest.mark.parametrize("empty_plans", [False, True])
+def test_efficacy_unavailable_sse_and_no_plan_storage(reason, entry, empty_plans):
+    from typing import get_args
+
+    from fastapi import FastAPI
+
+    from beautyads.api.ask import register_ask
+    from beautyads.api.sse import EventName
+    from beautyads.domain.supervisor import EFFICACY_UNAVAILABLE_TEXT
+
+    raw = {"kind": "efficacy_unavailable", "efficacy_unavailable": {"reason": reason}}
+    if empty_plans:
+        raw["plans"] = []
+    calls = []
+
+    def ask(*args, **kwargs):
+        calls.append((args, kwargs))
+        return raw
+
+    initial = services(ask)
+    initial.hydrate = lambda ids: pytest.fail("unavailable must not hydrate")
+    if entry == "create_app":
+        app = create_app(lambda: initial)
+    else:
+        app = FastAPI()
+        app.state.assembly = initial
+        register_ask(app)
+    with TestClient(app) as client:
+        assert client.app.state.assembly is initial
+        response = post(client)
+    assert response.status_code == 200 and len(calls) == 1
+    payload = {"reason": reason, "text": EFFICACY_UNAVAILABLE_TEXT[reason]}
+    events = parse_sse(response.text)
+    assert events == [
+        ("efficacy_unavailable", payload),
+        ("token", {"text": payload["text"]}),
+    ]
+    assert set(events[0][1]) == {"reason", "text"}
+    assert initial.tenants.saved == [] and initial.graph.calls == []
+    assert set(get_args(EventName)) == {
+        "step",
+        "tool_start",
+        "token",
+        "ui_command",
+        "error",
+        "needs_clarification",
+        "efficacy_unavailable",
+    }
+
+
+def test_create_app_no_confirmed_efficacy_clarification_options():
+    from beautyads.domain.supervisor import CLARIFY_NO_CONFIRMED_TEXT
+
+    raw = {
+        "kind": "needs_clarification",
+        "clarification": {
+            "reason": "no_efficacy_confirmed",
+            "requested_claim": None,
+            "available_efficacy": [],
+            "available_status": "ok",
+            "options": ["none", "cancel"],
+        },
+    }
+    initial = services(lambda *args, **kwargs: raw)
+    with TestClient(create_app(lambda: initial)) as client:
+        response = post(client)
+    assert response.status_code == 200
+    assert parse_sse(response.text) == [
+        (
+            "needs_clarification",
+            {
+                "reason": "no_efficacy_confirmed",
+                "requested_claim": None,
+                "requested_label": None,
+                "available": [],
+                "text": CLARIFY_NO_CONFIRMED_TEXT,
+                "options": [
+                    {"id": "none", "label": "효능 강조 없이 진행"},
+                    {"id": "cancel", "label": "중단"},
+                ],
+            },
+        ),
+        ("token", {"text": CLARIFY_NO_CONFIRMED_TEXT}),
+    ]
+    assert initial.tenants.saved == []

@@ -353,7 +353,7 @@ def test_private_state_is_json_and_disjoint_from_all_other_graphs():
         "sv_efficacy",
         "sv_claim_choice",
         "sv_clarification",
-        "sv_efficacy_notice",
+        "sv_efficacy_unavailable",
     }
     for other in (AgentState, ResearchState, PlanEvalState):
         assert not keys & set(other.__annotations__)
@@ -783,9 +783,16 @@ def test_claims_status_is_safe_and_never_changes_evaluation_decisions(mode):
     assert result["available_efficacy_status"] == status
     assert result["available_efficacy"] == (["hydration"] if mode == "ok" else [])
     assert "SYNTH_PRIVATE_CLAIMS_DIAGNOSTIC" not in json.dumps(result)
-    for field in ("status", "rework_count", "attempts"):
-        assert result["plans"][0][field] == base["plans"][0][field]
-    assert result["kind"] == base["kind"]
+    if mode in {"failed", "skipped", "exception"}:
+        assert result["kind"] == "efficacy_unavailable"
+        assert result["plans"] == []
+        assert result["efficacy_unavailable"] == {
+            "reason": "no_product" if mode == "skipped" else "failed"
+        }
+    else:
+        for field in ("status", "rework_count", "attempts"):
+            assert result["plans"][0][field] == base["plans"][0][field]
+        assert result["kind"] == base["kind"]
 
 
 def test_product_display_includes_only_server_profile_product_name():
@@ -948,7 +955,7 @@ def test_clarification_stops_before_research_and_planning(
     assert result["handoff"] == {}
     assert result["available_efficacy"] == available
     assert result["available_efficacy_status"] == "ok"
-    assert result["claim_choice"] == {} and result["efficacy_notice"] is None
+    assert result["claim_choice"] == {} and result["efficacy_unavailable"] == {}
     assert not result["incomplete"] and result["text"] == ""
     assert "research" not in f.order and "plan" not in f.order
     assert f.order.count("claims") == 1
@@ -970,7 +977,7 @@ def test_absent_claim_lookup_preserves_every_existing_result_field(requested):
     assert repeated["kind"] == "plan"
     assert repeated["brief"]["claim"] == requested
     assert repeated["clarification"] == repeated["claim_choice"] == {}
-    assert repeated["efficacy_notice"] is None
+    assert repeated["efficacy_unavailable"] == {}
 
 
 def test_confirmed_request_proceeds_and_lookup_runs_before_research_once():
@@ -989,7 +996,7 @@ def test_confirmed_request_proceeds_and_lookup_runs_before_research_once():
         "requested_claim": "hydration",
     }
     assert result["brief"]["claim"] == f.research_calls[0]["claim"] == "hydration"
-    assert result["clarification"] == {} and result["efficacy_notice"] is None
+    assert result["clarification"] == {} and result["efficacy_unavailable"] == {}
     calls = [item for item in f.order if isinstance(item, str) and item != "spent"]
     assert calls == ["decide", "claims", "research", "plan", "plan", "plan"]
     assert result["available_efficacy"] == ["hydration", "soothing"]
@@ -1032,7 +1039,7 @@ def test_claim_choice_rechecks_support_and_overrides_nondeterministic_decide(
     )
     assert result["kind"] == kind
     assert not result["incomplete"] and result["text"] == ""
-    assert result["clarification"] == {} and result["efficacy_notice"] is None
+    assert result["clarification"] == {} and result["efficacy_unavailable"] == {}
     assert result["available_efficacy"] == ["hydration", "soothing"]
     assert result["available_efficacy_status"] == "ok"
     if kind == "claim_choice_invalid":
@@ -1076,7 +1083,10 @@ def test_structurally_invalid_choice_fails_before_graph_calls(entry, choice):
 
 @pytest.mark.parametrize("mode", ["failed", "skipped", "exception", "invalid-status"])
 @pytest.mark.parametrize("requested", ["brightening", "other", None])
-def test_lookup_failure_proceeds_safely_without_exposing_diagnostics(mode, requested):
+@pytest.mark.parametrize(
+    "choice", [None, {"mode": "selected", "claims": ["hydration"]}, {"mode": "none"}]
+)
+def test_lookup_failure_stops_without_exposing_diagnostics(mode, requested, choice):
     f = Fakes(decision=decision_data(claim=requested))
 
     def claims(profile):
@@ -1084,33 +1094,44 @@ def test_lookup_failure_proceeds_safely_without_exposing_diagnostics(mode, reque
             raise RuntimeError("SYNTH_PRIVATE_CLAIMS_DIAGNOSTIC")
         return ["hydration"], mode
 
-    result = supervisor.run_request(
-        **f.args(
-            claims_fn=claims, claim_choice={"mode": "selected", "claims": ["hydration"]}
-        )
-    )
-    assert result["kind"] == "plan" and f.research_calls and f.plan_calls
+    result = supervisor.run_request(**f.args(claims_fn=claims, claim_choice=choice))
+    assert result["kind"] == "efficacy_unavailable"
+    assert f.research_calls == [] and f.plan_calls == []
+    assert result["plans"] == [] and result["handoff"] == {}
+    assert result["text"] == "" and not result["incomplete"]
+    assert not result["limit_hit"] and result["limit_kinds"] == []
     assert result["clarification"] == {}
-    assert result["efficacy_notice"] == "lookup_unconfirmed"
+    assert result["efficacy_unavailable"] == {
+        "reason": "no_product" if mode == "skipped" else "failed"
+    }
     assert result["available_efficacy"] == []
     assert result["available_efficacy_status"] == (
         mode if mode in {"failed", "skipped"} else "failed"
     )
-    assert result["brief"]["claim"] == requested
-    assert result["claim_choice"] == {
-        "mode": "keep_requested" if requested else "none",
-        "claims": [],
-        "requested_claim": requested,
-    }
+    assert result["brief"] == {} and result["claim_choice"] == {}
     assert "SYNTH_PRIVATE_CLAIMS_DIAGNOSTIC" not in json.dumps(result)
     assert "invalid-status" not in json.dumps(result)
 
 
-def test_no_requested_or_confirmed_claim_proceeds_with_notice():
+def test_no_requested_or_confirmed_claim_clarifies_then_proceeds_on_none():
     f = Fakes()
     result = supervisor.run_request(**f.args(claims_fn=lambda _: ([], "ok")))
+    assert result["kind"] == "needs_clarification"
+    assert result["clarification"] == {
+        "reason": "no_efficacy_confirmed",
+        "requested_claim": None,
+        "available_efficacy": [],
+        "available_status": "ok",
+        "options": ["none", "cancel"],
+    }
+    assert result["efficacy_unavailable"] == {} and result["claim_choice"] == {}
+    assert result["plans"] == [] and f.research_calls == [] and f.plan_calls == []
+    result = supervisor.run_request(
+        **f.args(claims_fn=lambda _: ([], "ok"), claim_choice={"mode": "none"})
+    )
     assert result["kind"] == "plan" and result["brief"]["claim"] is None
-    assert result["efficacy_notice"] == "none_confirmed"
+    assert f.research_calls[0]["claim"] is None and f.plan_calls
+    assert result["efficacy_unavailable"] == {}
     assert result["claim_choice"] == {
         "mode": "none",
         "claims": [],
@@ -1138,7 +1159,7 @@ def test_new_supervisor_state_defaults_are_json_and_empty():
     state = supervisor.initial_supervisor_state("synthetic", RequestLimits())
     assert state["sv_efficacy"] == {"available": [], "status": "skipped"}
     assert state["sv_claim_choice"] == state["sv_clarification"] == {}
-    assert state["sv_efficacy_notice"] is None
+    assert state["sv_efficacy_unavailable"] == {}
     assert primitive(state)
 
 

@@ -160,7 +160,7 @@ class SupervisorState(TypedDict):
     sv_efficacy: dict
     sv_claim_choice: dict
     sv_clarification: dict
-    sv_efficacy_notice: str | None
+    sv_efficacy_unavailable: dict
 
 
 def _copy_json(value):
@@ -202,7 +202,7 @@ def initial_supervisor_state(message: str, limits: RequestLimits) -> SupervisorS
         "sv_efficacy": {"available": [], "status": "skipped"},
         "sv_claim_choice": {},
         "sv_clarification": {},
-        "sv_efficacy_notice": None,
+        "sv_efficacy_unavailable": {},
     }
 
 
@@ -380,6 +380,10 @@ def build_supervisor_graph(
                     status=efficacy["status"],
                     choice=claim_choice,
                 )
+                if policy["action"] == "unavailable":
+                    state["sv_efficacy_unavailable"] = policy["unavailable"]
+                    state["sv_status"]["kind"] = "efficacy_unavailable"
+                    return Command(update=state, goto=END)
                 if policy["action"] == "invalid":
                     state["sv_status"]["kind"] = "claim_choice_invalid"
                     return Command(update=state, goto=END)
@@ -388,7 +392,6 @@ def build_supervisor_graph(
                     state["sv_status"]["kind"] = "needs_clarification"
                     return Command(update=state, goto=END)
                 state["sv_claim_choice"] = policy["claim_choice"]
-                state["sv_efficacy_notice"] = policy["notice"]
                 decision["claim"] = policy["claim"]
                 state["sv_decision"] = decision
             state["sv_brief"] = ResearchBrief.model_validate(
@@ -626,13 +629,15 @@ def run_request(
             "brief": state["sv_brief"],
             "handoff": state["sv_handoff"],
             "clarification": state["sv_clarification"],
-            "efficacy_notice": state["sv_efficacy_notice"],
+            "efficacy_unavailable": state["sv_efficacy_unavailable"],
             "claim_choice": state["sv_claim_choice"],
             "available_efficacy": state["sv_efficacy"]["available"]
-            if kind in {"needs_clarification", "claim_choice_invalid"}
+            if kind
+            in {"needs_clarification", "claim_choice_invalid", "efficacy_unavailable"}
             else state["sv_handoff"].get("available_efficacy", []),
             "available_efficacy_status": state["sv_efficacy"]["status"]
-            if kind in {"needs_clarification", "claim_choice_invalid"}
+            if kind
+            in {"needs_clarification", "claim_choice_invalid", "efficacy_unavailable"}
             else state["sv_handoff"].get("available_efficacy_status", "skipped"),
             "product_display": {
                 key: profile.get(key)
@@ -671,7 +676,8 @@ def run_request(
             },
             "incomplete": status["incomplete"],
             "text": ""
-            if kind in {"needs_clarification", "claim_choice_invalid"}
+            if kind
+            in {"needs_clarification", "claim_choice_invalid", "efficacy_unavailable"}
             else OUT_OF_SCOPE_TEXT
             if kind == "out_of_scope"
             else NO_EVIDENCE_TEXT
