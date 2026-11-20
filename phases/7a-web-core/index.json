@@ -47,7 +47,16 @@
     {
       "step": 4,
       "name": "web-scaffold",
-      "status": "pending"
+      "status": "blocked",
+      "started_at": "2026-11-20T17:58:51+0900",
+      "blocked_reason": "Step에서 “동반 패키지 … 사용자 확인 필요”로 명시한 vite, @testing-library/dom, @types/node, @types/react, @types/react-dom의 설치 승인이 필요합니다. 승인 질문을 보냈으며, 파일 수정과 패키지 설치는 하지 않았습니다.",
+      "blocked_at": "2026-11-20T18:00:28+0900",
+      "usage": {
+        "input_tokens": 193448,
+        "cached_input_tokens": 151040,
+        "output_tokens": 1381,
+        "attempts": 1
+      }
     },
     {
       "step": 5,
