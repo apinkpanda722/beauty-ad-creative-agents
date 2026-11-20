@@ -1,0 +1,11 @@
+{
+  "project": "beauty-ad-creative-agents",
+  "phase": "7b-ops-demo",
+  "steps": [
+    { "step": 1, "name": "ci-verify", "status": "pending" },
+    { "step": 2, "name": "trace-time", "status": "pending" },
+    { "step": 3, "name": "langfuse-sink", "status": "pending" },
+    { "step": 4, "name": "k3d-deploy", "status": "pending" },
+    { "step": 5, "name": "demo-kit", "status": "pending" }
+  ]
+}
