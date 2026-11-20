@@ -40,9 +40,8 @@
     },
     {
       "dir": "7a-web-core",
-      "status": "completed",
-      "blocked_at": "2026-11-20T18:00:28+0900",
-      "completed_at": "2026-11-20T19:28:30+0900"
+      "status": "pending",
+      "blocked_at": "2026-11-20T18:00:28+0900"
     }
   ]
 }
