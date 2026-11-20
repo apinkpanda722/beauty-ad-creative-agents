@@ -595,3 +595,235 @@ def test_other_requested_label_is_none_and_generic_copy_is_used(available):
     assert "other" not in view.answer_text
     assert view.ui_commands == [] and view.error_code is None
     assert raw == before
+
+
+@pytest.mark.parametrize("kept,removed", [(True, True), (True, False), (False, True)])
+def test_aggregate_command_separates_tool_counts_model_values_and_removed(
+    kept, removed
+):
+    from beautyads.api.ask_view import _counts
+
+    raw = result()
+    if not kept:
+        raw["handoff"]["aggregates"].pop("kept")
+    if not removed:
+        raw["aggregates_removed"] = []
+    before = deepcopy(raw)
+    view = build_view(raw, plan_ids=["id"], hydrate=None)
+    data = command(view, "show_aggregates")
+    surviving = {
+        name: value
+        for name, value in raw["handoff"]["aggregates"].items()
+        if name not in raw["aggregates_removed"]
+    }
+    assert data == {
+        "label": AGGREGATES_LABEL,
+        "verified_counts": _counts(raw["handoff"]["result_counts"]),
+        "model_written": [
+            {"name": name, "value": value} for name, value in surviving.items()
+        ],
+        "removed": raw["aggregates_removed"],
+    }
+    assert not set(data["removed"]) & {item["name"] for item in data["model_written"]}
+    assert all(
+        model["value"] not in count.values()
+        for model in data["model_written"]
+        for count in data["verified_counts"]
+    )
+    json.dumps(data, allow_nan=False)
+    data["verified_counts"][0]["row_count"] = 100
+    data["model_written"].clear()
+    data["removed"].append("changed")
+    assert raw == before
+
+
+@pytest.mark.parametrize("absent", [False, True])
+def test_no_aggregate_command_without_values_or_removals(absent):
+    raw = result()
+    raw["handoff"]["aggregates"] = {}
+    raw["aggregates_removed"] = []
+    if absent:
+        raw["handoff"].pop("aggregates")
+        raw.pop("aggregates_removed")
+    view = build_view(raw, plan_ids=["id"], hydrate=None)
+    assert "show_aggregates" not in [item["kind"] for item in view.ui_commands]
+
+
+@pytest.mark.parametrize("spent,maximum", [(0, 1), (0.125, 0.3)])
+def test_cost_command_uses_only_request_text_cost(spent, maximum):
+    raw = result()
+    raw["limits"] = {"text_spent_usd": spent, "max_text_cost_usd": maximum}
+    raw["image_spent_usd"] = 100
+    data = command(build_view(raw, plan_ids=["id"], hydrate=None), "show_cost")
+    assert data == {
+        "label": "텍스트 모델 비용(이미지 제외)",
+        "text_spent_usd": float(spent),
+        "max_text_cost_usd": float(maximum),
+    }
+    assert type(data["text_spent_usd"]) is type(data["max_text_cost_usd"]) is float
+    json.dumps(data, allow_nan=False)
+    data["text_spent_usd"] = 99
+    assert raw["limits"]["text_spent_usd"] == spent
+
+
+@pytest.mark.parametrize("field", ["text_spent_usd", "max_text_cost_usd"])
+@pytest.mark.parametrize(
+    "invalid", [float("nan"), float("inf"), -float("inf"), "0.1", True, False, None]
+)
+def test_invalid_cost_field_omits_whole_cost_command(field, invalid):
+    raw = result()
+    raw["limits"] = {"text_spent_usd": 0.1, "max_text_cost_usd": 0.3, field: invalid}
+    view = build_view(raw, plan_ids=["id"], hydrate=None)
+    assert "show_cost" not in [item["kind"] for item in view.ui_commands]
+    json.dumps(view.ui_commands, allow_nan=False)
+
+
+@pytest.mark.parametrize(
+    "limits", [None, {}, {"text_spent_usd": 0.1}, {"max_text_cost_usd": 0.3}]
+)
+def test_missing_cost_limits_omit_cost_command(limits):
+    raw = result()
+    if limits is not None:
+        raw["limits"] = limits
+    view = build_view(raw, plan_ids=["id"], hydrate=None)
+    assert "show_cost" not in [item["kind"] for item in view.ui_commands]
+
+
+@pytest.mark.parametrize("kind", ["plan", "research"])
+def test_display_text_omits_structured_content_and_preserves_legacy_bytes(kind):
+    from beautyads.api.ask_view import _counts
+
+    raw = result()
+    raw["kind"] = kind
+    raw["limits"] = {"text_spent_usd": 0.1, "max_text_cost_usd": 0.3}
+    message = (
+        ["기획안입니다."]
+        if kind == "plan"
+        else ["리서치 결과입니다.", raw["handoff"]["conclusion"]]
+    )
+    counts = _counts(raw["handoff"]["result_counts"])
+    count_lines = [f"{item['tool']}: {item['count_label']}" for item in counts]
+    plan = raw["plans"][0]["plan"]
+    plan_lines = [
+        plan["title"],
+        plan["hook_text"],
+        *plan["scenes"],
+        *plan["copy_lines"],
+    ]
+    if kind == "research":
+        raw["plans"] = []
+    model_lines = [
+        f"{name}: {value}"
+        for name, value in raw["handoff"]["aggregates"].items()
+        if name not in raw["aggregates_removed"]
+    ]
+    aggregate_lines = [
+        AGGREGATES_LABEL,
+        *model_lines,
+        "aggregates_removed: " + ", ".join(raw["aggregates_removed"]),
+    ]
+    view = build_view(raw, plan_ids=["id"], hydrate=None)
+    expected = "\n".join(
+        [
+            *message,
+            *count_lines,
+            *(plan_lines if kind == "plan" else []),
+            *aggregate_lines,
+        ]
+    )
+    assert view.answer_text.encode("utf-8") == expected.encode("utf-8")
+    assert view.display_text == "\n".join(message)
+    assert all(
+        line not in view.display_text
+        for line in [*plan_lines, *count_lines, *aggregate_lines]
+    )
+
+
+@pytest.mark.parametrize(
+    "kind,fixed",
+    [
+        ("out_of_scope", OUT_OF_SCOPE_TEXT),
+        ("no_evidence", NO_EVIDENCE_TEXT),
+        ("limit_hit", LIMIT_REACHED_TEXT),
+    ],
+)
+def test_display_text_keeps_fixed_messages_and_limit_details(kind, fixed):
+    raw = result()
+    raw.update(kind=kind, plans=[], limit_hit=True, limit_kinds=["text", "image"])
+    view = build_view(raw, plan_ids=[], hydrate=None)
+    assert fixed in view.answer_text and fixed in view.display_text
+    assert LIMIT_REACHED_TEXT in view.display_text
+    assert "도달한 상한: " + ", ".join(raw["limit_kinds"]) in view.display_text
+    assert AGGREGATES_LABEL not in view.display_text
+
+
+@pytest.mark.parametrize(
+    "kind", ["needs_clarification", "efficacy_unavailable", "claim_choice_invalid"]
+)
+def test_early_views_keep_display_text_none_and_commands_empty(kind):
+    raw = result()
+    raw.update(
+        kind=kind,
+        limits={"text_spent_usd": 0.1, "max_text_cost_usd": 0.3},
+        clarification={
+            "reason": "no_efficacy_confirmed",
+            "available_efficacy": [],
+            "options": ["none", "cancel"],
+        },
+        efficacy_unavailable={"reason": "failed"},
+    )
+    view = build_view(
+        raw, plan_ids=[], hydrate=lambda ids: pytest.fail("must not hydrate")
+    )
+    assert view.display_text is None and view.ui_commands == []
+
+
+@pytest.mark.parametrize("labels", ["present", "absent", "unlabelled"])
+def test_evidence_cards_export_all_analysis_fields_in_contract_order(labels):
+    from beautyads.api.ask_view import _CARD_FIELDS
+    from beautyads.domain.labels import Angle, Claim, CtaType, Format, HookType, Talent
+
+    fields = ("hook_type", "angle", "format", "talent", "cta_type", "claims")
+    assert _CARD_FIELDS == (
+        "evidence_id",
+        "source",
+        "url",
+        "brand",
+        "title",
+        "published_at",
+        "view_count",
+        "like_count",
+        *fields,
+    )
+    analysis = dict(
+        zip(
+            fields,
+            [
+                next(iter(HookType)).value,
+                next(iter(Angle)).value,
+                next(iter(Format)).value,
+                next(iter(Talent)).value,
+                next(iter(CtaType)).value,
+                [next(iter(Claim)).value],
+            ],
+            strict=True,
+        )
+    )
+    if labels == "unlabelled":
+        analysis = {**dict.fromkeys(fields), "claims": []}
+    rows = hydrate(result()["handoff"]["evidence_ids"])
+    if labels != "absent":
+        for row in rows:
+            row.update(deepcopy(analysis))
+    view = build_view(result(), plan_ids=["id"], hydrate=lambda ids: rows)
+    cards = command(view, "show_evidence_cards")["cards"]
+    assert len(cards) == len(rows)
+    for card, row in zip(cards, rows, strict=True):
+        assert set(card) == set(_CARD_FIELDS)
+        assert tuple(card) == _CARD_FIELDS
+        assert {key: card[key] for key in fields} == {
+            key: row.get(key) for key in fields
+        }
+        assert card["view_count"] == 7 and "thumbnail" not in card
+    cards[0]["claims"] = []
+    assert rows[0].get("claims") == (None if labels == "absent" else analysis["claims"])

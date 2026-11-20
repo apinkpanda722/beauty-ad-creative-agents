@@ -1,0 +1,5 @@
+onlyBuiltDependencies:
+  - esbuild
+# pnpm 12 records approve-builds decisions in allowBuilds.
+allowBuilds:
+  esbuild: true

@@ -34,6 +34,12 @@ _CARD_FIELDS = (
     "published_at",
     "view_count",
     "like_count",
+    "hook_type",
+    "angle",
+    "format",
+    "talent",
+    "cta_type",
+    "claims",
 )
 _CLAIM_DISPLAY = {
     claim.value: name
@@ -49,6 +55,7 @@ class View:
     clarification: dict | None = None
     error_code: str | None = None
     efficacy_unavailable: dict | None = None
+    display_text: str | None = None
 
 
 def json_copy(value):
@@ -159,6 +166,7 @@ def build_view(result, *, plan_ids, hydrate) -> View:
     elif kind == "plan":
         text.append("기획안입니다.")
 
+    display = text.copy()
     counts = _counts(handoff.get("result_counts", []))
     text.extend(f"{item['tool']}: {item['count_label']}" for item in counts)
     ids = list(dict.fromkeys(handoff.get("evidence_ids", [])))
@@ -261,4 +269,40 @@ def build_view(result, *, plan_ids, hydrate) -> View:
     if kind == "limit_hit" or result.get("limit_hit"):
         text.append(LIMIT_REACHED_TEXT)
         text.append("도달한 상한: " + ", ".join(result.get("limit_kinds", [])))
-    return View("\n".join(part for part in text if part), json_copy(commands))
+        display.extend(text[-2:])
+    if aggregates or removed:
+        commands.append(
+            {
+                "kind": "show_aggregates",
+                "data": {
+                    "label": AGGREGATES_LABEL,
+                    "verified_counts": counts,
+                    "model_written": [
+                        {"name": key, "value": value}
+                        for key, value in aggregates.items()
+                    ],
+                    "removed": removed,
+                },
+            }
+        )
+    limits = result.get("limits") or {}
+    spent, maximum = limits.get("text_spent_usd"), limits.get("max_text_cost_usd")
+    if all(
+        type(value) in (int, float) and math.isfinite(value)
+        for value in (spent, maximum)
+    ):
+        commands.append(
+            {
+                "kind": "show_cost",
+                "data": {
+                    "label": "텍스트 모델 비용(이미지 제외)",
+                    "text_spent_usd": float(spent),
+                    "max_text_cost_usd": float(maximum),
+                },
+            }
+        )
+    return View(
+        "\n".join(part for part in text if part),
+        json_copy(commands),
+        display_text="\n".join(part for part in display if part),
+    )
