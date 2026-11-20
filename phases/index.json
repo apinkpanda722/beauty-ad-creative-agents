@@ -35,7 +35,8 @@
     },
     {
       "dir": "6b-clarify",
-      "status": "pending"
+      "status": "blocked",
+      "blocked_at": "2026-11-20T14:13:34+0900"
     }
   ]
 }
