@@ -32,3 +32,42 @@ textarea { resize: vertical; line-height: 1.7; }
 fieldset { margin-top: 1rem; border: 1px solid #b5bdc2; border-radius: .4rem; padding: 1rem; }
 .claim-chip { display: inline-flex; align-items: center; gap: .3rem; margin-right: .8rem; }
 @media (max-width: 600px) { main { padding: 1rem; } .workspace-picker, .composer, .turn { padding: 1rem; } }
+.result-section { margin: 1.4rem 0; overflow-wrap: anywhere; }
+.result-section h3 { font-size: 1.15rem; margin: .4rem 0 1rem; }
+.result-section h4 { margin: 1rem 0 .55rem; }
+.result-section p, .result-section li { line-height: 1.65; white-space: pre-wrap; }
+.result-section a { color: #285e56; text-underline-offset: .2em; }
+.evidence-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr)); gap: .9rem; }
+.evidence-card { border: 1px solid #dce1e3; border-radius: .65rem; overflow: hidden; scroll-margin-top: 1rem; }
+.evidence-card:target { outline: 3px solid #78968c; }
+.evidence-thumbnail { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+.source-icon { display: grid; place-items: center; min-height: 5rem; background: #f1f3f4; color: #565e64; }
+.evidence-body { padding: .85rem; }
+.metric-row, .analysis-badges { display: flex; flex-wrap: wrap; gap: .4rem; margin: .7rem 0; font-size: .8rem; }
+.analysis-badge, .pattern-fact { display: inline-block; background: #f1f3f4; color: #384148; border-radius: .35rem; padding: .2rem .5rem; }
+.plan-card { border: 1px solid #c7d5cf; border-radius: .8rem; padding: 1.25rem; }
+.plan-card header { margin-bottom: 1rem; }
+.hook-text { font-size: 1.1rem; }
+.plan-checks, .pattern-panel, .feedback-bar { border-top: 1px solid #dce1e3; padding-top: 1rem; margin-top: 1.2rem; }
+.unknown-badge { display: inline-block; padding: .55rem .75rem; border-radius: .4rem; }
+.clear { background: #e8f1ee; color: #285346; }
+.attention { background: #fff0d8; color: #734713; border: 1px solid #c2904a; }
+.code-result, .evaluation-status { display: block; margin: .6rem 0; }
+.pattern-panel ul { padding-left: 1.3rem; }
+.pattern-panel li p { margin: .3rem 0 .7rem; }
+.aggregates-panel > section { padding: .8rem 1rem; margin: .75rem 0; border-left: 3px solid #bcc7c3; }
+.verified-block { background: #f3f8f5; border-color: #78968c !important; }
+.model-block, .removed-block { background: #f5f5f5; }
+.model-block dl > div { display: flex; gap: .8rem; flex-wrap: wrap; }
+.model-block dd { margin: 0; }
+.distribution-row { display: grid; grid-template-columns: minmax(4rem, 1fr) 2fr auto; gap: .7rem; align-items: center; margin: .65rem 0; }
+.distribution-row meter { width: 100%; accent-color: #78968c; }
+.table-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+caption { text-align: left; color: #565e64; margin-bottom: .6rem; }
+th, td { padding: .6rem; text-align: left; border-bottom: 1px solid #dce1e3; }
+.design-image { margin: 1rem 0; }
+.design-image img { display: block; max-width: 100%; max-height: 38rem; object-fit: contain; border-radius: .5rem; }
+.design-image figcaption { margin-top: .5rem; }
+.cost-line { border-top: 1px solid #dce1e3; padding-top: .75rem; }
+@media (max-width: 600px) { .plan-card { padding: .85rem; } }

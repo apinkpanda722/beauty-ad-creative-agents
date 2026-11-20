@@ -145,3 +145,31 @@ export type Workspace = {
 export type WorkspacesResponse = { workspaces: Workspace[]; image_enabled: boolean };
 export type Clarification = Extract<SseFrame, { event: "needs_clarification" }>["data"];
 export type StepEvent = Extract<SseFrame, { event: "step" }>["data"];
+
+export type SchemaResponse = {
+  labels: { label: string; layer: number; name_ko: string }[];
+  relationships: { type: string; from: string; to: string; layer: number }[];
+  taxonomy: Record<"hook_type" | "angle" | "format", { value: string; name: string; definition: string }[]>;
+  claims: { value: string; name: string }[];
+};
+export type PlanView = Extract<UiCommand, { kind: "show_plan" }>["data"];
+export type PatternAxis = {
+  plan: string | null;
+  dominant: string[];
+  same: boolean | null;
+  share: number | null;
+};
+export type PatternData = {
+  axes?: Partial<Record<"hook_type" | "angle" | "format", PatternAxis>>;
+  compared?: number;
+  same_count?: number;
+  skipped?: number;
+};
+export type EvaluationAttempt = {
+  attempt: number;
+  scores?: Record<string, number> | null;
+  low_items?: string[];
+  checks_passed?: boolean | null;
+  final_passed?: boolean | null;
+  cost_usd?: number | null;
+};

@@ -8,6 +8,8 @@ import type { Action, Turn } from "../lib/reducer";
 import type { Workspace } from "../lib/types";
 import { TurnView } from "./TurnView";
 import { WorkspacePicker } from "./WorkspacePicker";
+import { CommandTenantContext } from "./CommandSlot";
+import { FeedbackSession } from "./FeedbackBar";
 
 export function Chat({ workspaces, imageEnabled }: { workspaces: Workspace[]; imageEnabled: boolean }) {
   const [state, dispatch] = useReducer(reducer, initialState);
@@ -53,7 +55,7 @@ export function Chat({ workspaces, imageEnabled }: { workspaces: Workspace[]; im
     start({ type: "request_started", message, ...(imageEnabled ? { withImage } : {}) });
     setMessage("");
   }
-  return <>
+  return <CommandTenantContext.Provider value={state.tenantId}><FeedbackSession key={state.tenantId}>
     <WorkspacePicker workspaces={workspaces} value={state.tenantId} onChange={tenantId => {
       if (state.tenantId === tenantId) return;
       controller.current?.abort(); controller.current = null;
@@ -86,5 +88,5 @@ export function Chat({ workspaces, imageEnabled }: { workspaces: Workspace[]; im
         <button type="submit" disabled={!state.tenantId || busy || !message.trim()}>전송</button>
       </div>
     </form>
-  </>;
+  </FeedbackSession></CommandTenantContext.Provider>;
 }

@@ -45,3 +45,37 @@ def test_verify_checks_web_without_installing():
 
 def test_web_lockfile_exists():
     assert (ROOT / "web/pnpm-lock.yaml").is_file()
+
+
+def test_browser_static_talent_and_cta_keys_match_domain():
+    from beautyads.domain.labels import CtaType, Talent
+
+    text = (ROOT / "web/lib/taxonomy.ts").read_text(encoding="utf-8")
+    for table, enum in (("TALENT_NAMES", Talent), ("CTA_NAMES", CtaType)):
+        body = re.search(rf"export const {table} = \{{(.*?)\}}", text, re.DOTALL)
+        assert body is not None
+        keys = set(re.findall(r'^\s*([a-z_]+):\s*"', body.group(1), re.MULTILINE))
+        assert keys
+        assert keys == {member.value for member in enum}
+
+
+def test_browser_evidence_card_fields_match_server_projection():
+    import ast
+
+    server = ast.parse(
+        (ROOT / "src/beautyads/api/ask_view.py").read_text(encoding="utf-8")
+    )
+    fields = next(
+        ast.literal_eval(node.value)
+        for node in server.body
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(t, ast.Name) and t.id == "_CARD_FIELDS" for t in node.targets
+        )
+    )
+    text = (ROOT / "web/lib/types.ts").read_text(encoding="utf-8")
+    card = re.search(r"export type EvidenceCard = \{(.*?)\};", text, re.DOTALL)
+    assert card is not None
+    keys = set(re.findall(r"^\s*([a-z_]+):", card.group(1), re.MULTILINE))
+    assert keys
+    assert keys == set(fields)

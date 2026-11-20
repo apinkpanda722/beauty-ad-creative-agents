@@ -86,3 +86,41 @@ export async function postChatAsk(
   }
   return { threadId: response.headers.get("X-Thread-Id"), events: events() };
 }
+
+async function requireSuccess(response: Response): Promise<Response> {
+  if (response.status === 200) return response;
+  let code: string | null = null;
+  try {
+    const body: ApiErrorBody | null = await response.json();
+    if (typeof body?.detail === "string") code = body.detail;
+  } catch {
+    // Preserve HTTP status for empty and non-JSON error bodies.
+  }
+  throw new ApiError(response.status, code);
+}
+
+export async function getSchema(tenantId: string): Promise<import("./types").SchemaResponse> {
+  const response = await requireSuccess(await fetch("/api/graph/schema", {
+    headers: { "X-Tenant-Id": tenantId },
+  }));
+  return response.json();
+}
+
+export async function getDesignImage(tenantId: string, requestKey: string, index: number): Promise<Blob> {
+  const response = await requireSuccess(await fetch(
+    `/api/design/${encodeURIComponent(requestKey)}/${encodeURIComponent(String(index))}`,
+    { headers: { "X-Tenant-Id": tenantId } },
+  ));
+  return response.blob();
+}
+
+export async function postFeedback(args: {
+  tenantId: string; planId: string; decision: "approved" | "rejected"; reason: string;
+}): Promise<{ status: "ok" }> {
+  const response = await requireSuccess(await fetch("/api/feedback", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Tenant-Id": args.tenantId },
+    body: JSON.stringify({ plan_id: args.planId, decision: args.decision, reason: args.reason }),
+  }));
+  return response.json();
+}

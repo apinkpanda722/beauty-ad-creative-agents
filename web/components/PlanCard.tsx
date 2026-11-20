@@ -1,0 +1,47 @@
+import type { EvaluationAttempt, PatternData, PlanView } from "../lib/types";
+import { taxonomyNames } from "../lib/taxonomy";
+import type { TaxonomyNames } from "../lib/taxonomy";
+import { PatternAlignment } from "./PatternAlignment";
+import { DesignImage } from "./DesignImage";
+import { FeedbackBar } from "./FeedbackBar";
+const unknownNames: Record<string, string> = {
+  CERT_REQUIRED_UNVERIFIED: "인증 연결 없음",
+  EFFICACY_UNKNOWN: "효능 근거 연결 없음",
+  EFFICACY_UNSUPPORTED: "효능 근거가 뒷받침하지 않음",
+};
+const statusNames: Record<string, string> = { done: "완료", needs_review: "검토 필요", failed: "실패" };
+const scoreNames: Record<string, string> = { differentiation: "차별성", fit: "요청 적합성" };
+function checkLabel(value: boolean | null | undefined) { return value == null ? "미실행" : value ? "통과" : "실패"; }
+export function PlanCard({ data, tenantId, names = taxonomyNames(), evidenceAnchors = {} }: {
+  data: PlanView; tenantId: string | null; names?: TaxonomyNames; evidenceAnchors?: Record<string, string>;
+}) {
+  const plan = data.plan;
+  const attempts = data.attempts as EvaluationAttempt[];
+  return <article className="plan-card result-section" aria-label={plan.title ?? "기획안"}>
+    <header><small>기획안 · {Object.values(data.product_display).filter(Boolean).join(" · ")}</small><h3>{plan.title ?? "기획안"}</h3><p className="hook-text">{plan.hook_text}</p>
+      <div className="analysis-badges">{(["hook_type", "angle", "format"] as const).map(axis => plan[axis] && <span className="analysis-badge" key={axis}>{names.axisName(axis, plan[axis])}</span>)}</div>
+    </header>
+    {plan.scenes?.length ? <section aria-label="장면 구성"><h4>장면 구성</h4><ol>{plan.scenes.map((scene, i) => <li key={i}>{scene}</li>)}</ol></section> : null}
+    {plan.copy_lines?.length ? <section aria-label="카피"><h4>카피</h4>{plan.copy_lines.map((copy, i) => <p key={i}>{copy}</p>)}</section> : null}
+    {(plan.claimed_efficacy?.length ?? 0) > 0 && <section aria-label="주장 효능"><h4>주장 효능</h4><div className="analysis-badges">{plan.claimed_efficacy?.map((claim, i) => {
+      const status = data.efficacy_status[claim];
+      return <span key={i} className={`analysis-badge ${status === "supported" ? "clear" : ""}`}>{names.claimName(claim)} · {status === "supported" ? "확인됨" : status === "unsupported" ? "근거가 뒷받침하지 않음" : "근거 연결 없음"}</span>;
+    })}</div></section>}
+    <section className="plan-checks" aria-label="검사 결과"><strong className={`unknown-badge ${data.unknown_count > 0 ? "attention" : "clear"}`}>근거 연결 없음 {data.unknown_count}건</strong>
+      {Object.keys(data.unknown_codes).length > 0 && <ul>{Object.entries(data.unknown_codes).map(([code, count]) => <li key={code}>{Object.hasOwn(unknownNames, code) ? unknownNames[code] : code}: {count}건</li>)}</ul>}
+      <p className="code-result">코드 검사: {data.passed ? "통과" : "실패"}</p>
+      <p className="evaluation-status">평가 상태: {Object.hasOwn(statusNames, data.status) ? statusNames[data.status] : data.status}</p>
+    </section>
+    <section aria-label="평가 시도"><h4>평가 시도 · 되돌림 {Math.max(0, attempts.length - 1)}회</h4><ol>{attempts.map((attempt, i) => <li key={i}>
+      <strong>시도 {attempt.attempt}</strong><p>시도 코드 검사: {checkLabel(attempt.checks_passed)} · 최종 판정: {checkLabel(attempt.final_passed)}</p>
+      {attempt.scores && <ul>{Object.entries(attempt.scores).map(([key, score]) => <li key={key}>{Object.hasOwn(scoreNames, key) ? `${scoreNames[key]} (${key})` : key}: {score}</li>)}</ul>}
+      {(attempt.low_items?.length ?? 0) > 0 && <p className="muted">재검토 항목: {attempt.low_items?.map(key => Object.hasOwn(scoreNames, key) ? scoreNames[key] : key).join(", ")}</p>}
+      {attempt.cost_usd != null && <small>시도 텍스트 비용 ${attempt.cost_usd.toFixed(4)}</small>}
+    </li>)}</ol></section>
+    <PatternAlignment data={data.pattern_alignment as PatternData} label={data.pattern_alignment_label} names={names} />
+    {(plan.evidence_ids?.length ?? 0) > 0 && <section aria-label="기획안 근거"><h4>근거 소재 목록</h4><ul>{plan.evidence_ids?.map((id, i) => <li key={i}>{evidenceAnchors[id] ? <a href={`#${evidenceAnchors[id]}`}>{id}</a> : id}</li>)}</ul></section>}
+    <p className="muted">{data.disclaimer}</p>
+    {data.image && tenantId && <DesignImage tenantId={tenantId} image={data.image} disclaimer={data.design_disclaimer} />}
+    {tenantId && <FeedbackBar key={data.plan_id} tenantId={tenantId} planId={data.plan_id} />}
+  </article>;
+}
