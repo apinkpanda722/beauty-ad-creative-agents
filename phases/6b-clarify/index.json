@@ -33,16 +33,7 @@
     {
       "step": 3,
       "name": "clarify-prompts",
-      "status": "blocked",
-      "started_at": "2026-11-20T14:49:04+0900",
-      "blocked_reason": "재확인 결과, prereg.render_preregistration()이 현재 프롬프트 동결값을 포함하므로 버전·본문 변경으로 tests/test_prereg.py:567의 고정 해시와 충돌합니다. 해당 파일과 src/beautyads/eval/은 수정 금지이며, 지시에 '영향이 있으면 blocked'가 명시되어 있습니다. 허용 범위 내 수정으로는 해결할 수 없어 작업 범위 조정이 필요합니다.",
-      "blocked_at": "2026-11-20T14:57:25+0900",
-      "usage": {
-        "input_tokens": 2836888,
-        "cached_input_tokens": 2717056,
-        "output_tokens": 16782,
-        "attempts": 1
-      }
+      "status": "pending"
     },
     {
       "step": 4,

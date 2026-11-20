@@ -83,11 +83,11 @@
 
 ## 작업
 
-**수정할 파일**: `src/beautyads/agents/planning.py`, `src/beautyads/agents/evaluation.py`, `src/beautyads/agents/supervisor.py`, `src/beautyads/domain/supervisor.py`, `src/beautyads/api/ask_view.py`, `docs/PROMPT_CHANGELOG.md`, `tests/test_planning.py`, `tests/test_evaluation.py`, `tests/test_domain_supervisor.py`, `tests/test_supervisor.py`, `tests/test_api_ask.py`, `tests/test_ask_view.py`, `tests/test_supervisor_context_mode.py`
+**수정할 파일**: `src/beautyads/agents/planning.py`, `src/beautyads/agents/evaluation.py`, `src/beautyads/agents/supervisor.py`, `src/beautyads/domain/supervisor.py`, `src/beautyads/api/ask_view.py`, `docs/PROMPT_CHANGELOG.md`, `tests/test_planning.py`, `tests/test_evaluation.py`, `tests/test_domain_supervisor.py`, `tests/test_supervisor.py`, `tests/test_api_ask.py`, `tests/test_ask_view.py`, `tests/test_supervisor_context_mode.py`, `tests/test_prereg.py`
 
 열람 금지 경로: `data/interim/`
 열람 금지의 범위: 이 금지는 **Codex 세션이 해당 경로의 파일을 직접 열람·출력·인용하는 것**에 대한 것이다. 이 step의 코드가 런타임에 그 경로를 다루는 것(예: 기본 출력 경로)은 대상이 아니다. 테스트가 그 경로의 실제 파일 **내용**을 읽는 것은 여전히 금지이며 테스트는 임시 디렉터리와 합성 데이터만 쓴다.
-수정 허용 경로: `src/beautyads/agents/planning.py`, `src/beautyads/agents/evaluation.py`, `src/beautyads/agents/supervisor.py`, `src/beautyads/domain/supervisor.py`, `src/beautyads/api/ask_view.py`, `docs/PROMPT_CHANGELOG.md`, `tests/test_planning.py`, `tests/test_evaluation.py`, `tests/test_domain_supervisor.py`, `tests/test_supervisor.py`, `tests/test_api_ask.py`, `tests/test_ask_view.py`, `tests/test_supervisor_context_mode.py`
+수정 허용 경로: `src/beautyads/agents/planning.py`, `src/beautyads/agents/evaluation.py`, `src/beautyads/agents/supervisor.py`, `src/beautyads/domain/supervisor.py`, `src/beautyads/api/ask_view.py`, `docs/PROMPT_CHANGELOG.md`, `tests/test_planning.py`, `tests/test_evaluation.py`, `tests/test_domain_supervisor.py`, `tests/test_supervisor.py`, `tests/test_api_ask.py`, `tests/test_ask_view.py`, `tests/test_supervisor_context_mode.py`, `tests/test_prereg.py`
 
 위 "프롬프트 초안" A~D를 **조언 세션이 확인한 문장 그대로** 구현한다(확인 중 문장이 바뀌면 이 파일의 초안이 먼저 바뀐다). **모델 호출 없음, 테스트를 먼저 쓴다(TDD).**
 
@@ -98,6 +98,8 @@
 **3. 평가(`agents/evaluation.py`)**: 초안 C대로 `_SYSTEM`에 문장을 삽입하고 `EVALUATION_PROMPT_VERSION = "2026-11-20-1"`. `evaluate_plan`의 payload 최상위에 같은 방식으로 `"claim_choice"`를 더한다. `_CRITERIA`·`plan` 키 목록·코드 검사(`run_checks_on_dict`)·`efficacy_status`는 바꾸지 않는다.
 
 **4. 도메인·뷰(초안 D)**: `domain/supervisor.py`의 `resolve_claim_policy`·`ClaimChoice`·`clarification_texts`와 새 문구 상수 3개, `api/ask_view.py`의 `requested_label`.
+
+**4b. 사전 등록 렌더링 해시(`tests/test_prereg.py`)**: `test_none_measurement_preserves_original_bytes`(`:567`)는 `prereg.render_preregistration(**render_inputs, dev_measurement=None)` 전체 바이트의 SHA-256을 정확 일치로 고정한다. 이 렌더링에는 동결 줄(`동결 기획 프롬프트 버전`·`동결 기획 _SYSTEM sha256`·`동결 평가 프롬프트 버전`·`동결 평가 _SYSTEM sha256`)이 현재 코드값으로 들어가므로 이 step의 프롬프트·버전 변경으로 해시가 바뀐다(이미 확인함: 전체 테스트에서 이 한 개만 실패). **그 기대 해시 문자열 한 줄만** 새 렌더러 출력의 해시로 갱신하고(`uv run python`으로 합성 입력 `render_inputs`에서 계산; 코멘트 한 줄 "2026-11-20 6b-clarify step 3: 프롬프트 동결 줄 변경으로 갱신" 추가), 그 테스트의 나머지 단언(`None`이면 인자 생략과 같고 "E3 dev 측정 근거"가 없다)은 그대로 둔다. 의도된 변경에 따른 값 갱신이지 단언의 약화가 아니다. 같은 파일의 다른 해시 단언(`:132`, `:161`, `:918`, `:925`)은 바뀌지 않아야 한다(바뀌면 `blocked`).
 
 **5. 문서(`docs/PROMPT_CHANGELOG.md`)**: 표 끝에 두 줄을 더한다(`2026-11-20 | 기획 2026-11-20-1 | agents/planning.py | …`, `2026-11-20 | 평가 2026-11-20-1 | agents/evaluation.py | …`): 변경(소구 방향과 `claimed_efficacy` 분리, `claim_choice` 입력, `keep_requested`에서 단정 표현 제한과 `claimed_efficacy` 빈 목록 무감점)과 이유(E2 최종 실행에서 요청 효능이 조용히 근거 있는 다른 효능으로 바뀌거나 비워짐; 되묻기 흐름 추가)를 적는다. 한 줄에 "사전 등록 동결 줄과 달라져 final 가드가 막히는 것은 정상이며 실험은 재실행하지 않는다"를 적는다. 기존 줄은 고치지 않는다.
 
@@ -143,5 +145,5 @@ make verify   # lint + test 통과
 - 초안 B·C·D 밖의 `_SYSTEM` 문장(`image_brief`·`hook_text`·`rework`·데이터 규칙·`TOOL_DATA_RULE`·`PARTIAL_RESULT_RULE`)과 `_CRITERIA`·`Plan` 스키마·`EvaluationScores` 스키마를 바꾸지 마라. 이유: 구조화 스키마는 strict 가드 대상이고(FP-C15) 이 phase가 바꾸는 것은 효능 방향 입력과 그 해석 문장뿐이다. 이 step 뒤에도 `Plan.claimed_efficacy`의 분류 값·코드 검사(`EFFICACY_UNKNOWN`)는 그대로 근거 없는 값을 막아야 한다.
 - 모델 호출 인자에 `temperature`를 넣거나 `reasoning_effort` 값을 바꾸지 마라(`PLANNING_REASONING_EFFORT`·평가의 `reasoning_effort=None` 유지). 이유: AGENTS.md CRITICAL, 호출 래퍼 가드(`tests/test_llm_param_guard.py`)가 이 조합을 검사한다(FP-C13).
 - 기획·평가가 `claim_choice`를 실제 입력으로 받는다는 테스트를 가짜 `structured`의 반환값이 아니라 **호출 인자(`messages`의 user JSON)** 로 단언하라. 이유: 반환값만 보면 입력에 안 들어가도 통과한다(FP-C14). 시스템 지시 문장은 전체 일치가 아니라 핵심 낱말로 검사해 모델이 만든 문장을 굳히지 않는다(FP-C03).
-- `docs/results/p6_preregistration.md`·`docs/EVAL.md`·`tests/test_freeze_guard.py`·`tests/test_prereg.py`·`src/beautyads/eval/`를 수정하지 마라. 이유: 사전 등록 동결 줄과 달라지는 것은 정상이며 동결값은 결과를 본 뒤 바꾸지 않는다. 가드 테스트는 현재 코드값을 동적으로 읽어 영향이 없다(이미 확인함; 영향이 있으면 `blocked`).
-- 기존 테스트의 단언을 약화하지 마라. 허용: 버전 상수 정확 일치 갱신, 최상위 payload 키 집합에 `claim_choice` 하나를 더하는 갱신, 위 `other` 규칙 변경에 따른 기대 갱신. 이유: 새 키·새 규칙이 만드는 정확 일치 충돌이다(FP-C11, B-FP-071). 경계: `tests/test_planning.py`의 기존 `phrase in system["content"]` 목록은 그대로 통과해야 한다.
+- `docs/results/p6_preregistration.md`·`docs/EVAL.md`·`tests/test_freeze_guard.py`·`src/beautyads/eval/`를 수정하지 마라. `tests/test_prereg.py`는 아래 해시 한 줄 갱신 외에는 수정하지 마라. 이유: 사전 등록 동결 줄과 달라지는 것은 정상이며 동결값은 결과를 본 뒤 바꾸지 않는다. 가드 테스트(`test_freeze_guard.py`)는 현재 코드값을 동적으로 읽어 영향이 없다(이미 확인함).
+- 기존 테스트의 단언을 약화하지 마라. 허용: `tests/test_prereg.py:567` 기대 해시 한 줄 갱신(위 4b), 버전 상수 정확 일치 갱신, 최상위 payload 키 집합에 `claim_choice` 하나를 더하는 갱신, 위 `other` 규칙 변경에 따른 기대 갱신. 이유: 새 키·새 규칙이 만드는 정확 일치 충돌이다(FP-C11, B-FP-071). 경계: `tests/test_planning.py`의 기존 `phrase in system["content"]` 목록은 그대로 통과해야 한다.
