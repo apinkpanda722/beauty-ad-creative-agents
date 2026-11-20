@@ -1,0 +1,26 @@
+{
+  "project": "beauty-ad-creative-agents",
+  "phase": "6b-clarify",
+  "steps": [
+    {
+      "step": 1,
+      "name": "clarify-core",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "clarify-api",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "clarify-prompts",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "clarify-demo",
+      "status": "pending"
+    }
+  ]
+}
