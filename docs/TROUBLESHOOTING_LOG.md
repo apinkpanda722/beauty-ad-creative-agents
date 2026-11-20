@@ -316,7 +316,7 @@
 - **원인**: 모델 경계의 가짜 호출을 검사하는 테스트가 로컬 키 설정에 의존해 `.env`가 없는 환경에서 필요한 가짜 키를 받지 못했다.
 - **해결**: 지정 테스트의 가짜 환경에 테스트용 키를 명시적으로 전달했다. CI verify 워크플로와 워크플로 구조 검사도 추가했다.
 - **결과**: step 1에서 `make verify`와 `.env` 없이 `env -u GEMINI_API_KEY`로 실행한 단독 테스트가 통과했다. 실제 CI 러너 실행은 미확인이다.
-- **근거**: `tests/test_products_pipeline.py::test_model_contract_cost_summary_and_bytes_never_written`, `tests/test_ci_workflow.py`, `.github/workflows/verify.yml`, 사용자 제공 7b step 1 완료 기록.
+- **근거**: `tests/test_products_pipeline.py::test_model_contract_cost_summary_and_bytes_never_written`, `tests/test_ci_workflow.py`, `.github/workflows/verify.yml`, `phases/7b-ops-demo/step1.md`의 설계 검토 기록(클린 클론 측정 결과).
 
 ## 2026-11-20 P7 웹 의존성 버전 조정
 
@@ -332,4 +332,4 @@
 - **원인**: 같은 step 안에서 허용·요구한 작업을 다른 문구가 금지하도록 작성돼 있었다.
 - **해결**: 두 건 모두 step 파일만 수정해 요구와 금지 범위를 일치시켰다. 중단 당시 구현 코드는 변경하지 않았다.
 - **결과**: step 지시의 모순을 정정한 뒤 재실행했다. 이 기록은 실제 선점검 중단이며 서비스 실행 실패 사례가 아니다.
-- **근거**: `phases/7a-web-core/step2.md`(스키마 레이블), `phases/7a-web-core/step4.md`(동반 패키지 승인 표기), 사용자 제공 P7 설계 검토·문제 기록.
+- **근거**: `phases/7a-web-core/step2.md`(스키마 레이블), `phases/7a-web-core/step4.md`(동반 패키지 승인 표기), `phases/7a-web-core/index.json`의 step 2·4 blocked 기록.
