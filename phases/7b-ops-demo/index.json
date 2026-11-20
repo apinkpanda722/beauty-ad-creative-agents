@@ -19,7 +19,16 @@
     {
       "step": 2,
       "name": "trace-time",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-20T20:03:39+0900",
+      "summary": "단계 시각·호출 소요 시간·종료 시각·목적별 시간 집계 구현. 반복 결과 비교 테스트 2곳에 고정 시계 주입(기존 단언 유지). make verify 통과(Python 6,250건·웹 125건). 패키지 설치·커밋 없음.",
+      "completed_at": "2026-11-20T20:10:40+0900",
+      "usage": {
+        "input_tokens": 2160406,
+        "cached_input_tokens": 2051840,
+        "output_tokens": 10432,
+        "attempts": 1
+      }
     },
     {
       "step": 3,
