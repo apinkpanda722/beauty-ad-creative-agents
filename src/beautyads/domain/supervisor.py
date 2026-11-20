@@ -28,7 +28,7 @@ CLARIFY_REQUESTED_GENERIC_TEXT = "요청하신 효능은 이 제품의 성분·�
 CLARIFY_REQUESTED_GENERIC_NO_CONFIRMED_TEXT = "요청하신 효능은 이 제품의 성분·인증으로 근거가 확인되지 않았습니다. 이 제품에서 근거가 확인된 효능이 없습니다. 어떻게 진행할까요?"
 CLARIFY_UNSPECIFIED_TEXT = "효능을 지정하지 않으셨습니다. 이 제품에서 근거가 확인된 효능은 {available}입니다. 어떤 효능을 강조할까요?"
 OPTION_KEEP_REQUESTED = (
-    "요청하신 '{requested}'로 진행 (효능을 단정하는 표현은 제한됩니다)"
+    "요청하신 '{requested}' 효능으로 진행 (효능을 단정하는 표현은 제한됩니다)"
 )
 OPTION_KEEP_REQUESTED_GENERIC = (
     "요청하신 효능으로 진행 (효능을 단정하는 표현은 제한됩니다)"

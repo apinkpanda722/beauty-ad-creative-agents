@@ -897,7 +897,7 @@ def test_clarification_copy_is_fixed_and_rendered_with_display_names():
     )
     assert (
         policy.OPTION_KEEP_REQUESTED
-        == "요청하신 '{requested}'로 진행 (효능을 단정하는 표현은 제한됩니다)"
+        == "요청하신 '{requested}' 효능으로 진행 (효능을 단정하는 표현은 제한됩니다)"
     )
     assert policy.OPTION_SELECT_CONFIRMED == "확인된 효능 중에서 선택"
     assert policy.OPTION_SELECT_ONE == "한 가지 효능 선택"
@@ -934,7 +934,7 @@ def test_clarification_copy_is_fixed_and_rendered_with_display_names():
                 "options": [
                     {
                         "id": "keep_requested",
-                        "label": "요청하신 '미백'로 진행 (효능을 단정하는 표현은 제한됩니다)",
+                        "label": "요청하신 '미백' 효능으로 진행 (효능을 단정하는 표현은 제한됩니다)",
                     },
                     {"id": "select_confirmed", "label": "확인된 효능 중에서 선택"},
                     {"id": "none", "label": "효능 강조 없이 제품 홍보"},
@@ -949,7 +949,7 @@ def test_clarification_copy_is_fixed_and_rendered_with_display_names():
                 "options": [
                     {
                         "id": "keep_requested",
-                        "label": "요청하신 '미백'로 진행 (효능을 단정하는 표현은 제한됩니다)",
+                        "label": "요청하신 '미백' 효능으로 진행 (효능을 단정하는 표현은 제한됩니다)",
                     },
                     {"id": "none", "label": "효능 강조 없이 제품 홍보"},
                 ],
@@ -995,7 +995,7 @@ def test_clarification_copy_is_fixed_and_rendered_with_display_names():
         "options": [
             {
                 "id": "keep_requested",
-                "label": "요청하신 'brightening'로 진행 (효능을 단정하는 표현은 제한됩니다)",
+                "label": "요청하신 'brightening' 효능으로 진행 (효능을 단정하는 표현은 제한됩니다)",
             }
         ],
     }
