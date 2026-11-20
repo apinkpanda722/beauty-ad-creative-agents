@@ -75,7 +75,16 @@
     {
       "step": 6,
       "name": "web-evidence-plan",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-20T19:06:11+0900",
+      "summary": "근거·기획안 카드, 중립 패턴 비교, 분포·집계 분리·비용 표시, 시안 이미지와 승인·반려 구현 및 계약 테스트 추가. make verify 통과(Python 6,214개·웹 80개), 패키지 설치 없음.",
+      "completed_at": "2026-11-20T19:17:54+0900",
+      "usage": {
+        "input_tokens": 2829185,
+        "cached_input_tokens": 2731264,
+        "output_tokens": 22986,
+        "attempts": 1
+      }
     },
     {
       "step": 7,
