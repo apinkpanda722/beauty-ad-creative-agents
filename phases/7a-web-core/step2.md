@@ -123,7 +123,7 @@ make verify   # lint + test 통과
 ## 이 step의 금지사항
 
 - 이 경로들을 에이전트 도구(`agents/tools.py` 등록 목록)나 모델이 부를 수 있는 곳에 연결하지 마라. 질의 문자열에 `$ids` 외 입력을 보간하지 마라. 이유: 에이전트에게 Cypher를 쓰게 하지 않고 고수준 도구만 준다(AGENTS.md), 입력 보간은 주입 통로다.
-- 그래프 조각·스키마에 `Feedback`·`ClaimRule`·테넌트 전용 데이터를 넣지 마라. `/workspaces`에 `own_product_url`·`tone`·`forbidden_terms`·`price_band_pct`를 내보내지 마라. 이유: 테넌트 전용 데이터는 이 경로로 나가지 않는다(ADR-009).
+- **그래프 조각(`/graph/fragment`)**에 `Feedback`·`ClaimRule`·테넌트 전용 **데이터**를 넣지 마라(스키마 `/graph/schema`는 레이블·관계 **이름** 메타데이터만이라 `ONTOLOGY_LABELS`에 `Feedback`·`ClaimRule`이 이름으로 있어도 된다. 데이터·속성 값은 내보내지 않는다). `/workspaces`에 `own_product_url`·`tone`·`forbidden_terms`·`price_band_pct`를 내보내지 마라. 이유: 테넌트 전용 데이터는 이 경로로 나가지 않는다(ADR-009).
 - `Assembly.graph`를 Neo4j 연결로 쓰지 마라. 새 필드 `graph_fragment`만 쓰고 경로는 요청 시점에 `request.app.state.assembly`에서 읽어라. 이유: 이 필드는 LangGraph 그래프이고, 생성 시점 값을 붙잡으면 시작 때 교체한 가짜를 못 부른다(B-FP-070).
 - 합성 문자열 값만으로 조각 변환을 테스트하지 마라(실제 `neo4j.time.DateTime`을 쓴다). 알 수 없는 값 타입을 조용히 버리지 마라. 이유: 합성 값 테스트가 드라이버 값 타입의 직렬화 실패를 못 잡았다(FP-C03 추가 사례).
 - 카드 라벨 질의 실패를 카드 오류로 올리지 마라. 라벨이 없는 소재를 오류·누락으로 처리하지 마라. 이유: 라벨은 부가 정보이고 분석된 소재만 라벨이 있다(그래프 1,172/7,429). 동결 CQ 질의와 기존 `evidence_queries.py` 질의 문자열은 바꾸지 마라(동결 가드).
