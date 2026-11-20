@@ -4,11 +4,15 @@ import { ctaName, talentName, type TaxonomyNames } from "./taxonomy";
 export const LAYER_COLORS = { 1: "#427c69", 2: "#527cac", 3: "#8961a8" } as const;
 export const LABEL_COLORS: Record<string, string> = { Creative: "#365d89", Product: "#286550" };
 export const GRAPH_LEGEND = [
-  { name: "1층 · 제품 지식", color: LAYER_COLORS[1] },
-  { name: "제품", color: LABEL_COLORS.Product },
-  { name: "2층 · 광고 관찰", color: LAYER_COLORS[2] },
-  { name: "광고 소재", color: LABEL_COLORS.Creative },
-  { name: "3층 · 피드백", color: LAYER_COLORS[3] },
+  { title: "층", items: [
+    { name: "1층 · 제품 지식", color: LAYER_COLORS[1] },
+    { name: "2층 · 광고 관찰", color: LAYER_COLORS[2] },
+    { name: "3층 · 피드백", color: LAYER_COLORS[3] },
+  ] },
+  { title: "노드 종류", items: [
+    { name: "제품", color: LABEL_COLORS.Product },
+    { name: "광고 소재", color: LABEL_COLORS.Creative },
+  ] },
 ];
 const OBSERVATION_LABELS = new Set(["Creative", "Hook", "Angle", "Format", "Talent", "CtaType"]);
 export type GraphElement =

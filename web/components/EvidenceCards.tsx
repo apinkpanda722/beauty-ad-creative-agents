@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-img-element -- Direct thumbnails are neither stored nor proxied. */
 "use client";
 import { useId, useState } from "react";
+import { publishedDate } from "../lib/format";
 import type { EvidenceCard, UiCommand } from "../lib/types";
 import { ctaName, talentName, taxonomyNames } from "../lib/taxonomy";
 import type { TaxonomyNames } from "../lib/taxonomy";
@@ -27,7 +28,7 @@ function Card({ card, anchor, names }: { card: EvidenceCard; anchor: string; nam
       : <div className="source-icon" aria-label={`${card.source ?? "알 수 없는"} 출처`}>{card.source ?? "출처 정보 없음"}</div>}
     <div className="evidence-body"><small>{card.brand ?? "브랜드 정보 없음"} · {card.source ?? "출처 정보 없음"}</small>
       <h4>{href ? <a href={href} rel="noopener noreferrer" target="_blank">{title}</a> : title}</h4>
-      <p className="muted">{card.published_at ?? "게시일 정보 없음"}</p>
+      <p className="muted">{publishedDate(card.published_at)}</p>
       <div className="metric-row"><span>{card.view_count === null ? "조회수 정보 없음" : `조회수 ${card.view_count.toLocaleString("ko-KR")}`}</span><span>{card.like_count === null ? "좋아요 정보 없음" : `좋아요 ${card.like_count.toLocaleString("ko-KR")}`}</span></div>
       {badges.length ? <div aria-label="이 소재의 분석 결과" className="analysis-badges">{badges.map((label, i) => <span className="analysis-badge" key={i}>{label}</span>)}</div> : <small className="muted">분석 대상 아님</small>}
     </div>

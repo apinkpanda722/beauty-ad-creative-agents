@@ -31,6 +31,13 @@ export function taxonomyNames(schema?: SchemaResponse | null) {
     claimName(value: string): string {
       return schema?.claims?.find(item => item.value === value)?.name ?? value;
     },
+    valueName(value: string): string {
+      for (const axis of ["hook_type", "angle", "format"] as const) {
+        const name = schema?.taxonomy?.[axis]?.find(item => item.value === value)?.name;
+        if (name != null) return name;
+      }
+      return schema?.claims?.find(item => item.value === value)?.name ?? value;
+    },
   };
 }
 export type TaxonomyNames = ReturnType<typeof taxonomyNames>;

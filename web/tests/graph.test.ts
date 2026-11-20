@@ -36,7 +36,7 @@ it("converts every fragment node including isolated creatives, translates values
   expect(nodes.map(n => n.data.displayName)).toEqual(["youtube:a", "youtube:isolated", "합성 훅 이름", "합성 효능 이름", "원 이름"]);
   expect(elements.some(e => e.data.id.includes("missing"))).toBe(false);
   expect(fragmentToElements(fragment, taxonomyNames()).filter(e => e.group === "nodes").find(e => e.data.id === "Hook:synthetic_hook")?.data.displayName).toBe("synthetic_hook");
-  for (const node of nodes) expect(GRAPH_LEGEND.some(item => item.color === node.data.color)).toBe(true);
+  for (const node of nodes) expect(GRAPH_LEGEND.some(group => group.items.some(item => item.color === node.data.color))).toBe(true);
 });
 
 it("maps nonempty schema labels and relationships one for one, with distinct layer colors", () => {
@@ -71,4 +71,10 @@ it.each([[422, '{"detail":"GRAPH_IDS_INVALID"}', "GRAPH_IDS_INVALID"], [503, '{"
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(body, { status })));
   const result = getGraphFragment("synthetic", ["youtube:a"]);
   await expect(result).rejects.toBeInstanceOf(ApiError); await expect(result).rejects.toMatchObject({ status, code });
+});
+
+it("groups the legend into layers and node kinds without losing any colors", () => {
+  expect(GRAPH_LEGEND.map(group => group.title)).toEqual(["층", "노드 종류"]);
+  expect(GRAPH_LEGEND[0].items.map(item => item.color)).toEqual(Object.values(LAYER_COLORS));
+  expect(new Set(GRAPH_LEGEND[1].items.map(item => item.color))).toEqual(new Set(Object.values(LABEL_COLORS)));
 });

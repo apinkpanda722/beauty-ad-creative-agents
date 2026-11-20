@@ -14,7 +14,7 @@ export function CommandSlot({ commands, onOpenGraph }: { commands: UiCommand[]; 
   const tenantId = useContext(CommandTenantContext);
   const [schema, setSchema] = useState<{ tenantId: string; data: SchemaResponse } | null>(null);
   const prefix = useId();
-  const needsSchema = commands.some(command => command.kind === "show_evidence_cards" || command.kind === "show_plan");
+  const needsSchema = commands.some(command => command.kind === "show_evidence_cards" || command.kind === "show_plan" || command.kind === "show_distribution");
   useEffect(() => {
     if (!tenantId || !needsSchema) return;
     let active = true;
@@ -32,7 +32,7 @@ export function CommandSlot({ commands, onOpenGraph }: { commands: UiCommand[]; 
     {evidence.map((command, i) => <EvidenceCards key={`evidence-${i}`} data={command.data} names={names} anchors={anchors} />)}
     {commands.filter(command => command.kind === "show_plan").map((command, i) => <PlanCard key={`plan-${i}-${command.data.plan_id ?? "unsaved"}`} data={command.data} names={names} tenantId={tenantId} evidenceAnchors={anchors} />)}
     {onOpenGraph && commands.filter(command => command.kind === "show_graph_fragment").map((command, i) => <button key={`graph-${i}`} type="button" onClick={() => onOpenGraph(command.data.evidence_ids)}>근거 그래프 보기</button>)}
-    {commands.filter(command => command.kind === "show_distribution").map((command, i) => <DistributionChart key={`distribution-${i}`} data={command.data} />)}
+    {commands.filter(command => command.kind === "show_distribution").map((command, i) => <DistributionChart key={`distribution-${i}`} data={command.data} names={names} />)}
     {commands.filter(command => command.kind === "show_aggregates").map((command, i) => <AggregatesPanel key={`aggregates-${i}`} data={command.data} />)}
     {commands.filter(command => command.kind === "show_cost").map((command, i) => <CostLine key={`cost-${i}`} data={command.data} />)}
   </>;

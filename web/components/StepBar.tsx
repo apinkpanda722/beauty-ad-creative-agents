@@ -3,6 +3,8 @@ import type { StepEvent } from "../lib/types";
 import { deriveStages } from "../lib/stages";
 const labels = { pending: "대기", running: "진행 중", done: "완료", failed: "실패" };
 export function StepBar({ stepEvents, turnStatus }: { stepEvents: StepEvent[]; turnStatus: TurnStatus }) {
+  if (turnStatus === "unavailable" || turnStatus === "stopped") return null;
+  if (turnStatus === "needs_choice") return <p className="step-bar" aria-label="진행 단계" aria-live="polite">요청 해석 완료 · 선택을 기다리는 중</p>;
   return <ol className="step-bar" aria-label="진행 단계" aria-live="polite">
     {deriveStages(stepEvents, turnStatus).map(stage => <li key={stage.id} data-status={stage.status}>
       <span>{stage.label}</span> <small>{labels[stage.status]}</small>

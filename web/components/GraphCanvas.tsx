@@ -4,8 +4,10 @@ import type { Core } from "cytoscape";
 import { GRAPH_LEGEND, type GraphElement } from "../lib/graph";
 
 export function GraphLegend() {
-  return <ul className="graph-legend" aria-label="그래프 범례">{GRAPH_LEGEND.map(item => <li key={item.name}>
-    <span style={{ backgroundColor: item.color }} aria-hidden="true" />{item.name}</li>)}</ul>;
+  return <div aria-label="그래프 범례">{GRAPH_LEGEND.map(group => <section key={group.title} aria-label={group.title}>
+    <h4>{group.title}</h4><ul className="graph-legend">{group.items.map(item => <li key={item.name}>
+      <span style={{ backgroundColor: item.color }} aria-hidden="true" />{item.name}</li>)}</ul>
+  </section>)}</div>;
 }
 export function GraphCanvas({ elements, layout = "cose", onNodeClick }: {
   elements: GraphElement[]; layout?: "cose" | "breadthfirst"; onNodeClick: (id: string) => void;
@@ -20,10 +22,12 @@ export function GraphCanvas({ elements, layout = "cose", onNodeClick }: {
     void import("cytoscape").then(({ default: cytoscape }) => {
       if (!active || !container.current) return;
       cy = cytoscape({ container: container.current, elements,
-        layout: { name: layout, animate: false, padding: 36 },
+        layout: layout === "cose"
+          ? { name: layout, animate: false, padding: 36, nodeRepulsion: 8192, idealEdgeLength: 100, nodeOverlap: 16, nodeDimensionsIncludeLabels: true }
+          : { name: layout, animate: false, padding: 36 },
         style: [
-          { selector: "node", style: { "background-color": "data(color)", label: "data(displayName)", color: "#202124", "font-size": 11, "text-wrap": "wrap", "text-max-width": "110px", "text-valign": "bottom", "text-margin-y": 7, width: 28, height: 28 } },
-          { selector: "edge", style: { label: "data(type)", width: 1.5, "line-color": "#bbc5cc", "target-arrow-color": "#bbc5cc", "target-arrow-shape": "triangle", "curve-style": "bezier", "font-size": 8, color: "#565e64", "text-background-color": "#fff", "text-background-opacity": 0.85 } },
+          { selector: "node", style: { "background-color": "data(color)", label: "data(displayName)", color: "#202124", "font-size": 10, "text-wrap": "wrap", "text-max-width": "110px", "text-valign": "bottom", "text-margin-y": 4, width: 28, height: 28 } },
+          { selector: "edge", style: { label: "data(type)", width: 1.5, "line-color": "#bbc5cc", "target-arrow-color": "#bbc5cc", "target-arrow-shape": "triangle", "curve-style": "bezier", "font-size": 7, color: "#565e64", "text-background-color": "#fff", "text-background-opacity": 0.85 } },
           { selector: "node:selected", style: { "border-color": "#202124", "border-width": 3 } },
         ],
       });

@@ -1,13 +1,51 @@
 """Offline drift checks for the browser's server event contract."""
 
+import ast
 import json
 import re
 from pathlib import Path
 from typing import get_args
 
 from beautyads.api.sse import EventName
+from beautyads.domain.labels import Claim
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_browser_claim_values_match_domain_in_both_directions():
+    text = (ROOT / "web/lib/claim.ts").read_text(encoding="utf-8")
+    body = re.search(r"export const CLAIM_VALUES = \[(.*?)\] as const", text, re.DOTALL)
+    assert body is not None
+    values = set(re.findall(r'"([a-z_]+)"', body.group(1)))
+    assert values
+    assert values == {member.value for member in Claim}
+
+
+def test_browser_plan_intro_matches_server_plan_branch():
+    text = (ROOT / "web/lib/text.ts").read_text(encoding="utf-8")
+    intro = re.search(r'export const PLAN_INTRO_TEXT = ("[^"\n]+")', text)
+    assert intro is not None
+    server = ast.parse(
+        (ROOT / "src/beautyads/api/ask_view.py").read_text(encoding="utf-8")
+    )
+    branches = [
+        node
+        for node in ast.walk(server)
+        if isinstance(node, ast.If) and ast.unparse(node.test) == "kind == 'plan'"
+    ]
+    assert len(branches) == 1
+    strings = [
+        node.value
+        for statement in branches[0].body
+        for node in ast.walk(statement)
+        if isinstance(node, ast.Constant) and isinstance(node.value, str)
+    ]
+    assert strings == [json.loads(intro.group(1))]
+
+
+def test_next_disables_agent_rule_generation():
+    text = (ROOT / "web/next.config.ts").read_text(encoding="utf-8")
+    assert re.search(r"^\s*agentRules:\s*false\s*,", text, re.MULTILINE)
 
 
 def test_server_event_names_match_browser_discriminants():

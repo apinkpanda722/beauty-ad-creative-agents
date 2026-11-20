@@ -1,6 +1,7 @@
 import type { ClaimChoice, Clarification } from "./types";
 type OptionId = Clarification["options"][number]["id"];
-const claims = new Set(["hydration", "soothing", "brightening", "firming_elasticity", "pore_sebum", "acne_trouble", "barrier", "anti_aging", "sun_protection", "texture_finish", "other"]);
+export const CLAIM_VALUES = ["hydration", "soothing", "brightening", "firming_elasticity", "pore_sebum", "acne_trouble", "barrier", "anti_aging", "sun_protection", "texture_finish", "other"] as const;
+const claims = new Set<string>(CLAIM_VALUES);
 
 export function buildChoice(optionId: OptionId, clarification: Clarification, selectedClaims: string[]): ClaimChoice | null {
   if (optionId === "cancel") return null;

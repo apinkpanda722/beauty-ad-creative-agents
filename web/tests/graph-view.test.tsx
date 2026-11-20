@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { GraphPanel } from "../components/GraphPanel";
 import { SchemaView } from "../components/SchemaView";
-import { GraphCanvas } from "../components/GraphCanvas";
+import { GraphCanvas, GraphLegend } from "../components/GraphCanvas";
 import { NodeDetail } from "../components/NodeDetail";
 import { CommandSlot } from "../components/CommandSlot";
 import Page from "../app/page";
@@ -127,4 +127,27 @@ it("switches page tabs, preserves conversation and opens the command graph with 
   expect(screen.getByRole("tab", { name: "전체 스키마" }).getAttribute("aria-selected")).toBe("true");
   await waitFor(() => expect(cy.create).toHaveBeenCalledTimes(2));
   fireEvent.click(screen.getByRole("tab", { name: "대화" })); expect(screen.getByText("합성 응답")).toBeTruthy();
+});
+
+it("renders separate layer and node kind legend groups", () => {
+  render(<GraphLegend />);
+  const legend = screen.getByLabelText("그래프 범례");
+  expect(within(legend).getAllByRole("heading").map(node => node.textContent)).toEqual(["층", "노드 종류"]);
+  expect(within(legend).getAllByRole("list").map(list => Array.from(list.children).map(node => node.textContent))).toEqual([
+    ["1층 · 제품 지식", "2층 · 광고 관찰", "3층 · 피드백"], ["제품", "광고 소재"],
+  ]);
+});
+it("uses smaller labels and spreads cose nodes with built-in layout options", async () => {
+  render(<GraphCanvas elements={[]} onNodeClick={vi.fn()} />);
+  await waitFor(() => expect(cy.create).toHaveBeenCalledTimes(1));
+  const options = cy.create.mock.calls[0][0];
+  const node = options.style.find((item: { selector: string }) => item.selector === "node").style;
+  const edge = options.style.find((item: { selector: string }) => item.selector === "edge").style;
+  expect(node["font-size"]).toBeGreaterThanOrEqual(9); expect(node["font-size"]).toBeLessThanOrEqual(10);
+  expect(node["text-margin-y"]).toBeGreaterThanOrEqual(0); expect(node["text-margin-y"]).toBeLessThan(7);
+  expect(edge["font-size"]).toBe(7);
+  expect(options.layout.name).toBe("cose");
+  expect(options.layout.nodeRepulsion).toBeGreaterThan(2048);
+  expect(options.layout.idealEdgeLength).toBeGreaterThan(32);
+  expect(options.layout.nodeOverlap).toBeGreaterThan(4);
 });
