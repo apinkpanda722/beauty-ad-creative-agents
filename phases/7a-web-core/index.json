@@ -47,14 +47,16 @@
     {
       "step": 4,
       "name": "web-scaffold",
-      "status": "pending",
+      "status": "completed",
       "started_at": "2026-11-20T17:58:51+0900",
       "usage": {
-        "input_tokens": 193448,
-        "cached_input_tokens": 151040,
-        "output_tokens": 1381,
+        "input_tokens": 3011597,
+        "cached_input_tokens": 2922240,
+        "output_tokens": 18946,
         "attempts": 1
-      }
+      },
+      "summary": "Next.js 골격·서버 이벤트 타입·SSE 파서·API·계약 테스트·verify pnpm 단계 추가. make web-install 및 make verify 통과(Python 6,212개·웹 22개). 설치: next/eslint-config-next 16.4.6, react/react-dom 19.3.1, vitest 5.1.1, @testing-library/react 16.3.3, jsdom 31.0.1, cytoscape 3.35.0, @testing-library/dom 10.4.2, @types/node 26.6.6, @types/react/@types/react-dom 19.3.0, typescript 6.0.3(Next 린터의 7 미지원), eslint 9.39.5(Next 플러그인 peer 호환), vite 7.3.8(esbuild 설정 지원). esbuild만 빌드 승인.",
+      "completed_at": "2026-11-20T18:12:13+0900"
     },
     {
       "step": 5,
