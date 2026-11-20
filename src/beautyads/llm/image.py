@@ -23,6 +23,7 @@ from .errors import ErrorKind, classify_error
 IMAGE_PRICE_USD = 0.0336
 MAX_IMAGE_BYTES = 10_485_760
 _MODEL = "gemini-3.1-flash-lite-image"
+_monotonic = time.monotonic
 
 
 @dataclass(frozen=True)
@@ -153,6 +154,7 @@ def generate_image(
                 api_key if api_key is not None else require_setting("GEMINI_API_KEY")
             )
         try:
+            started = _monotonic()
             response = call(**kwargs)
         except Exception as exc:  # noqa: BLE001 -- retry only classified dispatch errors
             kind = classify_error(exc)
@@ -160,6 +162,7 @@ def generate_image(
                 sleep(backoff_s[min(attempt, len(backoff_s) - 1)])
                 continue
             raise _call_error(exc, exhausted=kind == ErrorKind.RETRYABLE) from None
+        duration_ms = int((_monotonic() - started) * 1000)
         break
 
     # Accounting and decoding are deliberately outside the dispatch retry loop.
@@ -186,6 +189,7 @@ def generate_image(
                 cost_usd=cost,
                 cost_source="response_cost" if measured else "price_table",
                 reasoning_effort=None,
+                duration_ms=duration_ms,
             ),
         )
         return _extract(response, cost=cost, model=model)

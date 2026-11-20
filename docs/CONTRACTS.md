@@ -347,6 +347,11 @@
 
 - **미확인**: 컨테이너 5개의 메모리 사용량, 처음 이미지 받는 시간, 대량 trace 지연, SDK 5.x의 상세 호환.
 
+- **SDK 3.15.0 시그니처 조회(2026-11-20, 서버 접속 없음)**: 공개 추적 API `start_span`·`start_generation`·`start_observation`에는 시작 시각 인자가 없다(`end(end_time=...)`으로 종료만 지정). 공개 타입 있는 REST 경로 `api.ingestion.batch`의 `TraceBody`·`CreateSpanBody`·`CreateGenerationBody` 이벤트 본문은 `timestamp`·`start_time`·`end_time`·`cost_details`·`usage_details`·`parent_observation_id`를 받는다(각 본문의 해당 필드). 사후 기록은 이 경로를 사용한다.
+- **미확인**: 서버 3.225.11이 ingestion 이벤트의 시간·`cost_details`를 받아 Langfuse 화면 타임라인을 그리는지는 사용자가 `make obs-up` 후 `make obs-check`와 실제 화면을 확인한 뒤 갱신한다. 이 step은 서버를 기동하지 않았다.
+- **MinIO 이미지(2026-11-20 로컬 확인)**: `cgr.dev/chainguard/minio@sha256:4cf4831a2bbcf13ddca09c1cbcc9faff716dd3c4247e0babc32864b8ee8e0034`의 `Descriptor.mediaType`은 `application/vnd.oci.image.index.v1+json`(멀티 아키텍처 인덱스, 로컬 arm64). 다른 아키텍처에서 같은 다이제스트로 pull되는지는 **미확인**이다. 별도 PostgreSQL을 포함한 이번 obs 서비스 6개의 메모리와 첫 이미지 다운로드 시간도 **미확인**이다.
+- **구성 참고(실측 아님)**: [Langfuse v3.225.11 공식 compose](https://github.com/langfuse/langfuse/blob/v3.225.11/docker-compose.yml)의 DB·ClickHouse·Redis·S3 환경 변수 이름과 MinIO 버킷 디렉터리 초기화 방식을 따른다. 이 저장소의 고정 이미지 구성 기동은 **미확인**이다.
+
 ## Neo4j (2026-11-12 실측, 임시 컨테이너, 끝난 뒤 삭제)
 
 | 확인한 것 | 결과 |

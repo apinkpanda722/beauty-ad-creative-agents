@@ -2,6 +2,66 @@
 
 뷰티 광고 크리에이티브를 분석해 근거가 달린 기획안을 만드는 멀티에이전트 프로젝트.
 
+## 명령 한 줄 실행과 데이터 이관
+
+기본 로컬 개발·시연 경로는 compose의 PostgreSQL·Neo4j와 로컬 API·웹
+프로세스다. Python 3.12(uv 관리)·uv·Node 24·pnpm 12.8.1·Docker를 준비하고,
+`.env`에 필요한 변수 이름은 [`.env.example`](.env.example)을 따른다.
+의존성은 `uv sync --locked`와 `make web-install`로 준비한다. 다음 명령은
+사용자가 직접 실행한다.
+
+```bash
+make db-up
+# DB가 준비된 뒤
+make db-migrate
+make serve
+# 다른 터미널에서: http://127.0.0.1:3000
+pnpm --dir web dev
+```
+
+API 기본 바인딩은 `127.0.0.1:8000`이다. `BEAUTYADS_API_HOST`는
+`127.0.0.1`·`0.0.0.0`만 허용하며, 빈 값은 기본값을 쓴다. PostgreSQL은
+기본 `127.0.0.1:5433`이고 `BEAUTYADS_POSTGRES_HOST`·`BEAUTYADS_POSTGRES_PORT`로
+변경한다. 시연 일괄 실행용 `make demo-up`은 step 5에서 추가할 예정이다.
+
+k3d는 로컬 배포 구성 검증용이다. k3d·kubectl·Docker와 위 도구를 준비하고
+저장소 루트에서 다음 명령을 사용자가 직접 실행한다.
+
+```bash
+make k3d-up
+make k3d-seed CONFIRM=yes
+# 이관이 끝난 뒤 http://127.0.0.1:3100
+```
+
+`k3d-up` 한 줄은 두 앱 이미지를 빌드하고, `beautyads` 클러스터가 없으면
+만든 뒤 이미지를 import하고 매니페스트를 적용한다. 레지스트리는 쓰지 않으며
+기존 클러스터를 다시 쓰면 앱을 재시작한다. 웹의 API rewrite는 빌드 인자
+`BEAUTYADS_API_ORIGIN=http://api:8000`으로 고정한다. 호스트 3100은 로컬 웹
+3000과 충돌하지 않는다. 모든 kubectl 명령은 `k3d-beautyads` 컨텍스트와
+`beautyads` 네임스페이스를 명시한다. Secret은 로컬 `.env`에서만 만들며
+값을 출력하거나 매니페스트·이미지에 넣지 않는다. PostgreSQL·Neo4j의 비밀번호는
+데이터 볼륨을 처음 만들 때 적용되므로 기존 원본과 같은 설정을 준비한다.
+API의 init container는 빈 클러스터 DB에 기존 마이그레이션을 적용한다.
+
+데이터 이관은 별도 `k3d-seed CONFIRM=yes` 명령이다. 원본 compose의
+`beautyads-postgres`가 실행 중이고 `data/manifest/costs.jsonl`이 있어야 한다.
+클러스터 DB를 원본 dump로 덮어쓴 뒤 PostgreSQL에서 그래프 1·2·3층을 각각
+`--layers 1|2|3 --full`로 재생성하고 비용 원장을 PVC로 복사한다.
+동기화 CLI의 기존 주입 인자로 Pod 실행을 확인된 런타임으로 취급하고,
+PostgreSQL TCP 점검을 `postgres` Service로 연결한다. Neo4j TCP 점검도 유지한다.
+이관이 완료되면 API를 다시 시작해 작업 공간 캐시를 갱신한다.
+이관 중에는 웹에서 요청하지 않는다. 모델 호출이나 수집·다운로드는 없으며,
+완료 후의 사용자 요청은 기존 공급사별 누적 비용 상한을 적용한다.
+이 절차는 데이터까지 한 줄로 올리는 절차가 아니다.
+
+```bash
+make k3d-down CONFIRM=yes
+```
+
+종료 명령은 `beautyads` 클러스터와 그 안의 데이터를 삭제한다. 원본 compose의
+컨테이너·볼륨은 변경하지 않는다. 이미지 빌드·pull·클러스터 기동·이관은 사용자가
+실행하며 자동 검증은 파일을 읽는 정적 테스트만 수행한다.
+
 ## db-migrate
 
 PostgreSQL이 준비되고 `POSTGRES_PASSWORD`를 기존 설정 방식으로 설정한 뒤
@@ -1285,3 +1345,28 @@ luna(`none`)로 리서치한다. 가격대는 그래프에 있는 우리 제품 
 응답 전문과 키는 남기지 않는다. 핸드오프와 기획안은 gitignore된 로컬 중간 파일이다.
 경쟁 소재에는 test 브랜드 소재가 검색될 수 있고 표본이 작아 통계적 근거가 아니다.
 권고는 출력만 하며 운영 기본값 변경은 결과 검토와 사용자 승인 뒤 별도로 진행한다.
+
+## 시연 (DEMO.md)
+
+촬영 준비·시연 문장·장면별 절차·사용자 live 리허설 확인은 [DEMO.md](DEMO.md)를 따른다.
+처음에는 위 DB 준비와 `make db-migrate`를 마친 뒤 사용자가 실행한다.
+
+```bash
+make demo-up
+```
+
+compose의 PostgreSQL·Neo4j와 로컬 API·웹 운영 모드를 함께 사용한다.
+test 그룹·sonnet 평가·시안 이미지 포함으로 시작하며 접속은
+`http://127.0.0.1:3000`, API·웹 종료는 Ctrl+C다. 개발은 `make serve`를 사용한다.
+dev와 test 그룹은 동시에 사용할 수 없으며 바꾸려면 서버를 재기동한다.
+위의 k3d(step 4) 절차는 별도의 로컬 배포 구성 검증 경로다. `demo-up`은
+k3d 기동·데이터 이관을 대신하지 않는다. 앞 절의 step 5 추가 예정 안내에
+해당하는 타깃이 이번에 추가됐다.
+
+trace 캡처는 `.env.example`의 obs 설정 이름을 준비한 뒤 사용자가
+`make obs-up` → `make obs-check`를 실행하고 `http://127.0.0.1:3001`에서
+확인한다. `obs-check`는 합성 trace의 ingestion/readback을 점검하며,
+실제 시연 요청의 타임라인·비용은 화면에서 따로 확인한다. **사용자가 실제
+타임라인에서 지연을 확인한 뒤에만** 다음 문장을 사용한다.
+
+[Langfuse 타임라인 확인 후 사용] 에이전트별 지연과 비용을 Langfuse에서 관측했다.

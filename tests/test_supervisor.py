@@ -2,6 +2,7 @@
 
 import json
 from copy import deepcopy
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from test_domain_supervisor import decision_data
@@ -21,6 +22,37 @@ from beautyads.llm.structured import StructuredFailure, StructuredResult
 
 AGG = next(tool.name for tool in TOOLS if tool.kind == "aggregate")
 LOOKUP = next(tool.name for tool in TOOLS if tool.kind == "lookup")
+
+
+def test_step_timestamps_are_utc_ordered_and_absent_from_callbacks(monkeypatch):
+    start = datetime(2026, 11, 20, tzinfo=UTC)
+    times = []
+
+    def utcnow():
+        value = start + timedelta(milliseconds=len(times) // 2)
+        times.append(value)
+        return value
+
+    monkeypatch.setattr(supervisor, "_utcnow", utcnow)
+    f = Fakes(plan={"status": "done", "rework_count": 2, "image": {"ok": True}})
+    result = supervisor.run_request(**f.args())
+    assert result["kind"] == "plan"
+    assert [step["at"] for step in result["steps"]] == [t.isoformat() for t in times]
+    assert times and times == sorted(times)
+    assert all(
+        datetime.fromisoformat(step["at"]).utcoffset() == timedelta(0)
+        for step in result["steps"]
+    )
+    events = [item for item in f.order if isinstance(item, dict)]
+    assert all("at" not in event for event in events)
+    assert [
+        {key: value for key, value in event.items() if key != "event"}
+        for event in events
+        if event["event"] == "step"
+    ] == [
+        {key: value for key, value in step.items() if key != "at"}
+        for step in result["steps"]
+    ]
 
 
 class Structured(CaptureStructured):
@@ -967,7 +999,11 @@ def test_clarification_stops_before_research_and_planning(
 
 
 @pytest.mark.parametrize("requested", [None, "hydration", "other"])
-def test_absent_claim_lookup_preserves_every_existing_result_field(requested):
+def test_absent_claim_lookup_preserves_every_existing_result_field(
+    requested, monkeypatch
+):
+    stamp = datetime(2026, 11, 20, tzinfo=UTC)
+    monkeypatch.setattr(supervisor, "_utcnow", lambda: stamp)
     f = Fakes(decision=decision_data(claim=requested))
     baseline = supervisor.run_request(**f.args())
     repeated = supervisor.run_request(

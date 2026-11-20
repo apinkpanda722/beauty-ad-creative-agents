@@ -25,6 +25,7 @@ _MODELS = frozenset(
     {"gpt-6-luna", "gpt-6.1-terra", "claude-haiku-5-5", "claude-sonnet-5-5"}
 )
 _UNSET = object()
+_monotonic = time.monotonic
 
 
 class ToolCall(NamedTuple):
@@ -64,6 +65,7 @@ def record_usage(
     response_cost: float | None,
     reasoning_effort: str | None,
     now: Callable[[], datetime] | None,
+    duration_ms: int | None = None,
 ) -> tuple[float, CostSource]:
     cost, source = resolve_cost(model, response_cost=response_cost, usage=usage)
     price = price_for(model)
@@ -88,6 +90,7 @@ def record_usage(
             cost_usd=cost,
             cost_source=source,
             reasoning_effort=reasoning_effort if price.provider == "openai" else None,
+            duration_ms=duration_ms,
         ),
     )
     return cost, source
@@ -237,6 +240,7 @@ def _chat(
                 else require_setting(f"{provider.upper()}_API_KEY")
             )
         try:
+            started = _monotonic()
             response = call(**kwargs)
         except Exception as exc:  # noqa: BLE001 -- classify every SDK failure, retry only known safe cases
             kind = classify_error(exc)
@@ -265,6 +269,7 @@ def _chat(
         response_cost=None if stream else hidden.get("response_cost"),
         reasoning_effort=reasoning_effort,
         now=now,
+        duration_ms=int((_monotonic() - started) * 1000),
     )
     return _result(raw, usage, cost, source)
 

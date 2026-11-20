@@ -338,3 +338,29 @@ def test_text_only_signature_and_invalid_input(args):
         with pytest.raises(ValueError, match="PROMPT_INVALID"):
             generate_image(**(args | {"prompt": prompt}), completion_fn=fn)
         fn.assert_not_called()
+
+
+@pytest.mark.parametrize("retry", [False, True])
+def test_image_duration_measures_only_successful_dispatch(args, monkeypatch, retry):
+    clock = {"seconds": 1.0}
+    monkeypatch.setattr(image, "_monotonic", lambda: clock["seconds"])
+    attempts = []
+
+    def dispatch(**kwargs):
+        attempts.append(clock["seconds"])
+        if retry and len(attempts) == 1:
+            clock["seconds"] += 4.0
+            raise error(503)
+        clock["seconds"] += 1.5
+        return response()
+
+    def sleep(seconds):
+        clock["seconds"] += seconds
+
+    assert generate_image(
+        **args, completion_fn=dispatch, sleep=sleep, backoff_s=(10.0,)
+    ).ok
+    assert attempts == ([1.0, 15.0] if retry else [1.0])
+    (row,) = read_entries(args["ledger_path"]).entries
+    assert row.duration_ms == 1500
+    assert row.ts == STAMP

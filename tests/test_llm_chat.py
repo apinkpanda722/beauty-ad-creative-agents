@@ -439,3 +439,77 @@ def test_tool_choice_allowance_is_openai_only(
         assert "tool_choice" not in kwargs
     else:
         assert kwargs.get("tool_choice") == choice
+
+
+@pytest.mark.parametrize("complete", [chat_complete, chat_stream])
+def test_successful_call_duration_includes_stream_consumption(
+    args, monkeypatch, complete
+):
+    clock = {"seconds": 1.0}
+    monkeypatch.setattr(chat, "_monotonic", lambda: clock["seconds"])
+    raw = probe()
+
+    def chunks():
+        clock["seconds"] = 2.0
+        yield {"synthetic": True}
+        clock["seconds"] = 2.25
+
+    def build(chunks, *, messages):
+        clock["seconds"] = 2.5
+        return raw
+
+    def dispatch(**kwargs):
+        if complete is chat_stream:
+            return chunks()
+        clock["seconds"] = 2.5
+        return raw
+
+    monkeypatch.setattr(chat.litellm, "stream_chunk_builder", build)
+    complete(**args, completion_fn=dispatch)
+    (row,) = read_entries(args["ledger_path"]).entries
+    assert row.duration_ms == 1500
+    assert row.ts == STAMP
+
+
+def test_call_duration_excludes_failed_attempt_and_backoff(args, monkeypatch):
+    clock = {"seconds": 1.0}
+    monkeypatch.setattr(chat, "_monotonic", lambda: clock["seconds"])
+    attempts = []
+
+    def dispatch(**kwargs):
+        attempts.append(clock["seconds"])
+        if len(attempts) == 1:
+            clock["seconds"] += 4.0
+            raise error(503)
+        clock["seconds"] += 1.5
+        return probe()
+
+    def sleep(seconds):
+        clock["seconds"] += seconds
+
+    chat_complete(**args, completion_fn=dispatch, sleep=sleep, backoff_s=(10.0,))
+    assert attempts == [1.0, 15.0]
+    (row,) = read_entries(args["ledger_path"]).entries
+    assert row.duration_ms == 1500
+
+
+def test_record_usage_duration_is_optional_keyword(args):
+    parameter = inspect.signature(record_usage).parameters["duration_ms"]
+    assert parameter.kind is inspect.Parameter.KEYWORD_ONLY
+    assert parameter.default is None
+    for duration in (None, 0, 1500):
+        record_usage(
+            model=args["model"],
+            purpose=args["purpose"],
+            ledger_path=args["ledger_path"],
+            usage={},
+            response_cost=0.01,
+            reasoning_effort="low",
+            now=lambda: STAMP,
+            duration_ms=duration,
+        )
+    assert [row.duration_ms for row in read_entries(args["ledger_path"]).entries] == [
+        None,
+        0,
+        1500,
+    ]

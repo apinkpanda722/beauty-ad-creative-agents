@@ -36,6 +36,16 @@ class TraceStep(_TraceModel):
     agent: Token
     phase: Token
     status: Token
+    at: datetime | None = Field(default=None, exclude_if=lambda value: value is None)
+
+    @field_validator("at")
+    @classmethod
+    def utc_timestamp(cls, value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        if value.utcoffset() is None:
+            raise ValueError("at must include a timezone")
+        return value.astimezone(UTC)
 
 
 class TraceTool(_TraceModel):
@@ -115,6 +125,21 @@ class TraceCall(_TraceModel):
     cached_tokens: Count = 0
     cost_usd: float
     cost_source: Literal["response_cost", "computed", "missing", "price_table"]
+    duration_ms: Count | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
+    ended_at: datetime | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
+
+    @field_validator("ended_at")
+    @classmethod
+    def utc_timestamp(cls, value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        if value.utcoffset() is None:
+            raise ValueError("ended_at must include a timezone")
+        return value.astimezone(UTC)
 
 
 class TraceStructured(_TraceModel):
@@ -290,7 +315,11 @@ def build_trace(
             )
         )
     calls = [
-        TraceCall(**_project(TraceCall, entry.model_dump())) for entry in ledger_entries
+        TraceCall(
+            **_project(TraceCall, entry.model_dump()),
+            ended_at=entry.ts if entry.duration_ms is not None else None,
+        )
+        for entry in ledger_entries
     ]
     by_purpose = defaultdict(list)
     for call in calls:
@@ -384,11 +413,15 @@ def summarize_by_tenant(records: list[TraceRecord]) -> dict[str, dict]:
     summaries = {}
     for tenant, traces in grouped.items():
         purposes = defaultdict(list)
+        durations = defaultdict(int)
         failures = defaultdict(int)
         details = defaultdict(int)
         structured_calls = 0
         distribution = []
         for trace in traces:
+            for call in trace.calls:
+                if call.duration_ms is not None:
+                    durations[call.purpose] += call.duration_ms
             distribution.extend(row.model_dump() for row in trace.pattern_distribution)
             for purpose, cost in trace.cost_by_purpose.items():
                 purposes[purpose].append(cost)
@@ -408,6 +441,7 @@ def summarize_by_tenant(records: list[TraceRecord]) -> dict[str, dict]:
             },
             "first_attempt_failures": dict(failures),
             "structured_calls": structured_calls,
+            **({"duration_ms_by_purpose": dict(durations)} if durations else {}),
             **({"pattern_distribution": distribution} if distribution else {}),
             **({"first_attempt_failure_details": dict(details)} if details else {}),
         }

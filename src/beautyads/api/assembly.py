@@ -6,6 +6,7 @@ from contextlib import AsyncExitStack
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
+from threading import Thread
 from time import monotonic
 from uuid import uuid4
 
@@ -60,9 +61,10 @@ from beautyads.graph.fragment_queries import (
 from beautyads.llm.chat import chat_complete
 from beautyads.llm.image import generate_image
 from beautyads.llm.structured import make_structured
+from beautyads.obs.langfuse_sink import export_trace
 from beautyads.obs.ledger import CostCapExceeded, ledger_total, read_entries
 from beautyads.obs.trace import append_trace, build_trace
-from beautyads.settings import DEFAULT_ENV_FILE, get_setting
+from beautyads.settings import DEFAULT_ENV_FILE, get_setting, langfuse_settings
 from beautyads.sources.claim_rules import load_claim_rules
 from beautyads.sources.workspaces import load_workspaces
 from beautyads.store.connection import connect, postgres_dsn
@@ -153,6 +155,7 @@ async def assemble_full(
         **(models or {}),
     }
     config = {"environ": environ, "env_file": env_file}
+    observation_settings = langfuse_settings(**config)
     caps = dict(settings.provider_caps_usd)
     purpose_caps = dict(settings.purpose_caps_usd)
 
@@ -599,6 +602,15 @@ async def assemble_full(
                             else settings.ledger_path.with_name("traces.jsonl"),
                             record,
                         )
+                        if observation_settings is not None:
+
+                            def send_trace():
+                                try:
+                                    export_trace(record, settings=observation_settings)
+                                except Exception:  # noqa: BLE001, S110 -- observation must never leak diagnostics
+                                    pass
+
+                            Thread(target=send_trace, daemon=True).start()
                     except Exception:  # noqa: BLE001, S110 -- observation must preserve results without diagnostics
                         pass
 

@@ -121,6 +121,18 @@ live-isolation:
 demo-clarify:
 	uv run python -m beautyads.eval.clarify_demo $(ARGS)
 
+.PHONY: obs-up obs-down obs-check
+obs-up:
+	uv run python -m beautyads.obs.langfuse_check preflight
+	$(COMPOSE) --profile obs up -d
+
+obs-down:
+	$(COMPOSE) --profile obs stop
+	$(COMPOSE) --profile obs rm -f
+
+obs-check:
+	uv run python -m beautyads.obs.langfuse_check
+
 # make serve; make serve BEAUTYADS_GROUP=test BEAUTYADS_EVAL_MODEL=claude-sonnet-5-5 BEAUTYADS_WITH_IMAGE=1
 .PHONY: serve
 serve:
@@ -129,3 +141,45 @@ serve:
 .PHONY: web-install
 web-install:
 	cd web && pnpm install --frozen-lockfile
+
+K3D_KUBECTL := kubectl --context k3d-beautyads -n beautyads
+
+.PHONY: k3d-up
+k3d-up:
+	@test -f .env || { echo "K3D_ENV_MISSING: see .env.example"; exit 1; }
+	docker build -f deploy/Dockerfile.api -t beautyads-api:local .
+	docker build -f deploy/Dockerfile.web --build-arg BEAUTYADS_API_ORIGIN=http://api:8000 -t beautyads-web:local .
+	@bash -o pipefail -c 'clusters=$$(k3d cluster list --no-headers) && { printf "%s\n" "$$clusters" | awk '\''$$1 == "beautyads" {found=1} END {exit !found}'\'' || k3d cluster create beautyads --agents 0 -p "3100:30000@server:0"; }'
+	k3d image import beautyads-api:local beautyads-web:local -c beautyads
+	$(K3D_KUBECTL) apply -f deploy/k3d/namespace.yaml
+	@bash -o pipefail -c '$(K3D_KUBECTL) create secret generic beautyads-env --from-env-file=.env --dry-run=client -o yaml | $(K3D_KUBECTL) apply -f -'
+	$(K3D_KUBECTL) apply -k deploy/k3d
+	$(K3D_KUBECTL) rollout status statefulset/postgres --timeout=300s
+	$(K3D_KUBECTL) rollout status statefulset/neo4j --timeout=300s
+	$(K3D_KUBECTL) rollout restart deployment/api deployment/web
+	$(K3D_KUBECTL) rollout status deployment/api --timeout=300s
+	$(K3D_KUBECTL) rollout status deployment/web --timeout=300s
+
+.PHONY: k3d-seed
+k3d-seed:
+	@if [ "$(CONFIRM)" != "yes" ]; then echo "K3D_SEED_NOT_CONFIRMED: make k3d-seed CONFIRM=yes"; exit 1; fi
+	@test -f data/manifest/costs.jsonl || { echo "K3D_LEDGER_MISSING: data/manifest/costs.jsonl"; exit 1; }
+	$(K3D_KUBECTL) rollout status deployment/api --timeout=300s
+	@bash -o pipefail -c 'docker exec beautyads-postgres pg_dump -U beautyads -d beautyads --clean --if-exists --no-owner --no-privileges | $(K3D_KUBECTL) exec -i postgres-0 -- psql -U beautyads -d beautyads --set ON_ERROR_STOP=1'
+	# kubectl verifies the Pod runtime; retain bounded Service TCP checks through sync's existing injection points.
+	$(K3D_KUBECTL) exec deployment/api -c api -- sh -ec 'for layer in 1 2 3; do python -c '\''from beautyads.pipeline.sync import main, tcp_reachable; from beautyads.settings import get_setting; raise SystemExit(main(docker_check=lambda: True, tcp_check=lambda host, port, timeout: tcp_reachable(get_setting("BEAUTYADS_POSTGRES_HOST", "127.0.0.1") if host == "127.0.0.1" else host, port, timeout)))'\'' --layers "$$layer" --full; done'
+	$(K3D_KUBECTL) exec deployment/api -c api -- mkdir -p /app/data/manifest
+	@set -eu; pod=$$($(K3D_KUBECTL) get pods -l app=api --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}'); test -n "$$pod"; $(K3D_KUBECTL) cp data/manifest/costs.jsonl "$$pod:/app/data/manifest/costs.jsonl" -c api
+	$(K3D_KUBECTL) rollout restart deployment/api
+	$(K3D_KUBECTL) rollout status deployment/api --timeout=300s
+
+.PHONY: k3d-down
+k3d-down:
+	@if [ "$(CONFIRM)" != "yes" ]; then echo "K3D_DOWN_NOT_CONFIRMED: make k3d-down CONFIRM=yes"; exit 1; fi
+	k3d cluster delete beautyads
+
+# make demo-up: 시연(test 그룹, sonnet, 시안 포함, 웹 운영 모드). 개발은 make serve
+.PHONY: demo-up
+demo-up:
+	$(MAKE) db-up
+	@bash -c 'trap "kill 0" EXIT; BEAUTYADS_GROUP=test BEAUTYADS_EVAL_MODEL=claude-sonnet-5-5 BEAUTYADS_WITH_IMAGE=1 uv run python -m beautyads.api.main & (cd web && pnpm build && pnpm start) & wait'

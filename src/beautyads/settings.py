@@ -105,6 +105,31 @@ def neo4j_uri(
     )
 
 
+class LangfuseSettings(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    host: str = Field(default="http://127.0.0.1:3001", repr=False)
+    public_key: str = Field(repr=False)
+    secret_key: str = Field(repr=False)
+
+
+def langfuse_settings(
+    *,
+    environ: Mapping[str, str] | None = None,
+    env_file: Path | None = DEFAULT_ENV_FILE,
+) -> LangfuseSettings | None:
+    config = {"environ": environ, "env_file": env_file}
+    public_key = get_setting("LANGFUSE_PUBLIC_KEY", **config)
+    secret_key = get_setting("LANGFUSE_SECRET_KEY", **config)
+    if public_key is None or secret_key is None:
+        return None
+    return LangfuseSettings(
+        public_key=public_key,
+        secret_key=secret_key,
+        host=get_setting("LANGFUSE_HOST", "http://127.0.0.1:3001", **config),
+    )
+
+
 class Settings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

@@ -7,7 +7,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Literal, NamedTuple
 
-from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 Provider = Literal["gemini", "openai", "anthropic"]
 _ledger_lock = Lock()
@@ -28,6 +28,9 @@ class LedgerEntry(BaseModel):
     cost_usd: float
     cost_source: Literal["response_cost", "computed", "missing", "price_table"]
     reasoning_effort: str | None = None
+    duration_ms: int | None = Field(
+        default=None, strict=True, ge=0, exclude_if=lambda value: value is None
+    )
 
     @field_validator("ts")
     @classmethod

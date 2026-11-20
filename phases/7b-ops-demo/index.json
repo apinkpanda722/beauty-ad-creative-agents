@@ -1,0 +1,78 @@
+{
+  "project": "beauty-ad-creative-agents",
+  "phase": "7b-ops-demo",
+  "steps": [
+    {
+      "step": 1,
+      "name": "ci-verify",
+      "status": "completed",
+      "started_at": "2026-11-20T19:58:49+0900",
+      "summary": "SHA 고정 verify 워크플로와 구조 테스트 추가, 지정 테스트에 키 주입 완료. make verify 통과(Python 6,223건·웹 125건), .env 없이 env -u GEMINI_API_KEY 단독 테스트 통과. 워크플로 구조 검증 통과, 실제 러너 실행은 미확인. 패키지 설치 없음.",
+      "completed_at": "2026-11-20T20:03:31+0900",
+      "usage": {
+        "input_tokens": 748077,
+        "cached_input_tokens": 696448,
+        "output_tokens": 4771,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 2,
+      "name": "trace-time",
+      "status": "completed",
+      "started_at": "2026-11-20T20:03:39+0900",
+      "summary": "단계 시각·호출 소요 시간·종료 시각·목적별 시간 집계 구현. 반복 결과 비교 테스트 2곳에 고정 시계 주입(기존 단언 유지). make verify 통과(Python 6,250건·웹 125건). 패키지 설치·커밋 없음.",
+      "completed_at": "2026-11-20T20:10:40+0900",
+      "usage": {
+        "input_tokens": 2160406,
+        "cached_input_tokens": 2051840,
+        "output_tokens": 10432,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 3,
+      "name": "langfuse-sink",
+      "status": "completed",
+      "started_at": "2026-11-20T20:11:00+0900",
+      "summary": "Langfuse 시간·비용 비동기 sink, obs profile·확인 도구·계약 문서 구현. make verify 통과(Python 6,283건·웹 125건), 실제 서버·화면 미확인. langfuse==3.15.0 설치; 전이 추가: backoff 2.2.1, googleapis-common-protos 1.76.0, protobuf 7.36.2, wrapt 1.17.3, opentelemetry-{sdk,proto,exporter-otlp-proto-common,exporter-otlp-proto-http} 1.45.2, opentelemetry-{semantic-conventions,exporter-http-transport,exporter-otlp-common} 0.66b2. SDK의 packaging<26 제약으로 packaging 26.3→25.0.",
+      "completed_at": "2026-11-20T20:23:18+0900",
+      "usage": {
+        "input_tokens": 2585041,
+        "cached_input_tokens": 2486528,
+        "output_tokens": 23978,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 4,
+      "name": "k3d-deploy",
+      "status": "completed",
+      "started_at": "2026-11-20T20:23:38+0900",
+      "usage": {
+        "input_tokens": 1882954,
+        "cached_input_tokens": 1798912,
+        "output_tokens": 17747,
+        "attempts": 1
+      },
+      "summary": "Dockerfile 2종·k3d 매니페스트·Make 타깃·README와 호스트 설정 추가, trace 테스트 수정. Pod 동기화는 기존 주입점으로 Service TCP 점검 유지. make verify 통과(Python 6,311건·웹 125건), standalone 빌드 통과, PYTHONHASHSEED=0·1·2·3에서 두 회귀 케이스 모두 통과. 실제 클러스터·이미지 빌드·이관 미실행. 패키지 설치·커밋 없음.",
+      "completed_at": "2026-11-20T20:49:00+0900"
+    },
+    {
+      "step": 5,
+      "name": "demo-kit",
+      "status": "completed",
+      "started_at": "2026-11-20T20:49:14+0900",
+      "summary": "DEMO.md·상세 페이지 초안·demo-up·리허설 점검표·P7 결정/문제 기록과 정적 테스트 추가. make verify 통과(Python 6,322건·웹 125건). 실제 기동·화면 미확인, 패키지 설치·커밋 없음.",
+      "completed_at": "2026-11-20T21:00:38+0900",
+      "usage": {
+        "input_tokens": 3980266,
+        "cached_input_tokens": 3824768,
+        "output_tokens": 22360,
+        "attempts": 1
+      }
+    }
+  ],
+  "created_at": "2026-11-20T19:58:49+0900",
+  "completed_at": "2026-11-20T21:00:38+0900"
+}
