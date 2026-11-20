@@ -358,7 +358,7 @@ tests/
 
 ## 스트리밍 이벤트와 화면 명령
 
-API는 SSE로 네 종류의 이벤트를 보낸다.
+API는 SSE로 일곱 종류의 이벤트를 보낸다.
 
 | 이벤트 | 내용 |
 |---|---|
@@ -366,6 +366,24 @@ API는 SSE로 네 종류의 이벤트를 보낸다.
 | `step` | 에이전트 단계 시작·종료(Supervisor, 리서치, 기획, 평가, 되돌림) |
 | `tool_start` | 도구 호출 시작(도구 이름, 종류) |
 | `ui_command` | 화면에 그릴 것. 답변 글자와 별도 경로로 간다 |
+| `error` | 처리 실패 또는 선택 오류의 코드. 이 이벤트 뒤 스트림 종료 |
+| `needs_clarification` | 효능 선택을 위한 고정 안내와 선택지 |
+| `efficacy_unavailable` | 효능 조회 불가의 고정 안내와 사유 |
+
+`/ask`는 진행 이벤트 뒤 기존 `ui_command`들을 순서대로 보내고, 새 `show_aggregates`·`show_cost`를 해당 조건이 성립할 때 그 뒤에 붙인 다음 마지막 `token`으로 종료한다. 별도 종료 이벤트는 없다. 되묻기는 `needs_clarification` → `token`, 효능 조회 불가는 `efficacy_unavailable` → `token`으로 종료하며 화면 명령은 보내지 않는다. 선택 오류와 처리 예외는 `error`로 종료하고 `token`을 보내지 않는다.
+
+진행 이벤트의 실제 순서는 `tests/test_supervisor.py`의 `test_events_arrive_at_stage_boundaries_including_tools_reworks_image`가 고정한다. 아래는 정상 진행 경로이며, 리서치나 기획이 필요 없는 요청·실패·한도 도달에서는 해당 단계가 생략된다. **Supervisor와 리서치는 시작 이벤트가 없고 끝날 때만 온다.** `tool_start`도 실시간 도구 시작 통지가 아니라 리서치 종료 뒤 `handoff.result_counts`의 호출 순서대로 일괄 전송된다.
+
+| 순서 | 이벤트 | 조건·반복 |
+|---|---|---|
+| 1 | `step(supervisor,end,ok)` | 요청 유형 판정 종료(실패 시 `failed`) |
+| 2 | `step(research,end,<상태>)` | 리서치 종료 |
+| 3 | `tool_start` | 리서치 종료 뒤 도구 호출 순서대로 일괄 |
+| 4 | `step(planning,start,running)` | 기획안마다 4~7 반복 |
+| 5 | `step(evaluation,end,<상태>)` | 해당 기획안의 평가 종료 |
+| 6 | `step(rework,end,done)` | 해당 기획안의 되돌림 횟수만큼 반복 |
+| 7 | `step(image,end,ok\|failed)` | 이미지 결과가 있으면 전송 |
+| 8 | `step(supervisor,done,<kind>)` | 최종 결과 종류와 함께 진행 이벤트 종료 |
 
 화면 명령은 종류와 데이터로 이루어진다.
 
@@ -375,8 +393,18 @@ API는 SSE로 네 종류의 이벤트를 보낸다.
 | `show_graph_fragment` | 응답에 쓰인 노드와 관계를 그래프로 표시 |
 | `show_distribution` | 분류 값별 분포 차트 |
 | `show_plan` | 기획안 카드(훅, 장면 구성, 카피, 근거 ID, 평가 결과) |
+| `show_aggregates` | 도구가 센 건수·모델 작성값·제거된 키를 분리 표시 |
+| `show_cost` | 요청의 텍스트 모델 비용과 상한(이미지 제외) |
 
 화면 명령의 데이터는 모델을 거치지 않는다. 도구가 전체 결과를 화면 명령으로 보내고 모델에는 요약만 준다(컨텍스트 관리의 도구 반환 이원화).
+
+`show_aggregates.data`는 `{"label": AGGREGATES_LABEL, "verified_counts": [{"tool", "row_count", "shown_count", "count_label"}], "model_written": [{"name", "value"}], "removed": ["키 이름"]}` 형태다(중괄호 안 키 목록은 각 항목의 필드). 기존 텍스트에 aggregates를 표시하던 조건, 즉 남은 `handoff.aggregates` 또는 `aggregates_removed`가 있을 때만 보낸다. `verified_counts`는 `handoff.result_counts`에 코드가 `count_label`을 붙인 도구별 건수다. `model_written`은 Supervisor의 `verify_aggregates`를 통과한 모델 작성값 중 제거 목록에 없는 키만 담고, `removed`는 도구 출력에 없어 제거된 키 이름만 담는다. 통과분도 모델이 쓴 문장이므로 `label`은 항상 **"모델 작성값, 검증되지 않음"**(`AGGREGATES_LABEL`)이며, 코드가 센 건수와 별도로 표시한다.
+
+`show_cost.data`는 `{"label": "텍스트 모델 비용(이미지 제외)", "text_spent_usd": float, "max_text_cost_usd": float}`다. 결과의 `limits.text_spent_usd`와 `limits.max_text_cost_usd`가 둘 다 유한한 숫자(bool 제외)일 때만 보낸다. 이미지 비용은 합산하지 않으며 추가 원장 조회도 하지 않는다.
+
+마지막 `token` 본문의 `text`는 기존 `View.answer_text` 그대로다. 선택 키 `display_text`는 `View.display_text`가 `None`이 아니고 `answer_text`와 다를 때만 추가한다. 이 화면용 텍스트에는 고정 안내·"기획안입니다."·"리서치 결과입니다."·리서치 결론·한도 도달 안내만 남기고, 구조화 명령으로 따로 그리는 기획안 제목·훅·장면·카피·도구별 건수·aggregates 줄은 넣지 않는다. 같거나 `None`이면 기존 `{"text": ...}`만 보낸다. 되묻기·효능 조회 불가·선택 오류의 `display_text`는 `None`이고 `ui_commands`는 빈 목록이다. 터미널 `chat_client`는 계속 `text`만 읽는다.
+
+근거 카드의 키는 기존 `evidence_id`·`source`·`url`·`brand`·`title`·`published_at`·`view_count`·`like_count` 뒤에 `hook_type`·`angle`·`format`·`talent`·`cta_type`·`claims`를 추가한 순서다. `hydrate`가 주지 않은 값은 `None`이며, 라벨 없는 소재도 카드를 그대로 보낸다(`claims`는 `[]` 또는 `None`).
 
 ## 요청 처리 공통 장치
 

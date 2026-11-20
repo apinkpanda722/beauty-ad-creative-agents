@@ -869,3 +869,83 @@ def test_create_app_no_confirmed_efficacy_clarification_options():
         ("token", {"text": CLARIFY_NO_CONFIRMED_TEXT}),
     ]
     assert initial.tenants.saved == []
+
+
+@pytest.mark.parametrize("kind", ["plan", "research"])
+def test_create_app_adds_display_text_and_appends_new_commands(kind):
+    from beautyads.api.ask_view import build_view
+
+    raw = result()
+    raw["kind"] = kind
+    raw["limits"] = {"text_spent_usd": 0.125, "max_text_cost_usd": 0.3}
+    if kind == "research":
+        raw["plans"] = []
+    initial = services(lambda *args, **kwargs: raw)
+    with TestClient(create_app(lambda: initial)) as client:
+        response = post(client)
+    assert response.status_code == 200
+    view = build_view(
+        raw,
+        plan_ids=[record.plan_id for _, record in initial.tenants.saved],
+        hydrate=initial.hydrate,
+    )
+    events = parse_sse(response.text)
+    expected_kinds = ["show_evidence_cards"]
+    if kind == "plan":
+        expected_kinds.append("show_plan")
+    expected_kinds.extend(
+        ["show_distribution", "show_graph_fragment", "show_aggregates", "show_cost"]
+    )
+    assert [
+        body["kind"] for name, body in events if name == "ui_command"
+    ] == expected_kinds
+    assert events == [
+        *[("ui_command", item) for item in view.ui_commands],
+        ("token", {"text": view.answer_text, "display_text": view.display_text}),
+    ]
+    assert view.display_text is not None and view.display_text != view.answer_text
+
+
+@pytest.mark.parametrize("kind", ["needs_clarification", "efficacy_unavailable"])
+def test_create_app_early_notice_token_stays_text_only_with_extra_result_data(kind):
+    from beautyads.api.ask_view import build_view
+
+    raw = result()
+    raw.update(
+        kind=kind,
+        plans=[],
+        limits={"text_spent_usd": 0.1, "max_text_cost_usd": 0.3},
+        clarification={
+            "reason": "no_efficacy_confirmed",
+            "available_efficacy": [],
+            "options": ["none", "cancel"],
+        },
+        efficacy_unavailable={"reason": "failed"},
+    )
+    initial = services(lambda *args, **kwargs: raw)
+    initial.hydrate = lambda ids: pytest.fail("notice must not hydrate")
+    view = build_view(raw, plan_ids=[], hydrate=initial.hydrate)
+    with TestClient(create_app(lambda: initial)) as client:
+        response = post(client)
+    events = parse_sse(response.text)
+    assert response.status_code == 200
+    assert [name for name, _ in events] == [kind, "token"]
+    assert events[-1] == ("token", {"text": view.answer_text})
+    assert initial.tenants.saved == []
+
+
+@pytest.mark.parametrize("display_text", [None, "synthetic", ""])
+def test_final_token_adds_display_text_only_when_present_and_different(
+    monkeypatch, display_text
+):
+    from beautyads.api import ask as ask_module
+    from beautyads.api.ask_view import View
+
+    view = View("synthetic", [], display_text=display_text)
+    monkeypatch.setattr(ask_module, "build_view", lambda *args, **kwargs: view)
+    with TestClient(create_app(lambda: services())) as client:
+        response = post(client)
+    body = {"text": view.answer_text}
+    if display_text == "":
+        body["display_text"] = ""
+    assert parse_sse(response.text) == [("token", body)]

@@ -183,7 +183,13 @@ def register_ask(app: FastAPI) -> None:
                     return
                 for command in outcome.ui_commands:
                     yield encode_event("ui_command", command)
-                yield encode_event("token", {"text": outcome.answer_text})
+                token = {"text": outcome.answer_text}
+                if (
+                    outcome.display_text is not None
+                    and outcome.display_text != outcome.answer_text
+                ):
+                    token["display_text"] = outcome.display_text
+                yield encode_event("token", token)
             finally:
                 # A disconnected stream cannot cancel a running synchronous
                 # request. The task consumes worker exceptions and saves plans.
