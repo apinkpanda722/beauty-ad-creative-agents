@@ -19,14 +19,16 @@
     {
       "step": 2,
       "name": "graph-api",
-      "status": "pending",
+      "status": "completed",
       "started_at": "2026-11-20T17:41:58+0900",
       "usage": {
-        "input_tokens": 26585,
-        "cached_input_tokens": 0,
-        "output_tokens": 429,
+        "input_tokens": 1442124,
+        "cached_input_tokens": 1350912,
+        "output_tokens": 13802,
         "attempts": 1
-      }
+      },
+      "summary": "읽기 전용 그래프·스키마·워크스페이스 API 3개와 카드 라벨 병합, 고정 질의·스키마 상수 및 테스트 추가. make verify 통과(6,164개), 계층 경계 준수, 패키지 설치 없음.",
+      "completed_at": "2026-11-20T17:51:48+0900"
     },
     {
       "step": 3,
