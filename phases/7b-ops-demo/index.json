@@ -47,7 +47,16 @@
     {
       "step": 4,
       "name": "k3d-deploy",
-      "status": "pending"
+      "status": "blocked",
+      "started_at": "2026-11-20T20:23:38+0900",
+      "blocked_reason": "이전 실패를 PYTHONHASHSEED=1로 재현했습니다. tests/test_api_assembly.py:1657의 두 케이스가 frozenset에서 선택한 dev-cosrx를 딕셔너리 첫 항목 dev-mixsoon과 비교해 실패합니다. “아래 에러를 반드시 참고하여 수정하라”는 요구를 충족하려면 해당 테스트 수정이 필요하지만, “이 step에 명시된 작업만 수행하라. 추가 기능이나 파일을 만들지 마라.” 및 수정 허용 경로 목록에서 해당 파일을 제외한 제한과 충돌합니다. 실제 요청 테넌트와 비교하도록 tests/test_api_assembly.py를 수정할 권한이 필요합니다.",
+      "blocked_at": "2026-11-20T20:37:51+0900",
+      "usage": {
+        "input_tokens": 3775224,
+        "cached_input_tokens": 3614464,
+        "output_tokens": 24398,
+        "attempts": 2
+      }
     },
     {
       "step": 5,
