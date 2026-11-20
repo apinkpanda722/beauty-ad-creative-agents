@@ -47,14 +47,16 @@
     {
       "step": 4,
       "name": "k3d-deploy",
-      "status": "pending",
+      "status": "completed",
       "started_at": "2026-11-20T20:23:38+0900",
       "usage": {
-        "input_tokens": 3775224,
-        "cached_input_tokens": 3614464,
-        "output_tokens": 24398,
-        "attempts": 2
-      }
+        "input_tokens": 1882954,
+        "cached_input_tokens": 1798912,
+        "output_tokens": 17747,
+        "attempts": 1
+      },
+      "summary": "Dockerfile 2종·k3d 매니페스트·Make 타깃·README와 호스트 설정 추가, trace 테스트 수정. Pod 동기화는 기존 주입점으로 Service TCP 점검 유지. make verify 통과(Python 6,311건·웹 125건), standalone 빌드 통과, PYTHONHASHSEED=0·1·2·3에서 두 회귀 케이스 모두 통과. 실제 클러스터·이미지 빌드·이관 미실행. 패키지 설치·커밋 없음.",
+      "completed_at": "2026-11-20T20:49:00+0900"
     },
     {
       "step": 5,
