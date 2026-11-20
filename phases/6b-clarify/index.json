@@ -47,7 +47,16 @@
     {
       "step": 4,
       "name": "efficacy-outcomes",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-20T15:39:54+0900",
+      "summary": "효능 조회 실패·제품 미등록 시 기획 차단, 확인 효능 0개 되묻기, 전용 SSE·추적 기록 구현 완료. make verify 6,063개 테스트 통과, 패키지 설치 없음.",
+      "completed_at": "2026-11-20T15:49:02+0900",
+      "usage": {
+        "input_tokens": 3602433,
+        "cached_input_tokens": 3475712,
+        "output_tokens": 14734,
+        "attempts": 1
+      }
     },
     {
       "step": 5,
