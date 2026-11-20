@@ -177,3 +177,9 @@ k3d-seed:
 k3d-down:
 	@if [ "$(CONFIRM)" != "yes" ]; then echo "K3D_DOWN_NOT_CONFIRMED: make k3d-down CONFIRM=yes"; exit 1; fi
 	k3d cluster delete beautyads
+
+# make demo-up: 시연(test 그룹, sonnet, 시안 포함, 웹 운영 모드). 개발은 make serve
+.PHONY: demo-up
+demo-up:
+	$(MAKE) db-up
+	@bash -c 'trap "kill 0" EXIT; BEAUTYADS_GROUP=test BEAUTYADS_EVAL_MODEL=claude-sonnet-5-5 BEAUTYADS_WITH_IMAGE=1 uv run python -m beautyads.api.main & (cd web && pnpm build && pnpm start) & wait'

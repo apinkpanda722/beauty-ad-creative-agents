@@ -309,3 +309,27 @@
 - **원인**: 효능 근거를 조회하지 못했거나 제품이 등록되지 않은 상태에서도 기획 단계로 넘어가도록 설계했다.
 - **해결**: 사용자 결정에 따라 조회 실패·제품 미등록은 차단하고, 확인 효능 0개는 되묻도록 변경했다.
 - **근거**: 효능 되묻기 step 4(`efficacy-outcomes`), 이슈 #55.
+
+## 2026-11-20 P7 클린 클론의 키 의존 테스트
+
+- **문제**: 클린 클론에서 `make verify`가 `tests/test_products_pipeline.py::test_model_contract_cost_summary_and_bytes_never_written` 1건 실패했다(P7 7b step 1).
+- **원인**: 모델 경계의 가짜 호출을 검사하는 테스트가 로컬 키 설정에 의존해 `.env`가 없는 환경에서 필요한 가짜 키를 받지 못했다.
+- **해결**: 지정 테스트의 가짜 환경에 테스트용 키를 명시적으로 전달했다. CI verify 워크플로와 워크플로 구조 검사도 추가했다.
+- **결과**: step 1에서 `make verify`와 `.env` 없이 `env -u GEMINI_API_KEY`로 실행한 단독 테스트가 통과했다. 실제 CI 러너 실행은 미확인이다.
+- **근거**: `tests/test_products_pipeline.py::test_model_contract_cost_summary_and_bytes_never_written`, `tests/test_ci_workflow.py`, `.github/workflows/verify.yml`, 사용자 제공 7b step 1 완료 기록.
+
+## 2026-11-20 P7 웹 의존성 버전 조정
+
+- **문제**: 7a step 4에서 처음 지정한 `typescript 7.0.2`·`eslint 10.15.0`이 Next 16.4.6과 호환되지 않아 조정이 필요했다.
+- **원인**: Next 린터는 TypeScript 7을 지원하지 않았고 Next 플러그인의 ESLint peer 범위와도 맞지 않았다. vitest의 esbuild 설정을 지원하는 Vite 버전도 필요했다.
+- **해결**: step의 호환 버전 조정 허용에 따라 `typescript 6.0.3`·`eslint 9.39.5`로 낮췄고 `vite 7.3.8`을 사용했다. 승인된 동반 패키지는 `vite`·`@testing-library/dom`·`@types/node`·`@types/react`·`@types/react-dom` 다섯 개이며 esbuild만 빌드 승인했다.
+- **결과**: 7a step 4의 `make web-install`과 `make verify`가 통과했다. 이번 demo-kit에서는 설치·의존성 변경을 하지 않았다.
+- **근거**: `web/package.json`, `web/pnpm-lock.yaml`, `phases/7a-web-core/step4.md`, 해당 step 완료 기록.
+
+## 2026-11-20 P7 step 파일의 요구와 금지사항 충돌
+
+- **문제**: 7a step 2의 스키마 레이블 요구와 금지사항, 7a step 4의 승인 표기와 금지사항이 각각 모순돼 구현 전 선점검에서 `blocked`됐다.
+- **원인**: 같은 step 안에서 허용·요구한 작업을 다른 문구가 금지하도록 작성돼 있었다.
+- **해결**: 두 건 모두 step 파일만 수정해 요구와 금지 범위를 일치시켰다. 중단 당시 구현 코드는 변경하지 않았다.
+- **결과**: step 지시의 모순을 정정한 뒤 재실행했다. 이 기록은 실제 선점검 중단이며 서비스 실행 실패 사례가 아니다.
+- **근거**: `phases/7a-web-core/step2.md`(스키마 레이블), `phases/7a-web-core/step4.md`(동반 패키지 승인 표기), 사용자 제공 P7 설계 검토·문제 기록.
