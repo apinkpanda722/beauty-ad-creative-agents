@@ -550,7 +550,9 @@ def test_makefile_adds_live_pilot_without_changing_verify():
     assert "live-" not in verify
     assert (
         verify
-        == "\tuv run ruff check .\n\tuv run ruff format --check .\n\tuv run pytest -q"
+        == "\tuv run ruff check .\n\tuv run ruff format --check .\n\tuv run pytest -q\n"
+        '\t@test -d web/node_modules || { echo "WEB_DEPS_MISSING: make web-install"; exit 1; }\n'
+        "\tcd web && pnpm lint && pnpm typecheck && pnpm test"
     )
 
 

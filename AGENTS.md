@@ -9,7 +9,7 @@
 - FastAPI(SSE), LangGraph, PostgreSQL(원본·체크포인터), Neo4j(그래프, 파생물), Langfuse(관측, compose `obs` profile)
 - 모델 호출은 LiteLLM **파이썬 SDK**(proxy 없음). 영상 분석 Gemini, Supervisor·리서치 OpenAI, 기획 OpenAI, 평가 Anthropic (`docs/ADR.md` ADR-005)
 - 테스트 pytest(+timeout, xdist), 린트 ruff
-- 웹(Next.js)은 M3 phase에서 추가한다. 지금은 `web/`이 없다.
+- 웹은 `web/`(Next.js 16, pnpm, TypeScript, vitest). 의존성 설치는 `make web-install`
 
 ## 계층 경계
 
@@ -67,6 +67,8 @@
 - 대기 루프는 `pgrep -f`처럼 명령줄 문자열 검색으로 자기 자신을 찾지 않게 PID(`kill -0`)와 완료 신호(`index.json` 상태·로그의 `completed!` 줄)로 확인하고, 상한(timeout)을 둔다.
 
 ## 명령어
+make web-install # 웹 의존성 설치
+make serve       # 로컬 API 서버 실행
 make verify      # ruff check + ruff format --check + pytest (Stop hook, execute.py, CI가 모두 이 명령을 부른다)
 uv run pytest -q # 테스트만
 uv run ruff check . && uv run ruff format .   # 린트와 포맷
