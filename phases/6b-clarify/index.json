@@ -33,7 +33,16 @@
     {
       "step": 3,
       "name": "clarify-prompts",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-20T14:59:52+0900",
+      "summary": "claim_choice 기획·평가 전달 및 승인 프롬프트, other 효능 처리·표시 구현 완료. 문서·렌더링 해시 갱신, make verify 6,021개 테스트 통과. 패키지 설치 없음.",
+      "completed_at": "2026-11-20T15:07:35+0900",
+      "usage": {
+        "input_tokens": 2236363,
+        "cached_input_tokens": 2121600,
+        "output_tokens": 13846,
+        "attempts": 1
+      }
     },
     {
       "step": 4,
