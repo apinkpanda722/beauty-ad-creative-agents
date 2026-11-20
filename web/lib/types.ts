@@ -135,3 +135,13 @@ export type SseFrame =
       };
     }
   | { event: "efficacy_unavailable"; data: { reason: "failed" | "no_product"; text: string } };
+
+export type Workspace = {
+  tenant_id: string;
+  display_name: string | null;
+  brand: string | null;
+  product_name: string | null;
+};
+export type WorkspacesResponse = { workspaces: Workspace[]; image_enabled: boolean };
+export type Clarification = Extract<SseFrame, { event: "needs_clarification" }>["data"];
+export type StepEvent = Extract<SseFrame, { event: "step" }>["data"];

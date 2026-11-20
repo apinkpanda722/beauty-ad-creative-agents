@@ -46,3 +46,43 @@ export async function postAsk(args: {
   }
   return { threadId: response.headers.get("X-Thread-Id"), events: events() };
 }
+
+export async function getWorkspaces(): Promise<import("./types").WorkspacesResponse> {
+  const response = await fetch("/api/workspaces");
+  if (!response.ok) throw new ApiError(response.status, null);
+  return response.json();
+}
+
+// Keep postAsk's existing default-body contract. The chat omits with_image when
+// the server disables images, while an explicit false still means unchecked.
+export async function postChatAsk(
+  args: Parameters<typeof postAsk>[0],
+): ReturnType<typeof postAsk> {
+  if (args.withImage !== undefined) return postAsk(args);
+  const response = await fetch("/api/ask", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Tenant-Id": args.tenantId },
+    body: JSON.stringify({
+      message: args.message,
+      ...(args.threadId !== undefined ? { thread_id: args.threadId } : {}),
+      ...(args.claimChoice !== undefined ? { claim_choice: args.claimChoice } : {}),
+    }),
+    ...(args.signal !== undefined ? { signal: args.signal } : {}),
+  });
+  if (response.status !== 200) {
+    let code: string | null = null;
+    try {
+      const error: ApiErrorBody | null = await response.json();
+      if (typeof error?.detail === "string") code = error.detail;
+    } catch {
+      // HTTP failures may contain non-JSON bodies.
+    }
+    throw new ApiError(response.status, code);
+  }
+  const stream = response.body;
+  async function* events(): AsyncGenerator<SseFrame> {
+    if (!stream) return;
+    for await (const frame of parseSseStream(stream)) yield frame as SseFrame;
+  }
+  return { threadId: response.headers.get("X-Thread-Id"), events: events() };
+}
