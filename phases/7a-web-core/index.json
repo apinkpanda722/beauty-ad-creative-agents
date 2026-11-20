@@ -33,7 +33,16 @@
     {
       "step": 3,
       "name": "view-contract",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-20T17:51:57+0900",
+      "summary": "show_aggregates·show_cost, display_text 조건부 SSE 전송, 카드 분석 속성 6개와 이벤트 계약 문서·테스트 추가. 기존 answer_text 유지, make verify 통과(6,207개), 패키지 설치 없음.",
+      "completed_at": "2026-11-20T17:58:37+0900",
+      "usage": {
+        "input_tokens": 1624594,
+        "cached_input_tokens": 1528704,
+        "output_tokens": 9844,
+        "attempts": 1
+      }
     },
     {
       "step": 4,
