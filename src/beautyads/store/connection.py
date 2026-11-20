@@ -35,9 +35,10 @@ def postgres_dsn(
     port = get_setting(
         "BEAUTYADS_POSTGRES_PORT", "5433", environ=environ, env_file=env_file
     )
-    return (
-        f"postgresql://beautyads:{quote(password, safe='')}@127.0.0.1:{port}/beautyads"
+    host = get_setting(
+        "BEAUTYADS_POSTGRES_HOST", "127.0.0.1", environ=environ, env_file=env_file
     )
+    return f"postgresql://beautyads:{quote(password, safe='')}@{host}:{port}/beautyads"
 
 
 class StoreConnectError(Exception):

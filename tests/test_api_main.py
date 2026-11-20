@@ -228,3 +228,46 @@ def test_make_serve_and_environment_names():
         "BEAUTYADS_API_PORT",
     ):
         assert f"# {name}=" in example.splitlines()
+
+
+@pytest.mark.parametrize("host", [None, "", " \t ", "127.0.0.1", "0.0.0.0"])
+def test_server_host_defaults_and_explicit_interfaces(host):
+    environ = {} if host is None else {"BEAUTYADS_API_HOST": host}
+    assert entry.server_host(environ=environ, env_file=None) == (
+        "0.0.0.0" if host == "0.0.0.0" else "127.0.0.1"
+    )
+
+
+@pytest.mark.parametrize("host", ["localhost", "::", "arbitrary-private-input"])
+def test_server_host_rejects_other_values_without_exposing_them(host):
+    with pytest.raises(InvalidSetting) as caught:
+        entry.server_host(environ={"BEAUTYADS_API_HOST": host}, env_file=None)
+    assert caught.value.name == "BEAUTYADS_API_HOST"
+    assert str(caught.value) == "BEAUTYADS_API_HOST"
+    assert host not in str(caught.value)
+
+
+@pytest.mark.parametrize("host", ["127.0.0.1", "0.0.0.0"])
+def test_main_passes_configured_host_and_prints_matching_url(monkeypatch, capsys, host):
+    configure_main(monkeypatch, {"BEAUTYADS_API_HOST": host})
+    runs = []
+    monkeypatch.setattr(entry.uvicorn, "run", lambda app, **kw: runs.append(kw))
+    entry.main()
+    assert runs == [{"host": host, "port": 8000}]
+    assert capsys.readouterr().out == (
+        "SERVE group=dev eval_model=claude-haiku-5-5 image=off "
+        f"url=http://{host}:8000\n"
+    )
+
+
+def test_main_invalid_host_exits_without_starting(monkeypatch, capsys):
+    configure_main(monkeypatch, {"BEAUTYADS_API_HOST": "localhost"})
+    monkeypatch.setattr(
+        entry.uvicorn, "run", lambda *a, **kw: pytest.fail("must not start")
+    )
+    with pytest.raises(SystemExit) as caught:
+        entry.main()
+    assert caught.value.code == 2
+    assert (
+        capsys.readouterr().out == "SERVE_FAILED INVALID_SETTING:BEAUTYADS_API_HOST\n"
+    )

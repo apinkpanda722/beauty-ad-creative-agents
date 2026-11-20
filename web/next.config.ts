@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const config: NextConfig = {
+  output: "standalone",
   agentRules: false,
   compress: false,
   async rewrites() {

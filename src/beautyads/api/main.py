@@ -1,4 +1,4 @@
-"""Local-only server entry point; assembly remains owned by the app lifespan."""
+"""Loopback by default; assembly remains owned by the app lifespan."""
 
 from functools import partial
 
@@ -59,19 +59,29 @@ def server_port(*, environ=None, env_file=DEFAULT_ENV_FILE) -> int:
     return port
 
 
+def server_host(*, environ=None, env_file=DEFAULT_ENV_FILE) -> str:
+    host = get_setting(
+        "BEAUTYADS_API_HOST", "127.0.0.1", environ=environ, env_file=env_file
+    )
+    if host not in {"127.0.0.1", "0.0.0.0"}:
+        raise InvalidSetting("BEAUTYADS_API_HOST")
+    return host
+
+
 def main() -> None:
     try:
         group, model, image = _serve_options()
         port = server_port()
+        host = server_host()
         app = build_app()
     except InvalidSetting as error:
         print(f"SERVE_FAILED INVALID_SETTING:{error.name}")
         raise SystemExit(2) from None
     print(
         f"SERVE group={group} eval_model={model} image={'on' if image else 'off'} "
-        f"url=http://127.0.0.1:{port}"
+        f"url=http://{host}:{port}"
     )
-    uvicorn.run(app, host="127.0.0.1", port=port)
+    uvicorn.run(app, host=host, port=port)
 
 
 if __name__ == "__main__":

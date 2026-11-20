@@ -1638,6 +1638,7 @@ def test_ask_exports_after_local_append_in_daemon_without_affecting_result(
 
     async def run():
         services = await rig.start()
+        tenant_id = next(iter(services.allowed_tenants))
         try:
             result = invoke(services)
             assert result["kind"] == "plan"
@@ -1648,13 +1649,14 @@ def test_ask_exports_after_local_append_in_daemon_without_affecting_result(
             release.set()
             assert finished.wait(5)
             await services.close()
+        return tenant_id
 
-    asyncio.run(run())
+    tenant_id = asyncio.run(run())
     assert len(observed) == 1
     record, settings, daemon, local = observed[0]
     assert settings is config and daemon is True
     assert local.records == [record] and local.skipped_lines == 0
-    assert record.tenant_id == next(iter(rig.profiles))
+    assert record.tenant_id == tenant_id
     assert "SYNTHETIC_PRIVATE_EXPORT_DIAGNOSTIC" not in caplog.text + str(
         capsys.readouterr()
     )

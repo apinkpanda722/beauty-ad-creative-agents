@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: beautyads
+spec:
+  type: NodePort
+  selector:
+    app: web
+  ports:
+    - port: 3000
+      targetPort: 3000
+      nodePort: 30000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: beautyads
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: web
+          image: beautyads-web:local
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 3000
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            periodSeconds: 5

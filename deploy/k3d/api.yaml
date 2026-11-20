@@ -1,0 +1,87 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: api-data
+  namespace: beautyads
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  namespace: beautyads
+spec:
+  selector:
+    app: api
+  ports:
+    - port: 8000
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: beautyads
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      initContainers:
+        - name: migrate
+          image: beautyads-api:local
+          imagePullPolicy: Never
+          command: [python, -m, beautyads.pipeline.migrate]
+          envFrom: &secret
+            - secretRef:
+                name: beautyads-env
+          env: &settings
+            - name: BEAUTYADS_GROUP
+              value: test
+            - name: BEAUTYADS_EVAL_MODEL
+              value: claude-sonnet-5-5
+            - name: BEAUTYADS_WITH_IMAGE
+              value: "1"
+            - name: BEAUTYADS_POSTGRES_HOST
+              value: postgres
+            - name: BEAUTYADS_POSTGRES_PORT
+              value: "5432"
+            - name: BEAUTYADS_NEO4J_URI
+              value: bolt://neo4j:7687
+            - name: BEAUTYADS_API_HOST
+              value: 0.0.0.0
+            - name: BEAUTYADS_API_PORT
+              value: "8000"
+            - name: BEAUTYADS_LEDGER_PATH
+              value: /app/data/manifest/costs.jsonl
+      containers:
+        - name: api
+          image: beautyads-api:local
+          imagePullPolicy: Never
+          envFrom: *secret
+          env: *settings
+          ports:
+            - containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            periodSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: api-data

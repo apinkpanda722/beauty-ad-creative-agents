@@ -710,6 +710,21 @@ def test_postgres_dsn_defaults_and_overridden_port(port, expected):
     assert unquote(parsed.password) == password
 
 
+@pytest.mark.parametrize("host", [None, "", " \t ", "postgres"])
+@pytest.mark.parametrize("port", [None, "6543"])
+def test_postgres_dsn_host_preserves_defaults_and_password_encoding(host, port):
+    environ = {"POSTGRES_PASSWORD": "synthetic /@:'?#% value"}
+    if host is not None:
+        environ["BEAUTYADS_POSTGRES_HOST"] = host
+    if port is not None:
+        environ["BEAUTYADS_POSTGRES_PORT"] = port
+    expected_host = "postgres" if host == "postgres" else "127.0.0.1"
+    assert postgres_dsn(environ=environ, env_file=None) == (
+        "postgresql://beautyads:synthetic%20%2F%40%3A%27%3F%23%25%20value@"
+        f"{expected_host}:{port or '5433'}/beautyads"
+    )
+
+
 def test_connect_uses_injected_or_default_driver(monkeypatch):
     conn = FakeConnection()
     received = []
