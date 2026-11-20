@@ -2,12 +2,50 @@
   "project": "beauty-ad-creative-agents",
   "phase": "7a-web-core",
   "steps": [
-    { "step": 1, "name": "serve-entry", "status": "pending" },
-    { "step": 2, "name": "graph-api", "status": "pending" },
-    { "step": 3, "name": "view-contract", "status": "pending" },
-    { "step": 4, "name": "web-scaffold", "status": "pending" },
-    { "step": 5, "name": "web-chat", "status": "pending" },
-    { "step": 6, "name": "web-evidence-plan", "status": "pending" },
-    { "step": 7, "name": "web-graph", "status": "pending" }
-  ]
+    {
+      "step": 1,
+      "name": "serve-entry",
+      "status": "completed",
+      "started_at": "2026-11-20T17:36:03+0900",
+      "summary": "로컬 서버 진입점·설정 검증·make serve·환경 변수 주석과 테스트 추가. make verify 통과(6,122개), 패키지 설치 없음.",
+      "completed_at": "2026-11-20T17:41:46+0900",
+      "usage": {
+        "input_tokens": 1081424,
+        "cached_input_tokens": 1016320,
+        "output_tokens": 7258,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 2,
+      "name": "graph-api",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "view-contract",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "web-scaffold",
+      "status": "pending"
+    },
+    {
+      "step": 5,
+      "name": "web-chat",
+      "status": "pending"
+    },
+    {
+      "step": 6,
+      "name": "web-evidence-plan",
+      "status": "pending"
+    },
+    {
+      "step": 7,
+      "name": "web-graph",
+      "status": "pending"
+    }
+  ],
+  "created_at": "2026-11-20T17:36:03+0900"
 }
