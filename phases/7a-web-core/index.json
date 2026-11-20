@@ -19,7 +19,16 @@
     {
       "step": 2,
       "name": "graph-api",
-      "status": "pending"
+      "status": "blocked",
+      "started_at": "2026-11-20T17:41:58+0900",
+      "blocked_reason": "스키마 요구사항이 충돌합니다. 필수 작업은 “`ONTOLOGY_LABELS`: 위 17개 레이블 + `Feedback`(layer 3)의 닫힌 튜플.”을 정의하고 `/graph/schema`에서 반환하도록 요구하지만, 금지사항은 “그래프 조각·스키마에 `Feedback`·`ClaimRule`·테넌트 전용 데이터를 넣지 마라.”라고 명시합니다. 스키마에 두 레이블을 포함할지 지침 통일이 필요합니다. 선점검 규칙에 따라 파일 수정·검증 실행 없이 중단했습니다.",
+      "blocked_at": "2026-11-20T17:43:04+0900",
+      "usage": {
+        "input_tokens": 26585,
+        "cached_input_tokens": 0,
+        "output_tokens": 429,
+        "attempts": 1
+      }
     },
     {
       "step": 3,
