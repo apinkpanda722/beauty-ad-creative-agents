@@ -89,7 +89,16 @@
     {
       "step": 7,
       "name": "web-graph",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-20T19:18:01+0900",
+      "summary": "Cytoscape 근거 그래프·전체 스키마 탭, 범례·노드 상세·재시도와 버튼 연결 구현. make verify 통과(Python 6,214개·웹 108개), 프로덕션 빌드 통과, 계층 경계 준수, 패키지 설치 없음.",
+      "completed_at": "2026-11-20T19:28:29+0900",
+      "usage": {
+        "input_tokens": 2166985,
+        "cached_input_tokens": 2076032,
+        "output_tokens": 18375,
+        "attempts": 1
+      }
     }
   ],
   "created_at": "2026-11-20T17:36:03+0900"
