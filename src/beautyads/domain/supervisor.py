@@ -2,11 +2,12 @@
 
 import math
 import re
+from collections.abc import Mapping
 from copy import deepcopy
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from beautyads.domain.labels import Angle, Category, Claim, Format, HookType
 from beautyads.domain.skin import SkinConcern
@@ -21,6 +22,166 @@ MIN_DOMINANT_SHARE = 0.4
 THIN_POOL_MAX = 10
 THIN_POOL_NOTE = "근거 소재가 {n}건으로 얇아 차별성 판단에 한계가 있다"
 DESIGN_IMAGE_DISCLAIMER = "생성 시안은 참고용이며 라벨 글자가 부정확할 수 있다"
+CLARIFY_REQUESTED_TEXT = "요청하신 '{requested}' 효능은 이 제품의 성분·인증으로 근거가 확인되지 않았습니다. 확인된 효능은 {available}입니다. 어떻게 진행할까요?"
+CLARIFY_REQUESTED_NO_CONFIRMED_TEXT = "요청하신 '{requested}' 효능은 이 제품의 성분·인증으로 근거가 확인되지 않았습니다. 이 제품에서 근거가 확인된 효능이 없습니다. 어떻게 진행할까요?"
+CLARIFY_UNSPECIFIED_TEXT = "효능을 지정하지 않으셨습니다. 이 제품에서 근거가 확인된 효능은 {available}입니다. 어떤 효능을 강조할까요?"
+OPTION_KEEP_REQUESTED = (
+    "요청하신 '{requested}'로 진행 (효능을 단정하는 표현은 제한됩니다)"
+)
+OPTION_SELECT_CONFIRMED = "확인된 효능 중에서 선택"
+OPTION_SELECT_ONE = "한 가지 효능 선택"
+OPTION_SELECT_MANY = "여러 효능 선택"
+OPTION_NONE = "효능 강조 없이 제품 홍보"
+EFFICACY_NOTICE_TEXT = {
+    "lookup_unconfirmed": "효능 근거를 확인하지 못해 효능 강조 없이 작성했습니다.",
+    "none_confirmed": "이 제품에서 근거가 확인된 효능이 없어 효능 강조 없이 작성했습니다.",
+}
+
+
+class ClarifyReason(StrEnum):
+    requested_not_confirmed = "requested_not_confirmed"
+    no_claim_requested = "no_claim_requested"
+
+
+class ClarifyOption(StrEnum):
+    keep_requested = "keep_requested"
+    select_confirmed = "select_confirmed"
+    select_one = "select_one"
+    select_many = "select_many"
+    none = "none"
+
+
+class ClaimChoice(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal["selected", "keep_requested", "none"]
+    claims: list[Claim] = Field(default_factory=list)
+    requested_claim: Claim | None = None
+
+    @model_validator(mode="after")
+    def validate_choice(self) -> "ClaimChoice":
+        if Claim.other in self.claims or self.requested_claim == Claim.other:
+            raise ValueError("CLAIM_CHOICE_OTHER")
+        if len(self.claims) != len(set(self.claims)):
+            raise ValueError("CLAIM_CHOICE_DUPLICATE")
+        if self.mode == "selected" and not self.claims:
+            raise ValueError("CLAIM_CHOICE_SELECTION_EMPTY")
+        if self.mode == "keep_requested" and self.requested_claim is None:
+            raise ValueError("CLAIM_CHOICE_REQUESTED_MISSING")
+        if self.mode != "selected" and self.claims:
+            raise ValueError("CLAIM_CHOICE_CLAIMS_UNEXPECTED")
+        return self
+
+
+def resolve_claim_policy(
+    *, requested: str | None, available: list[str], status: str, choice: dict | None
+) -> dict:
+    """Resolve confirmed efficacy and an optional marketer choice without I/O."""
+    if requested == Claim.other:
+        requested = None
+    result = {
+        "action": "proceed",
+        "claim": None,
+        "claim_choice": {},
+        "notice": None,
+        "clarification": {},
+    }
+    no_claim = {"mode": "none", "claims": [], "requested_claim": None}
+    if status != "ok":
+        result.update(
+            claim=requested,
+            claim_choice={
+                "mode": "keep_requested",
+                "claims": [],
+                "requested_claim": requested,
+            }
+            if requested
+            else no_claim,
+            notice="lookup_unconfirmed",
+        )
+    elif choice is not None:
+        mode = choice["mode"]
+        if mode == "selected":
+            if not all(claim in available for claim in choice["claims"]):
+                result["action"] = "invalid"
+            else:
+                result.update(claim=choice["claims"][0], claim_choice=deepcopy(choice))
+        elif mode == "keep_requested":
+            if requested is None:
+                result["action"] = "invalid"
+            else:
+                result.update(claim=requested, claim_choice=deepcopy(choice))
+        else:
+            result["claim_choice"] = no_claim
+    elif requested is not None and requested in available:
+        result.update(
+            claim=requested,
+            claim_choice={
+                "mode": "selected",
+                "claims": [requested],
+                "requested_claim": requested,
+            },
+        )
+    elif requested is not None or available:
+        options = (
+            [ClarifyOption.keep_requested]
+            + ([ClarifyOption.select_confirmed] if available else [])
+            + [ClarifyOption.none]
+            if requested is not None
+            else [
+                ClarifyOption.select_one,
+                ClarifyOption.select_many,
+                ClarifyOption.none,
+            ]
+        )
+        result.update(
+            action="clarify",
+            clarification={
+                "reason": (
+                    ClarifyReason.requested_not_confirmed
+                    if requested is not None
+                    else ClarifyReason.no_claim_requested
+                ).value,
+                "requested_claim": requested,
+                "available_efficacy": list(available),
+                "available_status": "ok",
+                "options": [option.value for option in options],
+            },
+        )
+    else:
+        result.update(claim_choice=no_claim, notice="none_confirmed")
+    return result
+
+
+def clarification_texts(clarification: dict, display: Mapping[str, str]) -> dict:
+    """Render centralized copy using caller-owned efficacy display names."""
+    requested = clarification.get("requested_claim")
+    requested_name = display.get(requested, requested)
+    available = clarification.get("available_efficacy", [])
+    template = (
+        CLARIFY_UNSPECIFIED_TEXT
+        if clarification.get("reason") == ClarifyReason.no_claim_requested
+        else CLARIFY_REQUESTED_TEXT
+        if available
+        else CLARIFY_REQUESTED_NO_CONFIRMED_TEXT
+    )
+    labels = {
+        ClarifyOption.keep_requested.value: OPTION_KEEP_REQUESTED,
+        ClarifyOption.select_confirmed.value: OPTION_SELECT_CONFIRMED,
+        ClarifyOption.select_one.value: OPTION_SELECT_ONE,
+        ClarifyOption.select_many.value: OPTION_SELECT_MANY,
+        ClarifyOption.none.value: OPTION_NONE,
+    }
+    return {
+        "text": template.format(
+            requested=requested_name,
+            available=", ".join(display.get(value, value) for value in available),
+        ),
+        "options": [
+            {"id": option, "label": labels[option].format(requested=requested_name)}
+            for option in clarification.get("options", [])
+        ],
+    }
 
 
 class Intent(StrEnum):

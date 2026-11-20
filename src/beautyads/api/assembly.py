@@ -283,6 +283,7 @@ async def assemble_full(
                 on_event=None,
                 *,
                 context_mode="on",
+                claim_choice=None,
             ):
                 profile = {**profile, "product_name": product_names.get(ctx.tenant_id)}
                 started_at, started = datetime.now(UTC), monotonic()
@@ -492,6 +493,11 @@ async def assemble_full(
                         limits=limits,
                         on_event=on_event,
                         claims_fn=claims_fn,
+                        **(
+                            {"claim_choice": claim_choice}
+                            if claim_choice is not None
+                            else {}
+                        ),
                         **(
                             {"context_mode": context_mode}
                             if context_mode != "on"

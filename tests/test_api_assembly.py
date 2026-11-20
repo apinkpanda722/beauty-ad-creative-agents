@@ -1184,6 +1184,7 @@ def test_assembled_claims_function_uses_only_existing_support_query(
                 profile,
                 {},
                 False,
+                claim_choice={"mode": "none"},
             )
             expected = (
                 (["hydration"], "ok")
@@ -1394,3 +1395,36 @@ def test_assembly_injects_axis_glossary_into_decide(rig, monkeypatch):
             await services.close()
 
     asyncio.run(run())
+
+
+@pytest.mark.parametrize("choice", [None, {"mode": "none"}])
+def test_assembly_forwards_claim_choice_only_when_supplied(rig, monkeypatch, choice):
+    calls = []
+
+    def request(**options):
+        calls.append(options)
+        return {}
+
+    monkeypatch.setattr(assembly, "run_request", request)
+
+    async def run():
+        services = await rig.start()
+        try:
+            tenant = next(iter(services.allowed_tenants))
+            services.ask(
+                "synthetic",
+                ToolContext(tenant_id=tenant, as_of=services.as_of),
+                services.workspaces[tenant],
+                {},
+                False,
+                claim_choice=choice,
+            )
+        finally:
+            await services.close()
+
+    asyncio.run(run())
+    assert len(calls) == 1
+    if choice is None:
+        assert "claim_choice" not in calls[0]
+    else:
+        assert calls[0]["claim_choice"] == choice
