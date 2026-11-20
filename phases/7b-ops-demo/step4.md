@@ -45,15 +45,17 @@
 
 ## 작업
 
-**수정할 파일**: `deploy/Dockerfile.api`, `deploy/Dockerfile.web`, `.dockerignore`, `deploy/k3d/`, `Makefile`, `README.md`, `src/beautyads/store/connection.py`, `src/beautyads/api/main.py`, `web/next.config.ts`, `tests/test_k3d.py`, `tests/test_store.py`, `tests/test_api_main.py`
+**수정할 파일**: `deploy/Dockerfile.api`, `deploy/Dockerfile.web`, `.dockerignore`, `deploy/k3d/`, `Makefile`, `README.md`, `src/beautyads/store/connection.py`, `src/beautyads/api/main.py`, `web/next.config.ts`, `tests/test_k3d.py`, `tests/test_store.py`, `tests/test_api_main.py`, `tests/test_api_assembly.py`
 
 열람 금지 경로: `data/interim/`, `data/design/`
-수정 허용 경로: `deploy/Dockerfile.api`, `deploy/Dockerfile.web`, `.dockerignore`, `deploy/k3d/`, `Makefile`, `README.md`, `src/beautyads/store/connection.py`, `src/beautyads/api/main.py`, `web/next.config.ts`, `tests/test_k3d.py`, `tests/test_store.py`, `tests/test_api_main.py`
+수정 허용 경로: `deploy/Dockerfile.api`, `deploy/Dockerfile.web`, `.dockerignore`, `deploy/k3d/`, `Makefile`, `README.md`, `src/beautyads/store/connection.py`, `src/beautyads/api/main.py`, `web/next.config.ts`, `tests/test_k3d.py`, `tests/test_store.py`, `tests/test_api_main.py`, `tests/test_api_assembly.py`
 열람 금지의 범위: 이 금지는 **Codex 세션이 해당 경로의 파일을 직접 열람·출력·인용하는 것**에 대한 것이다. 이 step의 코드가 런타임에 그 경로를 다루는 것(예: 기본 출력 경로)은 대상이 아니다. 테스트가 그 경로의 실제 파일 **내용**을 읽는 것은 여전히 금지이며 테스트는 임시 디렉터리와 합성 데이터만 쓴다.
 
 **1. `store/connection.py`**: `postgres_dsn`이 `BEAUTYADS_POSTGRES_HOST`(기본 `127.0.0.1`)를 `get_setting`으로 읽어 호스트에 쓴다(포트와 같은 방식, 빈 값은 기본값, 비밀번호 처리 불변). **`api/main.py`**: `BEAUTYADS_API_HOST`(기본 `127.0.0.1`, 허용 `127.0.0.1`·`0.0.0.0`, 그 밖은 `InvalidSetting`)를 `uvicorn.run(host=...)`에 쓰고 시작 줄의 URL도 같은 호스트를 보여 준다. **`web/next.config.ts`**: `output: "standalone"`을 더한다(`agentRules: false`·`rewrites` 유지).
 
 **2. 이미지·매니페스트·Makefile·README**: 위 "설계 결정"대로. 매니페스트는 평문 YAML(kustomize)이고 비밀 값이 없다. Dockerfile은 베이스 이미지에 명시 태그를 쓴다.
+
+**3. 이전 step이 만든 불안정 테스트 수정(`tests/test_api_assembly.py`, 이 step의 첫 실행이 blocked돼 추가)**: 7b step 3이 추가한 `test_ask_exports_after_local_append_in_daemon_without_affecting_result`(두 케이스: `raises` False·True)가 **해시 시드에 따라 실패한다**(재현: `PYTHONHASHSEED=1`·`3`에서 2건 실패, `0`·`2`는 통과, 2026-11-20). 원인: 마지막 단언 `assert record.tenant_id == next(iter(rig.profiles))`가 딕셔너리 첫 항목(`dev-mixsoon`)과 비교하는데, 요청은 `invoke(services)`가 `next(iter(services.allowed_tenants))`(frozenset 순회 순서, 시드마다 달라짐)로 고른 테넌트를 쓴다(`invoke`는 388행 부근). **이 단언을 요청이 실제로 쓴 테넌트와 비교하도록 갱신한다**: `run()` 안에서 `invoke` 호출과 같은 방식으로 고른 테넌트(`next(iter(services.allowed_tenants))`, 743행 부근 기존 단언과 같은 패턴)를 변수에 저장해 두고 그 값과 `record.tenant_id`가 같음을 단언한다. **단언을 `in`·존재 확인으로 약화하지 않는다.** 이 파일의 다른 테스트·단언은 바꾸지 않는다. 같은 seed 목록(`PYTHONHASHSEED`를 0~3으로 바꿔 이 두 케이스를 돌려도 통과)을 최종 응답에 적는다.
 
 **테스트(합성 데이터, 서비스·키·네트워크·Docker·`kubectl` 없음, 파일만 읽는다)**
 - `tests/test_store.py`(케이스 추가에 한함): (1) 호스트 설정이 없거나 빈 값·공백이면 DSN이 지금과 **같은 문자열**, (2) `BEAUTYADS_POSTGRES_HOST=postgres`이면 호스트만 바뀌고 포트·비밀번호 인코딩 불변, (3) 비밀번호가 예외·DSN 외 어디에도 안 남음(기존 단언 유지).
