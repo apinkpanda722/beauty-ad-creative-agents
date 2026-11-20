@@ -33,7 +33,16 @@
     {
       "step": 3,
       "name": "langfuse-sink",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-20T20:11:00+0900",
+      "summary": "Langfuse 시간·비용 비동기 sink, obs profile·확인 도구·계약 문서 구현. make verify 통과(Python 6,283건·웹 125건), 실제 서버·화면 미확인. langfuse==3.15.0 설치; 전이 추가: backoff 2.2.1, googleapis-common-protos 1.76.0, protobuf 7.36.2, wrapt 1.17.3, opentelemetry-{sdk,proto,exporter-otlp-proto-common,exporter-otlp-proto-http} 1.45.2, opentelemetry-{semantic-conventions,exporter-http-transport,exporter-otlp-common} 0.66b2. SDK의 packaging<26 제약으로 packaging 26.3→25.0.",
+      "completed_at": "2026-11-20T20:23:18+0900",
+      "usage": {
+        "input_tokens": 2585041,
+        "cached_input_tokens": 2486528,
+        "output_tokens": 23978,
+        "attempts": 1
+      }
     },
     {
       "step": 4,
