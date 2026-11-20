@@ -643,3 +643,130 @@ def test_unavailable_trace_schema_is_closed_and_names_are_bounded(extra):
         TraceEfficacyUnavailable.model_validate(
             {"reason": "failed", "brand": None, "product_name": None, **extra}
         )
+
+
+def test_legacy_timing_free_json_is_byte_identical_and_readable(tmp_path):
+    record = make_trace(
+        result={"steps": [{"agent": "research", "phase": "end", "status": "ok"}]},
+        ledger_entries=[ledger()],
+    )
+    record.trace_id = "0" * 32
+    legacy = (
+        '{"trace_id":"00000000000000000000000000000000","tenant_id":"tenant_a",'
+        '"started_at":"2026-11-18T00:00:00Z","duration_ms":12,"outcome":"ok",'
+        '"error_class":null,"error_code":null,"kind":null,"intent":null,'
+        '"efficacy_unavailable":null,"message_chars":30,"message_trimmed":false,'
+        '"steps":[{"agent":"research","phase":"end","status":"ok"}],'
+        '"tools":[],"plans":[],"pattern_distribution":[],"prompt_versions":{},'
+        '"limit_hit":false,"limit_kinds":[],"limit_detail":[],"input_trims":[],'
+        '"aggregates_removed_count":0,"text_spent_usd":null,"calls":['
+        '{"purpose":"planning","model":"synthetic-model","reasoning_effort":"low",'
+        '"input_tokens":11,"output_tokens":12,"thought_tokens":3,"cached_tokens":4,'
+        '"cost_usd":0.02,"cost_source":"price_table"}],"cost_total_usd":0.02,'
+        '"cost_by_purpose":{"planning":0.02},"structured":{}}'
+    )
+    assert record.model_dump_json() == legacy
+    assert record.steps[0].at is None
+    assert record.calls[0].duration_ms is record.calls[0].ended_at is None
+    path = tmp_path / "legacy.jsonl"
+    path.write_text(legacy + "\n", encoding="utf-8")
+    assert read_traces(path) == TraceRead([record], 0)
+
+
+@pytest.mark.parametrize("duration", [0, 1500])
+def test_timing_metadata_normalizes_projects_and_roundtrips(tmp_path, duration):
+    offset = START.astimezone(timezone(timedelta(hours=9)))
+    entry = LedgerEntry.model_validate(
+        {**ledger().model_dump(), "duration_ms": duration}
+    )
+    record = make_trace(
+        result={
+            "steps": [
+                {
+                    "agent": "research",
+                    "phase": "end",
+                    "status": "ok",
+                    "at": offset.isoformat(),
+                    "prompt": SECRET,
+                }
+            ],
+            "prompt": SECRET,
+            "messages": [{"role": "user", "content": SECRET}],
+            "response": SECRET,
+            "request_body": SECRET,
+        },
+        ledger_entries=[entry, ledger()],
+    )
+    assert record.steps[0].at == START
+    assert record.steps[0].at.utcoffset() == timedelta(0)
+    assert record.calls[0].duration_ms == duration
+    assert record.calls[0].ended_at == entry.ts
+    assert record.calls[0].ended_at.utcoffset() == timedelta(0)
+    assert record.calls[1].duration_ms is record.calls[1].ended_at is None
+    path = tmp_path / "trace.jsonl"
+    append_trace(path, record)
+    assert read_traces(path) == TraceRead([record], 0)
+    assert SECRET not in path.read_text()
+
+
+@pytest.mark.parametrize(
+    "model,field", [("TraceStep", "at"), ("TraceCall", "ended_at")]
+)
+def test_optional_timestamps_require_timezone_and_normalize(model, field):
+    from beautyads.obs import trace
+
+    values = (
+        {"agent": "research", "phase": "end", "status": "ok"}
+        if model == "TraceStep"
+        else make_trace(ledger_entries=[ledger()]).calls[0].model_dump()
+    )
+    schema = getattr(trace, model)
+    with pytest.raises(ValidationError):
+        schema.model_validate({**values, field: START.replace(tzinfo=None)})
+    offset = START.astimezone(timezone(timedelta(hours=9)))
+    normalized = schema.model_validate({**values, field: offset})
+    assert getattr(normalized, field) == START
+    assert getattr(normalized, field).utcoffset() == timedelta(0)
+    assert field not in schema.model_validate({**values, field: None}).model_dump()
+
+
+@pytest.mark.parametrize("duration", [-1, "1500", float("nan"), True, 1.5])
+def test_trace_call_duration_rejects_invalid_values(duration):
+    from beautyads.obs.trace import TraceCall
+
+    values = make_trace(ledger_entries=[ledger()]).calls[0].model_dump()
+    with pytest.raises(ValidationError):
+        TraceCall.model_validate({**values, "duration_ms": duration})
+
+
+def test_tenant_duration_summary_is_conditional_and_sums_purposes():
+    def timed(purpose, duration):
+        return LedgerEntry.model_validate(
+            {**ledger(purpose).model_dump(), "duration_ms": duration}
+        )
+
+    legacy = make_trace(ledger_entries=[ledger()])
+    summary = summarize_by_tenant([legacy])["tenant_a"]
+    assert set(summary) == {
+        "requests",
+        "errors",
+        "calls",
+        "cost_usd",
+        "cost_by_purpose",
+        "first_attempt_failures",
+        "structured_calls",
+    }
+    records = [
+        legacy,
+        make_trace(ledger_entries=[timed("planning", 1500), timed("image-plan", 250)]),
+        make_trace(ledger_entries=[timed("planning", 500), timed("research", 0)]),
+        make_trace(tenant_id="tenant_b", ledger_entries=[ledger()]),
+    ]
+    summaries = summarize_by_tenant(records)
+    assert summaries["tenant_a"]["duration_ms_by_purpose"] == {
+        "planning": 2000,
+        "image-plan": 250,
+        "research": 0,
+    }
+    assert set(summaries["tenant_a"]) == set(summary) | {"duration_ms_by_purpose"}
+    assert set(summaries["tenant_b"]) == set(summary)

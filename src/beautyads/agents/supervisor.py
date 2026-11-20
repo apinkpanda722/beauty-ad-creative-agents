@@ -3,7 +3,7 @@
 import json
 import re
 from copy import deepcopy
-from datetime import date
+from datetime import UTC, date, datetime
 from math import isfinite
 from pathlib import Path
 from typing import NamedTuple, TypedDict
@@ -206,10 +206,17 @@ def initial_supervisor_state(message: str, limits: RequestLimits) -> SupervisorS
     }
 
 
+def _utcnow():
+    return datetime.now(UTC)
+
+
 def _emit(state, event, on_event):
     if event["event"] == "step":
         state["sv_steps"].append(
-            {key: event[key] for key in ("agent", "phase", "status")}
+            {
+                **{key: event[key] for key in ("agent", "phase", "status")},
+                "at": _utcnow().isoformat(),
+            }
         )
     if on_event is not None:
         try:

@@ -245,3 +245,29 @@ def test_ledger_total_all_providers_and_exact_purpose_boundary(tmp_path, entry):
     with path.open("a") as stream:
         stream.write("{malformed\n")
     assert ledger_total(path) == 3.75
+
+
+def test_duration_none_preserves_legacy_serialization_and_reading(tmp_path, entry):
+    legacy = entry.model_dump_json()
+    assert "duration_ms" not in json.loads(legacy)
+    item = LedgerEntry.model_validate({**entry.model_dump(), "duration_ms": None})
+    assert item.duration_ms is None
+    assert item.model_dump_json() == legacy
+    path = tmp_path / "legacy.jsonl"
+    path.write_text(legacy + "\n", encoding="utf-8")
+    assert read_entries(path) == LedgerRead([item], 0)
+
+
+@pytest.mark.parametrize("duration", [0, 1500])
+def test_duration_roundtrips(tmp_path, entry, duration):
+    item = LedgerEntry.model_validate({**entry.model_dump(), "duration_ms": duration})
+    path = tmp_path / "costs.jsonl"
+    append_entry(path, item)
+    assert json.loads(path.read_text())["duration_ms"] == duration
+    assert read_entries(path) == LedgerRead([item], 0)
+
+
+@pytest.mark.parametrize("duration", [-1, "1500", "invalid", float("nan"), True, 1.5])
+def test_duration_rejects_invalid_values(entry, duration):
+    with pytest.raises(ValidationError):
+        LedgerEntry.model_validate({**entry.model_dump(), "duration_ms": duration})

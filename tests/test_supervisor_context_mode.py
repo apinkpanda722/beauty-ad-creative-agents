@@ -3,6 +3,7 @@
 import asyncio
 import json
 from copy import deepcopy
+from datetime import UTC, datetime
 
 import pytest
 import test_api_assembly
@@ -33,7 +34,9 @@ from beautyads.domain.tools import ToolContext, ToolResult
 rig = test_api_assembly.rig
 
 
-def test_default_and_on_requests_have_identical_results_and_calls():
+def test_default_and_on_requests_have_identical_results_and_calls(monkeypatch):
+    stamp = datetime(2026, 11, 20, tzinfo=UTC)
+    monkeypatch.setattr(supervisor, "_utcnow", lambda: stamp)
     outputs, calls = [], []
     limits = RequestLimits(handoff_max_evidence_ids=1, handoff_max_aggregates=1)
     for options in ({}, {"context_mode": "on"}):
