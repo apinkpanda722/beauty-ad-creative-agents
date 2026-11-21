@@ -1,0 +1,51 @@
+{
+  "project": "beauty-ad-creative-agents",
+  "phase": "7c-ui-redesign",
+  "steps": [
+    {
+      "step": 1,
+      "name": "tokens-shell",
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "name": "ui-kit",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "plan-main",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "results",
+      "status": "pending"
+    },
+    {
+      "step": 5,
+      "name": "graph-core",
+      "status": "pending"
+    },
+    {
+      "step": 6,
+      "name": "graph-data",
+      "status": "pending"
+    },
+    {
+      "step": 7,
+      "name": "saved-api",
+      "status": "pending"
+    },
+    {
+      "step": 8,
+      "name": "saved-ui",
+      "status": "pending"
+    },
+    {
+      "step": 9,
+      "name": "history-cleanup",
+      "status": "pending"
+    }
+  ]
+}
