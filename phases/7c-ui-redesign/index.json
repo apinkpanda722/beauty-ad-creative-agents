@@ -103,7 +103,16 @@
     {
       "step": 13,
       "name": "result-polish",
-      "status": "pending"
+      "status": "blocked",
+      "started_at": "2026-11-21T17:12:38+0900",
+      "blocked_reason": "지시 충돌: “접힌 상태에서는 `hidden` 속성 대신 `inert`+`aria-hidden`(또는 `visibility: hidden`)로 접근성에서 제외하되 **DOM에 유지**한다(기존 설계).”와 “4c에서 넣은 비용·상한 단언은 **수정 없이 통과**해야 한다(`within` 영역은 `전체 보기`의 `aria-controls` 요소 그대로).”를 동시에 충족할 수 없습니다. 기존 web/tests/results.test.tsx의 4c 테스트는 expect(expanded.hidden).toBe(true)와 cost.closest(\"[hidden]\")가 expanded인지를 요구합니다. hidden 관련 단언만 inert/aria-hidden의 동등한 접힘 검증으로 교체하고 비용·상한 문자열·정밀도·위치 단언은 유지하도록 허용이 필요합니다.",
+      "blocked_at": "2026-11-21T17:14:46+0900",
+      "usage": {
+        "input_tokens": 320133,
+        "cached_input_tokens": 239744,
+        "output_tokens": 1130,
+        "attempts": 1
+      }
     },
     {
       "step": 14,
