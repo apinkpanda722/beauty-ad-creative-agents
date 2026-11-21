@@ -37,15 +37,16 @@
 
 ## 작업
 
-**수정할 파일**: `web/components/plan/*`, `web/app/plan.css`, `web/lib/stages.ts`, `web/lib/examples.ts`(삭제), `web/components/{Chat,StepBar,TurnView,ClarifyCard}.tsx`(삭제), `web/components/shell/AppShell.tsx`(본문 연결), `web/tests/{plan,stages,chat}.test.tsx` (chat은 plan으로 교체), `tests/test_demo_docs.py`(칩 결합 단언 교체만)
+**수정할 파일**: `web/components/plan/*`, `web/app/plan.css`, `web/lib/stages.ts`, `web/lib/examples.ts`(삭제), `web/components/{Chat,StepBar,TurnView,ClarifyCard}.tsx`(삭제), `web/components/shell/AppShell.tsx`(본문 연결), `web/tests/{plan,stages,chat}.test.tsx` (chat은 plan으로 교체), `tests/test_demo_docs.py`(칩 결합 단언 교체만), `web/app/page.tsx`(`Chat` 렌더를 `PlanPage`로 교체만), `web/app/globals.css`(`.examples` 규칙 제거만: `.options, .examples, .composer-actions` 선택자에서 `.examples`를 빼고 `.examples`·`.examples button` 두 규칙 삭제), `web/tests/evidence-plan.test.tsx`(삭제되는 `Chat`·`TurnView`·`StepBar` 참조와 진행창 완료 표시 기대값만 새 구조에 맞춘다. 행동 단언 유지·약화 금지. step 4가 이 파일을 `results.test.tsx`로 교체한다)
 
 열람 금지 경로: `data/interim/`, `data/design/`, `.env`
-수정 허용 경로: `web/components/plan/*`, `web/app/plan.css`, `web/lib/stages.ts`, `web/lib/examples.ts`(삭제), `web/components/{Chat,StepBar,TurnView,ClarifyCard}.tsx`(삭제), `web/components/shell/AppShell.tsx`(본문 연결), `web/tests/{plan,stages,chat}.test.tsx` (chat은 plan으로 교체), `tests/test_demo_docs.py`(칩 결합 단언 교체만)
+수정 허용 경로: `web/components/plan/*`, `web/app/plan.css`, `web/lib/stages.ts`, `web/lib/examples.ts`(삭제), `web/components/{Chat,StepBar,TurnView,ClarifyCard}.tsx`(삭제), `web/components/shell/AppShell.tsx`(본문 연결), `web/tests/{plan,stages,chat}.test.tsx` (chat은 plan으로 교체), `tests/test_demo_docs.py`(칩 결합 단언 교체만), `web/app/page.tsx`(`Chat` 렌더를 `PlanPage`로 교체만), `web/app/globals.css`(`.examples` 규칙 제거만: `.options, .examples, .composer-actions` 선택자에서 `.examples`를 빼고 `.examples`·`.examples button` 두 규칙 삭제), `web/tests/evidence-plan.test.tsx`(삭제되는 `Chat`·`TurnView`·`StepBar` 참조와 진행창 완료 표시 기대값만 새 구조에 맞춘다. 행동 단언 유지·약화 금지. step 4가 이 파일을 `results.test.tsx`로 교체한다)
 열람 금지의 범위: 이 금지는 **Codex 세션이 해당 경로의 파일을 직접 열람·출력·인용하는 것**에 대한 것이다. 이 step의 코드가 런타임에 그 경로를 다루는 것은 대상이 아니다. 테스트는 임시 디렉터리와 합성 데이터만 쓴다.
 
 **1.** `web/lib/stages.ts`: `Stage`에 완료 단계의 표시 규칙을 추가한다(기존 필드와 `deriveStages` 결과의 `id/label/status/count/reworks`는 바꾸지 않는다. "완료 완료" 문제는 렌더 쪽에서 `id === "complete"`일 때 상태 글자를 생략해 해결한다).
 **2.** `web/components/plan/*`와 `web/app/plan.css`(`gs-` 접두). `PlanPage`가 `useSession()`으로 상태를 읽고 새 컴포넌트를 조립한다. 결과 영역은 기존 `CommandSlot`을 그대로 사용한다.
 **3.** 옛 `Chat`·`StepBar`·`TurnView`·`ClarifyCard`와 `examples.ts`를 삭제하고 `AppShell`의 광고 기획 본문을 `PlanPage`로 교체한다.
+**3-1.** 삭제되는 컴포넌트의 소비자도 함께 옮긴다(앞선 실행이 blocked로 찾아낸 누락): `web/app/page.tsx`가 `Chat`을 import해 렌더하므로 `PlanPage`로 바꾸고, `web/tests/evidence-plan.test.tsx`가 `Chat`·`TurnView`·`StepBar`를 import하므로 새 컴포넌트 참조로 바꾸되 **기존 행동 단언은 그대로 유지**하고(완료 표시 기대값만 새 규칙 "완료 한 번"에 맞춤), `web/app/globals.css`의 `.examples` 규칙 3줄은 소스 금지 가드(`.examples` 없음)와 충돌하므로 제거한다.
 **4.** **`tests/test_demo_docs.py` 갱신(예시 칩 삭제의 직접 영향)**: 이 파일의 `test_confirmed_prompts_match_workspace_chips`는 `web/lib/examples.ts`의 칩 문장이 `PROMPTS`와 같은지와 `DEMO.md`에 그 문장이 있는지를 함께 단언한다. 칩이 사라지므로 **칩 문장 일치 단언과 `chip_messages`·`test_chip_check_rejects_empty_synthetic_input`만** 제거하고, **`DEMO.md`에 `PROMPTS`의 모든 확인 문장이 있다는 단언은 그대로 유지**(`PROMPTS`를 직접 순회, 0건이면 실패)한다. 대체 가드로 `web/` 소스에 `examples`·`.examples`·`예시 요청`이 없다는 단언(소스 파일을 읽어 검사, 파일 0개면 실패)을 **추가**한다. 이 교체는 사용자 승인 사항이다(설계 제안서 §8 확인 요청 2).
 
 **테스트(합성 데이터, 서비스·키·네트워크·`.env` 없음)**
