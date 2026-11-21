@@ -2,8 +2,8 @@
 
 import { useSession } from "../../lib/session";
 import type { Workspace } from "../../lib/types";
-import { CommandTenantContext } from "../CommandSlot";
-import { FeedbackSession } from "../FeedbackBar";
+import { CommandTenantContext, WorkspaceBrandContext } from "../results/ResultsView";
+import { FeedbackSession } from "../results/FeedbackBar";
 import { WorkspacePicker } from "../WorkspacePicker";
 import { PageHeader } from "../ui";
 import { Composer } from "./Composer";
@@ -15,7 +15,7 @@ export function PlanPage({ workspaces, imageEnabled, onWorkspaceChange }: {
 }) {
   const { state, start, send, cancel, retry, selectWorkspace } = useSession();
   const busy = state.activeTurnId !== null;
-  return <CommandTenantContext.Provider value={state.tenantId}><FeedbackSession key={state.tenantId}>
+  return <CommandTenantContext.Provider value={state.tenantId}><WorkspaceBrandContext.Provider value={workspaces.find(workspace => workspace.tenant_id === state.tenantId)?.brand ?? null}><FeedbackSession key={state.tenantId}>
     <div className="gs-plan-page">
       <PageHeader title="광고 기획" description="제품과 원하는 광고 방향을 알려주세요. 근거를 찾아 기획안을 만듭니다." />
       <WorkspacePicker workspaces={workspaces} value={state.tenantId} onChange={tenantId => {
@@ -41,5 +41,5 @@ export function PlanPage({ workspaces, imageEnabled, onWorkspaceChange }: {
         })}
       </section>
     </div>
-  </FeedbackSession></CommandTenantContext.Provider>;
+  </FeedbackSession></WorkspaceBrandContext.Provider></CommandTenantContext.Provider>;
 }

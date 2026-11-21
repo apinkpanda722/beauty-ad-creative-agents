@@ -1,0 +1,22 @@
+.gs-evidence-page { display: grid; gap: var(--gs-space-6); color: var(--gs-text); }
+.gs-evidence-filters { display: flex; flex-wrap: wrap; gap: var(--gs-space-2); }
+.gs-evidence-filters [aria-pressed="true"] { color: var(--gs-accent); background: var(--gs-accent-weak); border-color: var(--gs-accent); }
+.gs-platform-group h2 { margin: 0 0 var(--gs-space-4); font-size: var(--gs-text-lg); }
+.gs-evidence-summary h3 { font-size: var(--gs-text-base); }
+.gs-evidence-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: var(--gs-space-4); }
+.gs-evidence-card { min-width: 0; scroll-margin-top: var(--gs-space-8); overflow-wrap: anywhere; }
+.gs-evidence-card > .gs-card { height: 100%; overflow: hidden; padding: 0; }
+.gs-evidence-card:target > .gs-card { border-color: var(--gs-accent); box-shadow: 0 0 0 2px var(--gs-accent); }
+.gs-evidence-card:focus-visible { outline: 2px solid var(--gs-accent); outline-offset: 3px; }
+.gs-evidence-thumbnail, .gs-platform-tile { width: 100%; aspect-ratio: 16 / 9; background: var(--gs-surface); }
+.gs-evidence-thumbnail { display: block; object-fit: cover; }
+.gs-platform-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--gs-space-2); color: var(--gs-text-muted); }
+.gs-platform-monogram { display: grid; place-items: center; width: var(--gs-space-12); height: var(--gs-space-12); border: 1px solid var(--gs-border); border-radius: var(--gs-radius-lg); background: var(--gs-bg); font-size: var(--gs-text-xl); font-weight: 600; }
+.gs-evidence-body { display: grid; gap: var(--gs-space-3); padding: var(--gs-space-4); }
+.gs-evidence-meta, .gs-evidence-metrics { display: flex; align-items: center; flex-wrap: wrap; gap: var(--gs-space-2); color: var(--gs-text-muted); }
+.gs-evidence-meta small { flex: 1; }
+.gs-evidence-body h4, .gs-evidence-body p { margin: 0; }
+.gs-evidence-body a { color: var(--gs-text); text-underline-offset: 3px; }
+.gs-evidence-body a:focus-visible { outline: 2px solid var(--gs-accent); outline-offset: 3px; }
+.gs-evidence-metrics { font-size: var(--gs-text-xs); font-variant-numeric: tabular-nums; }
+.gs-evidence-body .gs-result-badges { display: flex; flex-wrap: wrap; gap: var(--gs-space-2); }

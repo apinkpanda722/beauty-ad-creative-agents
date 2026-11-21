@@ -1,6 +1,6 @@
 "use client";
 import type { GraphNode } from "../lib/types";
-import { safeLink } from "./EvidenceCards";
+import { safeLink } from "../lib/evidence";
 
 export function NodeDetail({ node }: { node: GraphNode | null }) {
   return <aside className="node-detail" aria-label="노드 상세"><h4>노드 상세</h4>

@@ -35,7 +35,10 @@ it("renders exactly five ordered navigation items and switches the current page 
     expect(items.map(item => item.getAttribute("aria-current"))).toEqual(labels.map((_, i) => i === index ? "page" : null));
     if ([1, 3, 4].includes(index)) {
       expect(screen.getByRole("heading", { name: labels[index] })).toBeTruthy();
-      expect(screen.getByText("준비 중")).toBeTruthy();
+      if (index === 1) {
+        expect(screen.getByRole("heading", { name: "아직 근거 소재가 없습니다" })).toBeTruthy();
+        expect(screen.getByRole("button", { name: "광고 기획으로" })).toBeTruthy();
+      } else expect(screen.getByText("준비 중")).toBeTruthy();
     } else if (index === 2) {
       expect(screen.getByText("대화 탭에서 작업 공간을 선택하세요.")).toBeTruthy();
     } else expect(screen.getByRole("region", { name: "대화" })).toBeTruthy();

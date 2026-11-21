@@ -1,20 +1,22 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { PlanPage } from "../components/plan/PlanPage";
-import { EvidenceCards } from "../components/EvidenceCards";
-import { PlanCard } from "../components/PlanCard";
-import { AggregatesPanel } from "../components/AggregatesPanel";
-import { DistributionChart } from "../components/DistributionChart";
-import { DesignImage } from "../components/DesignImage";
-import { FeedbackBar, FeedbackSession } from "../components/FeedbackBar";
+import { EvidencePage } from "../components/evidence/EvidencePage";
+import Page from "../app/page";
+import { EvidenceSummary } from "../components/evidence/EvidenceSummary";
+import { PlanResult } from "../components/results/PlanResult";
+import { AggregatesPanel } from "../components/results/AggregatesPanel";
+import { DistributionChart } from "../components/results/DistributionChart";
+import { DesignImage } from "../components/results/DesignImage";
+import { FeedbackBar, FeedbackSession } from "../components/results/FeedbackBar";
 import { TurnCard } from "../components/plan/TurnCard";
 import { ProgressTracker } from "../components/plan/ProgressTracker";
-import { CommandSlot, CommandTenantContext } from "../components/CommandSlot";
+import { ResultsView, CommandTenantContext } from "../components/results/ResultsView";
 import { initialState, reducer } from "../lib/reducer";
 import { SessionProvider } from "../lib/session";
 import { deriveStages } from "../lib/stages";
 import { PLAN_INTRO_TEXT } from "../lib/text";
-import { CostLine } from "../components/CostLine";
+import { CostLine } from "../components/results/CostLine";
 import { ApiError, getSchema, getDesignImage, postFeedback } from "../lib/api";
 import { taxonomyNames } from "../lib/taxonomy";
 import type { EvidenceCard, PlanView, SchemaResponse, SseFrame, UiCommand } from "../lib/types";
@@ -36,8 +38,90 @@ const aggregates: Extract<UiCommand, { kind: "show_aggregates" }>["data"] = { la
 const image = { request_key: "synthetic/key", index: 0, mime: "image/png" as const, size: 1, sha256: "a".repeat(64) };
 const names = taxonomyNames(schema);
 
+function turnsWithCards(cards: EvidenceCard[][]) {
+  return cards.map(cards => ({ commands: [{ kind: "show_evidence_cards" as const, data: { cards, missing: 0 } }] }));
+}
+it("groups platforms with direct YouTube thumbnails and neutral monogram tiles, including failed thumbnails", () => {
+  const cards = [card, { ...card, evidence_id: "instagram:a", source: "instagram", title: "합성 인스타", hook_type: "question" }, { ...card, evidence_id: "tiktok:a", source: "tiktok", title: "합성 틱톡", hook_type: "question" }];
+  render(<EvidencePage turns={turnsWithCards([cards])} workspaceBrand={null} onPlan={vi.fn()} />);
+  expect(screen.getAllByRole("heading", { level: 2 }).map(node => node.textContent)).toEqual(["Instagram · 1건", "TikTok · 1건", "YouTube · 1건"]);
+  for (const [source, label, monogram] of [["instagram", "Instagram", "I"], ["tiktok", "TikTok", "T"]]) {
+    const tile = screen.getByLabelText(`${source} 출처`);
+    expect(tile.textContent).toContain(label);
+    expect(within(tile).getByText(monogram)).toBeTruthy();
+    expect(within(tile).getByText("question")).toBeTruthy();
+    expect(tile.closest("article")!.querySelector("img")).toBeNull();
+  }
+  const thumbnail = screen.getByRole("img");
+  expect(thumbnail.getAttribute("src")).toBe("https://i.ytimg.com/vi/abc_123-/hqdefault.jpg");
+  fireEvent.error(thumbnail);
+  const fallback = screen.getByLabelText("youtube 출처");
+  expect(within(fallback).getByText("YouTube")).toBeTruthy();
+  expect(within(fallback).getByText("Y")).toBeTruthy();
+  expect(screen.queryByRole("img")).toBeNull();
+});
+it("marks only the workspace brand, filters own/platform cards and restores all cards", () => {
+  const cards = [{ ...card, brand: "isntree" }, { ...card, evidence_id: "instagram:b", source: "instagram", title: "다른 브랜드", brand: "cosrx" }];
+  render(<EvidencePage turns={turnsWithCards([cards])} workspaceBrand="isntree" onPlan={vi.fn()} />);
+  expect(screen.getAllByText("자사")).toHaveLength(1);
+  expect(screen.getByText("자사").closest("article")!.textContent).toContain("합성 근거");
+  fireEvent.click(screen.getByRole("button", { name: "자사만" }));
+  expect(screen.getByRole("button", { name: "자사만" }).getAttribute("aria-pressed")).toBe("true");
+  expect(screen.getByRole("link", { name: "합성 근거" })).toBeTruthy();
+  expect(screen.queryByRole("link", { name: "다른 브랜드" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "전체" }));
+  fireEvent.click(screen.getByRole("button", { name: "Instagram" }));
+  expect(screen.queryByRole("link", { name: "합성 근거" })).toBeNull();
+  expect(screen.getByRole("link", { name: "다른 브랜드" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "전체" }));
+  expect(screen.getAllByRole("article")).toHaveLength(2);
+});
+it("offers the plan action for empty sessions and empty filters, deduplicates across turns and retains unknown platforms", () => {
+  const onPlan = vi.fn();
+  const { rerender } = render(<EvidencePage turns={[]} workspaceBrand={null} onPlan={onPlan} />);
+  expect(screen.getByRole("heading", { name: "아직 근거 소재가 없습니다" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "광고 기획으로" })); expect(onPlan).toHaveBeenCalledTimes(1);
+  const unknown = { ...card, source: "new-platform", evidence_id: "new-platform:a" };
+  rerender(<EvidencePage turns={turnsWithCards([[unknown], [unknown]])} workspaceBrand={null} onPlan={onPlan} />);
+  expect(screen.getAllByRole("article")).toHaveLength(1);
+  expect(screen.getByRole("heading", { name: "new-platform · 1건" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "자사만" }));
+  expect(screen.queryByRole("article")).toBeNull();
+  expect(screen.getByRole("heading", { name: "조건에 맞는 근거 소재가 없습니다" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "광고 기획으로" })).toBeTruthy();
+});
+it("keeps evidence anchors turn-local and unique when commands repeat within and across turns", () => {
+  const commands: UiCommand[] = [{ kind: "show_plan", data: plan }, { kind: "show_evidence_cards", data: { cards: [card], missing: 0 } }, { kind: "show_evidence_cards", data: { cards: [card], missing: 1 } }];
+  render(<><ResultsView commands={commands} /><ResultsView commands={commands} /></>);
+  const links = screen.getAllByRole("link", { name: card.evidence_id! });
+  expect(links).toHaveLength(2);
+  const targets = links.map(link => link.getAttribute("href")!.slice(1));
+  expect(targets[0]).not.toBe(targets[1]);
+  for (const target of targets) {
+    expect(Array.from(document.querySelectorAll("[id]")).filter(node => node.id === target)).toHaveLength(1);
+    expect(document.getElementById(target)!.textContent).toContain("합성 근거");
+  }
+});
+it("connects the evidence navigation to session cards, own-brand summaries and the empty-state plan action", async () => {
+  const command: UiCommand = { kind: "show_evidence_cards", data: { cards: [{ ...card, brand: "isntree" }], missing: 0 } };
+  vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => Promise.resolve(new Response(url === "/api/workspaces" ? JSON.stringify({ workspaces: [{ tenant_id: "synthetic", display_name: "합성 공간", brand: "isntree", product_name: null }], image_enabled: false }) : url === "/api/graph/schema" ? JSON.stringify(schema) : `event: ui_command\ndata: ${JSON.stringify(command)}\n\nevent: token\ndata: {"text":"합성 응답"}\n\n`))));
+  render(<Page />);
+  await screen.findByLabelText("작업 공간");
+  fireEvent.click(screen.getByRole("button", { name: "근거 소재" }));
+  fireEvent.click(screen.getByRole("button", { name: "광고 기획으로" }));
+  fireEvent.change(screen.getByLabelText("작업 공간"), { target: { value: "synthetic" } });
+  fireEvent.change(screen.getByLabelText("요청"), { target: { value: "합성 요청" } });
+  fireEvent.click(screen.getByRole("button", { name: "전송" }));
+  await screen.findByText("합성 응답");
+  expect(screen.getByText("자사")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "근거 소재" }));
+  expect(screen.getByRole("heading", { name: "YouTube · 1건" })).toBeTruthy();
+  expect(screen.getAllByRole("link", { name: "합성 근거" })).toHaveLength(1);
+  expect(within(screen.getByRole("region", { name: "YouTube · 1건" })).getByText("자사")).toBeTruthy();
+});
+
 it("renders separate code checks, evaluation state, unknown badge, neutral pattern and raw taxonomy fallback", () => {
-  const { container, rerender } = render(<PlanCard data={plan} tenantId="synthetic" evidenceAnchors={{ [card.evidence_id!]: "synthetic-anchor" }} />);
+  const { container, rerender } = render(<PlanResult data={plan} tenantId="synthetic" evidenceAnchors={{ [card.evidence_id!]: "synthetic-anchor" }} />);
   expect(screen.getByText("근거 연결 없음 0건").className).toContain("clear");
   expect(screen.getByText("코드 검사: 통과")).toBeTruthy();
   expect(screen.getByText("평가 상태: 검토 필요")).toBeTruthy();
@@ -48,7 +132,7 @@ it("renders separate code checks, evaluation state, unknown badge, neutral patte
   expect(screen.queryByRole("link", { name: "youtube:absent" })).toBeNull();
   expect(screen.getByText(/되돌림 0회/)).toBeTruthy();
   expect(screen.getByText(/차별성 \(differentiation\): 2/)).toBeTruthy();
-  rerender(<PlanCard data={{ ...plan, unknown_count: 3, unknown_codes: { CERT_REQUIRED_UNVERIFIED: 1, EFFICACY_UNKNOWN: 1, SYNTHETIC_UNKNOWN: 1 }, passed: false, status: "failed" }} tenantId="synthetic" names={names} />);
+  rerender(<PlanResult data={{ ...plan, unknown_count: 3, unknown_codes: { CERT_REQUIRED_UNVERIFIED: 1, EFFICACY_UNKNOWN: 1, SYNTHETIC_UNKNOWN: 1 }, passed: false, status: "failed" }} tenantId="synthetic" names={names} />);
   expect(screen.getByText("근거 연결 없음 3건").className).toContain("attention");
   expect(screen.getByText("인증 연결 없음").textContent).toBe("인증 연결 없음");
   expect(screen.getByText("효능 근거 연결 없음").textContent).toBe("효능 근거 연결 없음");
@@ -76,24 +160,24 @@ it("keeps aggregate provenance in three distinct blocks, including removed-only 
 });
 it("shows all six analysis attributes using schema and closed maps, raw unknown values and neutral absent analysis", () => {
   const labeled = { ...card, hook_type: "question", angle: "how_to", format: "demo", talent: "ordinary_person", cta_type: "shop_now", claims: ["hydration", "synthetic_claim"] };
-  const { rerender, container } = render(<EvidenceCards data={{ cards: [labeled], missing: 0 }} names={names} />);
+  const { rerender, container } = render(<EvidenceSummary data={{ cards: [labeled], missing: 0 }} names={names} />);
   for (const text of ["합성 훅", "합성 소구", "합성 형식", "일반 출연자", "구매 유도", "합성 효능", "synthetic_claim"]) expect(screen.getByText(text)).toBeTruthy();
   expect(container.textContent).not.toMatch(/좋음|효과적|인기|우수|나쁨/);
-  rerender(<EvidenceCards data={{ cards: [card], missing: 0 }} />);
+  rerender(<EvidenceSummary data={{ cards: [card], missing: 0 }} />);
   expect(screen.getByText("분석 대상 아님").className).toBe("muted");
-  rerender(<EvidenceCards data={{ cards: [{ ...card, talent: "synthetic_talent", cta_type: "synthetic_cta" }], missing: 0 }} />);
+  rerender(<EvidenceSummary data={{ cards: [{ ...card, talent: "synthetic_talent", cta_type: "synthetic_cta" }], missing: 0 }} />);
   expect(screen.getByText("synthetic_talent")).toBeTruthy(); expect(screen.getByText("synthetic_cta")).toBeTruthy();
   expect(screen.queryByText("분석 대상 아님")).toBeNull(); expect(screen.queryByText("합성 훅")).toBeNull();
 });
 it("validates thumbnail IDs and external schemes, handles nulls, missing and image load failure", () => {
-  const { rerender } = render(<EvidenceCards data={{ cards: [card], missing: 2 }} />);
+  const { rerender } = render(<EvidenceSummary data={{ cards: [card], missing: 2 }} />);
   const thumbnail = screen.getByRole("img") as HTMLImageElement;
   expect(thumbnail.getAttribute("src")).toBe("https://i.ytimg.com/vi/abc_123-/hqdefault.jpg");
   expect(thumbnail.getAttribute("referrerpolicy")).toBe("no-referrer"); expect(thumbnail.getAttribute("loading")).toBe("lazy");
   const link = screen.getByRole("link"); expect(link.getAttribute("rel")).toBe("noopener noreferrer"); expect(link.getAttribute("target")).toBe("_blank");
   expect(screen.getByText("조회수 정보 없음")).toBeTruthy(); expect(screen.getByText("게시일 정보 없음")).toBeTruthy(); expect(screen.getByText(/2건.*불러오지 못/)).toBeTruthy();
   fireEvent.error(thumbnail); expect(screen.queryByRole("img")).toBeNull(); expect(screen.getByLabelText("youtube 출처")).toBeTruthy();
-  rerender(<EvidenceCards data={{ cards: [{ ...card, evidence_id: "youtube:bad/id", url: "javascript:alert(1)" }, { ...card, evidence_id: "instagram:b", source: "instagram", url: "" }, { ...card, evidence_id: "tiktok:c", source: "tiktok", url: "http://example.test/" }], missing: 0 }} />);
+  rerender(<EvidenceSummary data={{ cards: [{ ...card, evidence_id: "youtube:bad/id", url: "javascript:alert(1)" }, { ...card, evidence_id: "instagram:b", source: "instagram", url: "" }, { ...card, evidence_id: "tiktok:c", source: "tiktok", url: "http://example.test/" }], missing: 0 }} />);
   expect(screen.queryByRole("img")).toBeNull(); expect(screen.getAllByRole("link")).toHaveLength(1);
   expect(screen.getByLabelText("instagram 출처")).toBeTruthy(); expect(screen.getByLabelText("tiktok 출처")).toBeTruthy();
 });
@@ -191,7 +275,7 @@ it.each([
   ["합성 날짜 원문", "합성 날짜 원문"],
   [null, "게시일 정보 없음"],
 ])("displays the date prefix without timezone conversion: %s", (published_at, expected) => {
-  render(<EvidenceCards data={{ cards: [{ ...card, published_at }], missing: 0 }} />);
+  render(<EvidenceSummary data={{ cards: [{ ...card, published_at }], missing: 0 }} />);
   expect(screen.getByText(expected).textContent).toBe(expected);
 });
 it("uses schema names across four distribution axes and preserves values without names", () => {
@@ -208,7 +292,7 @@ it("uses schema names across four distribution axes and preserves values without
 it.each([true, false])("fetches schema for distribution-only commands and falls back on failure=%s", async failed => {
   const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify(failed ? { detail: "GRAPH_UNAVAILABLE" } : schema), { status: failed ? 503 : 200 }));
   vi.stubGlobal("fetch", fetch);
-  render(<CommandTenantContext.Provider value="synthetic"><CommandSlot commands={[{ kind: "show_distribution", data: { tool: "synthetic", rows: [{ value: "question", creatives: 2 }] } }]} /></CommandTenantContext.Provider>);
+  render(<CommandTenantContext.Provider value="synthetic"><ResultsView commands={[{ kind: "show_distribution", data: { tool: "synthetic", rows: [{ value: "question", creatives: 2 }] } }]} /></CommandTenantContext.Provider>);
   await waitFor(() => expect(fetch).toHaveBeenCalledExactlyOnceWith("/api/graph/schema", { headers: { "X-Tenant-Id": "synthetic" } }));
   expect(await screen.findByRole("meter", { name: failed ? "question" : "합성 훅" })).toBeTruthy();
 });
@@ -246,7 +330,7 @@ it("shows only the choice status, hides unavailable/stopped stages and preserves
 });
 it("keeps evaluation attempts collapsed initially and reveals every attempt's checks, scores, review items and costs", () => {
   const attempts = [...plan.attempts, { attempt: 2, scores: { differentiation: 4, fit: 5 }, low_items: ["fit"], checks_passed: false, final_passed: false, cost_usd: .012345 }];
-  const { container } = render(<PlanCard data={{ ...plan, attempts }} tenantId={null} />);
+  const { container } = render(<PlanResult data={{ ...plan, attempts }} tenantId={null} />);
   const details = container.querySelector("details")!;
   expect(details).toBeTruthy(); expect(details.hasAttribute("open")).toBe(false);
   const summary = screen.getByText("평가 시도 보기 · 되돌림 1회");
@@ -267,7 +351,7 @@ it("keeps evaluation attempts collapsed initially and reveals every attempt's ch
 it("orders plan sections, disclaimer, image and feedback after the folded attempts", async () => {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(new Blob(["synthetic"]))));
   vi.stubGlobal("URL", Object.assign(class extends URL {}, { createObjectURL: () => "blob:synthetic", revokeObjectURL: vi.fn() }));
-  const { container } = render(<PlanCard data={{ ...plan, plan_id: "synthetic", image }} tenantId="synthetic" />);
+  const { container } = render(<PlanResult data={{ ...plan, plan_id: "synthetic", image }} tenantId="synthetic" />);
   await screen.findByRole("img");
   const root = container.querySelector(".plan-card")!;
   expect(Array.from(root.children).map(node => node.getAttribute("aria-label") ?? node.tagName)).toEqual([

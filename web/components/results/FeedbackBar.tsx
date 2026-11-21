@@ -1,7 +1,8 @@
 "use client";
 import { createContext, useContext, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { ApiError, postFeedback } from "../lib/api";
+import { ApiError, postFeedback } from "../../lib/api";
+import { Button } from "../ui";
 type Session = {
   saved: Set<string>; pending: Set<string>;
   begin: (key: string) => boolean; finish: (key: string, saved: boolean) => void;
@@ -43,9 +44,9 @@ export function FeedbackBar({ tenantId, planId }: { tenantId: string; planId: st
     catch (error) { setError(error instanceof ApiError ? error.code ?? `HTTP_${error.status}` : "피드백을 저장하지 못했습니다"); }
     finally { lock.current = false; setPending(false); session?.finish(key, success); }
   }
-  return <section className="feedback-bar" aria-label="기획안 피드백">{isSaved ? <p role="status">저장했습니다</p> : <>
+  return <section className="gs-feedback-bar" aria-label="기획안 피드백">{isSaved ? <p role="status">저장했습니다</p> : <>
     <label>피드백 사유<textarea value={reason} disabled={isPending} onChange={event => setReason(event.target.value)} placeholder="반려할 때는 사유를 입력하세요" /></label>
-    <div className="options"><button type="button" disabled={isPending} onClick={() => void submit("approved")}>승인</button><button type="button" disabled={isPending || !reason.trim()} onClick={() => void submit("rejected")}>반려</button>{isPending && <small role="status">저장 중입니다.</small>}</div>
+    <div className="gs-feedback-actions"><Button disabled={isPending} onClick={() => void submit("approved")}>승인</Button><Button variant="secondary" disabled={isPending || !reason.trim()} onClick={() => void submit("rejected")}>반려</Button>{isPending && <small role="status">저장 중입니다.</small>}</div>
     {error && <p role="alert">{error}</p>}
   </>}</section>;
 }

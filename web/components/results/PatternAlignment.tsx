@@ -1,9 +1,9 @@
-import type { PatternData } from "../lib/types";
-import { taxonomyNames } from "../lib/taxonomy";
-import type { TaxonomyNames } from "../lib/taxonomy";
+import type { PatternData } from "../../lib/types";
+import { taxonomyNames } from "../../lib/taxonomy";
+import type { TaxonomyNames } from "../../lib/taxonomy";
 const axes = { hook_type: "훅", angle: "소구", format: "형식" } as const;
 export function PatternAlignment({ data, label, names = taxonomyNames() }: { data: PatternData; label: string; names?: TaxonomyNames }) {
-  return <section className="pattern-panel" aria-label="경쟁사 패턴 반영"><h4>경쟁사 패턴 반영</h4>
+  return <section className="gs-pattern-panel" aria-label="경쟁사 패턴 반영"><h4>경쟁사 패턴 반영</h4>
     <p>비교한 축 {data.compared ?? 0}개 중 같은 축 {data.same_count ?? 0}개</p>
     <ul>{(Object.keys(axes) as (keyof typeof axes)[]).map(axis => {
       const item = data.axes?.[axis];

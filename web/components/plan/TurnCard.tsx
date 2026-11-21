@@ -4,7 +4,7 @@ import type { Turn } from "../../lib/reducer";
 import type { ClaimChoice } from "../../lib/types";
 import { PLAN_INTRO_TEXT } from "../../lib/text";
 import { ClarifyCard } from "./ClarifyCard";
-import { CommandSlot, CommandTenantContext } from "../CommandSlot";
+import { ResultsView, CommandTenantContext } from "../results/ResultsView";
 import { GraphPanel } from "../GraphPanel";
 import { Notice } from "../Notice";
 import { ProgressTracker } from "./ProgressTracker";
@@ -22,7 +22,7 @@ export function TurnCard({ turn, busy, onChoice, onCancel, onRetry, choiceLabel 
     <p className="gs-user-message">{turn.message}</p>
     <ProgressTracker stepEvents={turn.stepEvents} turnStatus={turn.status} />
     {displayText && <p className="gs-answer answer">{displayText}</p>}
-    <CommandSlot commands={turn.commands} onOpenGraph={tenantId ? setGraphIds : undefined} />
+    <ResultsView commands={turn.commands} onOpenGraph={tenantId ? setGraphIds : undefined} />
     {tenantId && graphIds && <GraphPanel tenantId={tenantId} ids={graphIds} />}
     {turn.clarification && turn.status === "needs_choice" && !turn.choiceLabel
       ? <ClarifyCard clarification={turn.clarification} disabled={busy} onSubmit={onChoice} onCancel={onCancel} />

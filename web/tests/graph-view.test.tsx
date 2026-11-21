@@ -4,7 +4,7 @@ import { GraphPanel } from "../components/GraphPanel";
 import { SchemaView } from "../components/SchemaView";
 import { GraphCanvas, GraphLegend } from "../components/GraphCanvas";
 import { NodeDetail } from "../components/NodeDetail";
-import { CommandSlot } from "../components/CommandSlot";
+import { ResultsView } from "../components/results/ResultsView";
 import Page from "../app/page";
 import type { GraphFragment, SchemaResponse, UiCommand } from "../lib/types";
 
@@ -100,12 +100,12 @@ it.each(["https://example.test/a", "http://example.test/a", "javascript:alert(1)
 });
 it("renders graph command buttons only with a callback and passes the exact command IDs", () => {
   const commands: Extract<UiCommand, { kind: "show_graph_fragment" }>[] = [{ kind: "show_graph_fragment", data: { evidence_ids: ["youtube:a"] } }, { kind: "show_graph_fragment", data: { evidence_ids: ["youtube:b", "youtube:c"] } }];
-  const open = vi.fn(); const { rerender } = render(<CommandSlot commands={commands} />);
+  const open = vi.fn(); const { rerender } = render(<ResultsView commands={commands} />);
   expect(screen.queryByRole("button", { name: "근거 그래프 보기" })).toBeNull();
-  rerender(<CommandSlot commands={commands} onOpenGraph={open} />);
+  rerender(<ResultsView commands={commands} onOpenGraph={open} />);
   const buttons = screen.getAllByRole("button", { name: "근거 그래프 보기" }); expect(buttons).toHaveLength(2);
   fireEvent.click(buttons[1]); expect(open).toHaveBeenCalledExactlyOnceWith(commands[1].data.evidence_ids);
-  rerender(<CommandSlot commands={[]} onOpenGraph={open} />); expect(screen.queryByRole("button", { name: "근거 그래프 보기" })).toBeNull();
+  rerender(<ResultsView commands={[]} onOpenGraph={open} />); expect(screen.queryByRole("button", { name: "근거 그래프 보기" })).toBeNull();
 });
 it("switches page tabs, preserves conversation and opens the command graph with the selected tenant", async () => {
   const command: UiCommand = { kind: "show_graph_fragment", data: { evidence_ids: ["youtube:a"] } };
