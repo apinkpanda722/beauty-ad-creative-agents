@@ -38,10 +38,8 @@
 .gs-plan-result summary { cursor: pointer; font-weight: 600; }
 .gs-plan-result details p, .gs-plan-result details small { margin-block: var(--gs-space-2); }
 .gs-design-image { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; min-width: 0; min-height: 0; width: 100%; height: 100%; }
-.gs-design-image img { position: relative; z-index: 2; display: block; width: 100%; height: 100%; object-fit: contain; }
-.gs-design-image img.gs-design-backdrop { position: absolute; z-index: 0; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(32px) brightness(0.78); transform: scale(1.2); }
-.gs-design-image::before { content: ""; position: absolute; inset-inline: 0; top: 0; height: 14%; pointer-events: none; z-index: 1; background: linear-gradient(to bottom, var(--gs-surface), transparent); }
-.gs-design-image::after { content: ""; position: absolute; inset-inline: 0; bottom: 0; height: 14%; pointer-events: none; z-index: 1; background: linear-gradient(to top, var(--gs-surface), transparent); }
+.gs-design-image img { position: relative; display: block; width: 100%; height: 100%; object-fit: contain; }
+.gs-design-image img.gs-design-backdrop { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(24px) brightness(0.85); transform: scale(1.1); }
 .gs-design-image figcaption { padding: var(--gs-space-2); color: var(--gs-text-muted); }
 .gs-feedback-bar { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--gs-space-2); font-size: var(--gs-text-sm); }
 .gs-feedback-bar label { flex: 1 0 100%; margin: 0; }

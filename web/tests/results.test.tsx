@@ -769,22 +769,6 @@ it("merges marketer distributions in one card while keeping embedded regions and
   expect(JSON.stringify(commands)).toBe(snapshot);
 });
 
-it("softens backdrop edges underneath the unmasked main image using surface-token bands", () => {
-  const css = readFileSync(join(process.cwd(), "app/results.css"), "utf8");
-  const main = css.match(/\.gs-design-image img\s*\{([^}]*)\}/)![1];
-  const backdrop = css.match(/\.gs-design-image img\.gs-design-backdrop\s*\{([^}]*)\}/)![1];
-  expect(backdrop).toContain("blur(32px)"); expect(backdrop).toContain("brightness(0.78)"); expect(backdrop).toContain("scale(1.2)");
-  expect(main).not.toContain("mask-image"); expect(main).toContain("position: relative");
-  const layer = (rule: string) => Number(rule.match(/z-index:\s*(\d+)/)?.[1]);
-  for (const [pseudo, direction, edge] of [["before", "bottom", "top"], ["after", "top", "bottom"]]) {
-    const rule = css.match(new RegExp(`\\.gs-design-image::${pseudo}\\s*\\{([^}]*)\\}`))![1];
-    expect(rule).toContain("height: 14%"); expect(rule).toContain("position: absolute"); expect(rule).toContain("inset-inline: 0");
-    expect(rule).toContain("pointer-events: none"); expect(rule).toContain(`linear-gradient(to ${direction}, var(--gs-surface), transparent)`);
-    expect(rule).toContain(`${edge}: 0`); expect(rule).not.toMatch(/#[0-9a-f]{3,8}\b/i);
-    expect(layer(rule)).toBeGreaterThan(layer(backdrop)); expect(layer(rule)).toBeLessThan(layer(main));
-  }
-  expect(css.match(/object-fit:\s*cover/g)).toHaveLength(1);
-});
 it("uses shared tokens for insight totals and comparison column emphasis", () => {
   const css = readFileSync(join(process.cwd(), "app/results.css"), "utf8");
   const rule = (name: string) => css.match(new RegExp(`\\.${name}\\s*\\{([^}]*)\\}`))![1];
