@@ -32,7 +32,9 @@ export function PlanPage({ workspaces, imageEnabled }: {
             const selected = next.claimChoice.claims.map(claim => turn.clarification?.available.find(item => item.claim === claim)?.label ?? claim);
             choiceLabel = [next.choiceLabel, ...selected].join(" · ");
           }
-          return <TurnCard key={turn.id} turn={turn} busy={busy} choiceLabel={choiceLabel}
+          const hideProgress = Boolean(turn.clarification && next?.claimChoice && next.message === turn.message);
+          const hideMessage = Boolean(turn.claimChoice && previous?.clarification && previous.message === turn.message);
+          return <TurnCard key={turn.id} turn={turn} busy={busy} choiceLabel={choiceLabel} hideProgress={hideProgress} hideMessage={hideMessage}
             onChoice={(choice, label) => start({ type: "choice_submitted", turnId: turn.id, choice, label })}
             onCancel={() => cancel(turn.id)} onRetry={() => retry(turn.id)} />;
         })}

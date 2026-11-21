@@ -6,6 +6,9 @@ import { afterEach, expect, it, vi } from "vitest";
 import { PlanPage } from "../components/plan/PlanPage";
 import { EvidencePage } from "../components/evidence/EvidencePage";
 import Page from "../app/page";
+import { BrandNamesContext } from "../lib/brandNames";
+import { scoreExplanations } from "../lib/localize";
+import { EvidenceCardView, EvidenceChip } from "../components/evidence/EvidenceCardView";
 import { EvidenceSummary } from "../components/evidence/EvidenceSummary";
 import { PlanResult } from "../components/results/PlanResult";
 import { HistoryDetail } from "../components/history/HistoryDetail";
@@ -105,10 +108,12 @@ it("groups platforms with direct YouTube thumbnails and neutral monogram tiles, 
   const cards = [card, { ...card, evidence_id: "instagram:a", source: "instagram", title: "합성 인스타", hook_type: "question" }, { ...card, evidence_id: "tiktok:a", source: "tiktok", title: "합성 틱톡", hook_type: "question" }];
   render(<EvidencePage turns={turnsWithCards([cards])} workspaceBrand={null} onPlan={vi.fn()} />);
   expect(screen.getAllByRole("heading", { level: 2 }).map(node => node.textContent)).toEqual(["Instagram · 1건", "TikTok · 1건", "YouTube · 1건"]);
-  for (const [source, label, monogram] of [["instagram", "Instagram", "I"], ["tiktok", "TikTok", "T"]]) {
+  for (const [source, label] of [["instagram", "Instagram"], ["tiktok", "TikTok"]]) {
     const tile = screen.getByLabelText(`${source} 출처`);
     expect(tile.textContent).toContain(label);
-    expect(within(tile).getByText(monogram)).toBeTruthy();
+    expect(tile.getAttribute("data-platform")).toBe(source);
+    expect(tile.querySelector('svg[aria-hidden="true"]')).toBeTruthy();
+    expect(tile.querySelector(".gs-platform-monogram")).toBeNull();
     expect(within(tile.closest("article")!).getByText("question")).toBeTruthy();
     expect(tile.closest("article")!.querySelector("img")).toBeNull();
   }
@@ -586,38 +591,54 @@ it("reveals rejection reasons on demand and never stores blank or whitespace-onl
   expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ plan_id: "synthetic-plan", reason: "합성 반려 사유", decision: "rejected" });
   expect(await screen.findByText("저장했습니다")).toBeTruthy();
 });
-it("uses the image's natural aspect ratio without cropping and resets to a placeholder on failure", async () => {
+it("fills the media slot with a contained image over a blurred backdrop and falls back on failure", async () => {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(new Blob(["synthetic"]))));
   vi.stubGlobal("URL", Object.assign(class extends URL {}, { createObjectURL: () => "blob:synthetic", revokeObjectURL: vi.fn() }));
   const { container } = render(<PlanResult data={{ ...plan, image }} tenantId="synthetic" />);
   const media = container.querySelector<HTMLElement>(".gs-plan-media")!;
-  expect(media.style.aspectRatio).toBe("1 / 1");
+  expect(media.style.aspectRatio).toBe("");
   const img = await screen.findByRole("img");
   Object.defineProperties(img, { naturalWidth: { value: 800 }, naturalHeight: { value: 1200 } }); fireEvent.load(img);
-  const [width, height = 1] = media.style.aspectRatio.split("/").map(Number);
-  expect(width / height).toBeCloseTo(2 / 3);
+  expect(media.style.aspectRatio).toBe("");
+  expect(screen.getAllByRole("img")).toEqual([screen.getByRole("img", { name: "기획안 시안 이미지" })]);
+  const backdrop = container.querySelector("img.gs-design-backdrop")!;
+  expect(backdrop.getAttribute("alt")).toBe(""); expect(backdrop.getAttribute("aria-hidden")).toBe("true");
+  expect(backdrop.getAttribute("src")).toBe(img.getAttribute("src"));
   expect(img.style.objectFit).not.toBe("cover");
   const css = readFileSync(join(process.cwd(), "app/results.css"), "utf8");
-  expect(css).toMatch(/object-fit:\s*contain/); expect(css).not.toMatch(/object-fit:\s*cover/);
-  expect(css).toMatch(/align-items:\s*start/); expect(css).not.toContain("position: sticky");
-  fireEvent.error(img); expect(media.style.aspectRatio).toBe("1 / 1");
+  const mainRule = css.match(/\.gs-design-image img\s*\{([^}]*)\}/)![1];
+  expect(mainRule).toMatch(/object-fit:\s*contain/); expect(mainRule).not.toMatch(/object-fit:\s*cover/);
+  const backdropRule = css.match(/[^{}]*\.gs-design-backdrop\s*\{([^}]*)\}/)![1];
+  expect(backdropRule).toMatch(/object-fit:\s*cover/); expect(backdropRule).toContain("blur(");
+  expect(css.match(/object-fit:\s*cover/g)).toHaveLength(1);
+  const mediaRule = css.match(/\.gs-plan-media\s*\{([^}]*)\}/)![1];
+  expect(mediaRule).toMatch(/position:\s*relative/); expect(mediaRule).toMatch(/overflow:\s*hidden/);
+  expect(css).toMatch(/align-items:\s*stretch/); expect(css).not.toContain("position: sticky");
+  fireEvent.error(img); expect(screen.getByRole("status").textContent).toBe("시안 이미지를 불러오지 못했습니다");
+  expect(container.querySelector(".gs-design-backdrop")).toBeNull();
 });
-it("shows Korean brand, review reasons with a tooltip and the original check details", () => {
+it("shows Korean brand, review reasons with an on-demand tooltip and the original check details", () => {
   const { container, rerender } = render(<PlanWithAudit data={{ ...plan, product_display: { brand: "beauty_of_joseon", display_name: "조선미녀 평가 작업 공간", product_name: "합성 제품" }, unknown_count: 4, unknown_codes: { EFFICACY_UNKNOWN: 1, CERT_REQUIRED_UNVERIFIED: 3 } }} tenantId={null} />);
   const summary = container.querySelector(".gs-plan-summary")!;
   expect(summary.querySelector("header small")!.textContent).toBe("기획안 · 조선미녀 · 합성 제품");
   expect(summary.textContent).not.toMatch(/beauty_of_joseon|작업 공간/);
   const badge = within(summary as HTMLElement).getByText("확인 필요 4건 · 인증 자료 연결 없음 · 효능 근거 연결 없음");
   const explanation = "코드 검사가 확인하지 못한 항목의 수입니다. 실패가 아니라 근거가 연결되지 않아 확인이 필요한 항목입니다.";
-  expect(badge.title).toBe(explanation);
-  expect(document.getElementById(badge.getAttribute("aria-describedby")!)!.textContent).toBe(explanation);
-  expect(screen.getByRole("tooltip", { hidden: true }).textContent).toBe(explanation);
+  expect(badge.hasAttribute("title")).toBe(false);
+  const trigger = badge.closest(".gs-tooltip-trigger")!;
+  expect(trigger.hasAttribute("title")).toBe(false); expect(screen.queryByRole("tooltip")).toBeNull();
+  expect(trigger.hasAttribute("aria-describedby")).toBe(false);
+  fireEvent.focus(trigger);
+  const tooltip = screen.getByRole("tooltip"); expect(tooltip.textContent).toBe(explanation);
+  expect(trigger.getAttribute("aria-describedby")).toBe(tooltip.id);
+  fireEvent.keyDown(trigger, { key: "Escape" }); expect(screen.queryByRole("tooltip")).toBeNull(); expect(trigger.hasAttribute("aria-describedby")).toBe(false);
   selectAuditTab("검증");
   const checks = container.querySelector('[aria-label="검사 결과"]') as HTMLElement;
   expect(within(checks).getByText("근거 연결 없음 4건")).toBeTruthy();
   expect(within(checks).getByText("인증 연결 없음").tagName).toBe("LI");
   rerender(<PlanWithAudit data={plan} tenantId={null} />);
-  expect(screen.getByText("확인 필요 0건")).toBeTruthy();
+  expect(screen.getByText("확인 필요 없음")).toBeTruthy();
+  expect(container.querySelector(".gs-review-badge")).toBeNull(); expect(screen.queryByRole("tooltip")).toBeNull();
   expect(container.querySelector("header small")!.textContent).toBe("기획안 · 브랜드 정보 없음");
 });
 it("opens in the next frame and waits for a grid transition before hiding", () => {
@@ -685,7 +706,7 @@ it("never displays the model-written rationale and leaves the input object uncha
   const data = { ...plan, attempts: [{ attempt: 1, checks_passed: true, scores }] };
   const snapshot = JSON.stringify(data);
   render(<PlanWithAudit data={data} tenantId={null} names={names} />); expandAll();
-  expect(screen.getByText("품질 검사 통과 · 평가 차별성 3/5, 요청 적합성 4/5")).toBeTruthy();
+  expect(document.querySelector(".gs-quality-summary")!.textContent).toBe("품질 검사 통과 · AI 평가 차별성 3/5 · 요청 적합성 4/5");
   selectAuditTab("단계");
   expect(screen.getByText("시도 1 · 검사 통과 · 최종 미실행 · 차별성 3/5 · 요청 적합성 4/5")).toBeTruthy();
   expect(document.body.textContent).not.toMatch(/사유:|rationale|합성 소구 대비|\(differentiation\)/);
@@ -697,7 +718,7 @@ it("summarizes only the latest attempt with absent scores omitted and failed che
   rerender(<PlanResult data={{ ...plan, attempts: [] }} tenantId={null} />);
   expect(screen.getByText("품질 검사 통과")).toBeTruthy();
   rerender(<PlanResult data={{ ...plan, attempts: [{ attempt: 1, checks_passed: true, scores: { fit: 5 } }] }} tenantId={null} />);
-  expect(screen.getByText("품질 검사 통과 · 평가 요청 적합성 5/5")).toBeTruthy();
+  expect(document.querySelector(".gs-quality-summary")!.textContent).toBe("품질 검사 통과 · AI 평가 요청 적합성 5/5");
 });
 it("renders market insights with Korean titles and columns, without tool captions, and retains meter names", () => {
   const { rerender } = render(<DistributionChart data={{ tool: "top_vs_bottom_axis", rows: [{ value: "question", n_top: 3, n_bottom: 1 }] }} names={names} />);
@@ -717,7 +738,7 @@ it("renders market insights with Korean titles and columns, without tool caption
 it("keeps only marketer summaries, insight, pattern facts and one verification link in results", () => {
   const { container } = render(<ResultsView commands={[{ kind: "show_plan", data: plan }, { kind: "show_distribution", data: { tool: "synthetic", rows: [{ value: "합성 분포", creatives: 1 }] } }, { kind: "show_aggregates", data: aggregates }]} />);
   expandAll();
-  expect(screen.getByText("품질 검사 통과 · 평가 차별성 2/5, 요청 적합성 3/5")).toBeTruthy();
+  expect(document.querySelector(".gs-quality-summary")!.textContent).toBe("품질 검사 통과 · AI 평가 차별성 2/5 · 요청 적합성 3/5");
   expect(screen.getByRole("region", { name: "분포" })).toBeTruthy();
   expect(within(screen.getByRole("region", { name: "경쟁사 패턴 반영" })).getByRole("table")).toBeTruthy();
   expect(screen.getAllByRole("link", { name: "검증 상세 보기 →" })).toHaveLength(1);
@@ -750,4 +771,42 @@ it("places the comparison note below one heading and omits it for other tools", 
   expect(within(panel).getByText(note).className).toBe("gs-insight-note");
   rerender(<DistributionChart data={{ tool: "compare_axis_by_category", rows: [{ value: "question", creatives: 3 }] }} />);
   expect(within(panel).queryByText(note)).toBeNull();
+});
+
+it("shows ordered accessible category tags and publication metrics without folded details", () => {
+  const { container } = render(<EvidenceCardView anchor="synthetic" names={names} card={{ ...card, hook_type: "question", angle: "how_to", format: "demo", talent: "ordinary_person", cta_type: "shop_now", claims: ["hydration"], published_at: "2026-01-02T00:00:00Z", view_count: 1234, like_count: 56 }} />);
+  const tags = [...container.querySelectorAll(".gs-tag")];
+  expect(tags.map(tag => tag.getAttribute("data-category"))).toEqual(["hook", "angle", "format", "talent", "cta", "claim"]);
+  expect(tags.map(tag => tag.querySelector(".gs-sr-only")!.textContent)).toEqual(["훅: ", "소구: ", "형식: ", "출연자: ", "CTA: ", "효능: "]);
+  for (const value of ["합성 훅", "합성 소구", "합성 형식", "일반 출연자", "구매 유도", "합성 효능"]) expect(screen.getByText(value)).toBeTruthy();
+  expect(container.querySelector("details")).toBeNull(); expect(screen.getByText("2026-01-02")).toBeTruthy(); expect(screen.getByText("조회수 1,234")).toBeTruthy(); expect(screen.getByText("좋아요 56")).toBeTruthy();
+});
+it("uses readable missing titles and stretches only a safe original link across its card", () => {
+  const { container, rerender } = render(<EvidenceCardView anchor="synthetic" card={{ ...card, title: "  " }} />);
+  const link = screen.getByRole("link", { name: "합성 브랜드 · YouTube 광고" });
+  expect(link.closest("article")!.getAttribute("data-linked")).toBe("true"); expect(screen.getAllByRole("link")).toHaveLength(1); expect(link.getAttribute("target")).toBe("_blank"); expect(link.textContent).not.toBe(card.evidence_id);
+  rerender(<EvidenceCardView anchor="synthetic" card={{ ...card, title: null, brand: null }} />); expect(screen.getByRole("link", { name: "브랜드 정보 없음 · YouTube 광고" })).toBeTruthy();
+  rerender(<EvidenceCardView anchor="synthetic" card={{ ...card, url: null }} />); expect(screen.queryByRole("link")).toBeNull(); expect(container.querySelector("article")!.hasAttribute("data-linked")).toBe(false);
+  const css = readFileSync(join(process.cwd(), "app/evidence.css"), "utf8");
+  expect(css).toMatch(/\.gs-evidence-card h4 a::after\s*\{[^}]*position:\s*absolute[^}]*inset:\s*0/);
+  expect(css).toMatch(/\[data-linked="true"\][^{]*\{[^}]*cursor:\s*pointer/);
+});
+it("shares brand names between card metadata, fallback titles and chips without changing evidence", () => {
+  const source = { ...card, source: "instagram", evidence_id: "instagram:synthetic", brand: "beauty_of_joseon", title: null }; const snapshot = JSON.stringify(source);
+  const content = <><EvidenceCardView anchor="synthetic" card={source} /><EvidenceChip id={source.evidence_id} card={source} /></>;
+  const { rerender, container } = render(<BrandNamesContext.Provider value={new Map([["beauty_of_joseon", "조선미녀"]])}>{content}</BrandNamesContext.Provider>);
+  expect(screen.getByText("조선미녀 · Instagram")).toBeTruthy(); expect(screen.getByText("조선미녀").closest(".gs-evidence-chip")).toBeTruthy(); expect(screen.getByRole("link", { name: "조선미녀 · Instagram 광고" })).toBeTruthy();
+  expect(container.querySelector('.gs-evidence-chip svg[aria-hidden="true"]')).toBeTruthy(); expect(container.querySelector(".gs-evidence-chip .gs-platform-monogram")).toBeNull();
+  rerender(content); expect(screen.getByText("beauty of joseon · Instagram")).toBeTruthy(); expect(screen.getByText("beauty of joseon")).toBeTruthy(); expect(JSON.stringify(source)).toBe(snapshot);
+});
+it("explains each scored label on focus and omits AI evaluation and triggers when no scores exist", () => {
+  const { container, rerender } = render(<PlanResult data={plan} tenantId={null} />);
+  const summary = container.querySelector(".gs-quality-summary") as HTMLElement;
+  expect(summary.textContent).toBe("품질 검사 통과 · AI 평가 차별성 2/5 · 요청 적합성 3/5");
+  for (const [label, name] of [["차별성", "differentiation"], ["요청 적합성", "fit"]] as const) {
+    const trigger = within(summary).getByText(label); expect(screen.queryByRole("tooltip")).toBeNull(); fireEvent.focus(trigger);
+    const tooltip = screen.getByRole("tooltip"); expect(tooltip.textContent).toBe(scoreExplanations[name]); expect(trigger.getAttribute("aria-describedby")).toBe(tooltip.id); fireEvent.blur(trigger);
+  }
+  rerender(<PlanResult data={{ ...plan, attempts: [{ attempt: 1, checks_passed: true, scores: null }] }} tenantId={null} />);
+  expect(summary.textContent).toBe("품질 검사 통과"); expect(summary.querySelector(".gs-tooltip-trigger")).toBeNull(); expect(screen.queryByText(/AI 평가/)).toBeNull();
 });

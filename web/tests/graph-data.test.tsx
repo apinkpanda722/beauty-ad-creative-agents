@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { BrandNamesContext } from "../lib/brandNames";
 import { DataTab } from "../components/graph/DataTab";
 import { GraphPage } from "../components/graph/GraphPage";
 import { GRAPH_TABS } from "../components/graph/tabs";
@@ -130,4 +131,24 @@ it("API clients forward tenant headers, encode the full ID and retain HTTP error
     fetcher.mockResolvedValueOnce(new Response("", { status: 503 }));
     await expect(request()).rejects.toMatchObject({ name: "ApiError", status: 503, code: null });
   }
+});
+
+it("maps brand display names, preserves product names and wire objects, and falls back only for missing names", async () => {
+  const nodes = [
+    { id: "Brand:beauty_of_joseon", label: "Brand", name: "beauty_of_joseon", props: { name: "beauty_of_joseon", brand: "beauty_of_joseon" } },
+    { id: "Brand:synthetic_x", label: "Brand", name: "synthetic_x", props: { name: "synthetic_x" } },
+    { id: "Product:synthetic", label: "Product", name: "Synthetic Product", props: { name: "Synthetic Product", name_ko: "Synthetic Original", brand: "beauty_of_joseon" } },
+    { id: "Brand:missing", label: "Brand", name: null, props: { name: null, brand: null } },
+    { id: "Product:missing", label: "Product", name: null, props: { name: null, name_ko: null } },
+  ];
+  const data = { nodes, edges: [], truncated: false }; const snapshot = JSON.stringify(data);
+  vi.mocked(getGraphOverview).mockResolvedValue(data);
+  render(<BrandNamesContext.Provider value={new Map([["beauty_of_joseon", "조선미녀"]])}><DataTab tenantId="synthetic" /></BrandNamesContext.Provider>); await ready();
+  for (const [index, expected] of [[0, "조선미녀"], [1, "synthetic x"], [2, "Synthetic Product"], [3, "정보 없음"], [4, "정보 없음"]] as const) {
+    select(nodes[index].id); const panel = screen.getByRole("complementary", { name: "노드 상세" }); expect(panel.textContent).toContain(expected);
+    const element = canvas.elements.find(element => element.group === "nodes" && element.data.id === nodes[index].id)!;
+    expect(element.group === "nodes" && element.data.displayName).toBe(expected);
+    if (index === 2) { expect(panel.textContent).toContain("Synthetic Original"); expect(panel.textContent).toContain("조선미녀"); expect(panel.textContent).not.toContain("정보 없음"); }
+  }
+  expect(JSON.stringify(data)).toBe(snapshot);
 });

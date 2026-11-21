@@ -176,3 +176,27 @@ it("opens the workspace chip by keyboard, moves options, selects and restores fo
   expect(screen.queryByRole("listbox")).toBeNull();
   expect(document.querySelector("select, .workspace-picker")).toBeNull();
 });
+
+it("keeps the chevron toggle in the sidebar head before nav and leaves only branding and workspace in the topbar", async () => {
+  render(<Page />); await screen.findByLabelText("요청");
+  const toggle = screen.getByRole("button", { name: "사이드바 접기" });
+  const head = document.querySelector(".gs-sidebar-column > .gs-sidebar-head")!;
+  const nav = screen.getByRole("navigation"); const header = document.querySelector(".gs-topbar")!;
+  expect(head.contains(toggle)).toBe(true); expect(head.nextElementSibling).toBe(nav);
+  expect(header.children).toHaveLength(2); expect(header.querySelector(".gs-logo")!.textContent).toBe(BRAND.name + BRAND.nameKo);
+  expect(header.querySelector(".gs-logo button")).toBeNull(); expect(header.querySelector(".gs-workspace-slot")).toBeTruthy();
+  expect(within(header as HTMLElement).queryByRole("button", { name: /사이드바/ })).toBeNull();
+  expect(toggle.querySelectorAll('svg[aria-hidden="true"]')).toHaveLength(1);
+  const path = toggle.querySelector("path")!.getAttribute("d"); fireEvent.click(toggle);
+  expect(screen.getByRole("button", { name: "사이드바 펼치기" })).toBe(toggle); expect(toggle.parentElement).toBe(head);
+  expect(toggle.querySelectorAll('svg[aria-hidden="true"]')).toHaveLength(1); expect(toggle.querySelector("path")!.getAttribute("d")).not.toBe(path);
+});
+it("moves the sidebar border to its column and centers the rail toggle while hiding its head on mobile", () => {
+  const css = readFileSync(join(process.cwd(), "app/shell.css"), "utf8");
+  expect(css).toMatch(/\.gs-sidebar-column\s*\{[^}]*border-right:/);
+  expect(css.match(/\.gs-sidebar\s*\{([^}]*)\}/)?.[1]).not.toContain("border-right");
+  expect(css).toMatch(/\.gs-sidebar-head\s*\{[^}]*justify-content:\s*flex-end/);
+  expect(css).toMatch(/\[data-sidebar="collapsed"\] \.gs-sidebar-head\s*\{[^}]*justify-content:\s*center/);
+  expect(css.split("@media (width < 880px)")[1]).toMatch(/\.gs-sidebar-head\s*\{[^}]*display:\s*none/);
+  expect(css).not.toContain(".gs-mark");
+});

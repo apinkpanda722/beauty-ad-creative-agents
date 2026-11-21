@@ -44,6 +44,25 @@
   --gs-text-xl: 24px;
   --gs-text-2xl: 32px;
   --gs-motion-accordion: 240ms;
+  --gs-tooltip-max-width: 280px;
+  --gs-tooltip-z-index: 20;
+  --gs-tag-hook-bg: #EFF6FF;
+  --gs-tag-hook-fg: #1E40AF;
+  --gs-tag-angle-bg: #FFF7ED;
+  --gs-tag-angle-fg: #9A3412;
+  --gs-tag-format-bg: #F5F3FF;
+  --gs-tag-format-fg: #5B21B6;
+  --gs-tag-talent-bg: #FDF2F8;
+  --gs-tag-talent-fg: #9D174D;
+  --gs-tag-cta-bg: #ECFEFF;
+  --gs-tag-cta-fg: #155E75;
+  --gs-tag-claim-bg: #FEFCE8;
+  --gs-tag-claim-fg: #854D0E;
+  --gs-platform-instagram-from: #6D28D9;
+  --gs-platform-instagram-via: #BE185D;
+  --gs-platform-instagram-to: #C2410C;
+  --gs-platform-tiktok-bg: #111827;
+  --gs-platform-on-color: #FFFFFF;
 }
 @media (width < 600px) {
   :root { --gs-action-gap: var(--gs-space-2); }

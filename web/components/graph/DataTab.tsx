@@ -1,5 +1,6 @@
 "use client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { brandDisplayName, BrandNamesContext, type BrandNames } from "../../lib/brandNames";
 import { ApiError, getGraphNeighbors, getGraphOverview, getSchema, type GraphExploreResponse } from "../../lib/api";
 import { fragmentToElements } from "../../lib/graph";
 import { ctaName, talentName, taxonomyNames } from "../../lib/taxonomy";
@@ -27,13 +28,20 @@ function merge(current: GraphExploreResponse, incoming: GraphExploreResponse): G
   return { nodes: [...nodes.values()], edges: [...edges.values()], truncated: current.truncated || incoming.truncated };
 }
 // Preserve wire identities for expansion; translate only the presentation copy.
-function displayNode(node: GraphNode): GraphNode {
+function displayNode(node: GraphNode, brandNames: BrandNames): GraphNode {
   const korean = (value: string) => /[가-힣]/.test(value) ? value : "정보 없음";
   const props = { ...node.props };
   let name = node.name;
   if (node.label === "Creative") name = "광고 소재";
-  if ((node.label === "Brand" || node.label === "Product") && name !== null) name = korean(name);
-  for (const key of ["name", "brand", "name_ko"]) if (typeof props[key] === "string") props[key] = korean(props[key]);
+  if (node.label === "Brand") name = brandDisplayName(name, brandNames);
+  if (node.label === "Product") name = name ?? "정보 없음";
+  for (const key of ["name", "brand", "name_ko"]) {
+    if (key === "brand" || (node.label === "Brand" && key === "name")) {
+      if (key in props) props[key] = brandDisplayName(typeof props[key] === "string" ? props[key] : null, brandNames);
+    } else if (node.label === "Product") {
+      if (key in props && props[key] === null) props[key] = "정보 없음";
+    } else if (typeof props[key] === "string") props[key] = korean(props[key]);
+  }
   if (node.label === "Talent" || node.label === "CtaType") {
     const translate = node.label === "Talent" ? talentName : ctaName;
     const translated = (value: string) => translate(value) === value && !/[가-힣]/.test(value) ? "기타" : value;
@@ -46,6 +54,7 @@ export function DataTab({ tenantId }: { tenantId: string }) {
   return <DataView key={tenantId} tenantId={tenantId} />;
 }
 function DataView({ tenantId }: { tenantId: string }) {
+  const brandNames = useContext(BrandNamesContext);
   const [state, setState] = useState<DataState>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -71,7 +80,7 @@ function DataView({ tenantId }: { tenantId: string }) {
       valueName: (value: string) => translated(value, original.valueName(value)),
     };
   }, [schema]);
-  const elements = useMemo(() => data ? fragmentToElements({ ...data, nodes: data.nodes.map(displayNode), missing: [] }, names) : [], [data, names]);
+  const elements = useMemo(() => data ? fragmentToElements({ ...data, nodes: data.nodes.map(node => displayNode(node, brandNames)), missing: [] }, names) : [], [data, names, brandNames]);
   const filters = useGraphFilters(elements);
   const selected = filters.elements.find(element => element.group === "nodes" && element.data.id === selectedId);
   const selectedNode = selected?.group === "nodes" ? selected.data : null;

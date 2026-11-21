@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { StrictMode, useState } from "react";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import { Badge, Button, Card, DataTable, EmptyState, PageHeader, SidePanel, Skeleton, Tabs } from "../components/ui";
+import { Badge, Button, Card, DataTable, EmptyState, PageHeader, SidePanel, Skeleton, Tabs, Tooltip } from "../components/ui";
 
 afterEach(cleanup);
 
@@ -200,4 +200,29 @@ it("defines scoped reduced motion, a two-pixel token focus ring and full-opacity
   expect(css).toMatch(/:focus-visible[^}]*outline:\s*2px solid var\(--gs-accent\)/s);
   expect(css).toMatch(/\.gs-button:disabled[^}]*opacity:\s*1/s);
   expect(css).not.toMatch(/#[0-9a-f]{3,8}\b|\brgba?\(/i);
+});
+
+
+it("opens tooltips only on hover or focus, links descriptions and dismisses on leave, blur and Escape", () => {
+  render(<Tooltip content={<strong>합성 설명</strong>} placement="bottom" align="end">합성 용어</Tooltip>);
+  const trigger = screen.getByText("합성 용어");
+  expect(trigger.tabIndex).toBe(0); expect(trigger.hasAttribute("title")).toBe(false);
+  const closed = () => { expect(screen.queryByRole("tooltip")).toBeNull(); expect(trigger.hasAttribute("aria-describedby")).toBe(false); };
+  const opened = () => {
+    const tip = screen.getByRole("tooltip"); expect(tip.textContent).toBe("합성 설명");
+    expect(trigger.getAttribute("aria-describedby")).toBe(tip.id);
+    expect(tip.getAttribute("data-placement")).toBe("bottom"); expect(tip.getAttribute("data-align")).toBe("end");
+  };
+  closed(); fireEvent.mouseEnter(trigger); opened(); fireEvent.mouseLeave(trigger); closed();
+  fireEvent.focus(trigger); opened(); fireEvent.blur(trigger); closed();
+  fireEvent.focus(trigger); opened(); fireEvent.keyDown(trigger, { key: "Escape" }); closed();
+  fireEvent.mouseEnter(trigger); opened(); fireEvent.keyDown(document, { key: "Escape" }); closed();
+});
+it("exports Tooltip and bounds tooltip styling with tokens and reduced motion", () => {
+  const css = readFileSync(join(process.cwd(), "app/ui.css"), "utf8");
+  const tokens = readFileSync(join(process.cwd(), "app/tokens.css"), "utf8");
+  expect(css).toMatch(/\.gs-tooltip\s*\{[^}]*max-width:\s*min\(var\(--gs-tooltip-max-width\), 90vw\)/);
+  expect(tokens).toMatch(/--gs-tooltip-max-width:\s*280px/);
+  expect(css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"))).toMatch(/transition:\s*none/);
+  expect(readFileSync(join(process.cwd(), "components/ui/index.ts"), "utf8")).toContain('export { Tooltip }');
 });

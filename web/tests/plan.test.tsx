@@ -417,3 +417,26 @@ it("enables scrolling only at the textarea height cap and hides it again after s
   expect(input.value).toBe("");
   expect(input.style.overflowY).toBe("hidden");
 });
+
+it("keeps an open question unchanged and shows only one request and continuation progress after resolving it", async () => {
+  const fetch = setup([{ event: "needs_clarification", data: clarification }]); selectWorkspace(); send(); await ready();
+  const first = screen.getByRole("article", { name: "요청 1" });
+  expect(first.querySelector(".gs-user-message")!.textContent).toBe("합성 사용자 요청");
+  expect(within(first).getByLabelText("진행 단계").textContent).toBe("요청 해석 완료 · 선택을 기다리는 중");
+  fetch.mockResolvedValue(response([{ event: "token", data: { text: "합성 후속 결과" } }]));
+  fireEvent.click(screen.getByRole("button", { name: "합성 하나 선택" })); fireEvent.click(screen.getByLabelText("합성 효능 A")); fireEvent.click(screen.getByRole("button", { name: "선택 제출" })); await ready();
+  expect(within(first).queryByLabelText("진행 단계")).toBeNull(); expect(within(first).getByLabelText("효능 선택 요약").textContent).toBe("효능 선택 · 합성 하나 선택 · 합성 효능 A");
+  const follow = screen.getByRole("article", { name: "요청 2" });
+  expect(follow.querySelector(".gs-user-message")).toBeNull(); expect(within(follow).getByLabelText("진행 단계")).toBeTruthy(); expect(within(follow).getByText("합성 후속 결과")).toBeTruthy();
+  expect(screen.getAllByText("합성 사용자 요청")).toHaveLength(1);
+  fireEvent.change(screen.getByLabelText("요청"), { target: { value: "합성 다른 요청" } }); fireEvent.click(screen.getByRole("button", { name: "기획하기" })); await ready();
+  const fresh = screen.getByRole("article", { name: "요청 3" }); expect(fresh.querySelector(".gs-user-message")!.textContent).toBe("합성 다른 요청"); expect(within(fresh).getByLabelText("진행 단계")).toBeTruthy();
+});
+it("retains continuation errors and retry controls while hiding only its duplicate request", async () => {
+  const fetch = setup([{ event: "needs_clarification", data: clarification }]); selectWorkspace(); send(); await ready();
+  fetch.mockResolvedValue(response([{ event: "error", data: { code: "AGENT_INTERNAL_ERROR", detail: "합성 후속 오류" } }]));
+  fireEvent.click(screen.getByRole("button", { name: "합성 생략" })); await ready();
+  const follow = screen.getByRole("article", { name: "요청 2" });
+  expect(follow.querySelector(".gs-user-message")).toBeNull(); expect(within(follow).getByText("합성 후속 오류")).toBeTruthy(); expect(within(follow).getByRole("button", { name: "다시 시도" })).toBeTruthy();
+  expect(within(screen.getByRole("article", { name: "요청 1" })).queryByLabelText("진행 단계")).toBeNull();
+});

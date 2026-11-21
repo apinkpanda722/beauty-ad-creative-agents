@@ -16,3 +16,5 @@ export { SidePanel } from "./SidePanel";
 export type { SidePanelProps } from "./SidePanel";
 export { PageHeader } from "./PageHeader";
 export type { PageHeaderProps } from "./PageHeader";
+export { Tooltip } from "./Tooltip";
+export type { TooltipProps } from "./Tooltip";

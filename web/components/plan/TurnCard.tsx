@@ -9,8 +9,8 @@ import { OpenGraphPathContext } from "../graph/context";
 import { Notice } from "../Notice";
 import { ProgressTracker } from "./ProgressTracker";
 import { ClarifySummary } from "./ClarifySummary";
-export function TurnCard({ turn, busy, onChoice, onCancel, onRetry, choiceLabel = turn.choiceLabel }: {
-  turn: Turn; busy: boolean; choiceLabel?: string | null; onChoice: (choice: ClaimChoice, label: string) => void;
+export function TurnCard({ turn, busy, onChoice, onCancel, onRetry, choiceLabel = turn.choiceLabel, hideProgress = false, hideMessage = false }: {
+  turn: Turn; busy: boolean; hideProgress?: boolean; hideMessage?: boolean; choiceLabel?: string | null; onChoice: (choice: ClaimChoice, label: string) => void;
   onCancel: () => void; onRetry: () => void;
 }) {
   const tenantId = useContext(CommandTenantContext);
@@ -20,8 +20,8 @@ export function TurnCard({ turn, busy, onChoice, onCancel, onRetry, choiceLabel 
     : turn.displayText;
   const cost = turn.commands.findLast(command => command.kind === "show_cost");
   return <article className="gs-turn" aria-label={`요청 ${turn.id}`}>
-    <p className="gs-user-message">{turn.message}</p>
-    <ProgressTracker stepEvents={turn.stepEvents} turnStatus={turn.status} times={{ startedAt: turn.startedAt, stepAt: turn.stepAt }} costUsd={cost?.data.text_spent_usd} costLabel={cost?.data.label} />
+    {!hideMessage && <p className="gs-user-message">{turn.message}</p>}
+    {!hideProgress && <ProgressTracker stepEvents={turn.stepEvents} turnStatus={turn.status} times={{ startedAt: turn.startedAt, stepAt: turn.stepAt }} costUsd={cost?.data.text_spent_usd} costLabel={cost?.data.label} />}
     {displayText && <p className="gs-answer answer">{displayText}</p>}
     <ResultsView commands={turn.commands} onOpenGraph={tenantId ? openGraphPath ?? undefined : undefined} />
     {turn.clarification && turn.status === "needs_choice" && !turn.choiceLabel

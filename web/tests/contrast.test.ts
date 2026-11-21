@@ -43,3 +43,18 @@ it("keeps the actual CSS token pairs above WCAG AA contrast", () => {
     expect((Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05), foreground).toBeGreaterThanOrEqual(4.5);
   }
 });
+
+function tokenColor(token: string, expected: string) {
+  const actual = css.match(new RegExp(`${token}\\s*:\\s*(#[0-9a-f]{6})\\s*;`, "i"))?.[1].toUpperCase();
+  expect(actual, token).toBe(expected); return actual!;
+}
+function contrast(a: string, b: string) { const x = luminance(a), y = luminance(b); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); }
+it("defines six exact low-saturation tag pairs above WCAG AA", () => {
+  for (const [category, background, foreground] of [["hook", "#EFF6FF", "#1E40AF"], ["angle", "#FFF7ED", "#9A3412"], ["format", "#F5F3FF", "#5B21B6"], ["talent", "#FDF2F8", "#9D174D"], ["cta", "#ECFEFF", "#155E75"], ["claim", "#FEFCE8", "#854D0E"]]) {
+    expect(contrast(tokenColor(`--gs-tag-${category}-bg`, background), tokenColor(`--gs-tag-${category}-fg`, foreground))).toBeGreaterThanOrEqual(4.5);
+  }
+});
+it("keeps white platform glyphs readable against every gradient stop and TikTok", () => {
+  const white = tokenColor("--gs-platform-on-color", "#FFFFFF");
+  for (const [token, value] of [["--gs-platform-instagram-from", "#6D28D9"], ["--gs-platform-instagram-via", "#BE185D"], ["--gs-platform-instagram-to", "#C2410C"], ["--gs-platform-tiktok-bg", "#111827"]]) expect(contrast(tokenColor(token, value), white)).toBeGreaterThanOrEqual(4.5);
+});

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { brandNameMap, BrandNamesContext } from "../lib/brandNames";
 import { HistoryPage } from "../components/history/HistoryPage";
 import { OpenHistoryDetailContext, CommandTenantContext } from "../components/results/ResultsView";
 import { PlanPage } from "../components/plan/PlanPage";
@@ -29,9 +30,10 @@ function WorkspaceShell() {
     getWorkspaces().then(value => { if (active) setData(value); }).catch(() => { if (active) setFailed(true); });
     return () => { active = false; };
   }, []);
-  return <AppShell workspace={<WorkspaceChip workspaces={data?.workspaces ?? []} value={state.tenantId} onChange={selectWorkspace} />}>
+  const brandNames = useMemo(() => brandNameMap(data?.workspaces ?? []), [data]);
+  return <BrandNamesContext.Provider value={brandNames}><AppShell workspace={<WorkspaceChip workspaces={data?.workspaces ?? []} value={state.tenantId} onChange={selectWorkspace} />}>
     {(view, setView) => <WorkspaceContent view={view} setView={setView} data={data} failed={failed} />}
-  </AppShell>;
+  </AppShell></BrandNamesContext.Provider>;
 }
 
 function WorkspaceContent({ view, setView, data, failed }: {
