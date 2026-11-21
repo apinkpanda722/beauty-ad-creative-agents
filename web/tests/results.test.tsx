@@ -59,6 +59,48 @@ function expandAll() { for (const button of screen.queryAllByRole("button", { na
 function turnsWithCards(cards: EvidenceCard[][]) {
   return cards.map(cards => ({ commands: [{ kind: "show_evidence_cards" as const, data: { cards, missing: 0 } }] }));
 }
+it("combines separate platform and brand filters with independent pressed states", () => {
+  const onPlan = vi.fn();
+  render(<EvidencePage turns={turnsWithCards([[{ ...card, brand: "isntree" }, { ...card, evidence_id: "instagram:synthetic", source: "instagram", title: "합성 다른 브랜드", brand: "cosrx" }]])} workspaceBrand="isntree" onPlan={onPlan} />);
+  const platform = within(screen.getByRole("group", { name: "플랫폼" }));
+  const brand = within(screen.getByRole("group", { name: "브랜드" }));
+  expect(screen.queryByRole("group", { name: "근거 소재 필터" })).toBeNull();
+  expect(platform.getAllByRole("button").map(button => button.textContent)).toEqual(["전체", "Instagram", "YouTube"]);
+  expect(brand.getAllByRole("button").map(button => button.textContent)).toEqual(["전체 브랜드", "자사만"]);
+  function pressed(platformStates: string[], brandStates: string[]) {
+    expect(platform.getAllByRole("button").map(button => button.getAttribute("aria-pressed"))).toEqual(platformStates);
+    expect(brand.getAllByRole("button").map(button => button.getAttribute("aria-pressed"))).toEqual(brandStates);
+  }
+  pressed(["true", "false", "false"], ["true", "false"]);
+  fireEvent.click(platform.getByRole("button", { name: "Instagram" }));
+  pressed(["false", "true", "false"], ["true", "false"]);
+  fireEvent.click(brand.getByRole("button", { name: "자사만" }));
+  pressed(["false", "true", "false"], ["false", "true"]);
+  expect(screen.getByRole("heading", { name: "조건에 맞는 근거 소재가 없습니다" })).toBeTruthy();
+  expect(screen.queryByRole("article")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "광고 기획으로" })); expect(onPlan).toHaveBeenCalledTimes(1);
+  fireEvent.click(brand.getByRole("button", { name: "전체 브랜드" }));
+  pressed(["false", "true", "false"], ["true", "false"]);
+  expect(screen.getAllByRole("article")).toHaveLength(1);
+  expect(screen.getByRole("link", { name: "합성 다른 브랜드" })).toBeTruthy();
+  fireEvent.click(platform.getByRole("button", { name: "전체" }));
+  pressed(["true", "false", "false"], ["true", "false"]);
+  expect(screen.getAllByRole("article")).toHaveLength(2);
+  fireEvent.click(brand.getByRole("button", { name: "자사만" }));
+  fireEvent.click(platform.getByRole("button", { name: "전체" }));
+  pressed(["true", "false", "false"], ["false", "true"]);
+  expect(screen.getAllByRole("article")).toHaveLength(1);
+  expect(screen.getByRole("link", { name: "합성 근거" })).toBeTruthy();
+});
+it("hides both filter rows for an empty session and filters a null platform", () => {
+  const { rerender } = render(<EvidencePage turns={[]} workspaceBrand={null} onPlan={vi.fn()} />);
+  expect(screen.queryByRole("group", { name: "플랫폼" })).toBeNull();
+  expect(screen.queryByRole("group", { name: "브랜드" })).toBeNull();
+  rerender(<EvidencePage turns={turnsWithCards([[card, { ...card, evidence_id: "synthetic:null", source: null, title: "합성 출처 없음" }]])} workspaceBrand={null} onPlan={vi.fn()} />);
+  fireEvent.click(within(screen.getByRole("group", { name: "플랫폼" })).getByRole("button", { name: "출처 정보 없음" }));
+  expect(screen.getAllByRole("article")).toHaveLength(1);
+  expect(screen.getByRole("heading", { name: "출처 정보 없음 · 1건" })).toBeTruthy();
+});
 it("groups platforms with direct YouTube thumbnails and neutral monogram tiles, including failed thumbnails", () => {
   const cards = [card, { ...card, evidence_id: "instagram:a", source: "instagram", title: "합성 인스타", hook_type: "question" }, { ...card, evidence_id: "tiktok:a", source: "tiktok", title: "합성 틱톡", hook_type: "question" }];
   render(<EvidencePage turns={turnsWithCards([cards])} workspaceBrand={null} onPlan={vi.fn()} />);
@@ -87,7 +129,7 @@ it("marks only the workspace brand, filters own/platform cards and restores all 
   expect(screen.getByRole("button", { name: "자사만" }).getAttribute("aria-pressed")).toBe("true");
   expect(screen.getByRole("link", { name: "합성 근거" })).toBeTruthy();
   expect(screen.queryByRole("link", { name: "다른 브랜드" })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "전체" }));
+  fireEvent.click(screen.getByRole("button", { name: "전체 브랜드" }));
   fireEvent.click(screen.getByRole("button", { name: "Instagram" }));
   expect(screen.queryByRole("link", { name: "합성 근거" })).toBeNull();
   expect(screen.getByRole("link", { name: "다른 브랜드" })).toBeTruthy();

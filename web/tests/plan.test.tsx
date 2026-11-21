@@ -71,7 +71,11 @@ it("enables input only after workspace selection and has no preset request butto
   expect(screen.queryByLabelText("예시 요청")).toBeNull();
   expect(existsSync(join(process.cwd(), "lib/examples.ts"))).toBe(false);
   expect((screen.getByLabelText("요청") as HTMLTextAreaElement).value).toBe("");
-  expect(screen.getAllByRole("button").map(button => button.textContent)).toEqual(["합성 공간 A · 합성 제품 A", "×", "+ 새 기획", "기획하기"]);
+  expect(screen.getAllByRole("button").map(button => button.textContent)).toEqual(["합성 공간 A · 합성 제품 A", "", "+ 새 기획", "기획하기"]);
+  const close = screen.getByRole("button", { name: "기획 1 닫기" });
+  expect(close.getAttribute("aria-label")).toBe("기획 1 닫기");
+  expect(close.querySelectorAll('svg[aria-hidden="true"]')).toHaveLength(1);
+  expect(close.textContent).toBe("");
   expect(fetch).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "작업 공간" }));
   expect(screen.getByText("작업 공간은 서버를 시작할 때 정한 그룹 하나만 보입니다. 바꾸려면 서버를 다시 시작하세요.")).toBeTruthy();

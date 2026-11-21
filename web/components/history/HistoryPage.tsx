@@ -8,13 +8,14 @@ import { DataTable, EmptyState, PageHeader } from "../ui";
 import { HistoryDetail } from "./HistoryDetail";
 import "../../app/history.css";
 
-export function HistoryPage({ workspaces, selectedTurnId, onSelectTurn, onPlan }: {
+export function HistoryPage({ workspaces, selectedTurnId, onSelectTurn, onPlan, origin = null, onReturn }: {
   workspaces: Workspace[]; selectedTurnId: number | null; onSelectTurn: (id: number | null) => void; onPlan: () => void;
+  origin?: "plan" | null; onReturn?: () => void;
 }) {
   const { state } = useSession();
   const selected = state.turns.find(turn => turn.id === selectedTurnId);
   const workspace = workspaces.find(workspace => workspace.tenant_id === state.tenantId);
-  if (selected) return <HistoryDetail key={selected.id} turn={selected} workspace={workspace ? workspaceLabel(workspace) : "정보 없음"} onBack={() => onSelectTurn(null)} />;
+  if (selected) return <HistoryDetail key={selected.id} turn={selected} workspace={workspace ? workspaceLabel(workspace) : "정보 없음"} onBack={() => onSelectTurn(null)} onReturn={origin === "plan" ? onReturn : undefined} />;
   const rows = state.turns.map(turn => ({ turn, summary: summarizeTurn(turn) }))
     .sort((a, b) => (b.summary.startedAt ?? -Infinity) - (a.summary.startedAt ?? -Infinity) || b.turn.id - a.turn.id);
   return <section className="gs-history-page">

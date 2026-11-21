@@ -13,6 +13,9 @@
   --gs-border-width: 1px;
   --gs-content-width: 1120px;
   --gs-sidebar-width: 216px;
+  --gs-sidebar-rail-width: 64px;
+  --gs-action-col-width: 96px;
+  --gs-action-gap: var(--gs-space-3);
   --gs-composer-min-height: 100px;
   --gs-composer-max-height: 264px;
   --gs-radius-pill: 999px;
@@ -39,4 +42,7 @@
   --gs-text-xl: 24px;
   --gs-text-2xl: 32px;
   --gs-motion-accordion: 240ms;
+}
+@media (width < 600px) {
+  :root { --gs-action-gap: var(--gs-space-2); }
 }

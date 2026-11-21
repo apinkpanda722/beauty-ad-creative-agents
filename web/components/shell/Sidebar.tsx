@@ -13,14 +13,15 @@ const groups: { label: string; items: { view: View; label: string }[] }[] = [
   ] },
 ];
 
-export function Sidebar({ view, onViewChange }: { view: View; onViewChange: (view: View) => void }) {
-  return <nav className="gs-sidebar" aria-label="주요 화면">
+export function Sidebar({ id, collapsed, view, onViewChange }: { id: string; collapsed: boolean; view: View; onViewChange: (view: View) => void }) {
+  return <nav id={id} className="gs-sidebar" aria-label="주요 화면">
     {groups.map(group => <div className="gs-nav-group" role="group" aria-label={group.label} key={group.label}>
       <span className="gs-nav-group-label">{group.label}</span>
       {group.items.map(item => <button key={item.view} type="button"
       className={view === item.view ? "gs-nav-pill" : undefined}
       aria-current={view === item.view ? "page" : undefined}
-      onClick={() => onViewChange(item.view)}><NavIcon view={item.view} />{item.label}</button>)}
+      title={collapsed ? item.label : undefined}
+      onClick={() => onViewChange(item.view)}><NavIcon view={item.view} /><span className="gs-nav-label">{item.label}</span></button>)}
     </div>)}
   </nav>;
 }

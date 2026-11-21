@@ -1,8 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { initialState, reducer } from "../lib/reducer";
+import { initialState, nextActiveTabId, reducer } from "../lib/reducer";
 import type { SseFrame, UiCommand } from "../lib/types";
 
 const command: UiCommand = { kind: "show_graph_fragment", data: { evidence_ids: ["synthetic-id"] } };
+it.each([[3, 3, 2], [2, 2, 1], [1, 1, 2], [2, 3, 3]] as const)("closes tab %s with active %s and selects %s with its thread", (closedId, activeId, expected) => {
+  const tabs = [1, 2, 3].map(id => ({ id, threadId: `synthetic:${id}` }));
+  expect(nextActiveTabId(tabs, closedId, activeId)).toBe(expected);
+  const state = reducer({ ...initialState, tabs, activeTabId: activeId, threadId: `synthetic:${activeId}` }, { type: "tab_closed", tabId: closedId });
+  expect(state.activeTabId).toBe(expected);
+  expect(state.threadId).toBe(`synthetic:${expected}`);
+  expect(state.tabs?.map(tab => tab.id)).toEqual([1, 2, 3].filter(id => id !== closedId));
+});
+it("returns no active tab when the only tab closes", () => {
+  expect(nextActiveTabId([{ id: 1 }], 1, 1)).toBeNull();
+});
 function started() {
   return reducer(reducer(initialState, { type: "workspace_selected", tenantId: "synthetic" }), {
     type: "request_started", message: "합성 요청", withImage: true,

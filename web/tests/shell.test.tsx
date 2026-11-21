@@ -12,6 +12,49 @@ vi.mock("../lib/api", async original => ({
   getWorkspaces: vi.fn(), getSchema: vi.fn(), postChatAsk: vi.fn(),
 }));
 const labels = ["광고 기획", "근거 소재", "저장한 기획", "지식 그래프", "실행 기록·검증"];
+it("toggles an accessible sidebar rail in session while keeping all five names and groups", async () => {
+  const storage = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index));
+  const { unmount } = render(<Page />); await screen.findByLabelText("요청");
+  const nav = screen.getByRole("navigation", { name: "주요 화면" });
+  const toggle = screen.getByRole("button", { name: "사이드바 접기" });
+  expect(toggle.getAttribute("aria-expanded")).toBe("true");
+  expect(nav.id).not.toBe(""); expect(toggle.getAttribute("aria-controls")).toBe(nav.id);
+  expect(nav.contains(toggle)).toBe(false);
+  expect(within(nav).getAllByRole("button")).toHaveLength(5);
+  expect(document.querySelector(".gs-shell")?.getAttribute("data-sidebar")).toBe("expanded");
+  fireEvent.click(toggle);
+  expect(screen.getByRole("button", { name: "사이드바 펼치기" })).toBe(toggle);
+  expect(toggle.getAttribute("aria-expanded")).toBe("false");
+  expect(document.querySelector(".gs-shell")?.getAttribute("data-sidebar")).toBe("collapsed");
+  expect(within(nav).getAllByRole("button").map(item => item.textContent)).toEqual(labels);
+  for (const label of labels) {
+    const item = within(nav).getByRole("button", { name: label });
+    expect(item.title).toBe(label); expect(item.querySelector(".gs-nav-label")?.textContent).toBe(label);
+  }
+  expect(within(nav).getAllByRole("group").map(group => group.getAttribute("aria-label"))).toEqual(["작업", "관리"]);
+  fireEvent.click(screen.getByRole("button", { name: "근거 소재" }));
+  expect(toggle.getAttribute("aria-expanded")).toBe("false");
+  fireEvent.click(toggle);
+  for (const label of labels) expect(within(nav).getByRole("button", { name: label }).hasAttribute("title")).toBe(false);
+  fireEvent.click(toggle); unmount(); render(<Page />); await screen.findByLabelText("요청");
+  expect(screen.getByRole("button", { name: "사이드바 접기" }).getAttribute("aria-expanded")).toBe("true");
+  expect(Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))).toEqual(storage);
+});
+it("limits rail geometry and visual label hiding to desktop and disables reduced-motion transitions", () => {
+  const css = readFileSync(join(process.cwd(), "app/shell.css"), "utf8");
+  const tokens = readFileSync(join(process.cwd(), "app/tokens.css"), "utf8");
+  expect(tokens).toMatch(/--gs-sidebar-rail-width:\s*64px/);
+  expect(css).toMatch(/transition:\s*grid-template-columns var\(--gs-motion-accordion\)/);
+  expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.gs-shell\s*\{\s*transition:\s*none/);
+  const desktop = css.split("@media (width >= 880px)")[1];
+  expect(desktop).toMatch(/\.gs-shell\[data-sidebar="collapsed"\]\s*\{[^}]*grid-template-columns:\s*var\(--gs-sidebar-rail-width\)/);
+  const label = desktop.match(/\.gs-shell\[data-sidebar="collapsed"\] \.gs-nav-label\s*\{([^}]*)\}/)?.[1];
+  expect(label).toMatch(/position:\s*absolute/); expect(label).toMatch(/clip-path:\s*inset\(50%\)/); expect(label).not.toMatch(/display:\s*none/);
+  expect(desktop).toMatch(/\.gs-nav-group-label\s*\{\s*display:\s*none/);
+  expect(css).toMatch(/\.gs-sidebar-toggle\s*\{[^}]*cursor:\s*pointer/);
+  expect(css).toMatch(/\.gs-sidebar-toggle:hover\s*\{[^}]*background:\s*var\(--gs-accent-weak\)/);
+  expect(css).toMatch(/\.gs-sidebar-toggle:focus-visible\s*\{[^}]*outline:/);
+});
 beforeEach(() => {
   vi.mocked(getWorkspaces).mockResolvedValue({ workspaces: [
     { tenant_id: "synthetic-workspace", display_name: "합성 공간", brand: "합성 브랜드", product_name: "합성 제품" },

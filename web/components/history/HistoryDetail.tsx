@@ -19,8 +19,9 @@ type DisplayAttempt = Omit<EvaluationAttempt, "scores"> & { scores?: Record<stri
 const checkLabel = (value: boolean | null | undefined) => value == null ? "미실행" : value ? "통과" : "실패";
 const statusNames: Record<string, string> = { done: "완료", needs_review: "검토 필요", failed: "실패" };
 
-export function HistoryDetail({ turn, workspace, onBack, names: suppliedNames }: {
+export function HistoryDetail({ turn, workspace, onBack, onReturn, names: suppliedNames }: {
   turn: Turn; workspace: string; onBack: () => void; names?: TaxonomyNames;
+  onReturn?: () => void;
 }) {
   const [tab, setTab] = useState("stages");
   const tenantId = useContext(CommandTenantContext);
@@ -38,7 +39,7 @@ export function HistoryDetail({ turn, workspace, onBack, names: suppliedNames }:
   const allAttempts = plans.flatMap(command => command.data.attempts as DisplayAttempt[]);
   const empty = <p>정보 없음</p>;
   return <section className="gs-history-page">
-    <PageHeader title="실행 기록·검증" actions={<Button variant="secondary" onClick={onBack}>목록으로</Button>} />
+    <PageHeader title="실행 기록·검증" actions={<><Button variant="secondary" onClick={onBack}>목록으로</Button>{onReturn && <Button variant="secondary" onClick={onReturn}>광고 기획으로 돌아가기</Button>}</>} />
     <Card className="gs-history-summary" aria-label="실행 요약">
       <h2>{turn.message}</h2><dl>
         <div><dt>작업 공간</dt><dd>{workspace}</dd></div>

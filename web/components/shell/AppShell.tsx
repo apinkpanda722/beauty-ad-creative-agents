@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { ReactNode } from "react";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
@@ -12,9 +12,11 @@ export function AppShell({ children, workspace }: {
   workspace?: ReactNode;
 }) {
   const [view, setView] = useState<View>("plan");
-  return <div className="gs-shell">
-    <TopBar workspace={workspace} />
-    <Sidebar view={view} onViewChange={setView} />
+  const [collapsed, setCollapsed] = useState(false);
+  const navId = useId();
+  return <div className="gs-shell" data-sidebar={collapsed ? "collapsed" : "expanded"}>
+    <TopBar workspace={workspace} collapsed={collapsed} navId={navId} onToggle={() => setCollapsed(value => !value)} />
+    <Sidebar id={navId} collapsed={collapsed} view={view} onViewChange={setView} />
     <main className="gs-content">{children(view, setView)}</main>
   </div>;
 }

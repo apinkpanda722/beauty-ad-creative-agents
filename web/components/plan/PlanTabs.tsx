@@ -7,6 +7,7 @@ import { useSession } from "../../lib/session";
 import { taxonomyNames } from "../../lib/taxonomy";
 import type { TaxonomyNames } from "../../lib/taxonomy";
 import type { Turn } from "../../lib/reducer";
+import { nextActiveTabId } from "../../lib/reducer";
 import type { SchemaResponse } from "../../lib/types";
 import { Button } from "../ui";
 
@@ -54,9 +55,10 @@ export function PlanTabs() {
     buttons.current[next]?.focus();
     selectTab(tabs[next].id);
   }
-  function close(id: number, index: number) {
+  function close(id: number) {
     // Move focus before removing the close button from the document.
-    buttons.current[index + 1 === tabs.length ? Math.max(0, index - 1) : index + 1]?.focus();
+    const nextId = nextActiveTabId(tabs, id, active);
+    if (nextId !== null) buttons.current[tabs.findIndex(tab => tab.id === nextId)]?.focus();
     closeTab(id);
   }
   return <div className="gs-plan-tabs gs-ui">
@@ -72,7 +74,7 @@ export function PlanTabs() {
             {running && <span className="gs-tab-spinner" aria-hidden="true" />}{titleFor(turns, tab.id, names)}
           </button>
           <button className="gs-tab-close" type="button" aria-label={`기획 ${tab.id} 닫기`} disabled={running}
-            onClick={() => close(tab.id, index)}>×</button>
+            onClick={() => close(tab.id)}><svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor"><path d="M3 3l6 6M9 3l-6 6" /></svg></button>
         </div>;
       })}
     </div>

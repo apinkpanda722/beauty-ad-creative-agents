@@ -26,6 +26,63 @@ const turn = { ...base, status: "done" as const, commands, stepEvents: ["supervi
 function detail() { return render(<HistoryDetail turn={turn} workspace="합성 브랜드 · 합성 제품" onBack={vi.fn()} names={taxonomyNames(schema)} />); }
 function tab(label: string) { fireEvent.click(screen.getByRole("tab", { name: label })); return screen.getByRole("tabpanel", { name: label }); }
 function reply() { return { threadId: "synthetic-thread", events: (async function* (): AsyncGenerator<SseFrame> { for (const data of commands) yield { event: "ui_command", data }; yield { event: "token", data: { text: "합성 완료" } }; })() }; }
+async function completedPage() {
+  render(<Page />); await screen.findByLabelText("요청");
+  fireEvent.click(screen.getByRole("button", { name: "작업 공간" })); fireEvent.click(screen.getByRole("option", { name: /합성 브랜드/ }));
+  fireEvent.click(screen.getByRole("button", { name: "+ 새 기획" }));
+  fireEvent.change(screen.getByLabelText("요청"), { target: { value: "합성 복귀 요청" } });
+  fireEvent.click(screen.getByRole("button", { name: "기획하기" }));
+  await screen.findByText("합성 완료");
+}
+it("returns from a result's detail to the exact plan tabs and result DOM", async () => {
+  await completedPage();
+  const list = screen.getByRole("tablist", { name: "기획 탭" });
+  const selected = within(list).getByRole("tab", { selected: true });
+  const result = screen.getByText("합성 기획안");
+  fireEvent.click(screen.getByRole("link", { name: "검증 상세 보기 →" }));
+  const back = screen.getByRole("button", { name: "광고 기획으로 돌아가기" });
+  expect(back.classList.contains("gs-button-secondary")).toBe(true);
+  expect(screen.getByRole("button", { name: "목록으로" })).toBeTruthy();
+  fireEvent.click(back);
+  expect(screen.getByRole("button", { name: "광고 기획" }).getAttribute("aria-current")).toBe("page");
+  expect(screen.getByRole("tablist", { name: "기획 탭" })).toBe(list);
+  expect(within(list).getAllByRole("tab")).toHaveLength(2);
+  expect(within(list).getByRole("tab", { selected: true })).toBe(selected);
+  expect(screen.getByText("합성 기획안")).toBe(result);
+  expect(screen.getByText("합성 완료")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "광고 기획으로 돌아가기" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "실행 기록·검증" }));
+  expect(within(screen.getByLabelText("실행 요약")).getByText("합성 복귀 요청")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "광고 기획으로 돌아가기" })).toBeNull();
+});
+it("clears the result origin on returning to the list and reopening its row", async () => {
+  await completedPage(); fireEvent.click(screen.getByRole("link", { name: "검증 상세 보기 →" }));
+  expect(screen.getByRole("button", { name: "광고 기획으로 돌아가기" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "목록으로" }));
+  const table = screen.getByRole("table", { name: "실행 요청 목록" });
+  fireEvent.click(within(table).getAllByRole("row")[1]);
+  expect(screen.getByRole("button", { name: "목록으로" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "광고 기획으로 돌아가기" })).toBeNull();
+});
+it("has no return action when opening history directly from its list", async () => {
+  await completedPage(); fireEvent.click(screen.getByRole("button", { name: "실행 기록·검증" }));
+  fireEvent.click(within(screen.getByRole("table", { name: "실행 요청 목록" })).getAllByRole("row")[1]);
+  expect(screen.getByRole("button", { name: "목록으로" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "광고 기획으로 돌아가기" })).toBeNull();
+});
+it("clears the result origin when leaving history through the sidebar", async () => {
+  await completedPage(); fireEvent.click(screen.getByRole("link", { name: "검증 상세 보기 →" }));
+  expect(screen.getByRole("button", { name: "광고 기획으로 돌아가기" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "근거 소재" }));
+  fireEvent.click(screen.getByRole("button", { name: "실행 기록·검증" }));
+  expect(screen.getByRole("button", { name: "목록으로" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "광고 기획으로 돌아가기" })).toBeNull();
+});
+it("omits the optional plan return in a standalone history detail", () => {
+  detail();
+  expect(screen.getByRole("button", { name: "목록으로" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "광고 기획으로 돌아가기" })).toBeNull();
+});
 beforeEach(() => { vi.mocked(getSchema).mockResolvedValue(schema); vi.mocked(getWorkspaces).mockResolvedValue({ workspaces: spaces, image_enabled: false }); vi.mocked(postChatAsk).mockImplementation(async () => reply()); });
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 function Harness() {

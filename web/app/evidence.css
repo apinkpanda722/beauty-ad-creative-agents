@@ -1,5 +1,7 @@
 .gs-evidence-page { display: grid; gap: var(--gs-space-4); color: var(--gs-text); }
-.gs-evidence-filters { display: flex; flex-wrap: wrap; gap: var(--gs-space-2); }
+.gs-evidence-filters { display: grid; gap: var(--gs-space-2); }
+.gs-evidence-filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gs-space-2); }
+.gs-evidence-filter-label { color: var(--gs-text-muted); font-size: var(--gs-text-xs); }
 .gs-evidence-filters [aria-pressed="true"] { color: var(--gs-accent); background: var(--gs-accent-weak); border-color: var(--gs-accent); }
 .gs-platform-group h2 { margin: 0 0 var(--gs-space-4); font-size: var(--gs-text-lg); }
 .gs-evidence-summary h3 { font-size: var(--gs-text-base); }

@@ -47,6 +47,20 @@ function send(message = "합성 요청") {
 async function idle() { await waitFor(() => expect(state().activeTurnId).toBeNull()); }
 function newTab() { fireEvent.click(screen.getByRole("button", { name: "+ 새 기획" })); }
 function tabs() { return within(screen.getByRole("tablist", { name: "기획 탭" })).getAllByRole("tab"); }
+it.each([[3, 3, 2], [2, 2, 1], [1, 1, 2], [2, 3, 3]] as const)("closing tab %s with active %s selects and focuses %s", (closedId, activeId, expected) => {
+  setup(); newTab(); newTab();
+  const original = tabs();
+  fireEvent.click(original[activeId - 1]);
+  const close = screen.getByRole("button", { name: `기획 ${closedId} 닫기` });
+  expect(close.querySelectorAll('svg[aria-hidden="true"]')).toHaveLength(1);
+  expect(close.textContent).toBe("");
+  expect(close.getAttribute("aria-label")).toBe(`기획 ${closedId} 닫기`);
+  close.focus(); fireEvent.click(close);
+  expect(original[expected - 1].getAttribute("aria-selected")).toBe("true");
+  expect(tabs().filter(tab => tab.getAttribute("aria-selected") === "true")).toEqual([original[expected - 1]]);
+  expect(document.activeElement).toBe(original[expected - 1]);
+  expect(state().activeTabId).toBe(expected);
+});
 beforeEach(() => {
   vi.mocked(getSchema).mockResolvedValue({ labels: [], relationships: [], taxonomy: { hook_type: [], angle: [], format: [] }, claims: [{ value: "sun_protection", name: "자외선 차단" }] });
   vi.mocked(postChatAsk).mockImplementation(async () => reply([done("합성 완료 결과")], "first"));

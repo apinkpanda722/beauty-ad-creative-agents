@@ -49,6 +49,11 @@ export const initialState: State = { tenantId: null, threadId: null, turns: [], 
   tabs: [{ id: 1, threadId: null }], activeTabId: 1 };
 
 function tabsOf(state: State) { return state.tabs ?? [{ id: 1, threadId: state.threadId }]; }
+export function nextActiveTabId(tabs: { id: number }[], closedId: number, activeId: number): number | null {
+  if (closedId !== activeId) return activeId;
+  const index = tabs.findIndex(tab => tab.id === closedId);
+  return tabs[index - 1]?.id ?? tabs[index + 1]?.id ?? null;
+}
 function append(state: State, request: Pick<Turn, "message" | "withImage" | "claimChoice" | "choiceLabel">, at?: number, tabId = state.activeTabId ?? 1): State {
   if (!state.tenantId || state.activeTurnId !== null) return state;
   const tab = tabsOf(state).find(tab => tab.id === tabId);
@@ -102,7 +107,8 @@ export function reducer(state: State, action: Action): State {
       if (!current.some(tab => tab.id === action.tabId) || state.turns.some(turn => turn.id === state.activeTurnId && (turn.tabId ?? 1) === action.tabId)) return state;
       const remaining = current.filter(tab => tab.id !== action.tabId);
       const tabs = remaining.length ? remaining : [{ id: Math.max(...current.map(tab => tab.id)) + 1, threadId: null }];
-      const active = tabs.find(tab => tab.id === (state.activeTabId ?? 1)) ?? tabs[0];
+      const nextId = nextActiveTabId(current, action.tabId, state.activeTabId ?? 1);
+      const active = tabs.find(tab => tab.id === nextId) ?? tabs[0];
       return { ...state, tabs, activeTabId: active.id, threadId: active.threadId,
         turns: state.turns.filter(turn => (turn.tabId ?? 1) !== action.tabId) };
     }
