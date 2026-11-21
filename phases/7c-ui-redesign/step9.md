@@ -2,46 +2,43 @@
 
 ## 설계 검토 기록
 
-**목적**: 실행 기록 화면(세션 기반)을 만들고, 옛 컴포넌트·CSS·테스트 잔재를 정리하고, 문서를 갱신한다. 컷이 발생한 화면의 내비 항목을 정리한다(컷 목록은 이 step을 실행하기 전 사용자가 지시한다: 기본은 5개 모두 유지).
+**목적(변경됨)**: 실행 기록 화면 구현은 step 14(history-verify)로 이관됐다. 이 step은 **옛 컴포넌트·CSS·테스트 잔재 정리, 내비·자리표시 정리, 문서(DEMO.md 리허설 ⑰~, README, PHASES, DETAIL_PAGE) 갱신**만 한다. 컷이 발생한 화면의 내비 항목 정리는 이 step을 실행하기 전 사용자가 지시한다(컷 순서: 저장한 기획(step 7·8) → 데이터 그래프(step 6) → 근거 소재 별도 화면. **실행 기록은 필수**).
 
 **설계 결정**
-- 실행 기록(`web/components/history/HistoryPage.tsx`): `DataTable`로 시각·요청 문장·결과 종류(기획안/확인 질문/근거 없음/오류/중단)·단계 요약(기획 N회·되돌림 M회)·시안 포함 여부·텍스트 비용(`show_cost`가 있으면). **세션 상태(`state.turns`)만** 사용하며 서버 이력은 없다. 화면 상단에 "이번 접속 중 N건 · 새로고침하면 지워집니다" 문구. 행 클릭 → 광고 기획 화면으로 이동하고 해당 턴으로 스크롤. 빈 상태는 `EmptyState`.
-- `web/lib/history.ts`: `summarizeTurn(turn)`(결과 종류·단계 요약·비용 추출, 순수 함수).
-- 정리: step 3·4·5에서 이미 삭제하지 않은 옛 컴포넌트와 사용되지 않는 `globals.css` 규칙을 제거한다. 제거 전 `rg`로 **참조가 없음을 확인**하고 목록을 summary에 적는다. `globals.css`에는 `*`·`body` 최소 리셋만 남기거나 `tokens.css`로 흡수한다.
-- 내비의 "준비 중" 본문(step 1)을 제거한다(컷된 화면은 항목 자체를 `nav` 배열에서 제거).
-- 문서: `DEMO.md`에 새 화면 리허설 항목 ⑰~(사람 검수마다 **뜻·판정·예시 하나·기록 방법**을 처음부터 붙임: 진행창 "완료 완료" 해소, 애니메이션과 reduced-motion, 근거 소재 플랫폼 묶음·자사 배지·대체 썸네일, 그래프 3탭 줌 한계, 저장한 기획 이미지 표시, 해결된 확인 질문 요약), `README.md`의 화면 설명, `docs/PHASES.md` 7c 행, `docs/portfolio/DETAIL_PAGE.md`의 UI 설명 한 곳(스크린샷은 사용자 촬영). `tests/test_demo_docs.py`는 **리허설 개수 단언(`== 16`)을 새 개수로 갱신**하고 새 항목에도 같은 엄격도(뜻·판정·예시·기록 방법)를 요구한다.
+- 정리: step 3·4·5·10~14에서 이미 삭제하지 않은 옛 컴포넌트와 사용되지 않는 `web/lib/*`, `globals.css`의 사용되지 않는 규칙을 제거한다. 제거 전 `rg`로 **참조가 없음을 확인**하고 목록을 summary에 적는다. `globals.css`에는 `*`·`body` 최소 리셋만 남기거나 `tokens.css`로 흡수한다.
+- 내비의 `준비 중` 자리표시(`gs-placeholder`)를 제거한다(컷된 화면은 항목 자체를 내비 배열에서 제거, 그룹 소제목 `작업`·`관리`의 항목 수가 바뀌어도 5개 이하 규칙을 깨지 않게).
+- 문서: `DEMO.md`에 새 화면 리허설 항목 ⑰~(이어지는 번호)를 쓰되 **사람 검수 항목마다 뜻·판정 기준·예시 하나·기록 방법을 처음부터 붙인다**. 항목: 진행 줄(스피너·shimmer·경과 초·연결선 채움, 시안은 체크만, 모션 줄이기에서 정지), 새 기획 탭(진행 중 새 요청·새 기획 비활성, 탭 이름 요약, 닫기), 입력창 스크롤바 없음과 자동 높이, 결과 카드 시안 이미지 여백 없음, `확인 필요 N건` 배지 문구와 설명, 전체 보기 아코디언과 섹션 구조, 영문 코드 노출 없음, 시장 인사이트 차트, 실행 기록·검증 페이지(단계·검증·평가·비용 탭), 근거 소재 화면의 플랫폼 묶음·자사 배지·대체 타일, 확인 질문 선택 뒤 요약 접힘, 지식 그래프 3탭과 줌 한계, 저장한 기획 이미지 표시(해당 step이 컷되지 않았다면). `README.md`의 화면 설명, `docs/PHASES.md` 7c 행, `docs/portfolio/DETAIL_PAGE.md`의 UI 설명 한 곳(스크린샷은 사용자 촬영). `tests/test_demo_docs.py`는 **리허설 개수 단언(`== 16`과 이미지 검수 정규식)을 새 개수·번호로 갱신**하고 새 항목에도 같은 엄격도(뜻·판정·예시·기록 방법)를 요구한다.
 
 **만드는 파일 → 읽는 파일 (새 칸)**
 
 | 새 칸 | 만드는 파일 | 읽는 파일 |
 |---|---|---|
-| `summarizeTurn` | `web/lib/history.ts` | `HistoryPage.tsx`, `history.test.ts` |
 | 리허설 ⑰~ | `DEMO.md` | `tests/test_demo_docs.py`, 사용자 |
+
+**공통 시각 기준(7c 시각 확인 반영, 이후 모든 새 화면이 따른다)**: 간격은 `tokens.css`의 `--gs-space-*`(4px 배수, 기본 리듬은 8px 단위)만 쓰고 색·반경·그림자·글자 크기도 `tokens.css` 변수만 쓴다. 화면에 보이는 문자열은 **한글**이다(영문 내부 코드·브랜드 슬러그·도구 이름·`value`·`n_top` 같은 필드명을 그대로 노출하지 않는다. `taxonomyNames`의 한글 이름, `web/lib/workspace.ts`의 `workspaceLabel`, 그리고 step 13의 한글 표시 매핑을 재사용하고 없는 이름은 새로 지어내지 말고 원문 대신 `기타`·`정보 없음` 같은 한글 대체를 쓴다). 펼침·접힘은 `grid-template-rows: 0fr → 1fr` 방식의 부드러운 아코디언(화살표 회전)이고, 모든 애니메이션·전환은 `@media (prefers-reduced-motion: reduce)`에서 즉시 동작·정지한다. 색에만 의존하지 않고 아이콘·글자를 함께 쓴다. 접힌 영역의 내용은 DOM에 유지한다(`hidden`이 아니라 `inert`/`aria-hidden`과 높이 0).
 
 ## 읽어야 할 파일
 
 먼저 아래 파일들을 읽고 프로젝트의 아키텍처와 설계 의도를 파악하라:
 
 - `/AGENTS.md`, `/docs/ARCHITECTURE.md`, `/docs/ADR.md`(ADR-009 테넌트), `/docs/PHASES.md`
-- `/web/lib/{session,reducer,stages}.ts*`, `/web/components/{ui,plan,shell}/*`, `/web/app/globals.css`, `rg`로 남은 옛 컴포넌트 참조, `/DEMO.md`, `/README.md`, `/docs/PHASES.md`, `/docs/portfolio/DETAIL_PAGE.md`, `/tests/test_demo_docs.py`
+- `/web/app/page.tsx`, `/web/app/globals.css`, `/web/components/`와 `/web/lib/` 전체(`rg`로 참조 확인), `/web/components/shell/*`, `/DEMO.md`, `/README.md`, `/docs/PHASES.md`, `/docs/portfolio/DETAIL_PAGE.md`, `/tests/test_demo_docs.py`
 
 이전 step에서 만들어진 코드를 꼼꼼히 읽고, 설계 의도를 이해한 뒤 작업하라.
 
 ## 작업
 
-**수정할 파일**: `web/lib/history.ts`, `web/components/history/*`, `web/app/{history,globals}.css`, 옛 `web/components/*`와 사용되지 않는 `web/lib/*`(참조 0 확인 후 삭제), `web/components/shell/*`(항목 정리만), `web/app/page.tsx`(실행 기록 연결, 남은 준비 중 자리표시 제거), `DEMO.md`, `README.md`, `docs/PHASES.md`, `docs/portfolio/DETAIL_PAGE.md`, `tests/test_demo_docs.py`, `web/tests/{history,history-page}.test.ts*`
+**수정할 파일**: `web/components/*`와 `web/lib/*`의 사용되지 않는 파일(참조 0 확인 후 삭제), `web/app/globals.css`, `web/components/shell/*`(항목 정리만), `web/app/page.tsx`(자리표시 제거만), `DEMO.md`, `README.md`, `docs/PHASES.md`, `docs/portfolio/DETAIL_PAGE.md`, `tests/test_demo_docs.py`, `web/tests/cleanup.test.ts`
 
 열람 금지 경로: `data/interim/`, `data/design/`, `.env`
-수정 허용 경로: `web/lib/history.ts`, `web/components/history/*`, `web/app/{history,globals}.css`, 옛 `web/components/*`와 사용되지 않는 `web/lib/*`(참조 0 확인 후 삭제), `web/components/shell/*`(항목 정리만), `web/app/page.tsx`(실행 기록 연결, 남은 준비 중 자리표시 제거), `DEMO.md`, `README.md`, `docs/PHASES.md`, `docs/portfolio/DETAIL_PAGE.md`, `tests/test_demo_docs.py`, `web/tests/{history,history-page}.test.ts*`
+수정 허용 경로: `web/components/*`와 `web/lib/*`의 사용되지 않는 파일(참조 0 확인 후 삭제), `web/app/globals.css`, `web/components/shell/*`(항목 정리만), `web/app/page.tsx`(자리표시 제거만), `DEMO.md`, `README.md`, `docs/PHASES.md`, `docs/portfolio/DETAIL_PAGE.md`, `tests/test_demo_docs.py`, `web/tests/cleanup.test.ts`
 열람 금지의 범위: 이 금지는 **Codex 세션이 해당 경로의 파일을 직접 열람·출력·인용하는 것**에 대한 것이다. 이 step의 코드가 런타임에 그 경로를 다루는 것은 대상이 아니다. 테스트는 임시 디렉터리와 합성 데이터만 쓴다.
 
-**1.** `web/lib/history.ts`·`web/components/history/*`·`web/app/history.css`. **2.** 옛 파일·규칙 정리(참조 0 확인 후). **3.** 문서 4곳과 `tests/test_demo_docs.py` 갱신.
+**1.** 옛 파일·규칙 정리(참조 0 확인 후, 목록을 summary에 보고). **2.** 내비·자리표시 정리. **3.** 문서 4곳과 `tests/test_demo_docs.py` 갱신.
 
 **테스트(합성 데이터, 서비스·키·네트워크·`.env` 없음)**
-- `web/tests/history.test.ts`: (1) `summarizeTurn`이 결과 종류 5가지를 구분, (2) 단계 요약이 기획 횟수·되돌림 횟수와 일치, (3) 비용이 없으면 `null`.
-- `web/tests/history-page.test.tsx`: (4) 행 수가 턴 수와 같고 최신 턴이 위, (5) 행 클릭 시 광고 기획 화면으로 이동, (6) 빈 상태, (7) "새로고침하면 지워집니다" 문구.
 - `tests/test_demo_docs.py`: 개수·형식 단언 갱신(약화 금지), 새 항목이 뜻·판정·예시·기록 방법을 포함.
-- 정리 검증: (8) `web/components`에 어떤 파일도 import되지 않은 채 남아 있지 않다(파일 목록과 import 그래프를 테스트가 읽어 검사, 파일 0개면 실패), (9) `globals.css`의 모든 클래스 규칙이 소스에서 쓰이거나 제거됐다(참조 확인 스크립트가 아니라 이 step의 summary에 목록으로 보고).
+- 정리 검증(`web/tests/cleanup.test.ts` 신규): (1) `web/components`·`web/lib`에 어떤 파일도 import되지 않은 채 남아 있지 않다(파일 목록과 import 그래프를 테스트가 읽어 검사, 파일 0개면 실패), (2) `준비 중` 자리표시가 소스에 없다, (3) `globals.css`에 소스에서 쓰이지 않는 클래스 규칙이 없다(검사 방식은 완료 보고에 적는다).
 - 해시 시드·집합·딕셔너리 순회 순서에 기대는 새 단언을 만들지 마라(리스트와 명시적 순서로 단언).
 
 ## Acceptance Criteria
@@ -80,5 +77,5 @@ make verify   # lint + pytest + pnpm lint·typecheck·test 통과
 - `pnpm add`·`uv add`·그 밖의 패키지 설치와 `package.json`·`pnpm-lock.yaml` 수정을 하지 마라. 이유: 이번 phase의 새 패키지는 승인된 `pretendard@1.3.9` 하나뿐이다.
 - 모델·유료 API를 호출하거나 `make live-slice`, `make live-collect`, `make live-pilot`, `make live-analyze`, `make live-tiktok`, `make live-tiktok-analyze`, `make live-graph`, `make live-products`, `make live-ingredient-catalog`, `make live-cert-recheck`, `make live-cq`, `make live-product-identify`, `make live-agent`, `make live-agents`, `make live-evidence`, `make live-compare`, `make live-evalset`, `make live-e2e5`, `make live-e3`, `make live-isolation`, `make serve`, `make demo-up`, `make db-up`, `make obs-up`을 실행하지 마라. `.env`를 열거나 출력하지 마라. 테스트는 합성 데이터와 가짜 환경만 쓴다. 이유: 실제 호출과 사람이 보는 확인은 사용자가 한다(AGENTS.md CRITICAL).
 - 제품 이름 문자열(`Gyeol Studio`, `결 스튜디오`)을 `web/lib/brand.ts` 밖에 리터럴로 쓰지 마라(테스트 파일 제외 불가: 가드 테스트가 `web/` 소스 전체를 검사한다). 이유: 이름은 한 곳에서만 바꾼다(확정 설계 조건 1).
-- 서버 코드(`src/`)를 수정하지 마라. 서버 이력 API를 만들지 마라. 이유: 실행 기록은 세션 기반이며 서버 영속은 범위 밖이다(설계 제안서 §3 결정 3).
+- 서버 코드(`src/`)를 수정하지 마라. 실행 기록·검증 화면을 이 step에서 만들지 마라(step 14 범위). 이유: 구현은 step 14로 이관됐다.
 - 참조가 남아 있는 파일·규칙을 삭제하지 마라(`rg`로 확인). 스크린샷·이미지 파일을 만들지 마라. 이유: 화면 촬영은 사용자가 한다.

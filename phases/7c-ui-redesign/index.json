@@ -87,6 +87,21 @@
       }
     },
     {
+      "step": 12,
+      "name": "main-polish",
+      "status": "pending"
+    },
+    {
+      "step": 13,
+      "name": "result-polish",
+      "status": "pending"
+    },
+    {
+      "step": 14,
+      "name": "history-verify",
+      "status": "pending"
+    },
+    {
       "step": 5,
       "name": "graph-core",
       "status": "pending"
