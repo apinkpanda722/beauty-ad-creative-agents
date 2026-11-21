@@ -1,11 +1,12 @@
 "use client";
 import { useId, useState } from "react";
-import type { EvaluationAttempt, PatternData, PlanView } from "../../lib/types";
+import type { EvaluationAttempt, PatternData, PlanView, UiCommand } from "../../lib/types";
 import { taxonomyNames } from "../../lib/taxonomy";
 import type { TaxonomyNames } from "../../lib/taxonomy";
 import { PatternAlignment, PatternSummary } from "./PatternAlignment";
 import { DesignImage } from "./DesignImage";
 import { FeedbackBar } from "./FeedbackBar";
+import { CostDetail } from "./CostDetail";
 import { Badge, Button, Card } from "../ui";
 import "../../app/results.css";
 const unknownNames: Record<string, string> = {
@@ -16,8 +17,9 @@ const unknownNames: Record<string, string> = {
 const statusNames: Record<string, string> = { done: "완료", needs_review: "검토 필요", failed: "실패" };
 const scoreNames: Record<string, string> = { differentiation: "차별성", fit: "요청 적합성" };
 function checkLabel(value: boolean | null | undefined) { return value == null ? "미실행" : value ? "통과" : "실패"; }
-export function PlanResult({ data, tenantId, names = taxonomyNames(), evidenceAnchors = {} }: {
+export function PlanResult({ data, tenantId, names = taxonomyNames(), evidenceAnchors = {}, cost }: {
   data: PlanView; tenantId: string | null; names?: TaxonomyNames; evidenceAnchors?: Record<string, string>;
+  cost?: Extract<UiCommand, { kind: "show_cost" }>["data"];
 }) {
   const [expanded, setExpanded] = useState(false);
   const expandedId = useId();
@@ -62,6 +64,7 @@ export function PlanResult({ data, tenantId, names = taxonomyNames(), evidenceAn
     </li>)}</ol></details>
     <p className="muted">{data.disclaimer}</p>
     {data.design_disclaimer && <p className="muted">{data.design_disclaimer}</p>}
+    <CostDetail data={cost} />
     </div>
   </Card>;
 }

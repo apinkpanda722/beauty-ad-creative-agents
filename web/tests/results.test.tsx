@@ -413,3 +413,86 @@ it("groups compact evidence summaries under platform headings with icons and cou
   expect(document.querySelectorAll(".gs-evidence-card")).toHaveLength(2);
   expect(screen.getByText("근거 소재 1건을 불러오지 못했습니다.")).toBeTruthy();
 });
+
+const restoredCost: Extract<UiCommand, { kind: "show_cost" }> = {
+  kind: "show_cost", data: { label: "텍스트 모델 비용(이미지 제외)", text_spent_usd: .012345, max_text_cost_usd: 1 },
+};
+const restoredCostText = "이 요청의 텍스트 모델 비용(이미지 제외) $0.0123";
+const restoredCapText = "텍스트 비용 상한 $1.0000";
+
+it("keeps four-decimal cost and cap in the hidden plan details and reveals them after the disclaimers", () => {
+  render(<ResultsView commands={[{ kind: "show_plan", data: { ...plan, design_disclaimer: "합성 시안 고지" } }, restoredCost]} />);
+  const toggle = screen.getByRole("button", { name: "전체 보기 →", expanded: false });
+  const expanded = document.getElementById(toggle.getAttribute("aria-controls")!)!;
+  expect(expanded.hidden).toBe(true);
+  const cost = within(expanded).getByText(restoredCostText);
+  const cap = within(expanded).getByText(restoredCapText);
+  expect(cost.closest("[hidden]")).toBe(expanded);
+  expect(cap.closest("[hidden]")).toBe(expanded);
+  expect(cost.textContent?.match(/이미지 제외/g)).toHaveLength(1);
+  expect(within(expanded).getByText("합성 시안 고지").compareDocumentPosition(cost) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(cost.compareDocumentPosition(cap) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  fireEvent.click(toggle);
+  expect(toggle.getAttribute("aria-expanded")).toBe("true");
+  expect(expanded.hidden).toBe(false);
+  expect(within(expanded).getByText(restoredCostText).closest("[hidden]")).toBeNull();
+  expect(within(expanded).getByText(restoredCapText).closest("[hidden]")).toBeNull();
+  fireEvent.click(toggle);
+  expect(expanded.hidden).toBe(true);
+  expect(within(expanded).getByText(restoredCostText)).toBe(cost);
+  expect(within(expanded).getByText(restoredCapText)).toBe(cap);
+});
+
+it("places request cost and cap only in the first plan's expanded area", () => {
+  render(<ResultsView commands={[restoredCost, { kind: "show_plan", data: plan }, { kind: "show_plan", data: { ...plan, plan: { title: "합성 두 번째 기획" } } }]} />);
+  const toggles = screen.getAllByRole("button", { name: "전체 보기 →" });
+  const areas = toggles.map(toggle => document.getElementById(toggle.getAttribute("aria-controls")!)!);
+  for (const toggle of toggles) fireEvent.click(toggle);
+  expect(within(areas[0]).getByText(restoredCostText).closest("[hidden]")).toBeNull();
+  expect(within(areas[0]).getByText(restoredCapText).closest("[hidden]")).toBeNull();
+  expect(within(areas[1]).queryByText(restoredCostText)).toBeNull();
+  expect(within(areas[1]).queryByText(restoredCapText)).toBeNull();
+  expect(screen.getAllByText(restoredCostText)).toHaveLength(1);
+  expect(screen.getAllByText(restoredCapText)).toHaveLength(1);
+});
+
+it("shows cost and cap directly without a plan and places them last", () => {
+  const { rerender } = render(<ResultsView commands={[restoredCost]} />);
+  expect(screen.queryByRole("button", { name: "전체 보기 →" })).toBeNull();
+  expect(screen.getByText(restoredCostText).closest("[hidden]")).toBeNull();
+  expect(screen.getByText(restoredCapText).closest("[hidden]")).toBeNull();
+  expect(screen.getAllByText(restoredCostText)).toHaveLength(1);
+  expect(screen.getAllByText(restoredCapText)).toHaveLength(1);
+  rerender(<ResultsView commands={[restoredCost, { kind: "show_aggregates", data: aggregates }]} />);
+  expect(screen.getByRole("region", { name: "검증된 집계(도구가 센 값)" }).compareDocumentPosition(screen.getByText(restoredCostText)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.getByText(restoredCostText).compareDocumentPosition(screen.getByText(restoredCapText)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+it.each([false, true])("omits all request cost details when show_cost is absent, with plan=%s", showPlan => {
+  const { container } = render(<ResultsView commands={showPlan ? [{ kind: "show_plan", data: plan }] : []} />);
+  expandAll();
+  expect(screen.queryByText(/이 요청의 .*비용/)).toBeNull();
+  expect(screen.queryByText(/텍스트 비용 상한/)).toBeNull();
+  expect(container.querySelector(".gs-cost-line")).toBeNull();
+});
+
+it.each([false, true])("preserves a different server cost label verbatim with plan=%s", showPlan => {
+  const cost: UiCommand = { ...restoredCost, data: { ...restoredCost.data, label: "합성 비용 레이블(이미지 제외)" } };
+  render(<ResultsView commands={showPlan ? [{ kind: "show_plan", data: plan }, cost] : [cost]} />);
+  expandAll();
+  const line = screen.getByText("이 요청의 합성 비용 레이블(이미지 제외) $0.0123");
+  expect(line.textContent).toBe("이 요청의 합성 비용 레이블(이미지 제외) $0.0123");
+  expect(line.textContent?.match(/이미지 제외/g)).toHaveLength(1);
+  expect(screen.queryByText(restoredCostText)).toBeNull();
+  expect(screen.getByText(restoredCapText).closest("[hidden]")).toBeNull();
+});
+
+it.each([false, true])("uses only the first show_cost command with plan=%s", showPlan => {
+  const laterCost: UiCommand = { kind: "show_cost", data: { label: "합성 후속 비용", text_spent_usd: .5, max_text_cost_usd: 2 } };
+  render(<ResultsView commands={[restoredCost, ...(showPlan ? [{ kind: "show_plan" as const, data: plan }] : []), laterCost]} />);
+  expandAll();
+  expect(screen.getAllByText(restoredCostText)).toHaveLength(1);
+  expect(screen.getAllByText(restoredCapText)).toHaveLength(1);
+  expect(screen.queryByText(/합성 후속 비용/)).toBeNull();
+  expect(screen.queryByText("텍스트 비용 상한 $2.0000")).toBeNull();
+});
