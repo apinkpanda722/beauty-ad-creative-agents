@@ -4,7 +4,7 @@
 
 ## 한 줄로 시연 환경 띄우기
 
-Docker 데몬(예: OrbStack), Docker Compose, uv 관리 Python 3.12, uv, Node 24, pnpm 12.8.1과 기존 프로젝트 의존성이 준비되어 있어야 한다. 의존성 준비는 [README](README.md#명령-한-줄-실행과-데이터-이관), 설정 이름은 [`.env.example`](.env.example)을 따른다. 기존 PostgreSQL 원본과 Neo4j 시연 데이터가 준비된 환경을 사용한다. `demo-up`은 수집·분석·데이터 이관을 하지 않는다.
+Docker 데몬(예: OrbStack), Docker Compose, uv 관리 Python 3.12, uv, Node 24, pnpm 12.8.1과 기존 프로젝트 의존성이 준비되어 있어야 한다. 의존성 준비는 [RUNBOOK](docs/RUNBOOK.md#명령-한-줄-실행과-데이터-이관), 설정 이름은 [`.env.example`](.env.example)을 따른다. 기존 PostgreSQL 원본과 Neo4j 시연 데이터가 준비된 환경을 사용한다. `demo-up`은 수집·분석·데이터 이관을 하지 않는다.
 
 처음 한 번은 DB를 먼저 올려 준비가 끝난 뒤 마이그레이션한다. 아래 명령은 모두 사용자가 실행한다.
 
