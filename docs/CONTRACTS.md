@@ -352,6 +352,8 @@
 - **MinIO 이미지(2026-11-20 로컬 확인)**: `cgr.dev/chainguard/minio@sha256:4cf4831a2bbcf13ddca09c1cbcc9faff716dd3c4247e0babc32864b8ee8e0034`의 `Descriptor.mediaType`은 `application/vnd.oci.image.index.v1+json`(멀티 아키텍처 인덱스, 로컬 arm64). 다른 아키텍처에서 같은 다이제스트로 pull되는지는 **미확인**이다. 별도 PostgreSQL을 포함한 이번 obs 서비스 6개의 메모리와 첫 이미지 다운로드 시간도 **미확인**이다.
 - **구성 참고(실측 아님)**: [Langfuse v3.225.11 공식 compose](https://github.com/langfuse/langfuse/blob/v3.225.11/docker-compose.yml)의 DB·ClickHouse·Redis·S3 환경 변수 이름과 MinIO 버킷 디렉터리 초기화 방식을 따른다. 이 저장소의 고정 이미지 구성 기동은 **미확인**이다.
 
+- **사용자 화면 확인(2026-11-21)**: 실제 시연 요청 1건의 Langfuse 타임라인과 비용 화면에서 요청 1건 약 31.65초·$0.0618, 단계별 지연과 호출별 비용이 보였다(7b 구조, 사용자 관측값). ingestion 이벤트의 시간·cost_details가 타임라인에 반영되는 것은 이 확인으로 **확인됨**. 7d 이후 새 span 구조·입력·출력 화면은 **미확인**(사용자 확인 후 갱신).
+
 ## Neo4j (2026-11-12 실측, 임시 컨테이너, 끝난 뒤 삭제)
 
 | 확인한 것 | 결과 |

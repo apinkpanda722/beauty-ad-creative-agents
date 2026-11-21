@@ -37,9 +37,9 @@ Python·uv, FastAPI(SSE), LangGraph, PostgreSQL, Neo4j, LiteLLM Python SDK, Next
 
 캡처는 재가공 없이 원본 그대로 싣는다. 촬영할 요청과 장면은 [DEMO.md](../../DEMO.md)에 있다. 영상·캡처는 아직 준비되지 않았으며 사용자가 촬영한다.
 
-[Langfuse 타임라인 확인 후 사용] 에이전트별 지연과 비용을 Langfuse에서 관측했다.
+에이전트별 지연과 비용을 Langfuse에서 관측했다. (확인 기록: DEMO.md "Langfuse 확인 기록")
 
-위 문장은 사용자가 실제 Langfuse 화면에서 타임라인의 지연과 비용을 확인한 뒤에만 사용한다. 현재는 확인 전 원고다.
+위 문장은 사용자가 2026-11-21에 7b 구조의 실제 Langfuse 화면에서 타임라인의 지연과 비용을 확인한 기록에 근거한다. 7d 이후 새 span 구조·입력·출력 화면은 미확인이며 DEMO.md 리허설 ⑪에 기록한다.
 
 ## 배경(이전·이후)
 
