@@ -39,6 +39,7 @@
 |---|---|---|
 | 리허설 ⑰~㉗ | `DEMO.md` | `tests/test_demo_docs.py`, 사용자 |
 | 정리 검증 | `web/tests/cleanup.test.ts` | 소스 전체(읽기) |
+| 자리표시 규칙 삭제(미사용 `.gs-placeholder`·`.gs-placeholder p` 두 규칙만) | `web/app/shell.css` | 소비자 없음(`rg` 참조 0; `shell.test.tsx` 96행의 `queryByText("준비 중")` null 단언은 수정하지 않는다) |
 
 **공통 시각 기준(7c 시각 확인 반영, 이후 모든 새 화면이 따른다)**: 간격은 `tokens.css`의 `--gs-space-*`(4px 배수, 기본 리듬은 8px 단위)만 쓰고 색·반경·그림자·글자 크기도 `tokens.css` 변수만 쓴다. 화면에 보이는 문자열은 **한글**이다(영문 내부 코드·브랜드 슬러그·도구 이름·`value`·`n_top` 같은 필드명을 그대로 노출하지 않는다. `taxonomyNames`의 한글 이름, `web/lib/workspace.ts`의 `workspaceLabel`, 그리고 step 13의 한글 표시 매핑을 재사용하고 없는 이름은 새로 지어내지 말고 원문 대신 `기타`·`정보 없음` 같은 한글 대체를 쓴다). 펼침·접힘은 `grid-template-rows: 0fr → 1fr` 방식의 부드러운 아코디언(화살표 회전)이고, 모든 애니메이션·전환은 `@media (prefers-reduced-motion: reduce)`에서 즉시 동작·정지한다. 색에만 의존하지 않고 아이콘·글자를 함께 쓴다. 접힌 영역의 내용은 DOM에 유지하고 접힌 최종 상태는 기존처럼 `hidden` 속성이다(펼칠 때 `hidden`을 동기적으로 제거한 뒤 다음 프레임에 열림 클래스를 붙이고, 접을 때는 전환 뒤 `hidden`을 설정하되 reduced-motion·전환 시간 0이면 즉시 설정한다).
 
@@ -53,10 +54,10 @@
 
 ## 작업
 
-**수정할 파일**: `web/components/*`와 `web/lib/*`의 사용되지 않는 파일(참조 0 확인 후 삭제), `web/app/globals.css`, `web/app/page.tsx`(자리표시·사용되지 않는 import 제거만), `DEMO.md`, `README.md`, `docs/PHASES.md`, `docs/portfolio/DETAIL_PAGE.md`, `tests/test_demo_docs.py`, `web/tests/cleanup.test.ts`
+**수정할 파일**: `web/components/*`와 `web/lib/*`의 사용되지 않는 파일(참조 0 확인 후 삭제), `web/app/globals.css`, `web/app/shell.css`(미사용 `.gs-placeholder`·`.gs-placeholder p` 규칙 두 개의 삭제만), `web/app/page.tsx`(자리표시·사용되지 않는 import 제거만), `DEMO.md`, `README.md`, `docs/PHASES.md`, `docs/portfolio/DETAIL_PAGE.md`, `tests/test_demo_docs.py`, `web/tests/cleanup.test.ts`
 
 열람 금지 경로: `data/interim/`, `data/design/`, `.env`
-수정 허용 경로: `web/components/*`와 `web/lib/*`의 사용되지 않는 파일(참조 0 확인 후 삭제), `web/app/globals.css`, `web/app/page.tsx`(자리표시·사용되지 않는 import 제거만), `DEMO.md`, `README.md`, `docs/PHASES.md`, `docs/portfolio/DETAIL_PAGE.md`, `tests/test_demo_docs.py`, `web/tests/cleanup.test.ts`
+수정 허용 경로: `web/components/*`와 `web/lib/*`의 사용되지 않는 파일(참조 0 확인 후 삭제), `web/app/globals.css`, `web/app/shell.css`(미사용 `.gs-placeholder`·`.gs-placeholder p` 규칙 두 개의 삭제만), `web/app/page.tsx`(자리표시·사용되지 않는 import 제거만), `DEMO.md`, `README.md`, `docs/PHASES.md`, `docs/portfolio/DETAIL_PAGE.md`, `tests/test_demo_docs.py`, `web/tests/cleanup.test.ts`
 열람 금지의 범위: 이 금지는 **Codex 세션이 해당 경로의 파일을 직접 열람·출력·인용하는 것**에 대한 것이다. 이 step의 코드가 런타임에 그 경로를 다루는 것은 대상이 아니다. 테스트는 임시 디렉터리와 합성 데이터만 쓴다.
 
 **1.** 옛 파일·규칙 정리(참조 0 확인 후, 목록을 summary에 보고). **2.** 문서 4곳과 `tests/test_demo_docs.py` 갱신. **3.** `web/tests/cleanup.test.ts`. 위 설계 결정과 교체 단언 표 D1·D2를 그대로 구현한다.
@@ -107,5 +108,5 @@ make verify   # lint + pytest + pnpm lint·typecheck·test 통과
 - 서버 코드(`src/`)를 수정하지 마라. 실행 기록·그래프·저장한 기획 화면을 이 step에서 새로 만들지 마라. 이유: 구현은 앞 step에서 끝났다.
 - `docs/portfolio/DETAIL_PAGE.md`의 수치 표(`| 값 | 종류 | 기준일 | 측정 조건 | 출처 |`)에 행을 추가·수정하지 마라(`tests/test_demo_docs.py`가 5칸·종류·출처 형식을 검사한다). `docs/PHASES.md`의 기존 행(특히 `| 58 |` P7 결정 행)과 `docs/TROUBLESHOOTING_LOG.md`를 수정하지 마라. 이유: 문서 가드 테스트가 기존 행의 형식을 단언한다.
 - 참조가 남아 있는 파일·규칙을 삭제하지 마라(`rg`로 확인). 스크린샷·이미지 파일을 만들지 마라. 사용자 live 결과를 지어내지 말고 ⑰~㉗의 결과 기록은 `______`로 둬라. 이유: 화면 촬영과 확인은 사용자가 한다.
-- `web/tests`의 기존 단언이 읽는 CSS 규칙(`results.css`·`plan.css`·`shell.css`·`graph.css`·`saved.css`·`history.css`·`tokens.css`)을 지우지 마라. 이유: CSS 구조 검사 테스트가 있다.
+- `web/tests`의 기존 단언이 읽는 CSS 규칙(`results.css`·`plan.css`·`shell.css`·`graph.css`·`saved.css`·`history.css`·`tokens.css`)을 지우지 마라(단 `shell.css`의 미사용 `.gs-placeholder`·`.gs-placeholder p` 두 규칙은 `rg`로 참조 0을 확인하고 지운다). 이유: CSS 구조 검사 테스트가 있다.
 - `web/app`·`web/components`·`web/lib` 소스에 `examples`·`.examples`·`예시 요청` 문자열을 쓰지 마라. 이유: `tests/test_demo_docs.py`의 예시 칩 금지 가드.

@@ -215,10 +215,8 @@
     {
       "step": 9,
       "name": "history-cleanup",
-      "status": "blocked",
+      "status": "pending",
       "started_at": "2026-11-21T22:16:45+0900",
-      "blocked_reason": "요구사항 “(2) `준비 중` 자리표시와 `gs-placeholder`가 소스에 없다”와 “수정 허용 경로: `web/components/*`와 `web/lib/*`의 사용되지 않는 파일(참조 0 확인 후 삭제), `web/app/globals.css`, `web/app/page.tsx`(자리표시·사용되지 않는 import 제거만), `DEMO.md`, `README.md`, `docs/PHASES.md`, `docs/portfolio/DETAIL_PAGE.md`, `tests/test_demo_docs.py`, `web/tests/cleanup.test.ts`”가 충돌합니다. web/app/shell.css에 `.gs-placeholder`와 `.gs-placeholder p` 규칙이 남아 있으나 shell.css는 수정 허용 범위 밖입니다. 최소 조정안은 shell.css의 이 두 미사용 규칙 삭제만 허용하는 것입니다. 선점검 규칙에 따라 수정·검증 전에 중단했습니다.",
-      "blocked_at": "2026-11-21T22:18:59+0900",
       "usage": {
         "input_tokens": 428312,
         "cached_input_tokens": 355200,
