@@ -11,9 +11,15 @@ export const TOOL_TITLES: Record<string, string> = {
   count_claim_supported_ads: "효능 근거가 연결된 광고",
   ingredient_ad_trend: "성분 광고의 게시 추이",
   top_claims_of_ingredient_ads: "성분 광고의 효능 분포",
-  top_vs_bottom_axis: "상위 vs 하위 광고 비교",
+  top_vs_bottom_axis: "조회수 상위·하위 25% 광고 비교",
   unclaimed_efficacy_gaps: "광고에 언급되지 않은 효능",
 };
+export function toolTitle(tool: string): string {
+  return Object.hasOwn(TOOL_TITLES, tool) ? TOOL_TITLES[tool] : "집계 항목";
+}
+export function insightDescription(tool: string): string | null {
+  return tool === "top_vs_bottom_axis" ? "같은 플랫폼·브랜드 안에서 조회수 상위 25%와 하위 25% 광고가 각 방식을 쓴 광고 수입니다." : null;
+}
 const axes = [
   { title: "오프닝 방식 분포", values: ["question", "problem", "result_first", "bold_claim", "product_first", "person_first", "other"] },
   { title: "메시지 유형 분포", values: ["problem_solution", "desire", "social_proof", "comparison", "ingredient_science", "how_to", "other"] },
@@ -31,4 +37,12 @@ const columns: Record<string, string> = {
   count: "건수", total: "전체 건수", brand: "브랜드", published_at: "게시일", view_count: "조회수",
 };
 export function columnName(key: string): string { return Object.hasOwn(columns, key) ? columns[key] : "항목"; }
+export function insightColumnName(tool: string, key: string): string {
+  if (tool === "top_vs_bottom_axis") {
+    if (key === "n_top") return "상위 25% 광고 수";
+    if (key === "n_bottom") return "하위 25% 광고 수";
+    if (key === "value") return "분류";
+  }
+  return columnName(key);
+}
 export function insightValue(value: string, names: TaxonomyNames): string { return displayValue(value, names); }

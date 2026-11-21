@@ -30,6 +30,8 @@
   --gs-space-8: 32px;
   --gs-space-10: 40px;
   --gs-space-12: 48px;
+  --gs-card-padding: var(--gs-space-5);
+  --gs-section-gap: var(--gs-space-4);
   --gs-radius-sm: 4px;
   --gs-radius-md: 8px;
   --gs-radius-lg: 12px;

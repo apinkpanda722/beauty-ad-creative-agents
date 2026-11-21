@@ -1,8 +1,8 @@
 import { expect, it } from "vitest";
-import { insightTitle, columnName, insightValue, TOOL_TITLES } from "../lib/insight";
+import { insightTitle, columnName, insightValue, TOOL_TITLES, toolTitle, insightDescription, insightColumnName } from "../lib/insight";
 import { taxonomyNames } from "../lib/taxonomy";
 it.each([
-  ["top_vs_bottom_axis", ["question"], "상위 vs 하위 광고 비교"],
+  ["top_vs_bottom_axis", ["question"], "조회수 상위·하위 25% 광고 비교"],
   ["compare_axis_by_category", ["question", "person_first", "other"], "오프닝 방식 분포"],
   ["show_distribution", ["how_to", "desire"], "메시지 유형 분포"],
   ["show_distribution", ["demo", "studio_film"], "제작 형식 분포"],
@@ -25,4 +25,20 @@ it.each([["value", "분류"], ["n_top", "상위 25%"], ["n_bottom", "하위 25%"
 it("labels other without inventing unknown names", () => {
   expect(insightValue("other", taxonomyNames())).toBe("기타");
   expect(insightValue("unknown", taxonomyNames())).toBe("unknown");
+});
+
+it("provides Korean tool titles and a scoped comparison description", () => {
+  expect(toolTitle("top_vs_bottom_axis")).toBe("조회수 상위·하위 25% 광고 비교");
+  expect(toolTitle("compare_axis_by_category")).toBe("카테고리별 광고 비교");
+  expect(toolTitle("unknown_tool")).toBe("집계 항목");
+  expect(insightDescription("top_vs_bottom_axis")).toBe("같은 플랫폼·브랜드 안에서 조회수 상위 25%와 하위 25% 광고가 각 방식을 쓴 광고 수입니다.");
+  for (const tool of ["compare_axis_by_category", "unknown_tool"]) expect(insightDescription(tool)).toBeNull();
+});
+it("specializes comparison columns while leaving generic column names intact", () => {
+  expect(insightColumnName("top_vs_bottom_axis", "n_top")).toBe("상위 25% 광고 수");
+  expect(insightColumnName("top_vs_bottom_axis", "n_bottom")).toBe("하위 25% 광고 수");
+  expect(insightColumnName("top_vs_bottom_axis", "value")).toBe("분류");
+  for (const key of ["n_top", "n_bottom", "value", "creatives", "unknown"]) expect(insightColumnName("compare_axis_by_category", key)).toBe(columnName(key));
+  expect(insightColumnName("top_vs_bottom_axis", "creatives")).toBe(columnName("creatives"));
+  expect(columnName("n_top")).toBe("상위 25%");
 });

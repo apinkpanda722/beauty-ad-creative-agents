@@ -13,7 +13,7 @@ it("localizes known complete codes using server names and shared score/closed na
 });
 it.each([
   "profit benefit fitness outfit", "how_to_use person_first_x", "youtube:how_to instagram:person_first",
-  "https://example.test/how_to?q=fit#person_first", "이미 한글인 문장", "unknown_snake_case", "desire other question",
+  "https://example.test/how_to?q=fit#person_first", "이미 한글인 문장", "unknown_snake_case",
   "evidence_id=youtube:how_to", "urn:synthetic:fit",
 ])("preserves protected and unnamed text: %s", text => {
   expect(localizeText(text, names)).toBe(text);
@@ -26,4 +26,12 @@ it("replaces longest whole identifiers repeatedly without modifying the source",
 it("accepts empty and null text", () => {
   expect(localizeText("", names)).toBe("");
   expect(localizeText(null, names)).toBe("");
+});
+
+it("overrides desire while preserving unnamed angle values and protected axis tokens", () => {
+  expect(localizeText("desire other question", names)).toBe("이상형 제시형 other question");
+  expect(localizeText("desire")).toBe("이상형 제시형");
+  expect(localizeText("how_to problem_solution social_proof comparison ingredient_science")).toBe("how_to problem_solution social_proof comparison ingredient_science");
+  expect(localizeText("hook_type angle format", names)).toBe("훅 소구 형식");
+  expect(localizeText("how_to_use youtube:angle angles", names)).toBe("how_to_use youtube:angle angles");
 });

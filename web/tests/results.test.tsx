@@ -187,15 +187,17 @@ it("renders separate code checks, evaluation state, unknown badge, neutral patte
   expect(screen.getByText("근거 연결 없음 0건").className).toContain("clear");
   expect(screen.getByText("코드 검사: 통과")).toBeTruthy();
   expect(screen.getByText("평가 상태: 검토 필요")).toBeTruthy();
-  expect(screen.getByText("question")).toBeTruthy();
-  for (const label of ["같음", "다름", "비교 불가", "점유율 비교 불가", "비교한 축 2개 중 같은 축 1개", plan.pattern_alignment_label, plan.disclaimer]) expect(screen.getAllByText(label).length).toBeGreaterThan(0);
+  const raw = screen.getAllByText("question"); expect(raw).toHaveLength(3);
+  expect(raw.filter(node => node.closest(".gs-plan-summary .gs-result-badges"))).toHaveLength(1);
+  expect(raw.filter(node => node.closest('[aria-label="경쟁사 패턴 반영"]'))).toHaveLength(2);
+  for (const label of ["같음", "다름", "비교 불가", "비교한 축 2개 중 같은 축 1개", plan.pattern_alignment_label, plan.disclaimer]) expect(screen.getAllByText(label).length).toBeGreaterThan(0);
   expect(container.textContent).not.toMatch(/좋음|나쁨|우수|미달/);
   expandAll();
   expect(screen.getByRole("link", { name: card.evidence_id! }).getAttribute("href")).toBe("#synthetic-anchor");
   expect(screen.queryByRole("link", { name: "youtube:absent" })).toBeNull();
-  selectAuditTab("평가");
-  expect(screen.getByText(/되돌림 0회/)).toBeTruthy();
-  expect(screen.getByText(/차별성 \(differentiation\): 2/)).toBeTruthy();
+  selectAuditTab("단계");
+  expect(screen.getByText("재작업 0회")).toBeTruthy();
+  expect(screen.getByText("시도 1 · 검사 통과 · 최종 실패 · 차별성 2/5 · 요청 적합성 3/5 · 재검토: 차별성")).toBeTruthy();
   rerender(<PlanWithAudit data={{ ...plan, unknown_count: 3, unknown_codes: { CERT_REQUIRED_UNVERIFIED: 1, EFFICACY_UNKNOWN: 1, SYNTHETIC_UNKNOWN: 1 }, passed: false, status: "failed" }} tenantId="synthetic" names={names} />);
   selectAuditTab("검증");
   expect(screen.getByText("근거 연결 없음 3건").className).toContain("attention");
@@ -409,23 +411,19 @@ it("shows only the choice status, hides unavailable/stopped stages and preserves
     expect(screen.getAllByRole("img").map(node => node.getAttribute("aria-label"))).toEqual(stages.map(stage => labels[stage.status]));
   }
 });
-it("keeps evaluation attempts in the inactive detail tab and reveals every attempt's checks, scores, review items and costs", () => {
+it("keeps every evaluation attempt's checks, scores and review items in the default stage tab and costs in the cost tab", () => {
   const attempts = [...plan.attempts, { attempt: 2, scores: { differentiation: 4, fit: 5 }, low_items: ["fit"], checks_passed: false, final_passed: false, cost_usd: .012345 }];
   render(<Audit commands={[{ kind: "show_plan", data: { ...plan, attempts } }]} />);
-  expect(screen.getByText("평가 시도 보기 · 되돌림 1회").closest("[hidden]")).toBeTruthy();
-  const details = selectAuditTab("평가");
-  expect(within(details).getByText("평가 시도 보기 · 되돌림 1회").closest("[hidden]")).toBeNull();
-  const items = details.querySelector("ol")!.children;
-  expect(items).toHaveLength(2);
-  expect(items[0].textContent).toContain("시도 1");
-  expect(items[0].textContent).toContain("차별성 (differentiation): 2");
-  expect(items[0].textContent).toContain("재검토 항목: 차별성");
-  expect(items[0].textContent).toContain("시도 코드 검사: 통과 · 최종 판정: 실패");
-  expect(items[1].textContent).toContain("시도 2");
-  expect(items[1].textContent).toContain("요청 적합성 (fit): 5");
-  expect(items[1].textContent).toContain("재검토 항목: 요청 적합성");
-  expect(items[1].textContent).toContain("시도 코드 검사: 실패 · 최종 판정: 실패");
-  expect(items[1].textContent).toContain("시도 텍스트 비용 $0.0123");
+  const details = screen.getByRole("tabpanel", { name: "단계" });
+  expect(screen.getByRole("tab", { name: "단계" }).getAttribute("aria-selected")).toBe("true");
+  const items = details.querySelectorAll(".gs-history-attempts > li");
+  expect([...items].map(item => item.textContent)).toEqual([
+    "시도 1 · 검사 통과 · 최종 실패 · 차별성 2/5 · 요청 적합성 3/5 · 재검토: 차별성",
+    "시도 2 · 검사 실패 · 최종 실패 · 차별성 4/5 · 요청 적합성 5/5 · 재검토: 요청 적합성",
+  ]);
+  for (const item of items) expect(item.closest("[hidden]")).toBeNull();
+  expect(within(selectAuditTab("비용")).getByText("시도 2 · 시도 텍스트 비용 $0.0123")).toBeTruthy();
+  expect(screen.queryByRole("tab", { name: "평가" })).toBeNull();
 });
 it("orders plan sections, disclaimer, image and feedback after the folded attempts", async () => {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(new Blob(["synthetic"]))));
@@ -464,10 +462,11 @@ it("shows a compact horizontal plan summary with a placeholder and preserves eve
   expect(screen.getByText("경쟁사 패턴 반영 · 비교한 축 2개 중 같은 축 1개")).toBeTruthy();
   for (const name of ["승인", "반려", "전체 보기 →"]) expect(screen.getByRole("button", { name })).toBeTruthy();
   expect((screen.getByLabelText("피드백 사유") as HTMLInputElement).tagName).toBe("INPUT");
-  for (const text of ["합성 장면", "합성 카피", "주장 효능", "효능 근거 연결 없음", "코드 검사: 통과", "평가 상태: 검토 필요", plan.pattern_alignment_label, "근거 소재 목록", "평가 시도 보기 · 되돌림 0회", plan.disclaimer, "합성 시안 고지"]) expect(screen.getByText(text).closest("[hidden]")).toBeTruthy();
+  for (const text of ["합성 장면", "합성 카피", "주장 효능", "효능 근거 연결 없음", "코드 검사: 통과", "평가 상태: 검토 필요", plan.pattern_alignment_label, "근거 소재 목록", plan.disclaimer, "합성 시안 고지"]) expect(screen.getByText(text).closest("[hidden]")).toBeTruthy();
   const verification = selectAuditTab("검증");
   for (const text of ["근거 연결 없음 1건", "효능 근거 연결 없음", "코드 검사: 통과", "평가 상태: 검토 필요"]) expect(within(verification).getByText(text).closest("[hidden]")).toBeNull();
-  expect(within(selectAuditTab("평가")).getByText("평가 시도 보기 · 되돌림 0회").closest("[hidden]")).toBeNull();
+  expect(within(selectAuditTab("단계")).getByText("시도 1 · 검사 통과 · 최종 실패 · 차별성 2/5 · 요청 적합성 3/5 · 재검토: 차별성").closest("[hidden]")).toBeNull();
+  expect(screen.queryByRole("tab", { name: "평가" })).toBeNull();
   expect(container.querySelector(".gs-plan-summary .gs-result-badges")).toBeTruthy();
   expandAll();
   for (const text of ["합성 장면", "합성 카피", "합성 시안 고지"]) expect(screen.getByText(text).closest("[hidden]")).toBeNull();
@@ -659,8 +658,8 @@ it("cards each detail section, numbers scenes, quotes copies and tabulates neutr
   expect(screen.getByRole("region", { name: "장면 구성" }).querySelector("ol li")!.textContent).toBe("합성 장면");
   expect(screen.getByText("합성 카피").tagName).toBe("BLOCKQUOTE");
   const table = within(screen.getByRole("region", { name: "경쟁사 패턴 반영" })).getByRole("table");
-  expect(within(table).getAllByRole("columnheader").map(node => node.textContent)).toEqual(["축", "기획안", "지배 패턴", "같음/다름", "점유율"]);
-  for (const text of ["같음", "다름", "비교 불가", "점유율 비교 불가"]) expect(within(table).getAllByText(text).every(node => node.textContent === text)).toBe(true);
+  expect(within(table).getAllByRole("columnheader").map(node => node.textContent)).toEqual(["축", "기획안", "경쟁사 최다 방식", "일치 여부", "시장 내 비중"]);
+  for (const text of ["같음", "다름", "비교 불가"]) expect(within(table).getAllByText(text).every(node => node.textContent === text)).toBe(true);
   expect(within(table).getByText("25.0%")).toBeTruthy();
 });
 it("keeps evidence link names and anchors while displaying thumbnail chips with brand text", () => {
@@ -681,16 +680,15 @@ it("styles disclaimer, image notice and the unmodified cost lines as one footnot
   for (const node of Array.from(expanded.children).slice(5)) expect(node.classList.contains("gs-footnote")).toBe(true);
   expect(Array.from(expanded.children).slice(5).map(node => node.textContent)).toEqual([plan.disclaimer, "합성 고지", restoredCostText, restoredCapText]);
 });
-it("localizes rationale only when displaying it, preserving numeric scores and the input object", () => {
+it("never displays the model-written rationale and leaves the input object unchanged", () => {
   const scores = { differentiation: 3, fit: 4, rationale: "how_to 대비 differentiation, fit. profit youtube:how_to" };
   const data = { ...plan, attempts: [{ attempt: 1, checks_passed: true, scores }] };
   const snapshot = JSON.stringify(data);
   render(<PlanWithAudit data={data} tenantId={null} names={names} />); expandAll();
   expect(screen.getByText("품질 검사 통과 · 평가 차별성 3/5, 요청 적합성 4/5")).toBeTruthy();
-  selectAuditTab("평가");
-  expect(screen.getByText("차별성 (differentiation): 3")).toBeTruthy(); expect(screen.getByText("요청 적합성 (fit): 4")).toBeTruthy();
-  const rationale = screen.getByText("사유: 합성 소구 대비 차별성, 요청 적합성. profit youtube:how_to");
-  expect(rationale.tagName).toBe("P"); expect(screen.queryByText(/^rationale:/)).toBeNull();
+  selectAuditTab("단계");
+  expect(screen.getByText("시도 1 · 검사 통과 · 최종 미실행 · 차별성 3/5 · 요청 적합성 4/5")).toBeTruthy();
+  expect(document.body.textContent).not.toMatch(/사유:|rationale|합성 소구 대비|\(differentiation\)/);
   expect(JSON.stringify(data)).toBe(snapshot);
 });
 it("summarizes only the latest attempt with absent scores omitted and failed checks explicit", () => {
@@ -705,8 +703,8 @@ it("renders market insights with Korean titles and columns, without tool caption
   const { rerender } = render(<DistributionChart data={{ tool: "top_vs_bottom_axis", rows: [{ value: "question", n_top: 3, n_bottom: 1 }] }} names={names} />);
   const region = screen.getByRole("region", { name: "분포" });
   expect(region.getAttribute("data-tool")).toBe("top_vs_bottom_axis");
-  expect(within(region).getByRole("heading").textContent).toBe("상위 vs 하위 광고 비교");
-  expect(within(region).getAllByRole("columnheader").map(node => node.textContent)).toEqual(["분류", "상위 25%", "하위 25%"]);
+  expect(within(region).getByRole("heading").textContent).toBe("조회수 상위·하위 25% 광고 비교");
+  expect(within(region).getAllByRole("columnheader").map(node => node.textContent)).toEqual(["분류", "상위 25% 광고 수", "하위 25% 광고 수"]);
   expect(region.querySelector("caption")).toBeNull(); expect(region.textContent).not.toContain("top_vs_bottom_axis");
   rerender(<DistributionChart data={{ tool: "compare_axis_by_category", rows: [{ value: "question", creatives: 3 }, { value: "other", creatives: 1 }] }} names={names} />);
   expect(within(region).getByRole("heading").textContent).toBe("오프닝 방식 분포");
@@ -726,4 +724,30 @@ it("keeps only marketer summaries, insight, pattern facts and one verification l
   expect(screen.queryByRole("region", { name: "검사 결과" })).toBeNull();
   expect(container.querySelector("details")).toBeNull();
   expect(screen.queryByRole("region", { name: "검증된 집계(도구가 센 값)" })).toBeNull();
+});
+
+it("explains pattern facts with titled columns and keeps the server calculation label only in checks", () => {
+  render(<PlanWithAudit data={plan} tenantId={null} />); expandAll();
+  const panel = screen.getByRole("region", { name: "경쟁사 패턴 반영" });
+  const descriptions = ["경쟁사 최다 방식: 같은 분류의 경쟁사 광고 중 가장 많이 쓰인 방식", "시장 내 비중: 경쟁사 광고 전체 중 기획안과 같은 방식을 쓴 광고의 비율"];
+  const elements = descriptions.map(text => within(panel).getByText(text));
+  expect(elements[0]).not.toBe(elements[1]);
+  for (const [index, element] of elements.entries()) expect(element.textContent).toBe(descriptions[index]);
+  expect(panel.textContent).not.toMatch(/기획안: |경쟁사 지배 패턴: |코드 계산, 판정 아님/);
+  for (const header of within(panel).getAllByRole("columnheader")) expect(header.getAttribute("title")?.trim()).toBeTruthy();
+  const rows = within(panel).getAllByRole("row").slice(1);
+  expect(within(rows[2]).getAllByRole("cell").slice(2).map(node => node.textContent)).toEqual(["비교 불가", "비교 불가"]);
+  expect(within(rows[0]).getByText("25.0%")).toBeTruthy();
+  const checks = within(selectAuditTab("검증")).getByRole("region", { name: "검사 결과" });
+  expect(within(checks).getByText(plan.pattern_alignment_label).classList.contains("gs-pattern-label")).toBe(true);
+});
+it("places the comparison note below one heading and omits it for other tools", () => {
+  const { rerender } = render(<DistributionChart data={{ tool: "top_vs_bottom_axis", rows: [{ value: "question", n_top: 3, n_bottom: 1 }] }} />);
+  const panel = screen.getByRole("region", { name: "분포" });
+  const note = "같은 플랫폼·브랜드 안에서 조회수 상위 25%와 하위 25% 광고가 각 방식을 쓴 광고 수입니다.";
+  expect(panel.querySelectorAll("h3")).toHaveLength(1);
+  expect(panel.querySelector("h3")!.nextElementSibling).toBe(within(panel).getByText(note));
+  expect(within(panel).getByText(note).className).toBe("gs-insight-note");
+  rerender(<DistributionChart data={{ tool: "compare_axis_by_category", rows: [{ value: "question", creatives: 3 }] }} />);
+  expect(within(panel).queryByText(note)).toBeNull();
 });

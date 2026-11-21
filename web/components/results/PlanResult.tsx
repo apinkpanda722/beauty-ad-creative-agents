@@ -89,7 +89,7 @@ export function PlanResult({ data, tenantId, names = taxonomyNames(), evidenceAn
       const status = data.efficacy_status[claim];
       return <Badge key={i} variant={status === "supported" ? "success" : "warn"} label={`${names.claimName(claim)} · ${status === "supported" ? "확인됨" : status === "unsupported" ? "근거가 뒷받침하지 않음" : "근거 연결 없음"}`} />;
     })}</div></section>}
-    <PatternAlignment data={data.pattern_alignment as PatternData} label={data.pattern_alignment_label} names={names} />
+    <PatternAlignment data={data.pattern_alignment as PatternData} names={names} />
     {(plan.evidence_ids?.length ?? 0) > 0 && <section className="gs-detail-card" aria-label="기획안 근거"><h4>근거 소재 목록</h4><ul className="gs-evidence-chips">{plan.evidence_ids?.map((id, i) => <li key={i}>{evidenceAnchors[id] ? <a href={`#${evidenceAnchors[id]}`} aria-label={id}><EvidenceChip key={id} id={id} card={evidenceCards.find(card => card.evidence_id === id)} /></a> : `근거 소재 ${i + 1}`}</li>)}</ul></section>}
     <p className="muted gs-footnote gs-footnote-first">{data.disclaimer}</p>
     {data.design_disclaimer && <p className="muted gs-footnote">{data.design_disclaimer}</p>}

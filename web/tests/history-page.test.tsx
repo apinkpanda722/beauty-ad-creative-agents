@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { AggregatesPanel } from "../components/results/AggregatesPanel";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import Page from "../app/page";
 import { HistoryPage } from "../components/history/HistoryPage";
@@ -124,22 +127,32 @@ it("renders recorded durations and rework counts, with only a check for image ti
 });
 it("moves checks and all three aggregate blocks with labeled provenance and identical chart source values", () => {
   detail(); const panel = tab("검증");
-  for (const text of ["근거 연결 없음 2건", "인증 연결 없음", "효능 근거 연결 없음", "코드 검사: 실패", "평가 상태: 검토 필요", "검증됨", "미검증", "제외됨", "합성 전체 10건 중 2건 표시", "전체 10건 · 표시 2건", "합성 모델 항목", "42", "합성 제외 항목"]) expect(within(panel).getByText(text)).toBeTruthy();
+  for (const text of ["근거 연결 없음 2건", "인증 연결 없음", "효능 근거 연결 없음", "코드 검사: 실패", "평가 상태: 검토 필요", "검증됨", "미검증", "제외됨", "합성 전체 10건 중 2건 표시", "합성 모델 항목", "42", "합성 제외 항목"]) expect(within(panel).getByText(text)).toBeTruthy();
   expect(within(panel).getByText("검증됨").className).toContain("gs-badge-success"); expect(within(panel).getByText("미검증").className).toContain("gs-badge-warn"); expect(within(panel).getByText("제외됨").className).toContain("gs-badge-neutral");
-  expect(within(panel).getAllByText(distribution.tool).every(node => node.classList.contains("gs-source-chip"))).toBe(true);
+  expect(within(panel).queryByText("전체 10건 · 표시 2건")).toBeNull();
+  const chips = panel.querySelectorAll(".gs-source-chip"); expect(chips).toHaveLength(1);
+  expect(chips[0].getAttribute("data-tool")).toBe("top_vs_bottom_axis");
+  expect(chips[0].textContent).toBe("조회수 상위·하위 25% 광고 비교");
+  expect(within(panel).queryByRole("table", { name: "시장 인사이트 원천 데이터" })).toBeNull();
+  fireEvent.click(within(panel).getByRole("button", { name: "원천 데이터 보기 (1)" }));
   const sourceTable = within(panel).getByRole("table", { name: "시장 인사이트 원천 데이터" });
-  expect(within(sourceTable).getAllByRole("columnheader").map(node => node.textContent)).toEqual(["분류", "상위 25%", "하위 25%"]);
+  expect(within(sourceTable).getAllByRole("columnheader").map(node => node.textContent)).toEqual(["분류", "상위 25% 광고 수", "하위 25% 광고 수"]);
   const sourceRows = within(sourceTable).getAllByRole("row").slice(1).map(row => within(row).getAllByRole("cell").map(node => node.textContent));
   render(<DistributionChart data={distribution} names={taxonomyNames(schema)} />);
   const chart = screen.getByRole("region", { name: "분포" });
   const chartRows = within(chart).getAllByRole("row").slice(1).map(row => within(row).getAllByRole("cell").map(node => node.textContent));
   expect(sourceRows).toEqual([["질문형", "7", "2"], ["사용법", "3", "1"]]); expect(sourceRows).toEqual(chartRows);
 });
-it("keeps every attempt's exact check, score, review and cost wording, localizing only displayed rationale", () => {
-  const snapshot = JSON.stringify(turn); detail(); const panel = tab("평가");
-  expect(within(panel).getByText("되돌림 1회").className).toContain("gs-badge-warn");
-  const attempts = panel.querySelectorAll(".gs-history-attempt"); expect(attempts).toHaveLength(2); expect([...attempts].every(item => item.classList.contains("gs-history-reworked"))).toBe(true);
-  for (const text of ["시도 1", "시도 2", "차별성 (differentiation): 2", "요청 적합성 (fit): 3", "차별성 (differentiation): 4", "요청 적합성 (fit): 5", "시도 코드 검사: 실패 · 최종 판정: 실패", "시도 코드 검사: 통과 · 최종 판정: 통과", "재검토 항목: 차별성", "시도 텍스트 비용 $0.0123", "사유: 사용법 대비 차별성, 요청 적합성. profit"]) expect(within(panel).getByText(text)).toBeTruthy();
+it("keeps exact attempt lines in the stage tab without rationale and preserves the input", () => {
+  const snapshot = JSON.stringify(turn); const { container } = detail(); const panel = tab("단계");
+  const attempts = panel.querySelectorAll(".gs-history-attempts > li");
+  expect([...attempts].map(item => item.textContent)).toEqual([
+    "시도 1 · 검사 실패 · 최종 실패 · 차별성 2/5 · 요청 적합성 3/5 · 재검토: 차별성",
+    "시도 2 · 검사 통과 · 최종 통과 · 차별성 4/5 · 요청 적합성 5/5",
+  ]);
+  expect(screen.getAllByRole("tab").map(item => item.textContent)).toEqual(["단계", "검증", "비용"]);
+  expect(screen.queryByRole("tab", { name: "평가" })).toBeNull();
+  expect(container.textContent).not.toMatch(/\(differentiation\)|사유:/);
   expect(JSON.stringify(turn)).toBe(snapshot);
 });
 it("reuses the server cost label and cap with four decimals and missing attempt costs explicit", () => {
@@ -182,4 +195,153 @@ it("opens the clicked request when several turns have equal result data and keep
   expect(within(screen.getByLabelText("실행 요약")).getByText("합성 첫 요청")).toBeTruthy();
   cleanup(); detail(); const header = screen.getByLabelText("실행 요약");
   expect(within(header).getByText("8.0초")).toBeTruthy(); expect(within(header).getByText("$0.0623")).toBeTruthy();
+});
+
+it("groups attempts under each plan and omits only missing scores or review items", () => {
+  const second = { ...plan, attempts: [
+    { attempt: 1, checks_passed: null, final_passed: null, scores: { fit: 4 }, low_items: ["unknown"] },
+    { attempt: 2, checks_passed: false, final_passed: false, scores: null },
+  ] };
+  const input = { ...turn, commands: [{ kind: "show_plan" as const, data: plan }, { kind: "show_plan" as const, data: second }] };
+  const snapshot = JSON.stringify(input);
+  const { container } = render(<HistoryDetail turn={input} workspace="합성" onBack={vi.fn()} names={taxonomyNames(schema)} />);
+  const stage = screen.getByText("기획·평가").closest("li")!;
+  const labels = within(stage).getAllByText(/^기획안 [12]$/);
+  expect(labels.map(label => label.textContent)).toEqual(["기획안 1", "기획안 2"]);
+  expect(labels.map(label => label.nextElementSibling?.className)).toEqual(["gs-history-attempts", "gs-history-attempts"]);
+  expect([...labels[1].nextElementSibling!.children].map(item => item.textContent)).toEqual([
+    "시도 1 · 검사 미실행 · 최종 미실행 · 요청 적합성 4/5 · 재검토: 기타",
+    "시도 2 · 검사 실패 · 최종 실패",
+  ]);
+  expect(container.textContent).not.toMatch(/사유:|\(fit\)/);
+  expect(JSON.stringify(input)).toBe(snapshot);
+});
+it("adds no placeholder or attempt list when a plan has no attempts", () => {
+  const { container } = render(<HistoryDetail turn={{ ...turn, stepAt: undefined, commands: [{ kind: "show_plan", data: { ...plan, attempts: [] } }] }} workspace="합성" onBack={vi.fn()} names={taxonomyNames(schema)} />);
+  const panel = screen.getByRole("tabpanel", { name: "단계" });
+  expect(panel.querySelector(".gs-history-attempts")).toBeNull();
+  expect(within(panel).getAllByText("정보 없음")).toHaveLength(3);
+  expect(container.querySelector(".gs-history-evaluation")).toBeNull();
+  tab("검증"); expect(screen.queryByRole("button", { name: /원천 데이터/ })).toBeNull();
+});
+it("toggles all source tables together with localized titles and no empty-rendered columns", () => {
+  const input = { ...turn, commands: [
+    { kind: "show_distribution" as const, data: { ...distribution, rows: distribution.rows.map((row, index) => ({ ...row, object: { value: 1 }, absent: null, mixed: index ? "표시 값" : null })) } },
+    { kind: "show_distribution" as const, data: { tool: "compare_axis_by_category", rows: [{ value: "question", creatives: 2 }] } },
+  ] };
+  render(<HistoryDetail turn={input} workspace="합성" onBack={vi.fn()} names={taxonomyNames(schema)} />); tab("검증");
+  const source = screen.getByRole("region", { name: "시장 인사이트 원천" });
+  const toggle = within(source).getByRole("button", { name: "원천 데이터 보기 (2)" });
+  const content = document.getElementById(toggle.getAttribute("aria-controls")!)!;
+  expect(toggle.getAttribute("aria-expanded")).toBe("false");
+  expect(content.hidden).toBe(true);
+  expect(within(source).queryByRole("table")).toBeNull();
+  fireEvent.click(toggle);
+  expect(content.hidden).toBe(false);
+  expect(toggle.getAttribute("aria-expanded")).toBe("true");
+  expect(toggle.textContent).toBe("원천 데이터 접기 (2)");
+  const tables = within(source).getAllByRole("table", { name: "시장 인사이트 원천 데이터" });
+  expect(tables).toHaveLength(2);
+  expect(within(tables[0]).getAllByRole("columnheader").map(node => node.textContent)).toEqual(["분류", "상위 25% 광고 수", "하위 25% 광고 수", "항목"]);
+  expect(within(tables[0]).getByText("표시 값")).toBeTruthy();
+  expect(within(source).getAllByRole("heading").map(node => node.textContent)).toEqual(["조회수 상위·하위 25% 광고 비교", "오프닝 방식 분포"]);
+  expect(source.querySelector(".gs-source-chip")).toBeNull();
+  expect(source.textContent).not.toMatch(/top_vs_bottom_axis|compare_axis_by_category/);
+});
+it("matches comparison source and chart column arrays and descriptions exactly", () => {
+  detail(); const panel = tab("검증");
+  const toggle = within(panel).getByRole("button", { name: "원천 데이터 보기 (1)" }); fireEvent.click(toggle);
+  expect(within(panel).getByRole("button", { name: "원천 데이터 접기 (1)" }).getAttribute("aria-expanded")).toBe("true");
+  const table = within(panel).getByRole("table", { name: "시장 인사이트 원천 데이터" });
+  render(<DistributionChart data={distribution} names={taxonomyNames(schema)} />);
+  const chart = screen.getByRole("region", { name: "분포" });
+  const headers = (element: HTMLElement) => within(element).getAllByRole("columnheader").map(node => node.textContent);
+  expect(headers(table)).toEqual(["분류", "상위 25% 광고 수", "하위 25% 광고 수"]);
+  expect(headers(chart)).toEqual(headers(table));
+  const description = "같은 플랫폼·브랜드 안에서 조회수 상위 25%와 하위 25% 광고가 각 방식을 쓴 광고 수입니다.";
+  for (const element of [panel, chart]) expect(within(element).getByText(description).className).toBe("gs-insight-note");
+});
+it("opens source content synchronously, animates next frame and hides after transition", () => {
+  let frame!: FrameRequestCallback;
+  vi.stubGlobal("requestAnimationFrame", vi.fn(callback => { frame = callback; return 1; }));
+  vi.stubGlobal("cancelAnimationFrame", vi.fn());
+  detail(); tab("검증");
+  const toggle = screen.getByRole("button", { name: "원천 데이터 보기 (1)" });
+  const content = document.getElementById(toggle.getAttribute("aria-controls")!)!;
+  const grid = content.parentElement!;
+  fireEvent.click(toggle); expect(content.hidden).toBe(false); expect(grid.classList.contains("gs-open")).toBe(false);
+  act(() => frame(0)); expect(grid.classList.contains("gs-open")).toBe(true);
+  vi.spyOn(window, "getComputedStyle").mockReturnValue({ transitionDuration: "0.2s", transitionDelay: "0s" } as CSSStyleDeclaration);
+  fireEvent.click(toggle); expect(content.hidden).toBe(false); expect(grid.classList.contains("gs-open")).toBe(false);
+  fireEvent.transitionEnd(grid, { propertyName: "grid-template-rows" }); expect(content.hidden).toBe(true);
+});
+it.each([false, true])("hides source content immediately for zero duration or reduced motion=%s", reduced => {
+  vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: reduced })));
+  detail(); tab("검증");
+  const toggle = screen.getByRole("button", { name: "원천 데이터 보기 (1)" });
+  const content = document.getElementById(toggle.getAttribute("aria-controls")!)!;
+  fireEvent.click(toggle);
+  vi.spyOn(window, "getComputedStyle").mockReturnValue({ transitionDuration: reduced ? "0.2s" : "0ms", transitionDelay: "0s" } as CSSStyleDeclaration);
+  fireEvent.click(toggle); expect(content.hidden).toBe(true);
+});
+afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+it("localizes only aggregate display names and values and keeps raw tool names in attributes", () => {
+  const data = { label: "모델 작성값 · 검증되지 않음", verified_counts: [
+    { tool: "top_vs_bottom_axis", row_count: 10, shown_count: 2, count_label: "합성 건수" },
+    { tool: "unknown_tool", row_count: 2, shown_count: 1, count_label: "합성 다른 건수" },
+  ], model_written: [{ name: "sun_protection hook_type", value: "person_first angle how_to format ugc_style" }, { name: "unknown_name", value: "unknown_value" }], removed: [] };
+  const inputSchema = { ...schema, taxonomy: { ...schema.taxonomy, hook_type: [{ value: "person_first", name: "인물 먼저 제시형", definition: "합성" }], format: [{ value: "ugc_style", name: "일반인 후기형", definition: "합성" }] }, claims: [{ value: "sun_protection", name: "자외선 차단" }] };
+  const snapshot = JSON.stringify({ data, inputSchema });
+  const { container } = render(<AggregatesPanel data={data} names={taxonomyNames(inputSchema)} />);
+  expect([...container.querySelectorAll(".gs-source-chip")].map(node => [node.getAttribute("data-tool"), node.textContent])).toEqual([
+    ["top_vs_bottom_axis", "조회수 상위·하위 25% 광고 비교"], ["unknown_tool", "집계 항목"],
+  ]);
+  expect(screen.getByText("자외선 차단 훅")).toBeTruthy();
+  expect(screen.getByText("인물 먼저 제시형 소구 사용법 형식 일반인 후기형")).toBeTruthy();
+  expect(screen.getByText("unknown_name")).toBeTruthy(); expect(screen.getByText("unknown_value")).toBeTruthy();
+  expect(container.textContent).not.toMatch(/전체 10건 · 표시 2건|sun_protection|hook_type|person_first|ugc_style/);
+  expect(JSON.stringify({ data, inputSchema })).toBe(snapshot);
+});
+it("keeps check labels, aggregate cards and source area as siblings", () => {
+  detail(); const panel = tab("검증");
+  const checks = within(panel).getByRole("region", { name: "검사 결과" });
+  const label = within(checks).getByText(plan.pattern_alignment_label);
+  expect(label.tagName).toBe("SMALL"); expect(label.classList.contains("gs-pattern-label")).toBe(true); expect(label.classList.contains("muted")).toBe(true);
+  const aggregateCard = panel.querySelector(".gs-aggregates")!;
+  const source = within(panel).getByRole("region", { name: "시장 인사이트 원천" });
+  expect(checks.parentElement).toBe(aggregateCard.parentElement); expect(source.parentElement).toBe(checks.parentElement);
+  expect(aggregateCard.querySelector(".gs-card")).toBeNull();
+});
+it("uses shared card spacing tokens and a reduced-motion grid accordion without full-width block fills", () => {
+  const css = (file: string) => readFileSync(join(process.cwd(), `app/${file}.css`), "utf8");
+  const globals = css("globals");
+  for (const rule of globals.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if (/\.(verified-block|model-block|removed-block)/.test(rule[1])) expect(rule[2]).not.toMatch(/background|!important/);
+  }
+  expect(css("tokens")).toMatch(/--gs-card-padding:\s*var\(--gs-space-5\)/);
+  expect(css("tokens")).toMatch(/--gs-section-gap:\s*var\(--gs-space-4\)/);
+  for (const [file, selector] of [["results", ".gs-aggregates"], ["history", ".gs-history-page .gs-plan-checks"], ["history", ".gs-history-source"]]) {
+    const rules = [...css(file).matchAll(/([^{}]+)\{([^{}]*)\}/g)];
+    expect(rules.some(rule => rule[1].split(",").map(value => value.trim()).includes(selector) && /padding:\s*var\(--gs-card-padding\)/.test(rule[2]))).toBe(true);
+    expect(css(file)).toContain("var(--gs-section-gap)");
+  }
+  const history = css("history");
+  expect(history).toMatch(/grid-template-rows:\s*0fr/); expect(history).toMatch(/grid-template-rows:\s*1fr/);
+  expect(history).toMatch(/transition:\s*grid-template-rows/);
+  expect(history.slice(history.indexOf("@media (prefers-reduced-motion: reduce)"))).toMatch(/transition:\s*none/);
+});
+it("omits nonnumeric score fields individually without changing the server attempt", () => {
+  const data = { ...plan, attempts: [
+    { attempt: 1, checks_passed: true, final_passed: false, scores: { differentiation: "2", fit: 4, rationale: "합성 숨김 문장" } },
+    { attempt: 2, checks_passed: true, final_passed: true, scores: { differentiation: 5, fit: false } },
+  ] };
+  const snapshot = JSON.stringify(data);
+  render(<HistoryDetail turn={{ ...turn, commands: [{ kind: "show_plan", data }] }} workspace="합성" onBack={vi.fn()} names={taxonomyNames(schema)} />);
+  const panel = screen.getByRole("tabpanel", { name: "단계" });
+  expect([...panel.querySelectorAll(".gs-history-attempts > li")].map(node => node.textContent)).toEqual([
+    "시도 1 · 검사 통과 · 최종 실패 · 요청 적합성 4/5",
+    "시도 2 · 검사 통과 · 최종 통과 · 차별성 5/5",
+  ]);
+  expect(document.body.textContent).not.toContain("합성 숨김 문장");
+  expect(JSON.stringify(data)).toBe(snapshot);
 });
