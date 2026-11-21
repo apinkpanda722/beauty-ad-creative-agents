@@ -229,7 +229,16 @@
     {
       "step": 17,
       "name": "ui-polish-2",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-21T22:52:49+0900",
+      "summary": "화면 다듬기 7건·공통 Tooltip/ScoreLabel·브랜드 표시 맵·문서 동기화 완료. make verify 통과(Python 6,512개·웹 400개), 패키지 설치 없음. 승인 교체: A1 자연 비율→contain·블러 배경·실패 검증, A2/A2b/A2c 기존 점수 문장→AI 평가 textContent, Q1 상시 툴팁→포커스·Esc·0건 중립 배지, A3a I/T→SVG 타일. A2b의 통과하던 두 단언은 유지. 사용자 시각 확인 필요: ① 사이드바 토글 위치·중앙·레일 폭 ② 태그 색·카드 전체 클릭·hover·포커스 링 ③ 툴팁 폭·좌우 잘림 ④ 플랫폼 색·아이콘 정렬 ⑤ 시안 높이·문구 보존·블러 ⑥ 700px 미만 1열 배치.",
+      "completed_at": "2026-11-21T23:05:37+0900",
+      "usage": {
+        "input_tokens": 4734904,
+        "cached_input_tokens": 4566528,
+        "output_tokens": 24348,
+        "attempts": 1
+      }
     },
     {
       "step": 18,
