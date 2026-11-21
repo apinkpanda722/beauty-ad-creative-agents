@@ -24,9 +24,7 @@ textarea { resize: vertical; line-height: 1.7; }
 .badge { display: block; }
 .notice { border-left: 3px solid #78968c; background: #f4f8f6; padding: .8rem 1rem; margin: 1rem 0; border-radius: .25rem; }
 .error { border-color: #aa4b3b; background: #fff5f2; }
-.options, .examples, .composer-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
-.examples { margin-bottom: 1rem; }
-.examples button { font-size: .85rem; }
+.options, .composer-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
 .composer-actions { margin-top: .75rem; justify-content: space-between; }
 .composer-actions label { margin: 0; }
 fieldset { margin-top: 1rem; border: 1px solid #b5bdc2; border-radius: .4rem; padding: 1rem; }

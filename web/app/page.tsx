@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Chat } from "../components/Chat";
+import { PlanPage } from "../components/plan/PlanPage";
 import { SchemaView } from "../components/SchemaView";
 import { AppShell } from "../components/shell/AppShell";
 import { getWorkspaces } from "../lib/api";
@@ -35,7 +35,7 @@ function WorkspaceShell() {
       </section> : null}
       {failed ? <p role="alert">API 서버에 연결하지 못했습니다. 서버가 실행 중인지 확인하세요.</p>
         : data ? <>
-          <div role="tabpanel" id="chat-view" aria-labelledby="chat-tab" hidden={view !== "plan"}><Chat workspaces={data.workspaces} imageEnabled={data.image_enabled} /></div>
+          <div role="tabpanel" id="chat-view" aria-labelledby="chat-tab" hidden={view !== "plan"}><PlanPage workspaces={data.workspaces} imageEnabled={data.image_enabled} /></div>
           <div role="tabpanel" id="schema-view" aria-labelledby="schema-tab" hidden={view !== "graph"}>{view === "graph" && (state.tenantId ? <SchemaView tenantId={state.tenantId} /> : <p>대화 탭에서 작업 공간을 선택하세요.</p>)}</div>
         </> : (view === "plan" || view === "graph") && <p role="status">작업 공간 목록을 불러오는 중입니다.</p>}
     </>}

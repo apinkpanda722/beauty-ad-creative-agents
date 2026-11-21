@@ -30,3 +30,11 @@ it("keeps planning in progress until its evaluation result and reopens it for la
   events.push(step("planning", "start", "running"));
   expect(deriveStages(events, "running").find(s => s.id === "planning")).toMatchObject({ status: "running", count: 2 });
 });
+
+it("adds only the terminal display rule without changing its stage data", () => {
+  const terminal = deriveStages([step("supervisor", "done", "plan")], "done").at(-1);
+  expect(terminal).toEqual({ id: "complete", label: "완료", status: "done", count: 1, reworks: 0, display: "label_only_when_done" });
+  expect(deriveStages([], "running").slice(0, -1).map(stage => stage.display)).toEqual([
+    "label_and_status", "label_and_status", "label_and_status", "label_and_status",
+  ]);
+});

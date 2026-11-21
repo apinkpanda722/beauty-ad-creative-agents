@@ -33,30 +33,26 @@ def read(relative):
     return (ROOT / relative).read_text(encoding="utf-8")
 
 
-def chip_messages(source, workspace):
-    binding = re.search(rf'"{re.escape(workspace)}"\s*:\s*(\w+)', source)
-    assert binding, f"missing workspace: {workspace}"
-    array = re.search(
-        rf"const\s+{binding.group(1)}\s*=\s*\[(.*?)\];", source, re.DOTALL
+def test_confirmed_prompts_are_in_demo():
+    assert PROMPTS, "zero checked workspaces must fail"
+    for messages in PROMPTS.values():
+        assert messages, "zero checked messages must fail"
+        for message in messages:
+            assert message in read("DEMO.md")
+
+
+def test_web_source_has_no_preset_requests():
+    sources = sorted(
+        path
+        for directory in ("web/app", "web/components", "web/lib")
+        for path in (ROOT / directory).rglob("*")
+        if path.is_file() and path.suffix in {".ts", ".tsx", ".css"}
     )
-    assert array, f"missing chip array: {workspace}"
-    messages = re.findall(r'message:\s*"([^"]+)"', array.group(1))
-    assert messages, "B-FP-069: zero checked messages must fail"
-    return tuple(messages)
-
-
-@pytest.mark.parametrize("workspace", PROMPTS)
-def test_confirmed_prompts_match_workspace_chips(workspace):
-    messages = chip_messages(read("web/lib/examples.ts"), workspace)
-    assert messages == PROMPTS[workspace]
-    for message in messages:
-        assert message in read("DEMO.md")
-
-
-@pytest.mark.parametrize("source", ["", '"test-isntree": serum, const serum = [];'])
-def test_chip_check_rejects_empty_synthetic_input(source):
-    with pytest.raises(AssertionError):
-        chip_messages(source, "test-isntree")
+    assert sources, "zero checked source files must fail"
+    for path in sources:
+        source = path.read_text(encoding="utf-8")
+        for forbidden in ("examples", ".examples", "예시 요청"):
+            assert forbidden not in source, path.relative_to(ROOT)
 
 
 def test_demo_sections_scenes_and_normal_flow():

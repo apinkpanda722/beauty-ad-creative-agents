@@ -1,14 +1,14 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import { Chat } from "../components/Chat";
+import { PlanPage } from "../components/plan/PlanPage";
 import { EvidenceCards } from "../components/EvidenceCards";
 import { PlanCard } from "../components/PlanCard";
 import { AggregatesPanel } from "../components/AggregatesPanel";
 import { DistributionChart } from "../components/DistributionChart";
 import { DesignImage } from "../components/DesignImage";
 import { FeedbackBar, FeedbackSession } from "../components/FeedbackBar";
-import { TurnView } from "../components/TurnView";
-import { StepBar } from "../components/StepBar";
+import { TurnCard } from "../components/plan/TurnCard";
+import { ProgressTracker } from "../components/plan/ProgressTracker";
 import { CommandSlot, CommandTenantContext } from "../components/CommandSlot";
 import { initialState, reducer } from "../lib/reducer";
 import { SessionProvider } from "../lib/session";
@@ -162,12 +162,12 @@ it("fetches schema and reports non-200 API errors with status-first parsing", as
     }
   }
 });
-it.each([true, false])("renders ordered command components in Chat with schema success=%s and display_text only", async success => {
+it.each([true, false])("renders ordered command components in PlanPage with schema success=%s and display_text only", async success => {
   const commands: UiCommand[] = [{ kind: "show_cost", data: { label: "합성 비용", text_spent_usd: .01, max_text_cost_usd: 1 } }, { kind: "show_aggregates", data: aggregates }, { kind: "show_distribution", data: { tool: "synthetic", rows: [{ value: "합성 분포", creatives: 1 }] } }, { kind: "show_plan", data: plan }, { kind: "show_plan", data: { ...plan, plan: { title: "합성 두 번째 기획" } } }, { kind: "show_evidence_cards", data: { cards: [card], missing: 0 } }];
   const frames: SseFrame[] = [...commands.map(data => ({ event: "ui_command" as const, data })), { event: "token", data: { text: "합성 숨긴 원문", display_text: "합성 화면 문장" } }];
   const bytes = new TextEncoder().encode(frames.map(f => `event: ${f.event}\ndata: ${JSON.stringify(f.data)}\n\n`).join(""));
   const fetch = vi.fn().mockImplementation((url: string) => Promise.resolve(url === "/api/graph/schema" ? new Response(JSON.stringify(success ? schema : { detail: "GRAPH_UNAVAILABLE" }), { status: success ? 200 : 503 }) : new Response(new ReadableStream({ start(c) { c.enqueue(bytes); c.close(); } })))); vi.stubGlobal("fetch", fetch);
-  render(<Chat workspaces={[{ tenant_id: "synthetic", display_name: "합성 공간", brand: null, product_name: null }]} imageEnabled={false} />, { wrapper: SessionProvider });
+  render(<PlanPage workspaces={[{ tenant_id: "synthetic", display_name: "합성 공간", brand: null, product_name: null }]} imageEnabled={false} />, { wrapper: SessionProvider });
   fireEvent.change(screen.getByLabelText("작업 공간"), { target: { value: "synthetic" } }); fireEvent.change(screen.getByLabelText("요청"), { target: { value: "합성 요청" } }); fireEvent.click(screen.getByRole("button", { name: "전송" }));
   await screen.findByText("합성 화면 문장"); await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
   const nodes = [screen.getByText("합성 화면 문장"), screen.getByRole("region", { name: "근거 소재" }), screen.getByRole("heading", { name: "합성 기획" }), screen.getByRole("heading", { name: "합성 두 번째 기획" }), screen.getByRole("region", { name: "분포" }), screen.getByRole("region", { name: "검증된 집계(도구가 센 값)" }), screen.getByText(/합성 비용.*\$0.0100/)];
@@ -216,7 +216,7 @@ it.each([true, false])("filters only the plan intro line when show_plan=%s, keep
   const state = reducer({ ...initialState, tenantId: "synthetic" }, { type: "request_started", message: "합성 요청" });
   const text = `합성 한도 도달 안내\n${PLAN_INTRO_TEXT}\n합성 안내: ${PLAN_INTRO_TEXT}\n합성 다른 안내`;
   const commands: UiCommand[] = [{ kind: "show_evidence_cards", data: { cards: [card], missing: 0 } }, ...(showPlan ? [{ kind: "show_plan" as const, data: plan }] : [])];
-  render(<TurnView turn={{ ...state.turns[0], status: "done", displayText: text, commands }} busy={false} onChoice={vi.fn()} onCancel={vi.fn()} onRetry={vi.fn()} />);
+  render(<TurnCard turn={{ ...state.turns[0], status: "done", displayText: text, commands }} busy={false} onChoice={vi.fn()} onCancel={vi.fn()} onRetry={vi.fn()} />);
   const answer = document.querySelector(".answer")!;
   expect(answer.textContent).toBe(showPlan ? `합성 한도 도달 안내\n합성 안내: ${PLAN_INTRO_TEXT}\n합성 다른 안내` : text);
   const stages = screen.getByLabelText("진행 단계");
@@ -225,23 +225,23 @@ it.each([true, false])("filters only the plan intro line when show_plan=%s, keep
 });
 it("omits an empty answer after filtering an intro-only plan turn", () => {
   const state = reducer({ ...initialState, tenantId: "synthetic" }, { type: "request_started", message: "합성 요청" });
-  const { container } = render(<TurnView turn={{ ...state.turns[0], status: "done", displayText: PLAN_INTRO_TEXT, commands: [{ kind: "show_plan", data: plan }] }} busy={false} onChoice={vi.fn()} onCancel={vi.fn()} onRetry={vi.fn()} />);
+  const { container } = render(<TurnCard turn={{ ...state.turns[0], status: "done", displayText: PLAN_INTRO_TEXT, commands: [{ kind: "show_plan", data: plan }] }} busy={false} onChoice={vi.fn()} onCancel={vi.fn()} onRetry={vi.fn()} />);
   expect(container.querySelector(".answer")).toBeNull();
 });
 it("shows only the choice status, hides unavailable/stopped stages and preserves running/done stages", () => {
-  const { rerender, container } = render(<StepBar turnStatus="needs_choice" stepEvents={[]} />);
+  const { rerender, container } = render(<ProgressTracker turnStatus="needs_choice" stepEvents={[]} />);
   const bar = screen.getByLabelText("진행 단계");
   expect(bar.textContent).toBe("요청 해석 완료 · 선택을 기다리는 중");
   expect(bar.textContent).not.toContain("대기");
   for (const status of ["unavailable", "stopped"] as const) {
-    rerender(<StepBar turnStatus={status} stepEvents={[]} />);
+    rerender(<ProgressTracker turnStatus={status} stepEvents={[]} />);
     expect(container.innerHTML).toBe("");
   }
   for (const status of ["running", "done"] as const) {
     const events = status === "done" ? [{ agent: "supervisor", phase: "done", status: "research" }] : [];
-    rerender(<StepBar turnStatus={status} stepEvents={events} />);
+    rerender(<ProgressTracker turnStatus={status} stepEvents={events} />);
     const labels = { pending: "대기", running: "진행 중", done: "완료", failed: "실패" };
-    expect(screen.getAllByRole("listitem").map(node => node.textContent)).toEqual(deriveStages(events, status).map(stage => `${stage.label} ${labels[stage.status]}`));
+    expect(screen.getAllByRole("listitem").map(node => node.textContent)).toEqual(deriveStages(events, status).map(stage => stage.id === "complete" && stage.status === "done" ? stage.label : `${stage.label} ${labels[stage.status]}`));
   }
 });
 it("keeps evaluation attempts collapsed initially and reveals every attempt's checks, scores, review items and costs", () => {

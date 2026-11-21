@@ -1,13 +1,18 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { ProgressTracker } from "../components/plan/ProgressTracker";
+import { TurnCard } from "../components/plan/TurnCard";
+import { initialState, reducer } from "../lib/reducer";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import { Chat } from "../components/Chat";
-import { ClarifyCard } from "../components/ClarifyCard";
+import { PlanPage } from "../components/plan/PlanPage";
+import { ClarifyCard } from "../components/plan/ClarifyCard";
 import { getWorkspaces } from "../lib/api";
 import type { Clarification, SseFrame, WorkspacesResponse } from "../lib/types";
 import Page from "../app/page";
 import { SessionProvider } from "../lib/session";
 
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 const workspaces: WorkspacesResponse = {
   workspaces: [
     { tenant_id: "test-isntree", display_name: "합성 공간 A", brand: "합성 브랜드 A", product_name: "합성 제품 A" },
@@ -26,7 +31,7 @@ function response(frames: SseFrame[], thread = "synthetic:thread") {
 function setup(frames: SseFrame[], imageEnabled = false) {
   const fetch = vi.fn().mockImplementation(() => Promise.resolve(response(frames)));
   vi.stubGlobal("fetch", fetch);
-  render(<Chat workspaces={workspaces.workspaces} imageEnabled={imageEnabled} />, { wrapper: SessionProvider });
+  render(<PlanPage workspaces={workspaces.workspaces} imageEnabled={imageEnabled} />, { wrapper: SessionProvider });
   return fetch;
 }
 function selectWorkspace(value = "test-isntree") {
@@ -51,13 +56,15 @@ it("loads workspace metadata with no headers and renders API failure", async () 
   render(<Page />);
   expect(await screen.findByText("API 서버에 연결하지 못했습니다. 서버가 실행 중인지 확인하세요.")).toBeTruthy();
 });
-it("enables input only after workspace selection; example chips fill without sending", () => {
+it("enables input only after workspace selection and has no preset request buttons", () => {
   const fetch = setup([]);
   expect((screen.getByLabelText("요청") as HTMLTextAreaElement).disabled).toBe(true);
   selectWorkspace();
   expect((screen.getByLabelText("요청") as HTMLTextAreaElement).disabled).toBe(false);
-  fireEvent.click(screen.getByRole("button", { name: "정상" }));
-  expect((screen.getByLabelText("요청") as HTMLTextAreaElement).value.length).toBeGreaterThan(0);
+  expect(screen.queryByLabelText("예시 요청")).toBeNull();
+  expect(existsSync(join(process.cwd(), "lib/examples.ts"))).toBe(false);
+  expect((screen.getByLabelText("요청") as HTMLTextAreaElement).value).toBe("");
+  expect(screen.getAllByRole("button").map(button => button.textContent)).toEqual(["전송"]);
   expect(fetch).not.toHaveBeenCalled();
   expect(screen.getByText("작업 공간은 서버를 시작할 때 정한 그룹 하나만 보입니다. 바꾸려면 서버를 다시 시작하세요.")).toBeTruthy();
 });
@@ -100,7 +107,8 @@ it.each(["select_confirmed", "select_one", "select_many", "none", "keep_requeste
   await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
   expect(fetch.mock.calls[1][0]).toBe("/api/ask");
   expect(body(fetch, 1)).toEqual({ message: "합성 사용자 요청", thread_id: "synthetic:thread", claim_choice: { mode: optionId.startsWith("select") ? "selected" : optionId, claims: optionId.startsWith("select") ? ["hydration"] : [], requested_claim: "soothing" } });
-  expect(screen.getByText("선택: 합성 분기 선택")).toBeTruthy();
+  expect(screen.getByText(optionId.startsWith("select") ? "효능 선택 · 합성 분기 선택 · 합성 효능 A" : "효능 선택 · 합성 분기 선택")).toBeTruthy();
+  expect(within(screen.getByRole("article", { name: "요청 1" })).queryByRole("button")).toBeNull();
   await ready();
 });
 it("shows an unavailable notice without choices and allows new input", async () => {
@@ -202,4 +210,95 @@ it("keeps no-evidence and limit notices as normal server text without fabricated
   expect(screen.queryByText("합성 원문")).toBeNull();
   expect(screen.queryByRole("button", { name: "다시 시도" })).toBeNull();
   expect(screen.queryByLabelText("효능 선택")).toBeNull();
+});
+
+it("renders the terminal stage label exactly once and retains stage counts and reworks", () => {
+  const events = [
+    { agent: "supervisor", phase: "end", status: "ok" },
+    { agent: "research", phase: "end", status: "ok" },
+    { agent: "planning", phase: "start", status: "running" },
+    { agent: "evaluation", phase: "end", status: "done" },
+    { agent: "rework", phase: "end", status: "done" },
+    { agent: "planning", phase: "start", status: "running" },
+    { agent: "evaluation", phase: "end", status: "done" },
+    { agent: "supervisor", phase: "done", status: "plan" },
+  ];
+  render(<ProgressTracker stepEvents={events} turnStatus="done" />);
+  expect(screen.getAllByText("완료")).toHaveLength(1);
+  expect(screen.getByText("기획 2회")).toBeTruthy();
+  expect(screen.getByText("되돌림 1회")).toBeTruthy();
+  expect(screen.getAllByRole("listitem").map(item => item.getAttribute("data-status"))).toEqual(["done", "done", "done", "done", "done"]);
+});
+it("announces running and failed stages with icons and text in a live region", () => {
+  const { rerender } = render(<ProgressTracker stepEvents={[]} turnStatus="running" />);
+  const region = screen.getByLabelText("진행 단계");
+  expect(region.getAttribute("aria-live")).toBe("polite");
+  expect(within(region).getByText("요청 해석 진행 중").closest("li")?.getAttribute("data-status")).toBe("running");
+  expect(region.querySelector('[data-status="running"] .gs-stage-icon')).toBeTruthy();
+  rerender(<ProgressTracker stepEvents={[{ agent: "research", phase: "end", status: "failed" }]} turnStatus="error" />);
+  expect(screen.getByText("리서치 실패").closest("li")?.getAttribute("data-status")).toBe("failed");
+});
+it("updates elapsed numbers with an injected clock only while running and cleans up timers", () => {
+  vi.useFakeTimers();
+  let now = 1000;
+  const clock = vi.fn(() => now);
+  const { rerender, unmount } = render(<ProgressTracker stepEvents={[]} turnStatus="running" clock={clock} />);
+  expect(screen.getByLabelText("경과 시간").textContent).toBe("0초 경과");
+  now = 4000;
+  act(() => { vi.advanceTimersByTime(1000); });
+  expect(screen.getByLabelText("경과 시간").textContent).toBe("3초 경과");
+  rerender(<ProgressTracker stepEvents={[]} turnStatus="done" clock={clock} />);
+  const calls = clock.mock.calls.length;
+  now = 10000;
+  act(() => { vi.advanceTimersByTime(5000); });
+  expect(screen.getByLabelText("경과 시간").textContent).toBe("3초 경과");
+  expect(clock).toHaveBeenCalledTimes(calls);
+  expect(vi.getTimerCount()).toBe(0);
+  rerender(<ProgressTracker stepEvents={[]} turnStatus="running" clock={clock} />);
+  unmount();
+  expect(vi.getTimerCount()).toBe(0);
+});
+it("uses CSS pulse and line transitions with reduced motion disabling both", () => {
+  const css = readFileSync(join(process.cwd(), "app/plan.css"), "utf8");
+  expect(css).toMatch(/@keyframes\s+gs-progress-pulse/);
+  expect(css).toMatch(/transition\s*:[^;]*;/);
+  const reduced = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
+  expect(reduced).toMatch(/animation\s*:\s*none/);
+  expect(reduced).toMatch(/transition\s*:\s*none/);
+});
+it("collapses resolved clarification to one line, then renders a fresh request as an ordinary turn", async () => {
+  const fetch = setup([{ event: "needs_clarification", data: clarification }]);
+  selectWorkspace(); send(); await ready();
+  const question = screen.getByRole("article", { name: "요청 1" });
+  expect(within(question).getByRole("button", { name: "합성 하나 선택" })).toBeTruthy();
+  fetch.mockResolvedValue(response([{ event: "token", data: { text: "합성 선택 결과" } }]));
+  fireEvent.click(screen.getByRole("button", { name: "합성 하나 선택" }));
+  fireEvent.click(screen.getByLabelText("합성 효능 A"));
+  fireEvent.click(screen.getByRole("button", { name: "선택 제출" }));
+  await ready();
+  expect(within(question).getByText("효능 선택 · 합성 하나 선택 · 합성 효능 A")).toBeTruthy();
+  expect(within(question).queryByRole("button")).toBeNull();
+  expect(within(question).queryByRole("checkbox")).toBeNull();
+  expect(within(question).queryByRole("radio")).toBeNull();
+  expect(within(question).queryByText(clarification.text)).toBeNull();
+  send(); await ready();
+  const fresh = screen.getByRole("article", { name: "요청 3" });
+  expect(within(fresh).getByText("합성 사용자 요청")).toBeTruthy();
+  expect(within(fresh).queryByLabelText("효능 선택")).toBeNull();
+  expect(within(fresh).queryByText(/효능 선택 ·/)).toBeNull();
+});
+it("hides choice buttons for every resolved status and for a turn with a recorded choice label", () => {
+  const turn = reducer({ ...initialState, tenantId: "synthetic" }, { type: "request_started", message: "합성 요청" }).turns[0];
+  const { rerender } = render(<TurnCard turn={{ ...turn, status: "needs_choice", clarification }} busy={false} onChoice={vi.fn()} onCancel={vi.fn()} onRetry={vi.fn()} />);
+  expect(screen.getByRole("button", { name: "합성 하나 선택" })).toBeTruthy();
+  for (const status of ["done", "running", "error", "unavailable", "stopped"] as const) {
+    rerender(<TurnCard turn={{ ...turn, status, clarification }} busy={false} onChoice={vi.fn()} onCancel={vi.fn()} onRetry={vi.fn()} />);
+    const summary = screen.getByLabelText("효능 선택 요약");
+    expect(summary.tagName).toBe("P");
+    expect(summary.textContent).toBe("효능 선택 · 선택 완료");
+    expect(screen.queryByRole("button")).toBeNull();
+  }
+  rerender(<TurnCard turn={{ ...turn, status: "needs_choice", choiceLabel: "합성 선택", clarification }} busy={false} onChoice={vi.fn()} onCancel={vi.fn()} onRetry={vi.fn()} />);
+  expect(screen.getByText("효능 선택 · 합성 선택")).toBeTruthy();
+  expect(screen.queryByRole("button")).toBeNull();
 });
