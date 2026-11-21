@@ -1,14 +1,14 @@
 import type { TurnStatus } from "./reducer";
 import type { StepEvent } from "./types";
-export type Stage = { id: string; label: string; status: "pending" | "running" | "done" | "failed"; count: number; reworks: number };
+export type Stage = { id: string; label: string; status: "pending" | "running" | "done" | "failed"; count: number; reworks: number; display: "label_and_status" | "label_only_when_done" };
 export function deriveStages(stepEvents: StepEvent[], turnStatus: TurnStatus): Stage[] {
   const stages: Stage[] = [
-    { id: "supervisor", label: "요청 해석", status: "pending", count: 0, reworks: 0 },
-    { id: "research", label: "리서치", status: "pending", count: 0, reworks: 0 },
-    { id: "planning", label: "기획", status: "pending", count: 0, reworks: 0 },
-    { id: "evaluation", label: "평가", status: "pending", count: 0, reworks: 0 },
-    ...(stepEvents.some(e => e.agent === "image") ? [{ id: "image", label: "시안", status: "pending" as const, count: 0, reworks: 0 }] : []),
-    { id: "complete", label: "완료", status: "pending", count: 0, reworks: 0 },
+    { id: "supervisor", label: "요청 해석", status: "pending", count: 0, reworks: 0, display: "label_and_status" },
+    { id: "research", label: "리서치", status: "pending", count: 0, reworks: 0, display: "label_and_status" },
+    { id: "planning", label: "기획", status: "pending", count: 0, reworks: 0, display: "label_and_status" },
+    { id: "evaluation", label: "평가", status: "pending", count: 0, reworks: 0, display: "label_and_status" },
+    ...(stepEvents.some(e => e.agent === "image") ? [{ id: "image", label: "시안", status: "pending" as const, count: 0, reworks: 0, display: "label_and_status" as const }] : []),
+    { id: "complete", label: "완료", status: "pending", count: 0, reworks: 0, display: "label_only_when_done" },
   ];
   let active = "supervisor";
   function finish(id: string, failed: boolean) {
@@ -48,4 +48,34 @@ export function deriveStages(stepEvents: StepEvent[], turnStatus: TurnStatus): S
     }
   }
   return stages;
+}
+
+export type Progress = {
+  id: "supervisor" | "research" | "plan_eval" | "image";
+  label: string;
+  status: Stage["status"];
+  reworks: number;
+  durationMs: number | null;
+};
+export type ProgressTimes = { startedAt?: number; stepAt?: number[] };
+
+export function deriveProgress(stepEvents: StepEvent[], turnStatus: TurnStatus, times?: ProgressTimes): Progress[] {
+  const stages = deriveStages(stepEvents, turnStatus);
+  const planning = stages.find(stage => stage.id === "planning")!;
+  const evaluation = stages.find(stage => stage.id === "evaluation")!;
+  const first = (agent: string) => stepEvents.findIndex(event => event.agent === agent && event.phase !== "start" && event.phase !== "done");
+  const supervisorAt = times?.stepAt?.[first("supervisor")];
+  const researchAt = times?.stepAt?.[first("research")];
+  const finalEvaluation = stepEvents.findLastIndex(event => event.agent === "evaluation" || event.agent === "rework");
+  const evaluationAt = times?.stepAt?.[finalEvaluation];
+  const imageAt = times?.stepAt?.[stepEvents.findLastIndex(event => event.agent === "image")];
+  const duration = (from?: number, to?: number) => from === undefined || to === undefined ? null : Math.max(0, to - from);
+  const combined = planning.status === "failed" || evaluation.status === "failed" ? "failed"
+    : planning.status === "running" ? "running" : evaluation.status === "done" ? "done" : planning.status;
+  return [
+    { id: "supervisor", label: "요청 해석", status: stages[0].status, reworks: 0, durationMs: duration(times?.startedAt, supervisorAt) },
+    { id: "research", label: "리서치", status: stages[1].status, reworks: 0, durationMs: duration(supervisorAt, researchAt) },
+    { id: "plan_eval", label: "기획·평가", status: combined, reworks: stepEvents.filter(event => event.agent === "rework").length, durationMs: duration(researchAt, evaluationAt) },
+    ...stages.filter(stage => stage.id === "image").map(stage => ({ id: "image" as const, label: "시안", status: stage.status, reworks: 0, durationMs: duration(evaluationAt, imageAt) })),
+  ];
 }

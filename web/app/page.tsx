@@ -1,32 +1,73 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Chat } from "../components/Chat";
-import { SchemaView } from "../components/SchemaView";
+import { useEffect, useMemo, useState } from "react";
+import { brandNameMap, BrandNamesContext } from "../lib/brandNames";
+import { HistoryPage } from "../components/history/HistoryPage";
+import { OpenHistoryDetailContext, CommandTenantContext } from "../components/results/ResultsView";
+import { PlanPage } from "../components/plan/PlanPage";
+import { GraphPage } from "../components/graph/GraphPage";
+import { OpenGraphPathContext } from "../components/graph/context";
+import { AppShell } from "../components/shell/AppShell";
+import type { View } from "../components/shell/AppShell";
+import { EvidencePage } from "../components/evidence/EvidencePage";
+import { SavedPage } from "../components/saved/SavedPage";
+import { WorkspaceChip } from "../components/shell/WorkspaceChip";
 import { getWorkspaces } from "../lib/api";
+import { latestGraphIds } from "../lib/graph";
+import { SessionProvider, useSession } from "../lib/session";
 import type { WorkspacesResponse } from "../lib/types";
 
 export default function Page() {
+  return <SessionProvider><WorkspaceShell /></SessionProvider>;
+}
+
+function WorkspaceShell() {
   const [data, setData] = useState<WorkspacesResponse | null>(null);
   const [failed, setFailed] = useState(false);
-  const [tab, setTab] = useState<"chat" | "schema">("chat");
-  const [tenantId, setTenantId] = useState<string | null>(null);
+  const { state, selectWorkspace } = useSession();
   useEffect(() => {
     let active = true;
     getWorkspaces().then(value => { if (active) setData(value); }).catch(() => { if (active) setFailed(true); });
     return () => { active = false; };
   }, []);
-  return <main>
-    <header><h1>Beauty Ad Creative Agents</h1><p className="muted">뷰티 광고 기획 작업 공간</p></header>
-    <div role="tablist" aria-label="화면 선택" className="view-tabs">
-      <button type="button" role="tab" id="chat-tab" aria-selected={tab === "chat"} aria-controls="chat-view" onClick={() => setTab("chat")}>대화</button>
-      <button type="button" role="tab" id="schema-tab" aria-selected={tab === "schema"} aria-controls="schema-view" onClick={() => setTab("schema")}>전체 스키마</button>
-    </div>
-    {failed ? <p role="alert">API 서버에 연결하지 못했습니다. 서버가 실행 중인지 확인하세요.</p>
-      : data ? <>
-        <div role="tabpanel" id="chat-view" aria-labelledby="chat-tab" hidden={tab !== "chat"}><Chat workspaces={data.workspaces} imageEnabled={data.image_enabled} onWorkspaceChange={setTenantId} /></div>
-        <div role="tabpanel" id="schema-view" aria-labelledby="schema-tab" hidden={tab !== "schema"}>{tab === "schema" && (tenantId ? <SchemaView tenantId={tenantId} /> : <p>대화 탭에서 작업 공간을 선택하세요.</p>)}</div>
-      </>
-        : <p role="status">작업 공간 목록을 불러오는 중입니다.</p>}
-  </main>;
+  const brandNames = useMemo(() => brandNameMap(data?.workspaces ?? []), [data]);
+  return <BrandNamesContext.Provider value={brandNames}><AppShell workspace={<WorkspaceChip workspaces={data?.workspaces ?? []} value={state.tenantId} onChange={selectWorkspace} />}>
+    {(view, setView) => <WorkspaceContent view={view} setView={setView} data={data} failed={failed} />}
+  </AppShell></BrandNamesContext.Provider>;
+}
+
+function WorkspaceContent({ view, setView, data, failed }: {
+  view: View; setView: (view: View) => void; data: WorkspacesResponse | null; failed: boolean;
+}) {
+  const { state } = useSession();
+  const [selectedTurnId, setSelectedTurnId] = useState<number | null>(null);
+  const [historyOrigin, setHistoryOrigin] = useState<"plan" | null>(null);
+  const [graphTab, setGraphTab] = useState("schema");
+  const [graphPathIds, setGraphPathIds] = useState<string[] | null>(null);
+  const [graphOrigin, setGraphOrigin] = useState<"plan" | null>(null);
+  const [previousView, setPreviousView] = useState(view);
+  if (view !== previousView) {
+    setPreviousView(view);
+    if (view !== "history") setHistoryOrigin(null);
+    if (view !== "graph") setGraphOrigin(null);
+  }
+  return <CommandTenantContext.Provider value={state.tenantId}><OpenGraphPathContext.Provider value={ids => {
+      setGraphPathIds(ids); setGraphTab("path"); setGraphOrigin("plan"); setView("graph");
+    }}><OpenHistoryDetailContext.Provider value={commands => {
+      const turn = state.turns.find(turn => turn.commands === commands);
+      if (turn) { setSelectedTurnId(turn.id); setHistoryOrigin("plan"); setView("history"); }
+    }}>
+      {view === "evidence" && <EvidencePage key={state.tenantId} turns={state.turns} workspaceBrand={data?.workspaces.find(workspace => workspace.tenant_id === state.tenantId)?.brand ?? null} onPlan={() => setView("plan")} />}
+      {view === "history" && <HistoryPage workspaces={data?.workspaces ?? []} selectedTurnId={selectedTurnId}
+        onSelectTurn={id => { setSelectedTurnId(id); setHistoryOrigin(null); }} onPlan={() => setView("plan")}
+        origin={historyOrigin} onReturn={() => { setHistoryOrigin(null); setView("plan"); }} />}
+      {view === "saved" && <SavedPage tenantId={state.tenantId} onPlan={() => setView("plan")} />}
+      {failed ? <p role="alert">API 서버에 연결하지 못했습니다. 서버가 실행 중인지 확인하세요.</p>
+        : data ? <>
+          <div hidden={view !== "plan"}><PlanPage workspaces={data.workspaces} imageEnabled={data.image_enabled} /></div>
+          {view === "graph" && <GraphPage tenantId={state.tenantId} tab={graphTab} onTabChange={setGraphTab}
+            pathIds={graphPathIds ?? latestGraphIds(state.turns)} onPlan={() => setView("plan")}
+            origin={graphOrigin} onReturn={() => { setGraphOrigin(null); setView("plan"); }} />}
+        </> : (view === "plan" || view === "graph") && <p role="status">작업 공간 목록을 불러오는 중입니다.</p>}
+    </OpenHistoryDetailContext.Provider></OpenGraphPathContext.Provider></CommandTenantContext.Provider>;
 }

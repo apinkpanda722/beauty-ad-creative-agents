@@ -8,11 +8,45 @@ from fastapi.responses import JSONResponse
 from beautyads.analysis.prompts import CLAIM_DISPLAY_NAMES, axis_glossary
 from beautyads.api.session import resolve_tenant
 from beautyads.domain.labels import Claim
+from beautyads.graph.explore_queries import neighbors_parameters
 from beautyads.graph.fragment_queries import fragment_parameters
 from beautyads.graph.ontology_view import ONTOLOGY_LABELS, ONTOLOGY_RELATIONSHIPS
 
 
 def register_graph(app: FastAPI) -> None:
+    @app.get("/graph/overview")
+    async def overview(request: Request):
+        services = request.app.state.assembly
+        resolve_tenant(
+            request.headers.get("X-Tenant-Id"), allowed_tenants=services.allowed_tenants
+        )
+        if services.graph_overview is None:
+            raise HTTPException(503, "GRAPH_UNAVAILABLE")
+        try:
+            result = await asyncio.to_thread(services.graph_overview)
+            return JSONResponse(result)
+        except Exception:  # noqa: BLE001 -- graph errors and values never cross the HTTP boundary
+            raise HTTPException(500, "GRAPH_QUERY_FAILED") from None
+
+    @app.get("/graph/neighbors")
+    async def neighbors(request: Request):
+        services = request.app.state.assembly
+        resolve_tenant(
+            request.headers.get("X-Tenant-Id"), allowed_tenants=services.allowed_tenants
+        )
+        identifier = request.query_params.get("id", "")
+        try:
+            neighbors_parameters(identifier)
+        except ValueError:
+            raise HTTPException(422, "GRAPH_ID_INVALID") from None
+        if services.graph_neighbors is None:
+            raise HTTPException(503, "GRAPH_UNAVAILABLE")
+        try:
+            result = await asyncio.to_thread(services.graph_neighbors, identifier)
+            return JSONResponse(result)
+        except Exception:  # noqa: BLE001 -- graph errors and values never cross the HTTP boundary
+            raise HTTPException(500, "GRAPH_QUERY_FAILED") from None
+
     @app.get("/graph/fragment")
     async def fragment(request: Request):
         services = request.app.state.assembly

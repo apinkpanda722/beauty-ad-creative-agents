@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, postAsk } from "../lib/api";
+import { ApiError, getPlanImage, getSavedPlans, postAsk } from "../lib/api";
 import type { ClaimChoice } from "../lib/types";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -71,5 +71,38 @@ describe("postAsk", () => {
     const error = new DOMException("Aborted", "AbortError");
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(error));
     await expect(postAsk({ tenantId: "demo", message: "synthetic" })).rejects.toBe(error);
+  });
+});
+
+describe("saved plan API", () => {
+  it("returns the plans array and sends the workspace header", async () => {
+    const plans = [{ plan_id: "synthetic", title: "합성 기획", has_image: false }];
+    const fetch = fakeFetch(Response.json({ plans }));
+    expect(await getSavedPlans("workspace-a")).toEqual(plans);
+    expect(fetch).toHaveBeenCalledExactlyOnceWith("/api/plans", { headers: { "X-Tenant-Id": "workspace-a" } });
+  });
+  it("returns an empty list when plans is absent", async () => {
+    fakeFetch(Response.json({}));
+    expect(await getSavedPlans("workspace-a")).toEqual([]);
+  });
+  it("preserves the list error status and code", async () => {
+    fakeFetch(Response.json({ detail: "TENANT_INVALID" }, { status: 403 }));
+    const result = getSavedPlans("workspace-a");
+    await expect(result).rejects.toBeInstanceOf(ApiError);
+    await expect(result).rejects.toMatchObject({ status: 403, code: "TENANT_INVALID" });
+  });
+  it("returns image bytes as a Blob and encodes the complete plan ID", async () => {
+    const fetch = fakeFetch(new Response("synthetic image", { headers: { "Content-Type": "image/png" } }));
+    const blob = await getPlanImage("workspace-a", "synthetic/id ?#");
+    expect(blob).toBeInstanceOf(Blob);
+    expect(await blob.text()).toBe("synthetic image");
+    expect(blob.type).toBe("image/png");
+    expect(fetch).toHaveBeenCalledExactlyOnceWith("/api/plans/synthetic%2Fid%20%3F%23/image", { headers: { "X-Tenant-Id": "workspace-a" } });
+  });
+  it.each(["PLAN_NOT_FOUND", "DESIGN_NOT_FOUND"])("preserves image error %s", async code => {
+    const fetch = vi.fn().mockImplementation(() => Promise.resolve(Response.json({ detail: code }, { status: 404 })));
+    vi.stubGlobal("fetch", fetch);
+    await expect(getPlanImage("workspace-a", "synthetic")).rejects.toBeInstanceOf(ApiError);
+    await expect(getPlanImage("workspace-a", "synthetic")).rejects.toMatchObject({ status: 404, code });
   });
 });

@@ -24,14 +24,17 @@ export function ctaName(value: string): string {
   return Object.hasOwn(CTA_NAMES, value) ? CTA_NAMES[value as keyof typeof CTA_NAMES] : value;
 }
 export function taxonomyNames(schema?: SchemaResponse | null) {
+  const angleDisplayName = (value: string) => value === "desire" ? "이상형 제시형" : undefined;
   return {
     axisName(axis: keyof SchemaResponse["taxonomy"], value: string): string {
-      return schema?.taxonomy?.[axis]?.find(item => item.value === value)?.name ?? value;
+      return (axis === "angle" ? angleDisplayName(value) : undefined) ?? schema?.taxonomy?.[axis]?.find(item => item.value === value)?.name ?? value;
     },
     claimName(value: string): string {
       return schema?.claims?.find(item => item.value === value)?.name ?? value;
     },
     valueName(value: string): string {
+      const displayName = angleDisplayName(value);
+      if (displayName) return displayName;
       for (const axis of ["hook_type", "angle", "format"] as const) {
         const name = schema?.taxonomy?.[axis]?.find(item => item.value === value)?.name;
         if (name != null) return name;

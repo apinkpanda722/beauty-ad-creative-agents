@@ -33,30 +33,26 @@ def read(relative):
     return (ROOT / relative).read_text(encoding="utf-8")
 
 
-def chip_messages(source, workspace):
-    binding = re.search(rf'"{re.escape(workspace)}"\s*:\s*(\w+)', source)
-    assert binding, f"missing workspace: {workspace}"
-    array = re.search(
-        rf"const\s+{binding.group(1)}\s*=\s*\[(.*?)\];", source, re.DOTALL
+def test_confirmed_prompts_are_in_demo():
+    assert PROMPTS, "zero checked workspaces must fail"
+    for messages in PROMPTS.values():
+        assert messages, "zero checked messages must fail"
+        for message in messages:
+            assert message in read("DEMO.md")
+
+
+def test_web_source_has_no_preset_requests():
+    sources = sorted(
+        path
+        for directory in ("web/app", "web/components", "web/lib")
+        for path in (ROOT / directory).rglob("*")
+        if path.is_file() and path.suffix in {".ts", ".tsx", ".css"}
     )
-    assert array, f"missing chip array: {workspace}"
-    messages = re.findall(r'message:\s*"([^"]+)"', array.group(1))
-    assert messages, "B-FP-069: zero checked messages must fail"
-    return tuple(messages)
-
-
-@pytest.mark.parametrize("workspace", PROMPTS)
-def test_confirmed_prompts_match_workspace_chips(workspace):
-    messages = chip_messages(read("web/lib/examples.ts"), workspace)
-    assert messages == PROMPTS[workspace]
-    for message in messages:
-        assert message in read("DEMO.md")
-
-
-@pytest.mark.parametrize("source", ["", '"test-isntree": serum, const serum = [];'])
-def test_chip_check_rejects_empty_synthetic_input(source):
-    with pytest.raises(AssertionError):
-        chip_messages(source, "test-isntree")
+    assert sources, "zero checked source files must fail"
+    for path in sources:
+        source = path.read_text(encoding="utf-8")
+        for forbidden in ("examples", ".examples", "예시 요청"):
+            assert forbidden not in source, path.relative_to(ROOT)
 
 
 def test_demo_sections_scenes_and_normal_flow():
@@ -68,12 +64,35 @@ def test_demo_sections_scenes_and_normal_flow():
         assert forbidden not in demo
     rehearsal = demo.split("## 리허설 확인", 1)[1]
     checks = re.findall(r"^- \[ \] (.+)$", rehearsal, re.MULTILINE)
-    assert len(checks) == 16
+    assert len(checks) == 27
     assert all("결과 기록:" in check for check in checks)
     assert "사용자가 live로" in rehearsal
-    numbered = re.findall(r"^- .*?[①-⑯].*$", rehearsal, re.MULTILINE)
+    numbered = re.findall(r"^- .*?[①-⑳㉑-㉗].*$", rehearsal, re.MULTILINE)
     assert numbered == [f"- [ ] {check}" for check in checks]
-    assert [check[0] for check in checks] == list("①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯")
+    assert [check[0] for check in checks] == [chr(0x2460 + i) for i in range(20)] + [
+        chr(0x3251 + i) for i in range(7)
+    ]
+
+
+def test_ui_review_items_explain_each_field_and_leave_results_pending():
+    rehearsal = read("DEMO.md").split("## 리허설 확인", 1)[1]
+    assert "⑰~㉗은 7c UI 개편 확인이며 PR·병합 조건이 아니다" in rehearsal
+    items = re.findall(r"^- \[ \] ([⑰-⑳㉑-㉗] .+)$", rehearsal, re.MULTILINE)
+    assert len(items) == 11, "zero checked UI review items must fail"
+    assert [item[0] for item in items] == list("⑰⑱⑲⑳㉑㉒㉓㉔㉕㉖㉗")
+    for item in items:
+        assert re.match(r"[⑰-⑳㉑-㉗] \*\*.+:\*\*", item)
+        for element in ("뜻 —", "판정 —", "예시 —", "기록 방법 —"):
+            assert element in item
+        criteria = item.split("판정 —", 1)[1].split("예시 —", 1)[0]
+        assert "(1)" in criteria and "(2)" in criteria
+        fields = re.findall(r"\((\d+)\) ([^()]+)", criteria)
+        assert [int(number) for number, _ in fields] == list(range(1, len(fields) + 1))
+        for _, criterion in fields:
+            assert ":" in criterion and "O" in criterion and "X" in criterion
+        assert "칸 번호별 O/X와 한 줄 메모" in item
+        assert "결과 기록: ______" in item
+        assert "결과 기록: 2026-11-21 사용자 live 확인" not in item
 
 
 @pytest.mark.parametrize(

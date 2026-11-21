@@ -3,7 +3,6 @@
 import asyncio
 import re
 from datetime import UTC, datetime
-from hashlib import sha256
 from uuid import uuid4
 
 from fastapi import APIRouter, FastAPI, HTTPException, Request
@@ -11,7 +10,8 @@ from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from beautyads.agents.tools import get_tool
-from beautyads.api.ask_view import IMAGE_MIMES, build_view, image_reference, json_copy
+from beautyads.api.ask_view import build_view, image_reference, json_copy
+from beautyads.api.design_files import design_file
 from beautyads.api.feedback import feedback_for_prompt
 from beautyads.api.session import resolve_session, resolve_tenant
 from beautyads.api.sse import encode_event
@@ -224,24 +224,14 @@ def register_ask(app: FastAPI) -> None:
                 break
         if image is None:
             raise HTTPException(404, "DESIGN_NOT_FOUND")
-        directory = sha256(image["request_key"].encode("utf-8")).hexdigest()[:16]
-        root = services.design_dir.resolve()
-        composed = image.get("composed")
-        filename = (
-            f"{image['index']:02d}_composed.png"
-            if composed is not None
-            else f"{image['index']:02d}.{IMAGE_MIMES[image['mime']]}"
-        )
-        path = (root / directory / filename).resolve()
-        if not path.is_relative_to(root):
-            raise HTTPException(404, "DESIGN_NOT_FOUND")
+        path, mime = design_file(services.design_dir, image)
         try:
             content = path.read_bytes()
         except (OSError, ValueError):
             raise HTTPException(404, "DESIGN_NOT_FOUND") from None
         return Response(
             content,
-            media_type=composed["mime"] if composed is not None else image["mime"],
+            media_type=mime,
             headers={"Cache-Control": "no-store"},
         )
 

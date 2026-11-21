@@ -1,5 +1,7 @@
 import { parseSseStream } from "./sse";
-import type { ApiErrorBody, ClaimChoice, SseFrame } from "./types";
+import type { ApiErrorBody, ClaimChoice, GraphFragment, SavedPlan, SseFrame } from "./types";
+
+export type GraphExploreResponse = Pick<GraphFragment, "nodes" | "edges"> & { truncated: boolean };
 
 export class ApiError extends Error {
   constructor(public status: number, public code: string | null) {
@@ -114,6 +116,22 @@ export async function getDesignImage(tenantId: string, requestKey: string, index
   return response.blob();
 }
 
+export async function getSavedPlans(tenantId: string): Promise<SavedPlan[]> {
+  const response = await requireSuccess(await fetch("/api/plans", {
+    headers: { "X-Tenant-Id": tenantId },
+  }));
+  const body: { plans?: SavedPlan[] } = await response.json();
+  return body.plans ?? [];
+}
+
+export async function getPlanImage(tenantId: string, planId: string): Promise<Blob> {
+  const response = await requireSuccess(await fetch(
+    `/api/plans/${encodeURIComponent(planId)}/image`,
+    { headers: { "X-Tenant-Id": tenantId } },
+  ));
+  return response.blob();
+}
+
 export async function postFeedback(args: {
   tenantId: string; planId: string; decision: "approved" | "rejected"; reason: string;
 }): Promise<{ status: "ok" }> {
@@ -129,6 +147,21 @@ export async function getGraphFragment(tenantId: string, ids: string[]): Promise
   if (ids.length < 1 || ids.length > 30) throw new ApiError(422, "GRAPH_IDS_INVALID");
   const response = await requireSuccess(await fetch(
     `/api/graph/fragment?ids=${ids.map(id => encodeURIComponent(id)).join(",")}`,
+    { headers: { "X-Tenant-Id": tenantId } },
+  ));
+  return response.json();
+}
+
+export async function getGraphOverview(tenantId: string): Promise<GraphExploreResponse> {
+  const response = await requireSuccess(await fetch("/api/graph/overview", {
+    headers: { "X-Tenant-Id": tenantId },
+  }));
+  return response.json();
+}
+
+export async function getGraphNeighbors(tenantId: string, id: string): Promise<GraphExploreResponse> {
+  const response = await requireSuccess(await fetch(
+    `/api/graph/neighbors?id=${encodeURIComponent(id)}`,
     { headers: { "X-Tenant-Id": tenantId } },
   ));
   return response.json();

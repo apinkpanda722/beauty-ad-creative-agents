@@ -112,6 +112,18 @@ def _counts(counts):
     ]
 
 
+def _image_cost_usd(plans) -> float | None:
+    costs = []
+    for item in plans:
+        image = item.get("image") if isinstance(item, dict) else None
+        if not isinstance(image, dict) or image.get("ok") is not True:
+            continue
+        cost = image.get("cost_usd")
+        if type(cost) in (int, float) and math.isfinite(cost) and cost >= 0:
+            costs.append(float(cost))
+    return float(sum(costs)) if costs else None
+
+
 def build_view(result, *, plan_ids, hydrate) -> View:
     """Hydrate only IDs; aggregate values here already passed Supervisor checks.
 
@@ -298,6 +310,7 @@ def build_view(result, *, plan_ids, hydrate) -> View:
                     "label": "텍스트 모델 비용(이미지 제외)",
                     "text_spent_usd": float(spent),
                     "max_text_cost_usd": float(maximum),
+                    "image_cost_usd": _image_cost_usd(result.get("plans") or []),
                 },
             }
         )

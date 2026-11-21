@@ -762,3 +762,96 @@ def test_actual_neo4j_values_serialize_through_every_tool_boundary(tool, ctx):
         for key in ("published_at", "date", "time", "duration"):
             assert payload["rows"][0][key] == row[key].iso_format()
     assert graph.records[0]["published_at"] is published
+
+
+@pytest.mark.parametrize(
+    "counts, expected",
+    [
+        (
+            [
+                ("bold_claim", 1, 0),
+                ("other", 100, 100),
+                ("person_first", 2, 0),
+                ("problem", 3, 0),
+                ("product_first", 4, 0),
+                ("question", 9, 0),
+                ("ugc_style", 8, 0),
+            ],
+            ["question", "ugc_style", "product_first", "problem", "person_first"],
+        ),
+        (
+            [("other", 99, 99), ("question", 1, 0), ("problem", 2, 0)],
+            ["problem", "question", "other"],
+        ),
+        (
+            [("question", 3, 1), ("ugc_style", 3, 4), ("problem", 3, 4)],
+            ["problem", "ugc_style", "question"],
+        ),
+        (
+            [("question", "9", 0), ("problem", 0, "9"), ("ugc_style", 0, 2)],
+            ["ugc_style", "problem", "question"],
+        ),
+    ],
+)
+def test_band_tool_sorts_before_five_row_limit_without_mutating_inputs(
+    counts, expected, monkeypatch, ctx
+):
+    from beautyads.agents import tools
+
+    class Row:
+        def __init__(self, value, n_top, n_bottom):
+            self.data = {"value": value, "n_top": n_top, "n_bottom": n_bottom}
+
+        def model_dump(self):
+            return dict(self.data)
+
+    band_rows = [Row(*count) for count in counts]
+    bands = SimpleNamespace(rows=band_rows, summary="합성 표본 설명.")
+    records = [{"value": value, "views": i} for i, (value, _, _) in enumerate(counts)]
+    graph = FakeGraph(records)
+    snapshot = json.dumps([row.data for row in band_rows])
+    record_snapshot = json.dumps(records)
+    original_order = list(band_rows)
+
+    def fake_split(rows, *, mature_before):
+        assert rows == records
+        assert mature_before is not None
+        return bands
+
+    monkeypatch.setattr(tools, "split_top_bottom", fake_split)
+    output = run_tool(
+        "top_vs_bottom_axis", EVIDENCE_INPUTS["top_vs_bottom_axis"], ctx, graph
+    )
+    assert isinstance(output, ToolResult)
+    assert [row["value"] for row in output.top_rows] == expected
+    assert len(output.top_rows) == min(5, len(counts))
+    assert output.row_count == len(counts)
+    assert output.summary == (
+        f"조회 결과 {len(counts)}행. category_basis=creative_label: "
+        "모델 라벨 기준(E1 채점 전). 합성 표본 설명."
+    )
+    assert band_rows == original_order
+    assert json.dumps([row.data for row in band_rows]) == snapshot
+    assert json.dumps(graph.records) == record_snapshot
+    assert json.dumps(records) == record_snapshot
+
+
+def test_axis_count_tool_retains_graph_order_and_inputs(ctx):
+    records = [
+        {"value": "other", "creatives": 1},
+        {"value": "question", "creatives": 9},
+        {"value": "problem", "creatives": 4},
+    ]
+    snapshot = json.dumps(records)
+    graph = FakeGraph(records)
+    output = run_tool(
+        "compare_axis_by_category",
+        EVIDENCE_INPUTS["compare_axis_by_category"],
+        ctx,
+        graph,
+    )
+    assert isinstance(output, ToolResult)
+    assert output.top_rows == records
+    assert output.row_count == 3
+    assert json.dumps(graph.records) == snapshot
+    assert json.dumps(records) == snapshot

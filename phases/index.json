@@ -54,6 +54,12 @@
       "dir": "7d-quality-fixes",
       "status": "completed",
       "completed_at": "2026-11-21T13:30:50+0900"
+    },
+    {
+      "dir": "7c-ui-redesign",
+      "status": "completed",
+      "blocked_at": "2026-11-22T00:02:50+0900",
+      "completed_at": "2026-11-22T00:52:19+0900"
     }
   ]
 }

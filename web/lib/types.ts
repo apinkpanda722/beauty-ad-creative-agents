@@ -111,7 +111,7 @@ export type UiCommand =
     }
   | {
       kind: "show_cost";
-      data: { label: string; text_spent_usd: number; max_text_cost_usd: number };
+      data: { label: string; text_spent_usd: number; max_text_cost_usd: number; image_cost_usd?: number | null };
     };
 
 export type SseFrame =
@@ -185,4 +185,15 @@ export type GraphFragment = {
   nodes: GraphNode[];
   edges: { source: string; target: string; type: string }[];
   missing: string[];
+};
+
+// api/plans.py projects only present plan fields and adds approval metadata.
+export type SavedPlan = Partial<Pick<Plan,
+  "title" | "hook_text" | "hook_type" | "angle" | "format" | "claimed_efficacy"
+  | "scenes" | "copy_lines" | "evidence_ids"
+>> & {
+  plan_id: string;
+  has_image: boolean;
+  decided_at: string;
+  reason: string;
 };
