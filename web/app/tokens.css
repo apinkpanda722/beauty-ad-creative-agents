@@ -38,4 +38,5 @@
   --gs-text-lg: 20px;
   --gs-text-xl: 24px;
   --gs-text-2xl: 32px;
+  --gs-motion-accordion: 240ms;
 }

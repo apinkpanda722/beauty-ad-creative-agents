@@ -35,7 +35,7 @@ export function ResultsView({ commands, onOpenGraph }: { commands: UiCommand[]; 
   // Anchors are turn-local so repeated evidence in another turn cannot hijack links.
   return <>
 
-    {plans.map((command, i) => <PlanResult key={`plan-${i}-${command.data.plan_id ?? "unsaved"}`} data={command.data} names={names} tenantId={tenantId} evidenceAnchors={anchors} cost={i === 0 ? cost : undefined} />)}
+    {plans.map((command, i) => <PlanResult key={`plan-${i}-${command.data.plan_id ?? "unsaved"}`} data={command.data} names={names} tenantId={tenantId} evidenceAnchors={anchors} evidenceCards={cards} cost={i === 0 ? cost : undefined} />)}
     <EvidenceSummary data={{ cards, missing: evidence.reduce((total, command) => total + command.data.missing, 0) }} names={names} anchors={anchors} workspaceBrand={workspaceBrand} />
     {onOpenGraph && commands.filter(command => command.kind === "show_graph_fragment").map((command, i) => <Button variant="secondary" key={`graph-${i}`} onClick={() => onOpenGraph(command.data.evidence_ids)}>근거 그래프 보기</Button>)}
     {commands.filter(command => command.kind === "show_distribution").map((command, i) => <DistributionChart key={`distribution-${i}`} data={command.data} names={names} />)}

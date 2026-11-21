@@ -7,7 +7,19 @@ import { publishedDate } from "../../lib/format";
 import type { EvidenceCard } from "../../lib/types";
 import { ctaName, talentName, taxonomyNames, type TaxonomyNames } from "../../lib/taxonomy";
 import { Badge, Card } from "../ui";
+import { displayValue } from "../../lib/localize";
 import "../../app/evidence.css";
+
+export function EvidenceChip({ id, card }: { id: string; card?: EvidenceCard }) {
+  const [failed, setFailed] = useState(false);
+  const youtubeId = id.match(/^youtube:([A-Za-z0-9_-]{1,64})$/)?.[1];
+  const source = card?.source ?? id.split(":", 1)[0];
+  return <span className="gs-evidence-chip">
+    {youtubeId && !failed ? <img src={`https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg`} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} />
+      : <span className="gs-platform-tile" aria-hidden="true"><span className="gs-platform-monogram">{source?.slice(0, 1).toUpperCase() || "?"}</span></span>}
+    <span>{card?.brand ?? "브랜드 정보 없음"}</span>
+  </span>;
+}
 
 export function EvidenceCardView({ card, anchor, names = taxonomyNames(), workspaceBrand }: {
   card: EvidenceCard; anchor: string; names?: TaxonomyNames; workspaceBrand?: string | null;
@@ -16,14 +28,14 @@ export function EvidenceCardView({ card, anchor, names = taxonomyNames(), worksp
   const id = card.source === "youtube" ? card.evidence_id?.match(/^youtube:([A-Za-z0-9_-]{1,64})$/)?.[1] : null;
   const thumbnail = id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : null;
   const href = safeLink(card.url);
-  const hook = card.hook_type ? names.axisName("hook_type", card.hook_type) : null;
+  const hook = card.hook_type ? displayValue(names.axisName("hook_type", card.hook_type), names) : null;
   const badges = [
     card.angle ? names.axisName("angle", card.angle) : null,
     card.format ? names.axisName("format", card.format) : null,
     card.talent ? talentName(card.talent) : null,
     card.cta_type ? ctaName(card.cta_type) : null,
     ...(card.claims ?? []).map(names.claimName),
-  ].filter((value): value is string => value !== null);
+  ].filter((value): value is string => value !== null).map(value => displayValue(value, names));
   const title = card.title ?? card.evidence_id ?? "제목 정보 없음";
   const label = platformLabel(card.source);
   return <article className="gs-evidence-card" id={anchor} tabIndex={-1}>

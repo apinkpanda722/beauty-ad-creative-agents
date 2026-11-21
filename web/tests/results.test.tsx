@@ -1,4 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
 import { PlanPage } from "../components/plan/PlanPage";
 import { EvidencePage } from "../components/evidence/EvidencePage";
@@ -221,9 +223,9 @@ it.each(["approved", "rejected"] as const)("validates reasons and submits exact 
   let resolve!: (r: Response) => void;
   const fetch = vi.fn().mockImplementation(() => new Promise<Response>(r => { resolve = r; })); vi.stubGlobal("fetch", fetch);
   render(<FeedbackBar tenantId="synthetic" planId="synthetic-plan" />);
-  expect((screen.getByRole("button", { name: "반려" }) as HTMLButtonElement).disabled).toBe(true);
-  if (decision === "rejected") fireEvent.change(screen.getByLabelText("피드백 사유"), { target: { value: "합성 사유" } });
-  const button = screen.getByRole("button", { name: decision === "approved" ? "승인" : "반려" });
+  expect((screen.getByRole("button", { name: "반려" }) as HTMLButtonElement).disabled).toBe(false);
+  if (decision === "rejected") { fireEvent.click(screen.getByRole("button", { name: "반려" })); fireEvent.change(screen.getByLabelText("피드백 사유"), { target: { value: "합성 사유" } }); }
+  const button = screen.getByRole("button", { name: decision === "approved" ? "승인" : "반려 제출" });
   fireEvent.click(button); fireEvent.click(button);
   expect(fetch).toHaveBeenCalledTimes(1);
   expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ plan_id: "synthetic-plan", decision, reason: decision === "approved" ? "" : "합성 사유" });
@@ -504,4 +506,152 @@ it.each([false, true])("uses only the first show_cost command with plan=%s", sho
   expect(screen.getAllByText(restoredCapText)).toHaveLength(1);
   expect(screen.queryByText(/합성 후속 비용/)).toBeNull();
   expect(screen.queryByText("텍스트 비용 상한 $2.0000")).toBeNull();
+});
+
+it("reveals rejection reasons on demand and never stores blank or whitespace-only rejections", async () => {
+  const fetch = vi.fn().mockResolvedValue(new Response('{"status":"ok"}')); vi.stubGlobal("fetch", fetch);
+  render(<FeedbackBar tenantId="synthetic" planId="synthetic-plan" />);
+  const input = screen.getByLabelText("피드백 사유") as HTMLInputElement;
+  expect(input.tagName).toBe("INPUT"); expect(input.hidden).toBe(true);
+  const reject = screen.getByRole("button", { name: "반려" }) as HTMLButtonElement;
+  expect(reject.disabled).toBe(false); fireEvent.click(reject);
+  expect(input.hidden).toBe(false);
+  const submit = screen.getByRole("button", { name: "반려 제출" }) as HTMLButtonElement;
+  expect(submit.disabled).toBe(true); fireEvent.click(submit); expect(fetch).toHaveBeenCalledTimes(0);
+  fireEvent.change(input, { target: { value: "   " } });
+  expect(submit.disabled).toBe(true); fireEvent.click(submit); expect(fetch).toHaveBeenCalledTimes(0);
+  fireEvent.click(screen.getByRole("button", { name: "취소" })); expect(input.hidden).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "반려" }));
+  fireEvent.change(input, { target: { value: "합성 반려 사유" } });
+  expect(submit.disabled).toBe(false);
+  fireEvent.click(screen.getByRole("button", { name: "반려 제출" }));
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ plan_id: "synthetic-plan", reason: "합성 반려 사유", decision: "rejected" });
+  expect(await screen.findByText("저장했습니다")).toBeTruthy();
+});
+it("uses the image's natural aspect ratio without cropping and resets to a placeholder on failure", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(new Blob(["synthetic"]))));
+  vi.stubGlobal("URL", Object.assign(class extends URL {}, { createObjectURL: () => "blob:synthetic", revokeObjectURL: vi.fn() }));
+  const { container } = render(<PlanResult data={{ ...plan, image }} tenantId="synthetic" />);
+  const media = container.querySelector<HTMLElement>(".gs-plan-media")!;
+  expect(media.style.aspectRatio).toBe("1 / 1");
+  const img = await screen.findByRole("img");
+  Object.defineProperties(img, { naturalWidth: { value: 800 }, naturalHeight: { value: 1200 } }); fireEvent.load(img);
+  const [width, height = 1] = media.style.aspectRatio.split("/").map(Number);
+  expect(width / height).toBeCloseTo(2 / 3);
+  expect(img.style.objectFit).not.toBe("cover");
+  const css = readFileSync(join(process.cwd(), "app/results.css"), "utf8");
+  expect(css).toMatch(/object-fit:\s*contain/); expect(css).not.toMatch(/object-fit:\s*cover/);
+  expect(css).toMatch(/align-items:\s*start/); expect(css).not.toContain("position: sticky");
+  fireEvent.error(img); expect(media.style.aspectRatio).toBe("1 / 1");
+});
+it("shows Korean brand, review reasons with a tooltip and the original check details", () => {
+  const { container, rerender } = render(<PlanResult data={{ ...plan, product_display: { brand: "beauty_of_joseon", display_name: "조선미녀 평가 작업 공간", product_name: "합성 제품" }, unknown_count: 4, unknown_codes: { EFFICACY_UNKNOWN: 1, CERT_REQUIRED_UNVERIFIED: 3 } }} tenantId={null} />);
+  const summary = container.querySelector(".gs-plan-summary")!;
+  expect(summary.querySelector("header small")!.textContent).toBe("기획안 · 조선미녀 · 합성 제품");
+  expect(summary.textContent).not.toMatch(/beauty_of_joseon|작업 공간/);
+  const badge = within(summary as HTMLElement).getByText("확인 필요 4건 · 인증 자료 연결 없음 · 효능 근거 연결 없음");
+  const explanation = "코드 검사가 확인하지 못한 항목의 수입니다. 실패가 아니라 근거가 연결되지 않아 확인이 필요한 항목입니다.";
+  expect(badge.title).toBe(explanation);
+  expect(document.getElementById(badge.getAttribute("aria-describedby")!)!.textContent).toBe(explanation);
+  expect(screen.getByRole("tooltip", { hidden: true }).textContent).toBe(explanation);
+  const checks = container.querySelector('[aria-label="검사 결과"]') as HTMLElement;
+  expect(within(checks).getByText("근거 연결 없음 4건")).toBeTruthy();
+  expect(within(checks).getByText("인증 연결 없음").tagName).toBe("LI");
+  rerender(<PlanResult data={plan} tenantId={null} />);
+  expect(screen.getByText("확인 필요 0건")).toBeTruthy();
+  expect(container.querySelector("header small")!.textContent).toBe("기획안 · 브랜드 정보 없음");
+});
+it("opens in the next frame and waits for a grid transition before hiding", () => {
+  let frame!: FrameRequestCallback;
+  vi.stubGlobal("requestAnimationFrame", vi.fn(callback => { frame = callback; return 1; }));
+  vi.stubGlobal("cancelAnimationFrame", vi.fn());
+  const { container } = render(<PlanResult data={plan} tenantId={null} />);
+  const expanded = container.querySelector<HTMLElement>(".gs-plan-expanded")!;
+  const toggle = screen.getByRole("button", { name: "전체 보기 →" });
+  fireEvent.click(toggle); expect(expanded.hidden).toBe(false); expect(expanded.classList.contains("gs-open")).toBe(false);
+  act(() => frame(0)); expect(expanded.classList.contains("gs-open")).toBe(true);
+  vi.spyOn(window, "getComputedStyle").mockReturnValue({ transitionDuration: "0.2s", transitionDelay: "0s" } as CSSStyleDeclaration);
+  fireEvent.click(toggle); expect(expanded.classList.contains("gs-open")).toBe(false); expect(expanded.hidden).toBe(false);
+  fireEvent.transitionEnd(expanded.parentElement!, { propertyName: "grid-template-rows" }); expect(expanded.hidden).toBe(true);
+});
+it.each([false, true])("hides synchronously for zero duration or reduced motion=%s", reduced => {
+  vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: reduced })));
+  const computedStyle = window.getComputedStyle;
+  vi.spyOn(window, "getComputedStyle").mockImplementation((...args) => {
+    const style = computedStyle(...args);
+    Object.defineProperties(style, { transitionDuration: { configurable: true, value: reduced ? "0.2s" : "0ms" }, transitionDelay: { configurable: true, value: "0s" } });
+    return style;
+  });
+  const { container } = render(<PlanResult data={plan} tenantId={null} />);
+  const expanded = container.querySelector<HTMLElement>(".gs-plan-expanded")!;
+  const toggle = screen.getByRole("button", { name: "전체 보기 →" });
+  fireEvent.click(toggle); expect(expanded.hidden).toBe(false);
+  fireEvent.click(toggle); expect(expanded.hidden).toBe(true);
+  const css = readFileSync(join(process.cwd(), "app/results.css"), "utf8");
+  expect(css).toMatch(/grid-template-rows:\s*0fr/); expect(css).toMatch(/grid-template-rows:\s*1fr/);
+  expect(css).toMatch(/transition:\s*grid-template-rows/);
+  expect(css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"))).toMatch(/transition:\s*none/);
+});
+it("cards each detail section, numbers scenes, quotes copies and tabulates neutral pattern facts", () => {
+  const { container } = render(<PlanResult data={plan} tenantId={null} />); expandAll();
+  const expanded = container.querySelector(".gs-plan-expanded")!;
+  for (const section of expanded.querySelectorAll(":scope > section")) expect(section.classList.contains("gs-detail-card")).toBe(true);
+  expect(screen.getByRole("region", { name: "장면 구성" }).querySelector("ol li")!.textContent).toBe("합성 장면");
+  expect(screen.getByText("합성 카피").tagName).toBe("BLOCKQUOTE");
+  const table = within(screen.getByRole("region", { name: "경쟁사 패턴 반영" })).getByRole("table");
+  expect(within(table).getAllByRole("columnheader").map(node => node.textContent)).toEqual(["축", "기획안", "지배 패턴", "같음/다름", "점유율"]);
+  for (const text of ["같음", "다름", "비교 불가", "점유율 비교 불가"]) expect(within(table).getAllByText(text).every(node => node.textContent === text)).toBe(true);
+  expect(within(table).getByText("25.0%")).toBeTruthy();
+});
+it("keeps evidence link names and anchors while displaying thumbnail chips with brand text", () => {
+  render(<ResultsView commands={[{ kind: "show_plan", data: plan }, { kind: "show_evidence_cards", data: { cards: [card], missing: 0 } }]} />); expandAll();
+  const evidence = screen.getByRole("region", { name: "기획안 근거" });
+  const link = within(evidence).getByRole("link", { name: card.evidence_id! });
+  expect(link.textContent).not.toContain("youtube:"); expect(link.textContent).toContain(card.brand);
+  const img = link.querySelector("img")!; expect(img.src).toBe("https://i.ytimg.com/vi/abc_123-/hqdefault.jpg");
+  expect(document.getElementById(link.getAttribute("href")!.slice(1))).toBeTruthy();
+  fireEvent.error(img); expect(link.querySelector("img")).toBeNull(); expect(link.querySelector(".gs-platform-monogram")).toBeTruthy();
+  expect(within(evidence).getByText("근거 소재 2")).toBeTruthy();
+  expect(evidence.textContent).not.toContain("youtube:");
+});
+it("styles disclaimer, image notice and the unmodified cost lines as one footnote block", () => {
+  const { container } = render(<PlanResult data={{ ...plan, design_disclaimer: "합성 고지" }} tenantId={null} cost={restoredCost.data} />);
+  const expanded = container.querySelector(".gs-plan-expanded")!;
+  expect(expanded.children[7].textContent).toBe(plan.disclaimer);
+  for (const node of Array.from(expanded.children).slice(7)) expect(node.classList.contains("gs-footnote")).toBe(true);
+  expect(Array.from(expanded.children).slice(7).map(node => node.textContent)).toEqual([plan.disclaimer, "합성 고지", restoredCostText, restoredCapText]);
+});
+it("localizes rationale only when displaying it, preserving numeric scores and the input object", () => {
+  const scores = { differentiation: 3, fit: 4, rationale: "how_to 대비 differentiation, fit. profit youtube:how_to" };
+  const data = { ...plan, attempts: [{ attempt: 1, checks_passed: true, scores }] };
+  const snapshot = JSON.stringify(data);
+  render(<PlanResult data={data} tenantId={null} names={names} />); expandAll();
+  expect(screen.getByText("품질 검사 통과 · 평가 차별성 3/5, 요청 적합성 4/5")).toBeTruthy();
+  expect(screen.getByText("차별성 (differentiation): 3")).toBeTruthy(); expect(screen.getByText("요청 적합성 (fit): 4")).toBeTruthy();
+  const rationale = screen.getByText("사유: 합성 소구 대비 차별성, 요청 적합성. profit youtube:how_to");
+  expect(rationale.tagName).toBe("P"); expect(screen.queryByText(/^rationale:/)).toBeNull();
+  expect(JSON.stringify(data)).toBe(snapshot);
+});
+it("summarizes only the latest attempt with absent scores omitted and failed checks explicit", () => {
+  const { rerender } = render(<PlanResult data={{ ...plan, attempts: [...plan.attempts, { attempt: 2, checks_passed: false, scores: null }] }} tenantId={null} />);
+  expect(screen.getByText("품질 검사 실패")).toBeTruthy();
+  rerender(<PlanResult data={{ ...plan, attempts: [] }} tenantId={null} />);
+  expect(screen.getByText("품질 검사 통과")).toBeTruthy();
+  rerender(<PlanResult data={{ ...plan, attempts: [{ attempt: 1, checks_passed: true, scores: { fit: 5 } }] }} tenantId={null} />);
+  expect(screen.getByText("품질 검사 통과 · 평가 요청 적합성 5/5")).toBeTruthy();
+});
+it("renders market insights with Korean titles and columns, without tool captions, and retains meter names", () => {
+  const { rerender } = render(<DistributionChart data={{ tool: "top_vs_bottom_axis", rows: [{ value: "question", n_top: 3, n_bottom: 1 }] }} names={names} />);
+  const region = screen.getByRole("region", { name: "분포" });
+  expect(region.getAttribute("data-tool")).toBe("top_vs_bottom_axis");
+  expect(within(region).getByRole("heading").textContent).toBe("상위 vs 하위 광고 비교");
+  expect(within(region).getAllByRole("columnheader").map(node => node.textContent)).toEqual(["분류", "상위 25%", "하위 25%"]);
+  expect(region.querySelector("caption")).toBeNull(); expect(region.textContent).not.toContain("top_vs_bottom_axis");
+  rerender(<DistributionChart data={{ tool: "compare_axis_by_category", rows: [{ value: "question", creatives: 3 }, { value: "other", creatives: 1 }] }} names={names} />);
+  expect(within(region).getByRole("heading").textContent).toBe("오프닝 방식 분포");
+  expect(within(region).getByText("기타")).toBeTruthy(); expect(within(region).getByRole("meter", { name: "other" })).toBeTruthy();
+  expect(within(region).getAllByRole("meter")).toHaveLength(2);
+  const css = readFileSync(join(process.cwd(), "app/results.css"), "utf8");
+  expect(css).toMatch(/accent-color:\s*var\(--gs-accent\)/);
 });
