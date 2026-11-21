@@ -61,6 +61,7 @@ from beautyads.graph.fragment_queries import (
 from beautyads.llm.chat import chat_complete
 from beautyads.llm.image import generate_image
 from beautyads.llm.structured import make_structured
+from beautyads.obs.langfuse_io import Capture, RequestIO, to_text
 from beautyads.obs.langfuse_sink import export_trace
 from beautyads.obs.ledger import CostCapExceeded, ledger_total, read_entries
 from beautyads.obs.trace import append_trace, build_trace
@@ -101,11 +102,25 @@ async def _close_saver(saver):
         raise RuntimeError("ASSEMBLY_CLOSE_FAILED") from None
 
 
+def _capture(captures, purpose, incoming, outgoing):
+    """Capture only selected bodies in memory; instrumentation cannot fail a call."""
+    try:
+        ended_at = datetime.now(UTC)
+        if hasattr(outgoing, "model_dump"):
+            outgoing = outgoing.model_dump(mode="json")
+        captures.append(
+            Capture(purpose, ended_at, to_text(incoming), to_text(outgoing))
+        )
+    except Exception:  # noqa: BLE001, S110 -- capture diagnostics may contain secrets
+        pass
+
+
 class _ConfiguredStructured:
-    def __init__(self, inner, options, guard):
+    def __init__(self, inner, options, guard, capture=None):
         self.inner, self.options, self.guard = inner, options, guard
         self.model = inner.model
         self.last_cost = None
+        self.capture = capture
 
     @property
     def stats(self):
@@ -120,6 +135,13 @@ class _ConfiguredStructured:
         except Exception:  # noqa: BLE001 -- model errors never cross assembly with raw diagnostics
             raise RuntimeError("ASSEMBLY_MODEL_FAILED") from None
         self.last_cost = result.cost_usd
+        if self.capture is not None:
+            _capture(
+                self.capture,
+                options.get("purpose", ""),
+                options.get("messages"),
+                result.value,
+            )
         return result
 
 
@@ -232,9 +254,9 @@ async def assemble_full(
                     "max_tokens": 4096,
                 }
 
-            def chat(**options):
+            def chat(*, capture=None, **options):
                 try:
-                    return model_calls["chat"](
+                    result = model_calls["chat"](
                         **{
                             "purpose": "agent-skeleton",
                             **options,
@@ -245,6 +267,26 @@ async def assemble_full(
                     raise
                 except Exception:  # noqa: BLE001 -- no model/credential diagnostics in public errors
                     raise RuntimeError("ASSEMBLY_MODEL_FAILED") from None
+                if capture is not None:
+                    try:
+                        _capture(
+                            capture,
+                            options.get("purpose", "agent-skeleton"),
+                            options.get("messages"),
+                            {
+                                "text": result.text,
+                                "tool_calls": [
+                                    {
+                                        "name": call.name,
+                                        "arguments": to_text(call.arguments),
+                                    }
+                                    for call in result.tool_calls
+                                ],
+                            },
+                        )
+                    except Exception:  # noqa: BLE001, S110 -- malformed optional capture cannot affect chat
+                        pass
+                return result
 
             def graph_fragment(ids):
                 params = fragment_parameters(ids)
@@ -330,6 +372,12 @@ async def assemble_full(
                 started_at, started = datetime.now(UTC), monotonic()
                 generators = []
                 result, failure = None, None
+                captures = (
+                    []
+                    if observation_settings is not None
+                    and observation_settings.capture_io
+                    else None
+                )
                 try:
                     before = ledger_total(
                         settings.ledger_path, exclude_purpose_prefix="image"
@@ -349,7 +397,10 @@ async def assemble_full(
 
                     def structured(model):
                         generator = _ConfiguredStructured(
-                            model_calls["structured"](model), call_options(model), guard
+                            model_calls["structured"](model),
+                            call_options(model),
+                            guard,
+                            **({"capture": captures} if captures is not None else {}),
                         )
                         generators.append(generator)
                         return generator
@@ -368,6 +419,8 @@ async def assemble_full(
 
                     def research_chat(**options):
                         guard()
+                        if captures is not None:
+                            return chat(**options, capture=captures)
                         return chat(**options)
 
                     def research_fn(brief, raw_store, context_mode="on"):
@@ -429,8 +482,9 @@ async def assemble_full(
                         def image_fn(plan):
                             nonlocal image_index
                             try:
+                                prompt = image_prompt(Plan.model_validate(plan))
                                 outcome = model_calls["image"](
-                                    prompt=image_prompt(Plan.model_validate(plan)),
+                                    prompt=prompt,
                                     ledger_path=settings.ledger_path,
                                     caps=caps,
                                     purpose_caps=purpose_caps,
@@ -452,6 +506,16 @@ async def assemble_full(
                                 }
                             except Exception:  # noqa: BLE001 -- no image diagnostics or signatures
                                 return {"ok": False, "code": "IMAGE_FAILED"}
+                            if captures is not None:
+                                try:
+                                    _capture(
+                                        captures,
+                                        "image-plan",
+                                        prompt,
+                                        {"mime": outcome.mime, "size": outcome.size},
+                                    )
+                                except Exception:  # noqa: BLE001, S110 -- never inspect image bytes for observation
+                                    pass
                             if not outcome.ok:
                                 return {"ok": False, "code": "IMAGE_FAILED"}
                             index = image_index
@@ -603,10 +667,19 @@ async def assemble_full(
                             record,
                         )
                         if observation_settings is not None:
+                            io = (
+                                RequestIO(
+                                    message, claim_choice, result, tuple(captures)
+                                )
+                                if captures is not None
+                                else None
+                            )
 
                             def send_trace():
                                 try:
-                                    export_trace(record, settings=observation_settings)
+                                    export_trace(
+                                        record, settings=observation_settings, io=io
+                                    )
                                 except Exception:  # noqa: BLE001, S110 -- observation must never leak diagnostics
                                     pass
 

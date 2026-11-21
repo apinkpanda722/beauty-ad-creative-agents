@@ -588,3 +588,162 @@ def test_check_readback_rejects_empty_expectations():
     from beautyads.obs.langfuse_check import _readback_matches
 
     assert _readback_matches({"observations": []}, []) is False
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    [(None, True), ("", True), (" \t", True), ("1", True), ("0", False)],
+)
+def test_io_setting_defaults_and_switch(value, expected):
+    env = {"LANGFUSE_PUBLIC_KEY": "synthetic", "LANGFUSE_SECRET_KEY": "synthetic"}
+    if value is not None:
+        env["BEAUTYADS_LANGFUSE_IO"] = value
+    assert langfuse_settings(environ=env, env_file=None).capture_io is expected
+
+
+@pytest.mark.parametrize("value", ["true", "false", "2", "SYNTHETIC_PRIVATE_SETTING"])
+def test_invalid_io_setting_never_exposes_value(value):
+    from beautyads.settings import InvalidSetting
+
+    env = {
+        "LANGFUSE_PUBLIC_KEY": "synthetic",
+        "LANGFUSE_SECRET_KEY": "synthetic",
+        "BEAUTYADS_LANGFUSE_IO": value,
+    }
+    with pytest.raises(InvalidSetting) as caught:
+        langfuse_settings(environ=env, env_file=None)
+    assert str(caught.value) == "BEAUTYADS_LANGFUSE_IO"
+    assert value not in str(caught.value)
+    assert (
+        langfuse_settings(environ={"BEAUTYADS_LANGFUSE_IO": value}, env_file=None)
+        is None
+    )
+
+
+def io_batch(record, io, settings):
+    client = FakeClient()
+    assert export_trace(
+        record, settings=settings, io=io, client_factory=lambda **kw: client
+    )
+    return [
+        event.dict(by_alias=True, exclude_unset=True)["body"]
+        for event in client.calls[0]
+    ]
+
+
+def test_none_or_disabled_io_preserves_exact_previous_batch():
+    from test_langfuse_io import synthetic_io
+
+    record = timeline_record()
+    baseline = io_batch(record, None, configured())
+    assert all("input" not in body and "output" not in body for body in baseline)
+    assert (
+        io_batch(
+            record,
+            synthetic_io(),
+            configured().model_copy(update={"capture_io": False}),
+        )
+        == baseline
+    )
+    assert build_timeline(record, None) == build_timeline(record)
+
+
+def test_enabled_io_sanitizes_root_stages_generations_and_keys():
+    from dataclasses import replace
+
+    from test_langfuse_io import synthetic_io
+
+    from beautyads.obs.langfuse_io import Capture
+
+    record = timeline_record()
+    secret = "sk-" + "synthetic_" * 3
+    payload = secret + " 한국어 " + "가" * 4100
+    io = replace(
+        synthetic_io(),
+        message=payload,
+        captures=tuple(
+            Capture(call.purpose, call.ended_at, payload, payload)
+            for call in record.calls
+        ),
+    )
+    io.result["plans"][0]["plan"]["title"] = payload
+    # Also sanitize dictionary keys in model-authored data.
+    io.result["plans"][0]["plan"]["copy_lines"] = ["data:image/png;base64,c3ludGhldGlj"]
+    bodies = io_batch(record, io, configured())
+    assert bodies[0]["input"]["요청"].startswith("[가림] 한국어")
+    spans = {
+        body["name"]: body
+        for body in bodies[1:]
+        if body["name"]
+        in {
+            "ask",
+            "supervisor",
+            "research",
+            "planning #1",
+            "planning #2",
+            "evaluation #1",
+            "evaluation #2",
+            "image",
+        }
+    }
+    assert "input" in spans["ask"] and "output" in spans["ask"]
+    assert "output" in spans["supervisor"] and "output" in spans["research"]
+    assert "output" not in spans["planning #1"]
+    assert "output" in spans["planning #2"] and "output" in spans["evaluation #1"]
+    assert "input" in spans["image"]
+    generations = [body for body in bodies if "model" in body]
+    assert len(generations) == len(record.calls)
+    assert all(
+        body["input"].startswith("[가림]") and body["output"].endswith("(생략됨)")
+        for body in generations
+    )
+
+    def strings(value):
+        if isinstance(value, str):
+            yield value
+        elif isinstance(value, dict):
+            for key, item in value.items():
+                yield key
+                yield from strings(item)
+        elif isinstance(value, list):
+            for item in value:
+                yield from strings(item)
+
+    assert all(len(text) <= 4000 for text in strings(bodies))
+    serialized = json.dumps(bodies, default=str, ensure_ascii=False)
+    assert secret not in serialized and "c3ludGhldGlj" not in serialized
+    assert "rationale" not in json.dumps(spans, default=str)
+
+
+def test_io_export_failure_never_emits_diagnostics(capsys, caplog):
+    from test_langfuse_io import synthetic_io
+
+    assert (
+        export_trace(
+            timeline_record(),
+            settings=configured(),
+            io=synthetic_io(),
+            client_factory=lambda **kw: FakeClient(fail=True),
+        )
+        is False
+    )
+    assert PRIVATE not in caplog.text + str(capsys.readouterr())
+
+
+def test_io_sanitizes_even_metadata_strings_and_leaves_unmatched_calls_empty():
+    from dataclasses import replace
+
+    from test_langfuse_io import synthetic_io
+
+    from beautyads.obs.langfuse_io import Capture
+
+    record = timeline_record()
+    secret = "sk-" + "synthetic_" * 3
+    record.tenant_id = secret
+    record.calls[0].model = secret
+    io = replace(synthetic_io(), captures=(Capture("evaluate", at(6), secret, secret),))
+    bodies = io_batch(record, io, configured())
+    assert secret not in json.dumps(bodies, default=str)
+    generations = [body for body in bodies if "model" in body]
+    assert [body["name"] for body in generations if "input" in body] == ["evaluate"]
+    assert sum("input" not in body for body in generations) == len(record.calls) - 1

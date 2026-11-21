@@ -1,4 +1,4 @@
-"""Optional metadata-only export of completed JSONL traces via public ingestion."""
+"""Optional export of local trace metadata with ephemeral, sanitized IO."""
 
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal, TypedDict
@@ -18,6 +18,17 @@ from langfuse.api.resources.ingestion.types.ingestion_event import (
     IngestionEvent_TraceCreate,
 )
 
+from beautyads.obs.langfuse_io import (
+    CLIP_CHARS,
+    OMITTED,
+    RequestIO,
+    clip,
+    match_captures,
+    redact,
+    stage_io,
+    trace_input,
+    trace_output,
+)
 from beautyads.obs.trace import TraceRecord
 from beautyads.settings import LangfuseSettings
 
@@ -32,9 +43,28 @@ class Observation(TypedDict):
     attrs: dict[str, Any]
 
 
-def build_timeline(record: TraceRecord) -> list[Observation]:
+def _safe_io(value):
+    if isinstance(value, str):
+        text = redact(value)
+        # Keep the omission marker inside the wire's 4,000-character budget.
+        limit = (
+            CLIP_CHARS - len("\n" + OMITTED) if len(text) > CLIP_CHARS else CLIP_CHARS
+        )
+        return clip(text, limit)
+    if isinstance(value, dict):
+        return {_safe_io(key): _safe_io(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_safe_io(item) for item in value]
+    return value
+
+
+def build_timeline(
+    record: TraceRecord, io: RequestIO | None = None
+) -> list[Observation]:
     """Project recorded boundaries only; legacy observations remain untimed."""
     observations: list[Observation] = []
+    stage_values = stage_io(io) if io is not None else {}
+    captures = match_captures(record.calls, io.captures) if io is not None else {}
     intervals = [
         (
             call.ended_at - timedelta(milliseconds=call.duration_ms),
@@ -75,6 +105,10 @@ def build_timeline(record: TraceRecord) -> list[Observation]:
             }
         },
     )
+    if io is not None:
+        root["attrs"].update(
+            _safe_io({"input": trace_input(io), "output": trace_output(io)})
+        )
     previous = record.started_at
     for name in ("supervisor", "research"):
         end = next(
@@ -147,7 +181,7 @@ def build_timeline(record: TraceRecord) -> list[Observation]:
         }
         if call.cached_tokens:
             usage["cache_read_input_tokens"] = call.cached_tokens
-        add(
+        generation = add(
             "generation",
             call.purpose,
             start,
@@ -165,6 +199,16 @@ def build_timeline(record: TraceRecord) -> list[Observation]:
                 },
             },
         )
+        capture = captures.get(index)
+        if capture is not None:
+            generation["attrs"].update(
+                _safe_io({"input": capture.input, "output": capture.output})
+            )
+    for row in observations:
+        if row["kind"] == "span" and row["name"] in stage_values:
+            row["attrs"].update(_safe_io(stage_values.get(row["name"])))
+        if io is not None:
+            row.update(_safe_io(row))
     # Assign UUID5 ordinals only after ordering spans and their generations.
     ordered = [
         root,
@@ -188,12 +232,33 @@ def export_trace(
     record: TraceRecord,
     *,
     settings: LangfuseSettings | None,
+    io: RequestIO | None = None,
     client_factory=Langfuse,
 ) -> bool:
     """Send one batch; failures never expose diagnostics or affect JSONL/results."""
     if settings is None:
         return False
     try:
+        io = io if settings.capture_io else None
+        trace_body = {
+            "id": record.trace_id,
+            "name": "ask",
+            "user_id": record.tenant_id,
+            "timestamp": record.started_at,
+            "tags": [f"kind:{record.kind}", f"outcome:{record.outcome}"],
+            "metadata": {
+                "kind": record.kind,
+                "intent": record.intent,
+                "outcome": record.outcome,
+                "cost_total_usd": record.cost_total_usd,
+                "text_spent_usd": record.text_spent_usd,
+                "limit_hit": record.limit_hit,
+                "prompt_versions": record.prompt_versions,
+            },
+        }
+        if io is not None:
+            trace_body.update(input=trace_input(io), output=trace_output(io))
+            trace_body = _safe_io(trace_body)
         client = client_factory(
             public_key=settings.public_key,
             secret_key=settings.secret_key,
@@ -207,22 +272,7 @@ def export_trace(
                 type="trace-create",
                 id=str(uuid4()),
                 timestamp=timestamp,
-                body=TraceBody(
-                    id=record.trace_id,
-                    name="ask",
-                    user_id=record.tenant_id,
-                    timestamp=record.started_at,
-                    tags=[f"kind:{record.kind}", f"outcome:{record.outcome}"],
-                    metadata={
-                        "kind": record.kind,
-                        "intent": record.intent,
-                        "outcome": record.outcome,
-                        "cost_total_usd": record.cost_total_usd,
-                        "text_spent_usd": record.text_spent_usd,
-                        "limit_hit": record.limit_hit,
-                        "prompt_versions": record.prompt_versions,
-                    },
-                ),
+                body=TraceBody(**trace_body),
             )
         ]
         event_types = {
@@ -230,7 +280,7 @@ def export_trace(
             "generation": (IngestionEvent_GenerationCreate, CreateGenerationBody),
             "event": (IngestionEvent_EventCreate, CreateEventBody),
         }
-        for observation in build_timeline(record):
+        for observation in build_timeline(record, io):
             event_type, body_type = event_types[observation["kind"]]
             body = {
                 "id": observation["id"],
