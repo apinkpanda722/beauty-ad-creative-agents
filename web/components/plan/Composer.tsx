@@ -12,7 +12,14 @@ export function Composer({ enabled, busy, imageEnabled, onSend }: {
   const [withImage, setWithImage] = useState(true);
   const textarea = useRef<HTMLTextAreaElement>(null);
   useLayoutEffect(() => {
-    if (textarea.current) { textarea.current.style.height = "auto"; textarea.current.style.height = `${textarea.current.scrollHeight}px`; }
+    const input = textarea.current;
+    if (!input) return;
+    input.style.overflowY = "hidden";
+    input.style.height = "auto";
+    const maximum = Number.parseFloat(getComputedStyle(input).maxHeight);
+    const height = Number.isFinite(maximum) ? Math.min(input.scrollHeight, maximum) : input.scrollHeight;
+    input.style.height = `${height}px`;
+    if (Number.isFinite(maximum) && height >= maximum && input.scrollHeight > input.clientHeight) input.style.overflowY = "auto";
   }, [message]);
   const composing = useRef(false);
   function send() {
@@ -22,7 +29,7 @@ export function Composer({ enabled, busy, imageEnabled, onSend }: {
   }
   return <form className="gs-composer" onSubmit={event => { event.preventDefault(); send(); }}>
     <label className="gs-sr-only" htmlFor={id}>요청</label>
-    <div className="gs-composer-bar"><textarea ref={textarea} id={id} rows={1} maxLength={2000} value={message} disabled={!enabled || busy}
+    <div className="gs-composer-bar"><textarea ref={textarea} id={id} rows={3} maxLength={2000} value={message} disabled={!enabled || busy}
       aria-describedby={message ? `${id}-hint` : undefined} placeholder="광고 기획 요청을 입력하세요"
       onChange={event => setMessage(event.target.value.slice(0, 2000))}
       onCompositionStart={() => { composing.current = true; }}

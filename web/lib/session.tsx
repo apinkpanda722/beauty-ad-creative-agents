@@ -13,6 +13,9 @@ type Session = {
   cancel: (turnId: number) => void;
   retry: (turnId: number) => void;
   selectWorkspace: (tenantId: string | null) => void;
+  newTab: () => void;
+  selectTab: (tabId: number) => void;
+  closeTab: (tabId: number) => void;
 };
 const SessionContext = createContext<Session | null>(null);
 
@@ -73,7 +76,10 @@ export function SessionProvider({ children, clock = monotonicClock }: { children
     controller.current?.abort(); controller.current = null;
     dispatch({ type: "workspace_selected", tenantId });
   }
-  return <SessionContext.Provider value={{ state, start, send, cancel, retry, selectWorkspace }}>{children}</SessionContext.Provider>;
+  function newTab() { dispatch({ type: "tab_created" }); }
+  function selectTab(tabId: number) { dispatch({ type: "tab_selected", tabId }); }
+  function closeTab(tabId: number) { dispatch({ type: "tab_closed", tabId }); }
+  return <SessionContext.Provider value={{ state, start, send, cancel, retry, selectWorkspace, newTab, selectTab, closeTab }}>{children}</SessionContext.Provider>;
 }
 
 export function useSession(): Session {

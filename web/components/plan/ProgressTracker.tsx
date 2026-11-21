@@ -24,16 +24,24 @@ export function ProgressTracker({ stepEvents, turnStatus, times, costUsd, costLa
   if (turnStatus === "unavailable" || turnStatus === "stopped") return null;
   if (turnStatus === "needs_choice") return <p className="gs-progress-choice" aria-label="진행 단계" aria-live="polite">요청 해석 완료 · 선택을 기다리는 중</p>;
   const stages = deriveProgress(stepEvents, turnStatus, times);
+  const running = stages.find(stage => stage.status === "running");
+  const elapsedText = <span className={running ? "gs-progress-elapsed" : "gs-sr-only"} aria-label="경과 시간" aria-live="off">{elapsed}초 경과</span>;
   return <section className="gs-progress" aria-label="진행 단계" aria-live="polite">
     <ol className="gs-stages">
-      {stages.map(stage => <li key={stage.id} data-status={stage.status}>
-        <span className="gs-stage-icon" role="img" aria-label={labels[stage.status]} />
-        <span className="gs-stage-copy">{stage.label}</span>
-        {stage.durationMs !== null && <span className="gs-stage-duration">{(stage.durationMs / 1000).toFixed(1)}s</span>}
+      {stages.map((stage, index) => <li key={stage.id} data-status={stage.status}>
+        {index > 0 && <span className="gs-stage-connector" aria-hidden="true" data-filled={stages[index - 1].status === "done"}><span /></span>}
+        <span className="gs-stage-chip">
+        <span className={`gs-stage-icon${stage.status === "running" ? " gs-stage-ring" : ""}`} role="img" aria-label={labels[stage.status]}>
+          {stage.status === "running" && <span className="gs-stage-running-text gs-sr-only">진행 중</span>}
+        </span>
+        <span className={`gs-stage-copy${stage.status === "running" ? " gs-stage-shimmer" : ""}`}>{stage.label}</span>
+        {stage.status === "running" && elapsedText}
+        {stage.id !== "image" && stage.durationMs !== null && <span className="gs-stage-duration">{(stage.durationMs / 1000).toFixed(1)}s</span>}
         {stage.id === "plan_eval" && stage.reworks > 0 && <span className="gs-rework-badge">재작업 {stage.reworks}회</span>}
+        </span>
       </li>)}
     </ol>
     {costUsd !== undefined && <span className="gs-progress-cost" aria-label={costLabel}>${costUsd.toFixed(3)}</span>}
-    <span className={turnStatus === "running" ? "gs-progress-elapsed" : "gs-sr-only"} aria-label="경과 시간" aria-live="off">{elapsed}초 경과</span>
+    {!running && elapsedText}
   </section>;
 }

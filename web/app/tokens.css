@@ -2,6 +2,7 @@
   color-scheme: light;
   --gs-accent: #0F766E;
   --gs-accent-weak: #F0FDFA;
+  --gs-accent-shine: #5EEAD4;
   --gs-bg: #FFFFFF;
   --gs-surface: #F8FAFC;
   --gs-border: #E2E8F0;
@@ -12,7 +13,8 @@
   --gs-border-width: 1px;
   --gs-content-width: 1120px;
   --gs-sidebar-width: 216px;
-  --gs-composer-max-height: 176px;
+  --gs-composer-min-height: 100px;
+  --gs-composer-max-height: 264px;
   --gs-radius-pill: 999px;
   --gs-danger: #B91C1C;
   --gs-warn: #92400E;

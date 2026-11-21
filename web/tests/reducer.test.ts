@@ -101,3 +101,88 @@ it("keeps timing arrays aligned when timed and untimed steps are mixed and never
   state = reducer(state, { type: "stream_event", turnId: 1, frame, at: 1800 });
   expect(Object.hasOwn(state.turns[0], "stepAt")).toBe(false);
 });
+
+describe("plan tabs", () => {
+  const finish = (state: ReturnType<typeof reducer>) => reducer(
+    reducer(state, { type: "stream_event", turnId: state.activeTurnId!, frame: { event: "token", data: { text: "합성 완료" } } }),
+    { type: "stream_ended", turnId: state.activeTurnId! },
+  );
+  it("starts with one active empty tab and creates an independent thread", () => {
+    expect(initialState.tabs).toEqual([{ id: 1, threadId: null }]);
+    expect(initialState.activeTabId).toBe(1);
+    let state = finish(reducer(started(), { type: "thread_received", turnId: 1, threadId: "first" }));
+    state = reducer(state, { type: "tab_created" });
+    expect(state.tabs).toEqual([{ id: 1, threadId: "first" }, { id: 2, threadId: null }]);
+    expect(state.activeTabId).toBe(2);
+    expect(state.threadId).toBeNull();
+    state = reducer(state, { type: "request_started", message: "두 번째" });
+    expect(state.turns.map(turn => turn.tabId)).toEqual([1, 2]);
+    expect(state.turns[1].threadId).toBeNull();
+    state = reducer(state, { type: "thread_received", turnId: 2, threadId: "second" });
+    state = reducer(state, { type: "thread_received", turnId: 2, threadId: "ignored" });
+    expect(state.tabs).toEqual([{ id: 1, threadId: "first" }, { id: 2, threadId: "second" }]);
+    expect(state.threadId).toBe("second");
+    expect(state.turns[1].threadId).toBe("second");
+  });
+  it("allows selection during a request without creating or closing its tab, and routes the response to its owner", () => {
+    let state = reducer(finish(reducer(started(), { type: "thread_received", turnId: 1, threadId: "first" })), { type: "tab_created" });
+    state = reducer(state, { type: "request_started", message: "두 번째" });
+    expect(reducer(state, { type: "tab_created" })).toBe(state);
+    expect(reducer(state, { type: "request_started", message: "동시 요청" })).toBe(state);
+    expect(reducer(state, { type: "tab_closed", tabId: 2 })).toBe(state);
+    state = reducer(state, { type: "tab_selected", tabId: 1 });
+    expect(state.activeTabId).toBe(1);
+    expect(state.activeTurnId).toBe(2);
+    expect(state.threadId).toBe("first");
+    state = reducer(state, { type: "thread_received", turnId: 2, threadId: "second" });
+    expect(state.tabs).toEqual([{ id: 1, threadId: "first" }, { id: 2, threadId: "second" }]);
+    expect(state.threadId).toBe("first");
+    expect(state.turns[1].threadId).toBe("second");
+    expect(reducer(state, { type: "tab_selected", tabId: 99 })).toBe(state);
+    expect(reducer(state, { type: "tab_closed", tabId: 99 })).toBe(state);
+  });
+  it("continues choices and retries in the source tab even when another tab is selected", () => {
+    let state = reducer(started(), { type: "thread_received", turnId: 1, threadId: "first" });
+    state = receive(state, { event: "needs_clarification", data: { reason: "no_claim_requested", requested_claim: null, requested_label: null, available: [], options: [], text: "합성 확인" } });
+    state = reducer(state, { type: "stream_ended", turnId: 1 });
+    state = reducer(state, { type: "tab_created" });
+    state = reducer(state, { type: "choice_submitted", turnId: 1, choice: { mode: "none", claims: [], requested_claim: null }, label: "합성 선택" });
+    expect(state.turns[1]).toMatchObject({ tabId: 1, threadId: "first", message: "합성 요청", withImage: true });
+    expect(state.turns[0].status).toBe("done");
+    expect(state.activeTabId).toBe(2);
+    expect(state.threadId).toBeNull();
+    state = reducer(state, { type: "request_failed", turnId: 2, error: { code: "SYNTHETIC" } });
+    state = reducer(state, { type: "stream_ended", turnId: 2 });
+    state = reducer(state, { type: "retry_requested", turnId: 2 });
+    expect(state.turns[2]).toMatchObject({ tabId: 1, threadId: "first", message: "합성 요청", choiceLabel: "합성 선택" });
+    expect(state.threadId).toBeNull();
+  });
+  it("only resolves questions in the receiving tab", () => {
+    let state = receive(started(), { event: "needs_clarification", data: { reason: "no_claim_requested", requested_claim: null, requested_label: null, available: [], options: [], text: "합성 확인" } });
+    state = reducer(state, { type: "stream_ended", turnId: 1 });
+    state = reducer(state, { type: "tab_created" });
+    state = reducer(state, { type: "request_started", message: "다른 탭" });
+    expect(state.turns[0].status).toBe("needs_choice");
+  });
+  it("removes only closed turns, selects a remaining thread, and replaces the last tab with a blank tab", () => {
+    let state = reducer(finish(started()), { type: "tab_created" });
+    state = finish(reducer(state, { type: "request_started", message: "두 번째" }));
+    state = reducer(state, { type: "tab_selected", tabId: 1 });
+    state = reducer(state, { type: "tab_closed", tabId: 2 });
+    expect(state.turns.map(turn => turn.id)).toEqual([1]);
+    expect(state.activeTabId).toBe(1);
+    state = reducer(state, { type: "tab_closed", tabId: 1 });
+    expect(state.turns).toEqual([]);
+    expect(state.tabs).toHaveLength(1);
+    expect(state.tabs?.[0].threadId).toBeNull();
+    expect(state.activeTabId).toBe(state.tabs?.[0].id);
+    expect(state.threadId).toBeNull();
+  });
+  it("restores the initial tab on workspace changes", () => {
+    const state = reducer(reducer(finish(started()), { type: "tab_created" }), { type: "workspace_selected", tenantId: "second" });
+    expect(state.tabs).toEqual(initialState.tabs);
+    expect(state.activeTabId).toBe(initialState.activeTabId);
+    expect(state.turns).toEqual([]);
+    expect(state.threadId).toBeNull();
+  });
+});

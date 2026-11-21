@@ -36,7 +36,10 @@ it("renders exactly five ordered navigation items and switches the current page 
   for (const index of [1, 2, 3, 4, 0]) {
     fireEvent.click(items[index]);
     expect(screen.queryByText("Beauty Ad Creative Agents")).toBeNull();
-    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(screen.queryByRole("tablist", { name: "화면 선택" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "대화" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "전체 스키마" })).toBeNull();
+    expect(screen.queryAllByRole("tablist", { name: "기획 탭" })).toHaveLength(index === 0 ? 1 : 0);
     expect(items.map(item => item.getAttribute("aria-current"))).toEqual(labels.map((_, i) => i === index ? "page" : null));
     if ([1, 3, 4].includes(index)) {
       expect(screen.getByRole("heading", { name: labels[index] })).toBeTruthy();

@@ -336,7 +336,16 @@ it("shows only the choice status, hides unavailable/stopped stages and preserves
     rerender(<ProgressTracker turnStatus={status} stepEvents={events} />);
     const labels = { pending: "대기", running: "진행 중", done: "완료", failed: "실패" };
     const stages = deriveProgress(events, status);
-    expect(screen.getAllByRole("listitem").map(node => node.textContent)).toEqual(stages.map(stage => stage.label));
+    const items = screen.getAllByRole("listitem");
+    expect(items.map(node => [...node.querySelectorAll(".gs-stage-copy")].map(label => label.textContent))).toEqual(stages.map(stage => [stage.label]));
+    expect(items.map(node => node.textContent)).toEqual(stages.map(stage => stage.status === "running" ? `진행 중${stage.label}0초 경과` : stage.label));
+    const elapsed = screen.getByLabelText("경과 시간");
+    expect(elapsed.textContent).toBe("0초 경과");
+    if (status === "running") expect(elapsed.closest("li")).toBe(items.find(node => node.getAttribute("data-status") === "running"));
+    else {
+      expect(elapsed.closest("li")).toBeNull();
+      expect(elapsed.classList.contains("gs-sr-only")).toBe(true);
+    }
     expect(screen.getAllByRole("listitem").map(node => node.getAttribute("data-status"))).toEqual(stages.map(stage => stage.status));
     expect(screen.getAllByRole("img").map(node => node.getAttribute("aria-label"))).toEqual(stages.map(stage => labels[stage.status]));
   }

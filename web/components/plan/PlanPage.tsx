@@ -7,6 +7,7 @@ import { FeedbackSession } from "../results/FeedbackBar";
 import { PageHeader } from "../ui";
 import { Composer } from "./Composer";
 import { TurnCard } from "./TurnCard";
+import { PlanTabs } from "./PlanTabs";
 import "../../app/plan.css";
 
 export function PlanPage({ workspaces, imageEnabled }: {
@@ -14,14 +15,16 @@ export function PlanPage({ workspaces, imageEnabled }: {
 }) {
   const { state, start, send, cancel, retry } = useSession();
   const busy = state.activeTurnId !== null;
+  const turns = state.turns.filter(turn => (turn.tabId ?? 1) === (state.activeTabId ?? 1));
   return <CommandTenantContext.Provider value={state.tenantId}><WorkspaceBrandContext.Provider value={workspaces.find(workspace => workspace.tenant_id === state.tenantId)?.brand ?? null}><FeedbackSession key={state.tenantId}>
     <div className="gs-plan-page">
       <PageHeader title="광고 기획" description="제품과 원하는 광고 방향을 알려주세요. 근거를 찾아 기획안을 만듭니다." />
-      <Composer key={state.tenantId} enabled={Boolean(state.tenantId)} busy={busy} imageEnabled={imageEnabled} onSend={send} />
+      <PlanTabs />
+      <Composer key={`${state.tenantId}-${state.activeTabId ?? 1}`} enabled={Boolean(state.tenantId)} busy={busy} imageEnabled={imageEnabled} onSend={send} />
       <section className="gs-conversation" aria-label="대화">
-        {state.turns.map((turn, index) => {
-          const next = state.turns[index + 1];
-          const previous = state.turns[index - 1];
+        {turns.map((turn, index) => {
+          const next = turns[index + 1];
+          const previous = turns[index - 1];
           // The reducer stores the chosen values on the continuation turn.
           // Present them on the resolved question without changing session state.
           let choiceLabel = previous?.clarification ? null : turn.choiceLabel;

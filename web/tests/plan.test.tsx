@@ -71,7 +71,7 @@ it("enables input only after workspace selection and has no preset request butto
   expect(screen.queryByLabelText("예시 요청")).toBeNull();
   expect(existsSync(join(process.cwd(), "lib/examples.ts"))).toBe(false);
   expect((screen.getByLabelText("요청") as HTMLTextAreaElement).value).toBe("");
-  expect(screen.getAllByRole("button").map(button => button.textContent)).toEqual(["합성 공간 A · 합성 제품 A", "기획하기"]);
+  expect(screen.getAllByRole("button").map(button => button.textContent)).toEqual(["합성 공간 A · 합성 제품 A", "×", "+ 새 기획", "기획하기"]);
   expect(fetch).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "작업 공간" }));
   expect(screen.getByText("작업 공간은 서버를 시작할 때 정한 그룹 하나만 보입니다. 바꾸려면 서버를 다시 시작하세요.")).toBeTruthy();
@@ -254,10 +254,13 @@ it("updates elapsed numbers with an injected clock only while running and cleans
   const clock = vi.fn(() => now);
   const { rerender, unmount } = render(<ProgressTracker stepEvents={[]} turnStatus="running" clock={clock} />);
   expect(screen.getByLabelText("경과 시간").textContent).toBe("0초 경과");
+  expect(screen.getByLabelText("경과 시간").closest("li")?.dataset.status).toBe("running");
   now = 4000;
   act(() => { vi.advanceTimersByTime(1000); });
   expect(screen.getByLabelText("경과 시간").textContent).toBe("3초 경과");
   rerender(<ProgressTracker stepEvents={[]} turnStatus="done" clock={clock} />);
+  expect(screen.getByLabelText("경과 시간").classList.contains("gs-sr-only")).toBe(true);
+  expect(screen.getByLabelText("경과 시간").closest("li")).toBeNull();
   const calls = clock.mock.calls.length;
   now = 10000;
   act(() => { vi.advanceTimersByTime(5000); });
@@ -268,13 +271,16 @@ it("updates elapsed numbers with an injected clock only while running and cleans
   unmount();
   expect(vi.getTimerCount()).toBe(0);
 });
-it("uses CSS pulse and line transitions with reduced motion disabling both", () => {
+it("uses CSS rotation, shimmer and line transitions with reduced motion disabling all", () => {
   const css = readFileSync(join(process.cwd(), "app/plan.css"), "utf8");
-  expect(css).toMatch(/@keyframes\s+gs-progress-pulse/);
+  expect(css).toMatch(/@keyframes\s+gs-progress-spin/);
+  expect(css).toMatch(/@keyframes\s+gs-progress-shimmer/);
   expect(css).toMatch(/transition\s*:[^;]*;/);
   const reduced = css.slice(css.indexOf("@media (prefers-reduced-motion: reduce)"));
   expect(reduced).toMatch(/animation\s*:\s*none/);
   expect(reduced).toMatch(/transition\s*:\s*none/);
+  expect(reduced).toMatch(/border-right-color\s*:\s*transparent/);
+  expect(reduced).toContain(".gs-stage-running-text");
 });
 it("collapses resolved clarification to one line, then renders a fresh request as an ordinary turn", async () => {
   const fetch = setup([{ event: "needs_clarification", data: clarification }]);
@@ -313,15 +319,18 @@ it("hides choice buttons for every resolved status and for a turn with a recorde
   expect(screen.queryByRole("button")).toBeNull();
 });
 
-it("starts with one input row, grows with content, and only describes nonempty input", () => {
+it("starts with three input rows, grows without a scrollbar, and only describes nonempty input", () => {
   setup([]); selectWorkspace();
   const input = screen.getByLabelText("요청") as HTMLTextAreaElement;
-  expect(input.rows).toBe(1);
+  expect(input.rows).toBe(3);
   expect(input.getAttribute("aria-describedby")).toBeNull();
   expect(screen.queryByText(/2000 · Enter/)).toBeNull();
   Object.defineProperty(input, "scrollHeight", { configurable: true, value: 120 });
   fireEvent.change(input, { target: { value: "합성 입력" } });
   expect(input.style.height).toBe("120px");
+  expect(input.style.overflowY).toBe("hidden");
+  const css = readFileSync(join(process.cwd(), "app/plan.css"), "utf8");
+  expect(css).toMatch(/overflow-y\s*:\s*hidden/);
   expect(screen.getByText("5/2000 · Enter 전송, Shift+Enter 줄바꿈").id).toBe(input.getAttribute("aria-describedby"));
   expect(document.querySelector("select, .workspace-picker")).toBeNull();
   fireEvent.keyDown(input, { key: "Enter", keyCode: 229 });
@@ -365,4 +374,42 @@ it("timestamps requests and SSE arrivals with the injected session clock, includ
   now = 6500; fireEvent.click(screen.getByRole("button", { name: "합성 생략" })); await ready();
   expect(snapshot()).toEqual([{ startedAt: 100, stepAt: [1700] }, { startedAt: 3300, stepAt: [4900] }, { startedAt: 6500, stepAt: [8100] }]);
   expect(fetch).toHaveBeenCalledTimes(3);
+});
+
+
+it("marks running rings and shimmer, and fills connectors only after completed stages", () => {
+  const { rerender } = render(<ProgressTracker stepEvents={[]} turnStatus="running" />);
+  expect(document.querySelector('[data-status="running"] .gs-stage-ring')).toBeTruthy();
+  expect(document.querySelector('[data-status="running"] .gs-stage-shimmer')).toBeTruthy();
+  expect(screen.getByText("진행 중").classList.contains("gs-sr-only")).toBe(true);
+  expect(screen.getAllByRole("listitem").map(item => item.dataset.status)).toEqual(["running", "pending", "pending"]);
+  expect([...document.querySelectorAll(".gs-stage-connector")].map(item => item.getAttribute("data-filled"))).toEqual(["false", "false"]);
+  rerender(<ProgressTracker stepEvents={[{ agent: "supervisor", phase: "end", status: "ok" }]} turnStatus="running" />);
+  expect([...document.querySelectorAll(".gs-stage-connector")].map(item => item.getAttribute("data-filled"))).toEqual(["true", "false"]);
+  expect(screen.getByLabelText("경과 시간").closest("li")).toBe(screen.getByText("리서치").closest("li"));
+});
+it("omits image durations while preserving other stages and completion checks", () => {
+  const stepEvents = ["supervisor", "research", "evaluation", "image"].map(agent => ({ agent, phase: "end", status: "ok" }));
+  render(<ProgressTracker stepEvents={stepEvents} turnStatus="done" times={{ startedAt: 0, stepAt: [1600, 3200, 4800, 6400] }} />);
+  const image = screen.getByText("시안").closest("li")!;
+  expect(within(image).getByRole("img", { name: "완료" })).toBeTruthy();
+  expect(image.querySelector(".gs-stage-duration")).toBeNull();
+  expect(within(image).queryByText(/s$/)).toBeNull();
+  expect(screen.getAllByText("1.6s")).toHaveLength(3);
+  expect(screen.queryByText(/완료 완료/)).toBeNull();
+});
+it("enables scrolling only at the textarea height cap and hides it again after sending", async () => {
+  setup([{ event: "token", data: { text: "합성 완료" } }]); selectWorkspace();
+  const input = screen.getByLabelText("요청") as HTMLTextAreaElement;
+  input.style.maxHeight = "264px";
+  Object.defineProperty(input, "scrollHeight", { configurable: true, value: 600 });
+  Object.defineProperty(input, "clientHeight", { configurable: true, value: 264 });
+  fireEvent.change(input, { target: { value: "합성 긴 입력" } });
+  expect(input.style.height).toBe("264px");
+  expect(input.style.overflowY).toBe("auto");
+  Object.defineProperty(input, "scrollHeight", { configurable: true, value: 96 });
+  fireEvent.click(screen.getByRole("button", { name: "기획하기" }));
+  await ready();
+  expect(input.value).toBe("");
+  expect(input.style.overflowY).toBe("hidden");
 });
