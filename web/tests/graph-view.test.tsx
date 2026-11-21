@@ -115,18 +115,19 @@ it("switches page tabs, preserves conversation and opens the command graph with 
     return Promise.resolve(new Response(JSON.stringify(url === "/api/graph/schema" ? schema : fragment)));
   }); vi.stubGlobal("fetch", fetch); render(<Page />);
   await screen.findByLabelText("작업 공간");
-  fireEvent.click(screen.getByRole("tab", { name: "전체 스키마" }));
-  expect(screen.getByText("대화 탭에서 작업 공간을 선택하세요.")).toBeTruthy();
-  fireEvent.click(screen.getByRole("tab", { name: "대화" }));
-  fireEvent.change(screen.getByLabelText("작업 공간"), { target: { value: "synthetic" } });
-  fireEvent.change(screen.getByLabelText("요청"), { target: { value: "합성 요청" } }); fireEvent.click(screen.getByRole("button", { name: "전송" }));
+  fireEvent.click(screen.getByRole("button", { name: "지식 그래프" }));
+  expect(screen.getByText("상단 바에서 작업 공간을 선택하세요.")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "광고 기획" }));
+  fireEvent.click(screen.getByRole("button", { name: "작업 공간" }));
+  fireEvent.click(await screen.findByRole("option", { name: /합성 공간/ }));
+  fireEvent.change(screen.getByLabelText("요청"), { target: { value: "합성 요청" } }); fireEvent.click(screen.getByRole("button", { name: "기획하기" }));
   await screen.findByText("합성 응답"); fireEvent.click(screen.getByRole("button", { name: "근거 그래프 보기" }));
   await waitFor(() => expect(cy.create).toHaveBeenCalledTimes(1));
   expect(fetch).toHaveBeenCalledWith("/api/graph/fragment?ids=youtube%3Aa", { headers: { "X-Tenant-Id": "synthetic" } });
-  fireEvent.click(screen.getByRole("tab", { name: "전체 스키마" }));
-  expect(screen.getByRole("tab", { name: "전체 스키마" }).getAttribute("aria-selected")).toBe("true");
+  fireEvent.click(screen.getByRole("button", { name: "지식 그래프" }));
+  expect(screen.getByRole("button", { name: "지식 그래프" }).getAttribute("aria-current")).toBe("page");
   await waitFor(() => expect(cy.create).toHaveBeenCalledTimes(2));
-  fireEvent.click(screen.getByRole("tab", { name: "대화" })); expect(screen.getByText("합성 응답")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "광고 기획" })); expect(screen.getByText("합성 응답")).toBeTruthy();
 });
 
 it("renders separate layer and node kind legend groups", () => {

@@ -1,3 +1,4 @@
+import { NavIcon } from "./icons";
 import type { View } from "./AppShell";
 
 const items: { view: View; label: string }[] = [
@@ -11,7 +12,8 @@ const items: { view: View; label: string }[] = [
 export function Sidebar({ view, onViewChange }: { view: View; onViewChange: (view: View) => void }) {
   return <nav className="gs-sidebar" aria-label="주요 화면">
     {items.map(item => <button key={item.view} type="button"
+      className={view === item.view ? "gs-nav-pill" : undefined}
       aria-current={view === item.view ? "page" : undefined}
-      onClick={() => onViewChange(item.view)}>{item.label}</button>)}
+      onClick={() => onViewChange(item.view)}><NavIcon view={item.view} />{item.label}</button>)}
   </nav>;
 }

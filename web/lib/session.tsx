@@ -16,8 +16,18 @@ type Session = {
 };
 const SessionContext = createContext<Session | null>(null);
 
-export function SessionProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, initialState);
+const monotonicClock = () => performance.now();
+
+// The envelope timestamps continuation requests without changing public actions.
+function sessionReducer(state: State, request: { action: Action; startedAt?: number }): State {
+  const next = reducer(state, request.action);
+  if (request.startedAt === undefined || next.nextTurnId === state.nextTurnId) return next;
+  return { ...next, turns: next.turns.map(turn => turn.id === next.activeTurnId ? { ...turn, startedAt: request.startedAt } : turn) };
+}
+
+export function SessionProvider({ children, clock = monotonicClock }: { children: ReactNode; clock?: () => number }) {
+  const [state, apply] = useReducer(sessionReducer, initialState);
+  const dispatch = (action: Action) => apply({ action });
   const controller = useRef<AbortController | null>(null);
   useEffect(() => () => { controller.current?.abort(); controller.current = null; }, []);
 
@@ -34,7 +44,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "thread_received", turnId: turn.id, threadId: response.threadId });
       for await (const frame of response.events) {
         if (!current()) break;
-        dispatch({ type: "stream_event", turnId: turn.id, frame });
+        dispatch({ type: "stream_event", turnId: turn.id, frame, at: clock() });
       }
     } catch (error) {
       if (current()) dispatch({ type: "request_failed", turnId: turn.id,
@@ -45,10 +55,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }
   function start(action: Action) {
     if (controller.current || !state.tenantId) return;
+    const startedAt = clock();
+    action = action.type === "request_started" ? { ...action, at: startedAt } : action;
     const next = reducer(state, action);
     const turn = next.turns.at(-1);
     if (!turn || next === state) return;
-    dispatch(action);
+    apply({ action, startedAt });
     void run(turn, state.tenantId);
   }
   function send(message: string, withImage?: boolean) {

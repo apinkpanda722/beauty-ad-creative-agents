@@ -18,9 +18,10 @@ export function TurnCard({ turn, busy, onChoice, onCancel, onRetry, choiceLabel 
   const displayText = turn.commands.some(command => command.kind === "show_plan")
     ? turn.displayText.split("\n").filter(line => line !== PLAN_INTRO_TEXT).join("\n")
     : turn.displayText;
+  const cost = turn.commands.findLast(command => command.kind === "show_cost");
   return <article className="gs-turn" aria-label={`요청 ${turn.id}`}>
     <p className="gs-user-message">{turn.message}</p>
-    <ProgressTracker stepEvents={turn.stepEvents} turnStatus={turn.status} />
+    <ProgressTracker stepEvents={turn.stepEvents} turnStatus={turn.status} times={{ startedAt: turn.startedAt, stepAt: turn.stepAt }} costUsd={cost?.data.text_spent_usd} costLabel={cost?.data.label} />
     {displayText && <p className="gs-answer answer">{displayText}</p>}
     <ResultsView commands={turn.commands} onOpenGraph={tenantId ? setGraphIds : undefined} />
     {tenantId && graphIds && <GraphPanel tenantId={tenantId} ids={graphIds} />}

@@ -4,6 +4,7 @@ import { useId, useState } from "react";
 import { collectSessionCards, groupByPlatform, isOwnBrand, platformLabel } from "../../lib/evidence";
 import type { UiCommand } from "../../lib/types";
 import { Button, EmptyState, PageHeader } from "../ui";
+import { PlatformIcon } from "./PlatformIcon";
 import { EvidenceCardView } from "./EvidenceCardView";
 
 export function EvidencePage({ turns, workspaceBrand, onPlan }: {
@@ -22,7 +23,7 @@ export function EvidencePage({ turns, workspaceBrand, onPlan }: {
       <Button variant="secondary" size="sm" aria-pressed={filter.type === "own"} onClick={() => setFilter({ type: "own" })}>자사만</Button>
     </div>}
     {visible.length ? groupByPlatform(visible).map((group, groupIndex) => <section key={JSON.stringify(group.source)} className="gs-platform-group" aria-labelledby={`${prefix}-platform-${groupIndex}`}>
-      <h2 id={`${prefix}-platform-${groupIndex}`}>{platformLabel(group.source)} · {group.cards.length}건</h2>
+      <h2 className="gs-platform-heading" id={`${prefix}-platform-${groupIndex}`}><PlatformIcon source={group.source} />{platformLabel(group.source)} · {group.cards.length}건</h2>
       <div className="gs-evidence-grid">{group.cards.map((card, index) => <EvidenceCardView key={`${card.evidence_id}-${index}`} card={card} workspaceBrand={workspaceBrand} anchor={`${prefix}-card-${groupIndex}-${index}`} />)}</div>
     </section>) : <EmptyState title={cards.length ? "조건에 맞는 근거 소재가 없습니다" : "아직 근거 소재가 없습니다"} description="광고 기획에서 요청을 보내면 찾은 근거 소재가 여기에 모입니다." action={{ label: "광고 기획으로", onClick: onPlan }} />}
   </div>;

@@ -73,3 +73,31 @@ describe("conversation reducer", () => {
     expect(state.turns[2]).toMatchObject({ id: 3, message: state.turns[1].message, threadId: state.turns[1].threadId, claimChoice: choice, withImage: true });
   });
 });
+
+it("records optional arrival times aligned to step events and leaves untimed actions unchanged", () => {
+  let state = reducer({ ...initialState, tenantId: "synthetic" }, { type: "request_started", message: "합성 요청", at: 100 });
+  const frame: SseFrame = { event: "step", data: { agent: "supervisor", phase: "end", status: "ok" } };
+  state = reducer(state, { type: "stream_event", turnId: 1, frame, at: 1700 });
+  state = reducer(state, { type: "stream_event", turnId: 1, frame, at: 1800 });
+  expect(state.turns[0].startedAt).toBe(100);
+  expect(state.turns[0].stepAt).toEqual([1700, 1800]);
+  expect(state.turns[0].stepAt).toHaveLength(state.turns[0].stepEvents.length);
+  const untimed = receive(started(), frame).turns[0];
+  expect(Object.hasOwn(untimed, "startedAt")).toBe(false);
+  expect(Object.hasOwn(untimed, "stepAt")).toBe(false);
+});
+
+it("keeps timing arrays aligned when timed and untimed steps are mixed and never reuses retry timing", () => {
+  const frame: SseFrame = { event: "step", data: { agent: "supervisor", phase: "end", status: "ok" } };
+  let state = reducer({ ...initialState, tenantId: "synthetic" }, { type: "request_started", message: "합성 요청", at: 100 });
+  state = reducer(state, { type: "stream_event", turnId: 1, frame, at: 1700 });
+  state = reducer(state, { type: "request_failed", turnId: 1, error: { code: "SYNTHETIC" } });
+  const finished = reducer(state, { type: "stream_ended", turnId: 1 });
+  const retry = reducer(finished, { type: "retry_requested", turnId: 1 }).turns[1];
+  expect(Object.hasOwn(retry, "startedAt")).toBe(false);
+  expect(Object.hasOwn(retry, "stepAt")).toBe(false);
+  state = reducer(state, { type: "stream_event", turnId: 1, frame });
+  expect(Object.hasOwn(state.turns[0], "stepAt")).toBe(false);
+  state = reducer(state, { type: "stream_event", turnId: 1, frame, at: 1800 });
+  expect(Object.hasOwn(state.turns[0], "stepAt")).toBe(false);
+});

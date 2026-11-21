@@ -13,8 +13,9 @@ import { TurnCard } from "../components/plan/TurnCard";
 import { ProgressTracker } from "../components/plan/ProgressTracker";
 import { ResultsView, CommandTenantContext } from "../components/results/ResultsView";
 import { initialState, reducer } from "../lib/reducer";
-import { SessionProvider } from "../lib/session";
-import { deriveStages } from "../lib/stages";
+import { WorkspaceChip } from "../components/shell/WorkspaceChip";
+import { SessionProvider, useSession } from "../lib/session";
+import { deriveProgress } from "../lib/stages";
 import { PLAN_INTRO_TEXT } from "../lib/text";
 import { CostLine } from "../components/results/CostLine";
 import { ApiError, getSchema, getDesignImage, postFeedback } from "../lib/api";
@@ -38,6 +39,11 @@ const aggregates: Extract<UiCommand, { kind: "show_aggregates" }>["data"] = { la
 const image = { request_key: "synthetic/key", index: 0, mime: "image/png" as const, size: 1, sha256: "a".repeat(64) };
 const names = taxonomyNames(schema);
 
+function TestWorkspace() {
+  const { state, selectWorkspace } = useSession();
+  return <WorkspaceChip workspaces={[{ tenant_id: "synthetic", display_name: "합성 공간", brand: null, product_name: null }]} value={state.tenantId} onChange={selectWorkspace} />;
+}
+function expandAll() { for (const button of screen.queryAllByRole("button", { name: "전체 보기 →", expanded: false })) fireEvent.click(button); }
 function turnsWithCards(cards: EvidenceCard[][]) {
   return cards.map(cards => ({ commands: [{ kind: "show_evidence_cards" as const, data: { cards, missing: 0 } }] }));
 }
@@ -49,7 +55,7 @@ it("groups platforms with direct YouTube thumbnails and neutral monogram tiles, 
     const tile = screen.getByLabelText(`${source} 출처`);
     expect(tile.textContent).toContain(label);
     expect(within(tile).getByText(monogram)).toBeTruthy();
-    expect(within(tile).getByText("question")).toBeTruthy();
+    expect(within(tile.closest("article")!).getByText("question")).toBeTruthy();
     expect(tile.closest("article")!.querySelector("img")).toBeNull();
   }
   const thumbnail = screen.getByRole("img");
@@ -93,6 +99,7 @@ it("offers the plan action for empty sessions and empty filters, deduplicates ac
 it("keeps evidence anchors turn-local and unique when commands repeat within and across turns", () => {
   const commands: UiCommand[] = [{ kind: "show_plan", data: plan }, { kind: "show_evidence_cards", data: { cards: [card], missing: 0 } }, { kind: "show_evidence_cards", data: { cards: [card], missing: 1 } }];
   render(<><ResultsView commands={commands} /><ResultsView commands={commands} /></>);
+  expandAll();
   const links = screen.getAllByRole("link", { name: card.evidence_id! });
   expect(links).toHaveLength(2);
   const targets = links.map(link => link.getAttribute("href")!.slice(1));
@@ -109,9 +116,9 @@ it("connects the evidence navigation to session cards, own-brand summaries and t
   await screen.findByLabelText("작업 공간");
   fireEvent.click(screen.getByRole("button", { name: "근거 소재" }));
   fireEvent.click(screen.getByRole("button", { name: "광고 기획으로" }));
-  fireEvent.change(screen.getByLabelText("작업 공간"), { target: { value: "synthetic" } });
+  fireEvent.click(screen.getByRole("button", { name: "작업 공간" })); fireEvent.click(await screen.findByRole("option", { name: /합성 공간/ }));
   fireEvent.change(screen.getByLabelText("요청"), { target: { value: "합성 요청" } });
-  fireEvent.click(screen.getByRole("button", { name: "전송" }));
+  fireEvent.click(screen.getByRole("button", { name: "기획하기" }));
   await screen.findByText("합성 응답");
   expect(screen.getByText("자사")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "근거 소재" }));
@@ -128,6 +135,7 @@ it("renders separate code checks, evaluation state, unknown badge, neutral patte
   expect(screen.getByText("question")).toBeTruthy();
   for (const label of ["같음", "다름", "비교 불가", "점유율 비교 불가", "비교한 축 2개 중 같은 축 1개", plan.pattern_alignment_label, plan.disclaimer]) expect(screen.getAllByText(label).length).toBeGreaterThan(0);
   expect(container.textContent).not.toMatch(/좋음|나쁨|우수|미달/);
+  expandAll();
   expect(screen.getByRole("link", { name: card.evidence_id! }).getAttribute("href")).toBe("#synthetic-anchor");
   expect(screen.queryByRole("link", { name: "youtube:absent" })).toBeNull();
   expect(screen.getByText(/되돌림 0회/)).toBeTruthy();
@@ -139,8 +147,8 @@ it("renders separate code checks, evaluation state, unknown badge, neutral patte
   expect(screen.getByText("SYNTHETIC_UNKNOWN").textContent).toBe("SYNTHETIC_UNKNOWN");
   expect(screen.getByText("코드 검사: 실패")).toBeTruthy();
   expect(screen.getByText("평가 상태: 실패")).toBeTruthy();
-  expect(screen.getByText("합성 효능 · 확인됨")).toBeTruthy();
-  expect(screen.getByText("soothing · 근거 연결 없음")).toBeTruthy();
+  expect(screen.getAllByText("합성 효능 · 확인됨")).toHaveLength(2);
+  expect(screen.getAllByText("soothing · 근거 연결 없음")).toHaveLength(2);
 });
 it("keeps aggregate provenance in three distinct blocks, including removed-only and empty", () => {
   const { rerender, container } = render(<AggregatesPanel data={aggregates} />);
@@ -251,11 +259,13 @@ it.each([true, false])("renders ordered command components in PlanPage with sche
   const frames: SseFrame[] = [...commands.map(data => ({ event: "ui_command" as const, data })), { event: "token", data: { text: "합성 숨긴 원문", display_text: "합성 화면 문장" } }];
   const bytes = new TextEncoder().encode(frames.map(f => `event: ${f.event}\ndata: ${JSON.stringify(f.data)}\n\n`).join(""));
   const fetch = vi.fn().mockImplementation((url: string) => Promise.resolve(url === "/api/graph/schema" ? new Response(JSON.stringify(success ? schema : { detail: "GRAPH_UNAVAILABLE" }), { status: success ? 200 : 503 }) : new Response(new ReadableStream({ start(c) { c.enqueue(bytes); c.close(); } })))); vi.stubGlobal("fetch", fetch);
-  render(<PlanPage workspaces={[{ tenant_id: "synthetic", display_name: "합성 공간", brand: null, product_name: null }]} imageEnabled={false} />, { wrapper: SessionProvider });
-  fireEvent.change(screen.getByLabelText("작업 공간"), { target: { value: "synthetic" } }); fireEvent.change(screen.getByLabelText("요청"), { target: { value: "합성 요청" } }); fireEvent.click(screen.getByRole("button", { name: "전송" }));
+  render(<><TestWorkspace /><PlanPage workspaces={[{ tenant_id: "synthetic", display_name: "합성 공간", brand: null, product_name: null }]} imageEnabled={false} /></>, { wrapper: SessionProvider });
+  fireEvent.click(screen.getByRole("button", { name: "작업 공간" })); fireEvent.click(await screen.findByRole("option", { name: /합성 공간/ })); fireEvent.change(screen.getByLabelText("요청"), { target: { value: "합성 요청" } }); fireEvent.click(screen.getByRole("button", { name: "기획하기" }));
   await screen.findByText("합성 화면 문장"); await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
-  const nodes = [screen.getByText("합성 화면 문장"), screen.getByRole("region", { name: "근거 소재" }), screen.getByRole("heading", { name: "합성 기획" }), screen.getByRole("heading", { name: "합성 두 번째 기획" }), screen.getByRole("region", { name: "분포" }), screen.getByRole("region", { name: "검증된 집계(도구가 센 값)" }), screen.getByText(/합성 비용.*\$0.0100/)];
+  const nodes = [screen.getByLabelText("합성 비용"), screen.getByText("합성 화면 문장"), screen.getByRole("heading", { name: "합성 기획" }), screen.getByRole("heading", { name: "합성 두 번째 기획" }), screen.getByRole("region", { name: "근거 소재" }), screen.getByRole("region", { name: "분포" }), screen.getByRole("region", { name: "검증된 집계(도구가 센 값)" })];
   for (let i = 1; i < nodes.length; i++) expect(nodes[i - 1].compareDocumentPosition(nodes[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.getByLabelText("합성 비용").textContent).toBe("$0.010");
+  expandAll();
   expect(screen.queryByText("합성 숨긴 원문")).toBeNull(); expect(screen.getByRole("link", { name: card.evidence_id! }).getAttribute("href")).toBe(`#${screen.getByRole("region", { name: "근거 소재" }).querySelector("article")!.id}`);
 });
 it("shares pending and saved feedback across copies of the same plan in the conversation", async () => {
@@ -305,7 +315,7 @@ it.each([true, false])("filters only the plan intro line when show_plan=%s, keep
   expect(answer.textContent).toBe(showPlan ? `합성 한도 도달 안내\n합성 안내: ${PLAN_INTRO_TEXT}\n합성 다른 안내` : text);
   const stages = screen.getByLabelText("진행 단계");
   expect(stages.nextElementSibling).toBe(answer);
-  expect(answer.nextElementSibling).toBe(screen.getByRole("region", { name: "근거 소재" }));
+  expect(answer.nextElementSibling).toBe(showPlan ? screen.getByRole("article", { name: "합성 기획" }) : screen.getByRole("region", { name: "근거 소재" }));
 });
 it("omits an empty answer after filtering an intro-only plan turn", () => {
   const state = reducer({ ...initialState, tenantId: "synthetic" }, { type: "request_started", message: "합성 요청" });
@@ -325,12 +335,16 @@ it("shows only the choice status, hides unavailable/stopped stages and preserves
     const events = status === "done" ? [{ agent: "supervisor", phase: "done", status: "research" }] : [];
     rerender(<ProgressTracker turnStatus={status} stepEvents={events} />);
     const labels = { pending: "대기", running: "진행 중", done: "완료", failed: "실패" };
-    expect(screen.getAllByRole("listitem").map(node => node.textContent)).toEqual(deriveStages(events, status).map(stage => stage.id === "complete" && stage.status === "done" ? stage.label : `${stage.label} ${labels[stage.status]}`));
+    const stages = deriveProgress(events, status);
+    expect(screen.getAllByRole("listitem").map(node => node.textContent)).toEqual(stages.map(stage => stage.label));
+    expect(screen.getAllByRole("listitem").map(node => node.getAttribute("data-status"))).toEqual(stages.map(stage => stage.status));
+    expect(screen.getAllByRole("img").map(node => node.getAttribute("aria-label"))).toEqual(stages.map(stage => labels[stage.status]));
   }
 });
 it("keeps evaluation attempts collapsed initially and reveals every attempt's checks, scores, review items and costs", () => {
   const attempts = [...plan.attempts, { attempt: 2, scores: { differentiation: 4, fit: 5 }, low_items: ["fit"], checks_passed: false, final_passed: false, cost_usd: .012345 }];
   const { container } = render(<PlanResult data={{ ...plan, attempts }} tenantId={null} />);
+  expandAll();
   const details = container.querySelector("details")!;
   expect(details).toBeTruthy(); expect(details.hasAttribute("open")).toBe(false);
   const summary = screen.getByText("평가 시도 보기 · 되돌림 1회");
@@ -354,8 +368,48 @@ it("orders plan sections, disclaimer, image and feedback after the folded attemp
   const { container } = render(<PlanResult data={{ ...plan, plan_id: "synthetic", image }} tenantId="synthetic" />);
   await screen.findByRole("img");
   const root = container.querySelector(".plan-card")!;
-  expect(Array.from(root.children).map(node => node.getAttribute("aria-label") ?? node.tagName)).toEqual([
-    "HEADER", "장면 구성", "카피", "주장 효능", "검사 결과", "경쟁사 패턴 반영", "기획안 근거", "DETAILS", "P", "FIGURE", "기획안 피드백",
+  expect(root.querySelector(".gs-plan-media img")).toBeTruthy();
+  expect(root.querySelector(".gs-plan-summary h3")?.textContent).toBe(plan.plan.title);
+  expect(root.querySelector(".gs-plan-actions [aria-label='기획안 피드백']")).toBeTruthy();
+  const expanded = root.querySelector<HTMLElement>(".gs-plan-expanded")!;
+  expect(expanded.hidden).toBe(true);
+  expect(Array.from(expanded.children).map(node => node.getAttribute("aria-label") ?? node.tagName)).toEqual([
+    "장면 구성", "카피", "주장 효능", "검사 결과", "경쟁사 패턴 반영", "기획안 근거", "DETAILS", "P",
   ]);
-  expect(root.children[8].textContent).toBe(plan.disclaimer);
+  expect(expanded.children[7].textContent).toBe(plan.disclaimer);
+  expect(screen.getByText("합성 장면")).toBeTruthy();
+  expect(screen.queryByRole("region", { name: "장면 구성" })).toBeNull();
+  const toggle = screen.getByRole("button", { name: "전체 보기 →" });
+  fireEvent.click(toggle);
+  expect(toggle.getAttribute("aria-expanded")).toBe("true");
+  expect(expanded.hidden).toBe(false);
+  for (const label of ["장면 구성", "카피", "주장 효능", "검사 결과", "경쟁사 패턴 반영", "기획안 근거"]) expect(screen.getByRole("region", { name: label })).toBeTruthy();
+  expect(screen.getByText("합성 카피")).toBeTruthy();
+  expect(screen.getByText("평가 시도 보기 · 되돌림 0회")).toBeTruthy();
+  fireEvent.click(toggle);
+  expect(expanded.hidden).toBe(true);
+});
+
+it("shows a compact horizontal plan summary with a placeholder and preserves every detail in the DOM", () => {
+  const { container } = render(<PlanResult data={{ ...plan, plan_id: "synthetic", unknown_count: 1, unknown_codes: { EFFICACY_UNKNOWN: 1 }, design_disclaimer: "합성 시안 고지" }} names={names} tenantId="synthetic" />);
+  expect(screen.getByText("시안 이미지").closest(".gs-plan-media")).toBeTruthy();
+  expect(screen.getAllByText("합성 효능 · 확인됨")).toHaveLength(2);
+  expect(screen.getByText("근거 연결 없음 1건")).toBeTruthy();
+  expect(screen.getByText("경쟁사 패턴 반영 · 비교한 축 2개 중 같은 축 1개")).toBeTruthy();
+  for (const name of ["승인", "반려", "전체 보기 →"]) expect(screen.getByRole("button", { name })).toBeTruthy();
+  expect((screen.getByLabelText("피드백 사유") as HTMLInputElement).tagName).toBe("INPUT");
+  for (const text of ["합성 장면", "합성 카피", "주장 효능", "효능 근거 연결 없음", "코드 검사: 통과", "평가 상태: 검토 필요", plan.pattern_alignment_label, "근거 소재 목록", "평가 시도 보기 · 되돌림 0회", plan.disclaimer, "합성 시안 고지"]) expect(screen.getByText(text).closest("[hidden]")).toBeTruthy();
+  expect(container.querySelector(".gs-plan-summary .gs-result-badges")).toBeTruthy();
+  expandAll();
+  for (const text of ["합성 장면", "합성 카피", "합성 시안 고지"]) expect(screen.getByText(text).closest("[hidden]")).toBeNull();
+});
+it("groups compact evidence summaries under platform headings with icons and counts", () => {
+  render(<EvidenceSummary data={{ cards: [card, { ...card, evidence_id: "instagram:a", source: "instagram", hook_type: "question" }], missing: 1 }} />);
+  expect(screen.getAllByRole("heading", { level: 4 }).filter(node => node.classList.contains("gs-platform-heading")).map(node => node.textContent)).toEqual(["Instagram · 1건", "YouTube · 1건"]);
+  for (const heading of document.querySelectorAll(".gs-platform-heading")) {
+    expect(heading.querySelector("svg[aria-hidden=true]")).toBeTruthy();
+    expect(heading.nextElementSibling?.classList.contains("gs-evidence-grid")).toBe(true);
+  }
+  expect(document.querySelectorAll(".gs-evidence-card")).toHaveLength(2);
+  expect(screen.getByText("근거 소재 1건을 불러오지 못했습니다.")).toBeTruthy();
 });

@@ -4,25 +4,19 @@ import { useSession } from "../../lib/session";
 import type { Workspace } from "../../lib/types";
 import { CommandTenantContext, WorkspaceBrandContext } from "../results/ResultsView";
 import { FeedbackSession } from "../results/FeedbackBar";
-import { WorkspacePicker } from "../WorkspacePicker";
 import { PageHeader } from "../ui";
 import { Composer } from "./Composer";
 import { TurnCard } from "./TurnCard";
 import "../../app/plan.css";
 
-export function PlanPage({ workspaces, imageEnabled, onWorkspaceChange }: {
-  workspaces: Workspace[]; imageEnabled: boolean; onWorkspaceChange?: (tenantId: string | null) => void;
+export function PlanPage({ workspaces, imageEnabled }: {
+  workspaces: Workspace[]; imageEnabled: boolean;
 }) {
-  const { state, start, send, cancel, retry, selectWorkspace } = useSession();
+  const { state, start, send, cancel, retry } = useSession();
   const busy = state.activeTurnId !== null;
   return <CommandTenantContext.Provider value={state.tenantId}><WorkspaceBrandContext.Provider value={workspaces.find(workspace => workspace.tenant_id === state.tenantId)?.brand ?? null}><FeedbackSession key={state.tenantId}>
     <div className="gs-plan-page">
       <PageHeader title="광고 기획" description="제품과 원하는 광고 방향을 알려주세요. 근거를 찾아 기획안을 만듭니다." />
-      <WorkspacePicker workspaces={workspaces} value={state.tenantId} onChange={tenantId => {
-        if (state.tenantId === tenantId) return;
-        selectWorkspace(tenantId);
-        onWorkspaceChange?.(tenantId);
-      }} />
       <Composer key={state.tenantId} enabled={Boolean(state.tenantId)} busy={busy} imageEnabled={imageEnabled} onSend={send} />
       <section className="gs-conversation" aria-label="대화">
         {state.turns.map((turn, index) => {

@@ -8,7 +8,6 @@ import { EvidenceSummary } from "../evidence/EvidenceSummary";
 import { PlanResult } from "./PlanResult";
 import { DistributionChart } from "./DistributionChart";
 import { AggregatesPanel } from "./AggregatesPanel";
-import { CostLine } from "./CostLine";
 import { Button } from "../ui";
 import "../../app/results.css";
 
@@ -32,11 +31,11 @@ export function ResultsView({ commands, onOpenGraph }: { commands: UiCommand[]; 
   const anchors: Record<string, string> = Object.fromEntries(cards.flatMap((card, i) => card.evidence_id ? [[card.evidence_id, `${prefix}-evidence-${i}`]] : []));
   // Anchors are turn-local so repeated evidence in another turn cannot hijack links.
   return <>
-    <EvidenceSummary data={{ cards, missing: evidence.reduce((total, command) => total + command.data.missing, 0) }} names={names} anchors={anchors} workspaceBrand={workspaceBrand} />
+
     {commands.filter(command => command.kind === "show_plan").map((command, i) => <PlanResult key={`plan-${i}-${command.data.plan_id ?? "unsaved"}`} data={command.data} names={names} tenantId={tenantId} evidenceAnchors={anchors} />)}
+    <EvidenceSummary data={{ cards, missing: evidence.reduce((total, command) => total + command.data.missing, 0) }} names={names} anchors={anchors} workspaceBrand={workspaceBrand} />
     {onOpenGraph && commands.filter(command => command.kind === "show_graph_fragment").map((command, i) => <Button variant="secondary" key={`graph-${i}`} onClick={() => onOpenGraph(command.data.evidence_ids)}>근거 그래프 보기</Button>)}
     {commands.filter(command => command.kind === "show_distribution").map((command, i) => <DistributionChart key={`distribution-${i}`} data={command.data} names={names} />)}
     {commands.filter(command => command.kind === "show_aggregates").map((command, i) => <AggregatesPanel key={`aggregates-${i}`} data={command.data} />)}
-    {commands.filter(command => command.kind === "show_cost").map((command, i) => <CostLine key={`cost-${i}`} data={command.data} />)}
   </>;
 }

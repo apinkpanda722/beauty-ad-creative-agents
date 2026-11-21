@@ -45,7 +45,7 @@ export function FeedbackBar({ tenantId, planId }: { tenantId: string; planId: st
     finally { lock.current = false; setPending(false); session?.finish(key, success); }
   }
   return <section className="gs-feedback-bar" aria-label="기획안 피드백">{isSaved ? <p role="status">저장했습니다</p> : <>
-    <label>피드백 사유<textarea value={reason} disabled={isPending} onChange={event => setReason(event.target.value)} placeholder="반려할 때는 사유를 입력하세요" /></label>
+    <label><span className="gs-sr-only">피드백 사유</span><input type="text" value={reason} disabled={isPending} onChange={event => setReason(event.target.value)} placeholder="반려할 때는 사유를 입력하세요" /></label>
     <div className="gs-feedback-actions"><Button disabled={isPending} onClick={() => void submit("approved")}>승인</Button><Button variant="secondary" disabled={isPending || !reason.trim()} onClick={() => void submit("rejected")}>반려</Button>{isPending && <small role="status">저장 중입니다.</small>}</div>
     {error && <p role="alert">{error}</p>}
   </>}</section>;

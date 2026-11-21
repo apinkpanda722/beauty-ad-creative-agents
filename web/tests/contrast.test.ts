@@ -8,9 +8,15 @@ const colors = {
   "--gs-text-muted": "#475569",
   "--gs-accent": "#0F766E",
   "--gs-danger": "#B91C1C",
+  "--gs-accent-weak": "#F0FDFA",
+  "--gs-success": "#166534",
+  "--gs-success-weak": "#F0FDF4",
   "--gs-bg": "#FFFFFF",
 };
 const pairs = [
+  ["--gs-accent", "--gs-accent-weak"],
+  ["--gs-success", "--gs-bg"],
+  ["--gs-success", "--gs-success-weak"],
   ["--gs-text", "--gs-bg"],
   ["--gs-text-muted", "--gs-bg"],
   ["--gs-accent", "--gs-bg"],

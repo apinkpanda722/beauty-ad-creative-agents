@@ -13,3 +13,7 @@ export function PatternAlignment({ data, label, names = taxonomyNames() }: { dat
     })}</ul><small>{label}</small>
   </section>;
 }
+
+export function PatternSummary({ data }: { data: PatternData }) {
+  return <p className="gs-pattern-summary">경쟁사 패턴 반영 · 비교한 축 {data.compared ?? 0}개 중 같은 축 {data.same_count ?? 0}개</p>;
+}

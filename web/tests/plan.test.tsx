@@ -10,7 +10,8 @@ import { ClarifyCard } from "../components/plan/ClarifyCard";
 import { getWorkspaces } from "../lib/api";
 import type { Clarification, SseFrame, WorkspacesResponse } from "../lib/types";
 import Page from "../app/page";
-import { SessionProvider } from "../lib/session";
+import { WorkspaceChip } from "../components/shell/WorkspaceChip";
+import { SessionProvider, useSession } from "../lib/session";
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 const workspaces: WorkspacesResponse = {
@@ -28,18 +29,23 @@ function response(frames: SseFrame[], thread = "synthetic:thread") {
   const bytes = new TextEncoder().encode(frames.map(f => `event: ${f.event}\ndata: ${JSON.stringify(f.data)}\n\n`).join(""));
   return new Response(new ReadableStream({ start(c) { c.enqueue(bytes); c.close(); } }), { headers: { "X-Thread-Id": thread } });
 }
+function PlanHarness({ imageEnabled }: { imageEnabled: boolean }) {
+  const { state, selectWorkspace } = useSession();
+  return <><WorkspaceChip workspaces={workspaces.workspaces} value={state.tenantId} onChange={selectWorkspace} /><PlanPage workspaces={workspaces.workspaces} imageEnabled={imageEnabled} /></>;
+}
 function setup(frames: SseFrame[], imageEnabled = false) {
   const fetch = vi.fn().mockImplementation(() => Promise.resolve(response(frames)));
   vi.stubGlobal("fetch", fetch);
-  render(<PlanPage workspaces={workspaces.workspaces} imageEnabled={imageEnabled} />, { wrapper: SessionProvider });
+  render(<PlanHarness imageEnabled={imageEnabled} />, { wrapper: SessionProvider });
   return fetch;
 }
 function selectWorkspace(value = "test-isntree") {
-  fireEvent.change(screen.getByLabelText("작업 공간"), { target: { value } });
+  fireEvent.click(screen.getByRole("button", { name: "작업 공간" }));
+  fireEvent.click(screen.getByRole("option", { name: value === "test-isntree" ? /합성 공간 A/ : /합성 공간 B/ }));
 }
 function send() {
   fireEvent.change(screen.getByLabelText("요청"), { target: { value: "합성 사용자 요청" } });
-  fireEvent.click(screen.getByRole("button", { name: "전송" }));
+  fireEvent.click(screen.getByRole("button", { name: "기획하기" }));
 }
 async function ready() { await waitFor(() => expect((screen.getByLabelText("요청") as HTMLTextAreaElement).disabled).toBe(false)); }
 function body(fetch: ReturnType<typeof vi.fn>, index: number) { return JSON.parse(fetch.mock.calls[index][1].body); }
@@ -50,7 +56,8 @@ it("loads workspace metadata with no headers and renders API failure", async () 
   expect(await getWorkspaces()).toEqual(workspaces);
   expect(fetch).toHaveBeenCalledExactlyOnceWith("/api/workspaces");
   render(<Page />);
-  expect(await screen.findByRole("option", { name: /합성 공간 A.*합성 브랜드 A.*합성 제품 A/ })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "작업 공간" }));
+  expect(await screen.findByRole("option", { name: /합성 공간 A.*합성 제품 A/ })).toBeTruthy();
   cleanup();
   fetch.mockRejectedValue(new TypeError("synthetic"));
   render(<Page />);
@@ -64,8 +71,9 @@ it("enables input only after workspace selection and has no preset request butto
   expect(screen.queryByLabelText("예시 요청")).toBeNull();
   expect(existsSync(join(process.cwd(), "lib/examples.ts"))).toBe(false);
   expect((screen.getByLabelText("요청") as HTMLTextAreaElement).value).toBe("");
-  expect(screen.getAllByRole("button").map(button => button.textContent)).toEqual(["전송"]);
+  expect(screen.getAllByRole("button").map(button => button.textContent)).toEqual(["합성 공간 A · 합성 제품 A", "기획하기"]);
   expect(fetch).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "작업 공간" }));
   expect(screen.getByText("작업 공간은 서버를 시작할 때 정한 그룹 하나만 보입니다. 바꾸려면 서버를 다시 시작하세요.")).toBeTruthy();
 });
 it("renders server labels verbatim, limits chips to available values and requires at least one selection", () => {
@@ -151,7 +159,7 @@ it("handles IME, Shift+Enter, a 2000 character cap and disabled running input", 
   fireEvent.compositionEnd(input);
   fireEvent.keyDown(input, { key: "Enter" });
   expect(fetch).toHaveBeenCalledTimes(1); expect(input.disabled).toBe(true);
-  expect((screen.getByRole("button", { name: "전송" }) as HTMLButtonElement).disabled).toBe(true);
+  expect((screen.getByRole("button", { name: "기획하기" }) as HTMLButtonElement).disabled).toBe(true);
   await ready();
 });
 it.each([true, false])("image_enabled=%s controls checkbox and optional request field", async enabled => {
@@ -198,7 +206,7 @@ it("reuses the first response thread, supports image opt-out and leaves Shift+En
   fireEvent.change(input, { target: { value: "합성 다음 줄\n합성 추가 줄" } });
   expect(input.value).toContain("\n");
   fetch.mockResolvedValue(response([{ event: "token", data: { text: "합성 두 번째 완료" } }], "synthetic:other"));
-  fireEvent.click(screen.getByRole("button", { name: "전송" })); await ready();
+  fireEvent.click(screen.getByRole("button", { name: "기획하기" })); await ready();
   send(); await ready();
   expect(body(fetch, 0).with_image).toBe(false);
   expect(body(fetch, 1).thread_id).toBe("synthetic:thread"); expect(body(fetch, 2).thread_id).toBe("synthetic:thread");
@@ -224,19 +232,21 @@ it("renders the terminal stage label exactly once and retains stage counts and r
     { agent: "supervisor", phase: "done", status: "plan" },
   ];
   render(<ProgressTracker stepEvents={events} turnStatus="done" />);
-  expect(screen.getAllByText("완료")).toHaveLength(1);
-  expect(screen.getByText("기획 2회")).toBeTruthy();
-  expect(screen.getByText("되돌림 1회")).toBeTruthy();
-  expect(screen.getAllByRole("listitem").map(item => item.getAttribute("data-status"))).toEqual(["done", "done", "done", "done", "done"]);
+  for (const label of ["요청 해석", "리서치", "기획·평가"]) expect(screen.getAllByText(label)).toHaveLength(1);
+  expect(screen.queryByText(/완료 완료|요청 해석 완료/)).toBeNull();
+  expect(screen.getByText("재작업 1회").closest("li")?.textContent).toContain("기획·평가");
+  expect(screen.getAllByRole("img", { name: "완료" })).toHaveLength(3);
+  expect(screen.getAllByRole("listitem").map(item => item.getAttribute("data-status"))).toEqual(["done", "done", "done"]);
 });
 it("announces running and failed stages with icons and text in a live region", () => {
   const { rerender } = render(<ProgressTracker stepEvents={[]} turnStatus="running" />);
   const region = screen.getByLabelText("진행 단계");
   expect(region.getAttribute("aria-live")).toBe("polite");
-  expect(within(region).getByText("요청 해석 진행 중").closest("li")?.getAttribute("data-status")).toBe("running");
+  expect(within(region).getByText("요청 해석").closest("li")?.getAttribute("data-status")).toBe("running");
+  expect(within(region).getByRole("img", { name: "진행 중" })).toBeTruthy();
   expect(region.querySelector('[data-status="running"] .gs-stage-icon')).toBeTruthy();
   rerender(<ProgressTracker stepEvents={[{ agent: "research", phase: "end", status: "failed" }]} turnStatus="error" />);
-  expect(screen.getByText("리서치 실패").closest("li")?.getAttribute("data-status")).toBe("failed");
+  expect(screen.getByText("리서치").closest("li")?.getAttribute("data-status")).toBe("failed");
 });
 it("updates elapsed numbers with an injected clock only while running and cleans up timers", () => {
   vi.useFakeTimers();
@@ -301,4 +311,58 @@ it("hides choice buttons for every resolved status and for a turn with a recorde
   rerender(<TurnCard turn={{ ...turn, status: "needs_choice", choiceLabel: "합성 선택", clarification }} busy={false} onChoice={vi.fn()} onCancel={vi.fn()} onRetry={vi.fn()} />);
   expect(screen.getByText("효능 선택 · 합성 선택")).toBeTruthy();
   expect(screen.queryByRole("button")).toBeNull();
+});
+
+it("starts with one input row, grows with content, and only describes nonempty input", () => {
+  setup([]); selectWorkspace();
+  const input = screen.getByLabelText("요청") as HTMLTextAreaElement;
+  expect(input.rows).toBe(1);
+  expect(input.getAttribute("aria-describedby")).toBeNull();
+  expect(screen.queryByText(/2000 · Enter/)).toBeNull();
+  Object.defineProperty(input, "scrollHeight", { configurable: true, value: 120 });
+  fireEvent.change(input, { target: { value: "합성 입력" } });
+  expect(input.style.height).toBe("120px");
+  expect(screen.getByText("5/2000 · Enter 전송, Shift+Enter 줄바꿈").id).toBe(input.getAttribute("aria-describedby"));
+  expect(document.querySelector("select, .workspace-picker")).toBeNull();
+  fireEvent.keyDown(input, { key: "Enter", keyCode: 229 });
+  expect(input.value).toBe("합성 입력");
+});
+it("renders arrival durations and the same turn's optional text cost in the progress row", () => {
+  const base = reducer({ ...initialState, tenantId: "synthetic" }, { type: "request_started", message: "합성 요청" }).turns[0];
+  const turn = { ...base, startedAt: 100, stepAt: [1700], stepEvents: [{ agent: "supervisor", phase: "end", status: "ok" }] };
+  const props = { busy: false, onChoice: vi.fn(), onCancel: vi.fn(), onRetry: vi.fn() };
+  const { rerender } = render(<TurnCard turn={turn} {...props} />);
+  expect(screen.getByText("1.6s")).toBeTruthy();
+  expect(screen.queryByLabelText("텍스트 모델 비용(이미지 제외)")).toBeNull();
+  rerender(<TurnCard turn={{ ...turn, commands: [{ kind: "show_cost", data: { label: "텍스트 모델 비용(이미지 제외)", text_spent_usd: .062, max_text_cost_usd: 1 } }] }} {...props} />);
+  const cost = screen.getByLabelText("텍스트 모델 비용(이미지 제외)");
+  expect(cost.textContent).toBe("$0.062");
+  expect(cost.closest("section")).toBe(screen.getByLabelText("진행 단계"));
+  expect(screen.getAllByText("$0.062")).toHaveLength(1);
+});
+
+it("timestamps requests and SSE arrivals with the injected session clock, including retries and choices", async () => {
+  let now = 100;
+  const step: SseFrame = { event: "step", data: { agent: "supervisor", phase: "end", status: "ok" } };
+  const fetch = vi.fn().mockImplementationOnce(async () => {
+    now = 1700; return response([step, { event: "error", data: { code: "AGENT_INTERNAL_ERROR" } }]);
+  }).mockImplementationOnce(async () => {
+    now = 4900; return response([step, { event: "needs_clarification", data: clarification }]);
+  }).mockImplementationOnce(async () => {
+    now = 8100; return response([step, { event: "token", data: { text: "합성 시간 완료" } }]);
+  });
+  vi.stubGlobal("fetch", fetch);
+  function Snapshot() {
+    const { state } = useSession();
+    return <output aria-label="합성 세션">{JSON.stringify(state.turns.map(turn => ({ startedAt: turn.startedAt, stepAt: turn.stepAt })))}</output>;
+  }
+  render(<SessionProvider clock={() => now}><PlanHarness imageEnabled={false} /><Snapshot /></SessionProvider>);
+  const snapshot = () => JSON.parse(screen.getByLabelText("합성 세션").textContent!);
+  selectWorkspace(); send(); await ready();
+  expect(snapshot()).toEqual([{ startedAt: 100, stepAt: [1700] }]);
+  now = 3300; fireEvent.click(screen.getByRole("button", { name: "다시 시도" })); await ready();
+  expect(snapshot()).toEqual([{ startedAt: 100, stepAt: [1700] }, { startedAt: 3300, stepAt: [4900] }]);
+  now = 6500; fireEvent.click(screen.getByRole("button", { name: "합성 생략" })); await ready();
+  expect(snapshot()).toEqual([{ startedAt: 100, stepAt: [1700] }, { startedAt: 3300, stepAt: [4900] }, { startedAt: 6500, stepAt: [8100] }]);
+  expect(fetch).toHaveBeenCalledTimes(3);
 });

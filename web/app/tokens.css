@@ -7,6 +7,13 @@
   --gs-border: #E2E8F0;
   --gs-text: #0F172A;
   --gs-text-muted: #475569;
+  --gs-success: #166534;
+  --gs-success-weak: #F0FDF4;
+  --gs-border-width: 1px;
+  --gs-content-width: 1120px;
+  --gs-sidebar-width: 216px;
+  --gs-composer-max-height: 176px;
+  --gs-radius-pill: 999px;
   --gs-danger: #B91C1C;
   --gs-warn: #92400E;
   --gs-space-1: 4px;
@@ -21,7 +28,7 @@
   --gs-radius-sm: 4px;
   --gs-radius-md: 8px;
   --gs-radius-lg: 12px;
-  --gs-shadow-sm: 0 1px 3px rgb(15 23 42 / 8%);
+  --gs-shadow-sm: none;
   --gs-shadow-md: 0 4px 12px rgb(15 23 42 / 12%);
   --gs-text-xs: 12px;
   --gs-text-sm: 14px;
