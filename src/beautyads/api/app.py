@@ -19,6 +19,7 @@ from beautyads.agents.skeleton import RECURSION_LIMIT
 from beautyads.api.ask import register_ask
 from beautyads.api.feedback import register_feedback
 from beautyads.api.graph_routes import register_graph
+from beautyads.api.plans import register_plans
 from beautyads.api.session import resolve_session
 from beautyads.api.sse import encode_event
 from beautyads.domain.tenant import TenantRepository
@@ -72,6 +73,7 @@ def create_app(assemble: Callable[[], Assembly]) -> FastAPI:
     register_feedback(app)
     register_ask(app)
     register_graph(app)
+    register_plans(app)
 
     @app.get("/healthz")
     async def healthz():
