@@ -47,7 +47,16 @@
     {
       "step": 4,
       "name": "docs-release",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-21T12:28:06+0900",
+      "summary": "Langfuse 확인 기록과 문구 해제, 리허설 16개 항목, CONTRACTS·PHASES 기록 및 문서 테스트 갱신. 새 화면·이미지 검수는 미확인 유지. make verify 통과(Python 6390개·웹 125개), 패키지 설치 없음.",
+      "completed_at": "2026-11-21T12:34:50+0900",
+      "usage": {
+        "input_tokens": 1377079,
+        "cached_input_tokens": 1291392,
+        "output_tokens": 9413,
+        "attempts": 1
+      }
     }
   ],
   "created_at": "2026-11-21T11:58:26+0900"
