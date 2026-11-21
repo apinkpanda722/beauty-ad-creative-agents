@@ -49,7 +49,10 @@ def _synthetic_trace() -> TraceRecord:
                 ("supervisor", "end", 1),
                 ("research", "end", 3),
                 ("planning", "start", 4),
-                ("evaluation", "end", 8),
+                ("evaluation", "end", 10),
+                ("rework", "end", 10),
+                ("image", "end", 10),
+                ("supervisor", "done", 10),
             ]
         ],
         calls=[
@@ -65,8 +68,13 @@ def _synthetic_trace() -> TraceRecord:
                 "ended_at": start + timedelta(seconds=offset),
             }
             for purpose, cost, duration, offset in [
-                ("research", 0.001, 1000, 2),
-                ("planning", 0.002, 2000, 7),
+                ("supervisor", 0, 1000, 1),
+                ("research", 0.001, 2000, 3),
+                ("plan", 0.002, 1000, 5),
+                ("evaluate", 0, 1000, 6),
+                ("plan", 0, 1000, 7),
+                ("evaluate", 0, 1000, 8),
+                ("image-plan", 0, 2000, 10),
             ]
         ],
     )
@@ -88,6 +96,8 @@ def _readback_matches(response, expected):
     for item in expected:
         row = observations.get(item["id"], {})
         if row.get("type") != item["kind"].upper():
+            return False
+        if row.get("name") != item["name"]:
             return False
         if row.get("parentObservationId") != item["parent_id"]:
             return False
@@ -167,6 +177,12 @@ def main(
                             f"{item['kind']} {item['name']} startTime=ok endTime=ok latency=ok "
                             f"costDetails={'ok' if item['kind'] == 'generation' else 'n/a'} parent=ok"
                         )
+                    print(
+                        "span_names=ok "
+                        + ", ".join(
+                            item["name"] for item in expected if item["kind"] == "span"
+                        )
+                    )
                     print(
                         "OBS_CHECK_OK synthetic trace fields verified; confirm timeline in UI"
                     )

@@ -35,11 +35,22 @@ class Observation(TypedDict):
 def build_timeline(record: TraceRecord) -> list[Observation]:
     """Project recorded boundaries only; legacy observations remain untimed."""
     observations: list[Observation] = []
-    timed = any(step.at is not None for step in record.steps)
+    intervals = [
+        (
+            call.ended_at - timedelta(milliseconds=call.duration_ms),
+            call.ended_at,
+        )
+        if call.duration_ms is not None and call.ended_at is not None
+        else (None, None)
+        for call in record.calls
+    ]
+    timed = any(step.at is not None for step in record.steps) or any(
+        start is not None for start, _ in intervals
+    )
 
     def add(kind, name, start, end, parent_id, attrs=None):
         observation: Observation = {
-            "id": uuid5(NAMESPACE_URL, f"{record.trace_id}:{len(observations)}").hex,
+            "id": str(len(observations)),
             "kind": kind,
             "name": name,
             "start": start,
@@ -58,38 +69,60 @@ def build_timeline(record: TraceRecord) -> list[Observation]:
         if timed
         else None,
         None,
+        {
+            "metadata": {
+                "rework_count": sum(step.agent == "rework" for step in record.steps)
+            }
+        },
     )
-    previous = record.started_at if timed else None
-    pending_plan = None
-    for step in record.steps:
-        if step.agent == "supervisor" and step.phase == "done":
+    previous = record.started_at
+    for name in ("supervisor", "research"):
+        end = next(
+            (
+                step.at
+                for step in record.steps
+                if step.agent == name and step.phase == "end" and step.at is not None
+            ),
+            None,
+        )
+        if previous is not None and end is not None and previous <= end:
+            add("span", name, previous, end, root["id"])
+        previous = end
+
+    image_count = sum(
+        call.purpose.startswith("image") and start is not None
+        for call, (start, _) in zip(record.calls, intervals, strict=True)
+    )
+    counts = {"planning": 0, "evaluation": 0, "image": 0}
+    call_stages = {}
+    for index, (call, (start, end)) in enumerate(
+        zip(record.calls, intervals, strict=True)
+    ):
+        if start is None:
             continue
-        if step.agent == "rework":
-            add("event", "rework", step.at, step.at, root["id"])
-            continue
-        if step.agent == "planning" and step.phase == "start":
-            pending_plan = add("span", "plan", None, None, root["id"])
-            previous = step.at
-        elif step.agent == "evaluation":
-            if pending_plan is not None:
-                if previous is not None and step.at is not None and previous <= step.at:
-                    pending_plan["start"], pending_plan["end"] = previous, step.at
-                pending_plan = None
-            previous = step.at
-        elif step.agent in {"supervisor", "research", "image"}:
-            start, end = previous, step.at
-            if start is None or end is None or start > end:
-                start = end = None
-            add("span", step.agent, start, end, root["id"])
-            previous = step.at
+        name = {"plan": "planning", "evaluate": "evaluation"}.get(call.purpose)
+        if call.purpose.startswith("image"):
+            name = "image"
+        if name is not None:
+            counts[name] += 1
+            label = (
+                name
+                if name == "image" and image_count == 1
+                else f"{name} #{counts[name]}"
+            )
+            call_stages[index] = add("span", label, start, end, root["id"])
+
+    if not any(call.purpose.startswith("image") for call in record.calls):
+        for step in record.steps:
+            if step.agent == "image" and step.status == "failed":
+                add("event", "image_failed", None, None, root["id"])
 
     stages = [row for row in observations if row["kind"] == "span" and row is not root]
-    for call in record.calls:
-        start = end = None
+    for index, (call, (start, end)) in enumerate(
+        zip(record.calls, intervals, strict=True)
+    ):
         parent = root
-        if timed and call.duration_ms is not None and call.ended_at is not None:
-            end = call.ended_at
-            start = end - timedelta(milliseconds=call.duration_ms)
+        if start is not None:
             containing = [
                 row
                 for row in stages
@@ -99,7 +132,14 @@ def build_timeline(record: TraceRecord) -> list[Observation]:
                 and end <= row["end"]
             ]
             if containing:
-                parent = min(containing, key=lambda row: row["end"] - row["start"])
+                parent = min(
+                    containing,
+                    key=lambda row: (
+                        row["end"] - row["start"],
+                        not row["name"].startswith(("planning", "evaluation", "image")),
+                        row is not call_stages.get(index),
+                    ),
+                )
         usage = {
             "input": call.input_tokens,
             "output": call.output_tokens,
@@ -125,7 +165,23 @@ def build_timeline(record: TraceRecord) -> list[Observation]:
                 },
             },
         )
-    return observations
+    # Assign UUID5 ordinals only after ordering spans and their generations.
+    ordered = [
+        root,
+        *sorted(
+            observations[1:],
+            key=lambda row: (row["start"] is None, row["start"], row["kind"] != "span"),
+        ),
+    ]
+    ids = {
+        row["id"]: uuid5(NAMESPACE_URL, f"{record.trace_id}:{index}").hex
+        for index, row in enumerate(ordered)
+    }
+    for row in ordered:
+        row["id"] = ids[row["id"]]
+        if row["parent_id"] is not None:
+            row["parent_id"] = ids[row["parent_id"]]
+    return ordered
 
 
 def export_trace(

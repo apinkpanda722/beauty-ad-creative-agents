@@ -2,7 +2,9 @@
 
 import json
 from datetime import UTC, datetime, timedelta
+from itertools import pairwise
 from types import SimpleNamespace
+from uuid import NAMESPACE_URL, uuid5
 
 import pytest
 
@@ -37,7 +39,10 @@ def timeline_record():
                 ("supervisor", "end", 1),
                 ("research", "end", 3),
                 ("planning", "start", 4),
-                ("evaluation", "end", 8),
+                ("evaluation", "end", 10),
+                ("rework", "end", 10),
+                ("image", "end", 10),
+                ("supervisor", "done", 10),
             ]
         ],
         calls=[
@@ -55,8 +60,13 @@ def timeline_record():
                 "ended_at": at(end),
             }
             for purpose, cache, cost, duration, end in [
-                ("research", 3, 0.02, 1000, 2),
-                ("planning", 0, 0, 2000, 7),
+                ("supervisor", 0, 0, 1000, 1),
+                ("research", 3, 0.02, 2000, 3),
+                ("plan", 0, 0, 1000, 5),
+                ("evaluate", 0, 0, 1000, 6),
+                ("plan", 0, 0, 1000, 7),
+                ("evaluate", 0, 0, 1000, 8),
+                ("image-plan", 0, 0, 2000, 10),
             ]
         ],
     )
@@ -97,23 +107,56 @@ def test_timeline_boundaries_smallest_parent_and_deterministic_ids():
     timeline = build_timeline(record)
     assert timeline and timeline == build_timeline(record)
     spans = {row["name"]: row for row in timeline if row["kind"] == "span"}
-    assert set(spans) == {"ask", "supervisor", "research", "plan"}
-    for name, start, end in [
+    boundaries = [
         ("ask", 0, 10),
         ("supervisor", 0, 1),
         ("research", 1, 3),
-        ("plan", 4, 8),
-    ]:
+        ("planning #1", 4, 5),
+        ("evaluation #1", 5, 6),
+        ("planning #2", 6, 7),
+        ("evaluation #2", 7, 8),
+        ("image", 8, 10),
+    ]
+    assert list(spans) == [name for name, _, _ in boundaries]
+    for name, start, end in boundaries:
         assert (spans[name]["start"], spans[name]["end"]) == (at(start), at(end))
+        assert spans[name]["parent_id"] == (
+            None if name == "ask" else spans["ask"]["id"]
+        )
+    stages = list(spans.values())[1:]
+    assert all(left["end"] <= right["start"] for left, right in pairwise(stages))
     generations = [row for row in timeline if row["kind"] == "generation"]
-    assert len(generations) == 2
-    for row, start, end, parent in zip(
-        generations, [1, 5], [2, 7], ["research", "plan"], strict=True
-    ):
-        assert (row["start"], row["end"]) == (at(start), at(end))
-        assert row["parent_id"] == spans[parent]["id"]
+    assert len(generations) == len(record.calls) == 7
+    for row, call, stage in zip(generations, record.calls, stages, strict=True):
+        assert row["name"] == call.purpose
+        assert (row["start"], row["end"]) == (stage["start"], stage["end"])
+        assert row["parent_id"] == stage["id"]
+    assert generations[-1]["parent_id"] == spans["image"]["id"]
+    assert spans["image"]["end"] - spans["image"]["start"] == timedelta(
+        milliseconds=2000
+    )
+    assert not [row for row in timeline if row["kind"] == "event"]
+    assert spans["ask"]["attrs"]["metadata"]["rework_count"] == 1
+    assert [row["name"] for row in timeline] == [
+        "ask",
+        "supervisor",
+        "supervisor",
+        "research",
+        "research",
+        "planning #1",
+        "plan",
+        "evaluation #1",
+        "evaluate",
+        "planning #2",
+        "plan",
+        "evaluation #2",
+        "evaluate",
+        "image",
+        "image-plan",
+    ]
     assert len({row["id"] for row in timeline}) == len(timeline)
-    for row in timeline:
+    for index, row in enumerate(timeline):
+        assert row["id"] == uuid5(NAMESPACE_URL, f"{record.trace_id}:{index}").hex
         assert row["start"] <= row["end"]
         assert row["parent_id"] is None or row["parent_id"] in {
             item["id"] for item in timeline
@@ -123,26 +166,150 @@ def test_timeline_boundaries_smallest_parent_and_deterministic_ids():
 def test_multiple_plans_rework_image_and_done():
     record = timeline_record()
     step = type(record.steps[0])
-    record.steps.extend(
-        [
-            step(agent="rework", phase="end", status="ok", at=at(8)),
-            step(agent="planning", phase="start", status="ok", at=at(8)),
-            step(agent="evaluation", phase="end", status="ok", at=at(9)),
-            step(agent="image", phase="end", status="ok", at=at(10)),
-            step(agent="supervisor", phase="done", status="ok", at=at(10)),
-        ]
+    record.steps = [item for item in record.steps if item.agent != "rework"]
+    record.steps.insert(3, step(agent="evaluation", phase="end", status="ok", at=at(6)))
+    record.steps.insert(4, step(agent="planning", phase="start", status="ok", at=at(6)))
+    timeline = build_timeline(record)
+    attempts = [
+        row for row in timeline if row["kind"] == "span" and " #" in row["name"]
+    ]
+    assert [(row["name"], row["start"], row["end"]) for row in attempts] == [
+        ("planning #1", at(4), at(5)),
+        ("evaluation #1", at(5), at(6)),
+        ("planning #2", at(6), at(7)),
+        ("evaluation #2", at(7), at(8)),
+    ]
+    assert not [row for row in timeline if row["kind"] == "event"]
+    assert timeline[0]["attrs"]["metadata"]["rework_count"] == 0
+    image = next(row for row in timeline if row["name"] == "image")
+    assert (image["start"], image["end"]) == (at(8), at(10))
+    assert (
+        len(
+            [
+                row
+                for row in timeline
+                if row["kind"] == "span" and row["name"] == "supervisor"
+            ]
+        )
+        == 1
+    )
+
+
+@pytest.mark.parametrize(
+    "index, name", [(2, "planning #1"), (3, "evaluation #1"), (6, "image")]
+)
+def test_call_span_wins_equal_interval_parent_tie(index, name):
+    record = timeline_record()
+    record.calls[index].duration_ms = 2000
+    record.calls[index].ended_at = at(3)
+    timeline = build_timeline(record)
+    stage = next(row for row in timeline if row["name"] == name)
+    generation = next(
+        row
+        for row in timeline
+        if row["kind"] == "generation" and row["name"] == record.calls[index].purpose
+    )
+    assert (stage["start"], stage["end"]) == (at(1), at(3))
+    assert generation["parent_id"] == stage["id"]
+
+
+def test_multiple_image_calls_have_numbered_spans():
+    record = timeline_record()
+    record.calls.append(record.calls[-1].model_copy(update={"duration_ms": 0}))
+    timeline = build_timeline(record)
+    images = [
+        row
+        for row in timeline
+        if row["kind"] == "span" and row["name"].startswith("image")
+    ]
+    assert [(row["name"], row["start"], row["end"]) for row in images] == [
+        ("image #1", at(8), at(10)),
+        ("image #2", at(10), at(10)),
+    ]
+    generations = [
+        row
+        for row in timeline
+        if row["kind"] == "generation" and row["name"] == "image-plan"
+    ]
+    assert [row["parent_id"] for row in generations] == [row["id"] for row in images]
+
+
+def test_calls_use_smallest_containing_stage_or_root():
+    record = timeline_record()
+    record.calls[1].duration_ms = 1000
+    record.calls[1].ended_at = at(2)
+    record.calls.append(
+        record.calls[1].model_copy(
+            update={
+                "purpose": "other",
+                "duration_ms": 500,
+                "ended_at": at(4),
+            }
+        )
     )
     timeline = build_timeline(record)
-    plans = [row for row in timeline if row["name"] == "plan"]
-    assert [(row["start"], row["end"]) for row in plans] == [
-        (at(4), at(8)),
-        (at(8), at(9)),
+    spans = {row["name"]: row for row in timeline if row["kind"] == "span"}
+    generations = {row["name"]: row for row in timeline if row["kind"] == "generation"}
+    assert (generations["research"]["start"], generations["research"]["end"]) == (
+        at(1),
+        at(2),
+    )
+    assert generations["research"]["parent_id"] == spans["research"]["id"]
+    assert (generations["other"]["start"], generations["other"]["end"]) == (
+        at(3.5),
+        at(4),
+    )
+    assert generations["other"]["parent_id"] == spans["ask"]["id"]
+
+
+def test_missing_image_call_only_emits_untimed_failure_event():
+    record = timeline_record()
+    record.calls.pop()
+    next(step for step in record.steps if step.agent == "image").status = "failed"
+    timeline = build_timeline(record)
+    events = [row for row in timeline if row["kind"] == "event"]
+    assert len(events) == 1
+    assert events[0] == {
+        "id": uuid5(NAMESPACE_URL, f"{record.trace_id}:{len(timeline) - 1}").hex,
+        "kind": "event",
+        "name": "image_failed",
+        "start": None,
+        "end": None,
+        "parent_id": timeline[0]["id"],
+        "attrs": {},
+    }
+    assert not [
+        row
+        for row in timeline
+        if row["kind"] == "span" and row["name"].startswith("image")
     ]
-    rework = [row for row in timeline if row["kind"] == "event"]
-    assert len(rework) == 1 and rework[0]["start"] == at(8)
-    image = next(row for row in timeline if row["name"] == "image")
-    assert (image["start"], image["end"]) == (at(9), at(10))
-    assert len([row for row in timeline if row["name"] == "supervisor"]) == 1
+    record.calls.append(timeline_record().calls[-1])
+    assert not [row for row in build_timeline(record) if row["kind"] == "event"]
+
+
+def test_timed_calls_without_step_timestamps_keep_their_recorded_intervals():
+    record = timeline_record()
+    for step in record.steps:
+        step.at = None
+    timeline = build_timeline(record)
+    spans = {row["name"]: row for row in timeline if row["kind"] == "span"}
+    assert list(spans) == [
+        "ask",
+        "planning #1",
+        "evaluation #1",
+        "planning #2",
+        "evaluation #2",
+        "image",
+    ]
+    assert (spans["ask"]["start"], spans["ask"]["end"]) == (at(0), at(10))
+    generations = [row for row in timeline if row["kind"] == "generation"]
+    assert len(generations) == 7
+    for generation, call in zip(generations, record.calls, strict=True):
+        assert generation["end"] == call.ended_at
+        assert generation["start"] == call.ended_at - timedelta(
+            milliseconds=call.duration_ms
+        )
+    assert [row["parent_id"] for row in generations[:2]] == [spans["ask"]["id"]] * 2
 
 
 def test_legacy_and_partially_timed_calls_do_not_invent_times():
@@ -154,11 +321,25 @@ def test_legacy_and_partially_timed_calls_do_not_invent_times():
     timeline = build_timeline(record)
     assert timeline
     assert all(row["start"] is row["end"] is None for row in timeline)
+    assert [(row["kind"], row["name"]) for row in timeline] == [
+        ("span", "ask"),
+        *[("generation", call.purpose) for call in record.calls],
+    ]
+    assert all(row["parent_id"] == timeline[0]["id"] for row in timeline[1:])
     record = timeline_record()
-    record.calls[0].duration_ms = None
-    record.calls[1].ended_at = None
-    generations = [row for row in build_timeline(record) if row["kind"] == "generation"]
-    assert len(generations) == 2
+    for index, call in enumerate(record.calls):
+        if index % 2:
+            call.ended_at = None
+        else:
+            call.duration_ms = None
+    timeline = build_timeline(record)
+    assert [row["name"] for row in timeline if row["kind"] == "span"] == [
+        "ask",
+        "supervisor",
+        "research",
+    ]
+    generations = [row for row in timeline if row["kind"] == "generation"]
+    assert len(generations) == 7
     assert all(row["start"] is row["end"] is None for row in generations)
     assert all(
         row["parent_id"] == build_timeline(record)[0]["id"] for row in generations
@@ -170,7 +351,7 @@ def test_generation_attrs_always_include_ledger_cost_and_only_metadata():
     attrs = [
         row["attrs"] for row in build_timeline(record) if row["kind"] == "generation"
     ]
-    assert len(attrs) == len(record.calls) == 2
+    assert len(attrs) == len(record.calls) == 7
     for values, call in zip(attrs, record.calls, strict=True):
         assert values["cost_details"] == {"total": call.cost_usd}
         assert values["model"] == call.model
@@ -231,6 +412,8 @@ def test_export_single_typed_batch_and_payload():
         return client
 
     record = timeline_record()
+    record.calls.pop()
+    next(step for step in record.steps if step.agent == "image").status = "failed"
     record.steps.append(
         type(record.steps[0])(agent="rework", phase="end", status="ok", at=at(8))
     )
@@ -253,6 +436,12 @@ def test_export_single_typed_batch_and_payload():
         "event-create",
     }
     wire = [event.dict(by_alias=True, exclude_unset=True) for event in batch]
+    root = next(
+        event["body"]
+        for event in wire
+        if event["type"] == "span-create" and event["body"]["name"] == "ask"
+    )
+    assert root["metadata"] == {"rework_count": 2}
     trace = next(event["body"] for event in wire if event["type"] == "trace-create")
     assert trace == {
         "id": record.trace_id,
@@ -320,7 +509,9 @@ def test_check_preflight_reports_only_missing_names(capsys):
     assert PRIVATE not in str(capsys.readouterr())
 
 
-@pytest.mark.parametrize("mode", ["ok", "missing", "parent", "cost", "time", "error"])
+@pytest.mark.parametrize(
+    "mode", ["ok", "missing", "parent", "cost", "time", "name", "error"]
+)
 def test_check_polls_and_validates_readback_with_fake_sdk(mode, capsys):
     from beautyads.obs.langfuse_check import main
 
@@ -358,6 +549,10 @@ def test_check_polls_and_validates_readback_with_fake_sdk(mode, capsys):
             observations[-1]["costDetails"] = {}
         elif mode == "time":
             observations[-1]["startTime"] = None
+        elif mode == "name":
+            next(row for row in observations if row["name"] == "planning #1")[
+                "name"
+            ] = "wrong"
         return {"observations": observations}
 
     client.api.trace = SimpleNamespace(get=get)
@@ -377,9 +572,19 @@ def test_check_polls_and_validates_readback_with_fake_sdk(mode, capsys):
     if mode == "ok":
         assert "OBS_CHECK_OK" in output
         assert (
+            "span_names=ok ask, supervisor, research, planning #1, evaluation #1, planning #2, evaluation #2, image"
+            in output.splitlines()
+        )
+        assert (
             "startTime" in output
             and "endTime" in output
             and "latency" in output
             and "costDetails" in output
             and "parent" in output
         )
+
+
+def test_check_readback_rejects_empty_expectations():
+    from beautyads.obs.langfuse_check import _readback_matches
+
+    assert _readback_matches({"observations": []}, []) is False
