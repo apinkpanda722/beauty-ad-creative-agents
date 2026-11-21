@@ -253,6 +253,11 @@
       },
       "summary": "인사이트 2카드·축 탭·검증/앰버 모델 차트·축별 접힘 표·단계/비용 표·텍스트+이미지 총비용·마케터 비용 비표시·DEMO 4항목 완료. 승인 단언 대응: S1→image_cost_usd 포함 정확 dict, C1→기록 비용 검증, C2·C4·R4→금액 비표시, C3→면책·고지 2개, H1·H2·H4~H7·A3b~d→단계/시도 셀, H3→비용 행·상한 막대, H8·B1·B2a~f·B3a→검증 차트·축별 표·형제 구조; 통과하던 비용 명령 부재 단언 유지. 서버 assembly.py +1줄·ask_view.py +13줄, 추가 응답 필드 image_cost_usd. make verify 통과(Python 6,530개·웹 414개); test_design_images.py·test_api_assembly.py 수정 없이 통과. 패키지 설치 없음. 카드·탭·차트 색/배치·아코디언·표 정렬·비용 막대는 사용자 시각 확인 필요.",
       "completed_at": "2026-11-21T23:30:53+0900"
+    },
+    {
+      "step": 19,
+      "name": "insight-polish-3",
+      "status": "pending"
     }
   ],
   "created_at": "2026-11-21T14:00:50+0900",
