@@ -103,14 +103,16 @@
     {
       "step": 13,
       "name": "result-polish",
-      "status": "pending",
+      "status": "blocked",
       "started_at": "2026-11-21T17:12:38+0900",
       "usage": {
-        "input_tokens": 320133,
-        "cached_input_tokens": 239744,
-        "output_tokens": 1130,
+        "input_tokens": 30401,
+        "cached_input_tokens": 0,
+        "output_tokens": 801,
         "attempts": 1
-      }
+      },
+      "blocked_reason": "선점검에서 단언 수정 지시의 충돌을 발견해 코드 수정 없이 중단했습니다. 설계 결정 3번은 “**기존 `근거 연결 없음` 단언은 새 문구로 같은 엄격도 교체**하고 코드→한글 매핑 단언(알려진 3개, 모르는 코드, 사유 순서)을 추가한다.”고 요구하지만, 10번은 “기존 `근거 연결 없음 N건`(클래스 `clear`/`attention`, `getByText`로 하나만 찾아짐) 요소는 **`검사 결과` 섹션 안에 그대로 유지**한다(기존 단언 불변).”고 요구합니다. 해당 단언을 교체할지 그대로 유지할지 지시 통일이 필요합니다.",
+      "blocked_at": "2026-11-21T17:20:20+0900"
     },
     {
       "step": 14,
