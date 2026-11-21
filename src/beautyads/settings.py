@@ -111,6 +111,7 @@ class LangfuseSettings(BaseModel):
     host: str = Field(default="http://127.0.0.1:3001", repr=False)
     public_key: str = Field(repr=False)
     secret_key: str = Field(repr=False)
+    capture_io: bool = True
 
 
 def langfuse_settings(
@@ -123,9 +124,13 @@ def langfuse_settings(
     secret_key = get_setting("LANGFUSE_SECRET_KEY", **config)
     if public_key is None or secret_key is None:
         return None
+    capture_io = get_setting("BEAUTYADS_LANGFUSE_IO", "1", **config)
+    if capture_io not in {"1", "0"}:
+        raise InvalidSetting("BEAUTYADS_LANGFUSE_IO")
     return LangfuseSettings(
         public_key=public_key,
         secret_key=secret_key,
+        capture_io=capture_io == "1",
         host=get_setting("LANGFUSE_HOST", "http://127.0.0.1:3001", **config),
     )
 

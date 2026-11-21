@@ -1615,7 +1615,7 @@ def test_ask_exports_after_local_append_in_daemon_without_affecting_result(
         reads.append(kwargs)
         return config
 
-    def export(record, *, settings):
+    def export(record, *, settings, io=None):
         try:
             observed.append(
                 (
@@ -1660,3 +1660,187 @@ def test_ask_exports_after_local_append_in_daemon_without_affecting_result(
     assert "SYNTHETIC_PRIVATE_EXPORT_DIAGNOSTIC" not in caplog.text + str(
         capsys.readouterr()
     )
+
+
+@pytest.mark.parametrize("configured", [False, True])
+def test_disabled_io_never_enters_capture_path(rig, monkeypatch, configured):
+    from beautyads.settings import LangfuseSettings
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("disabled IO entered capture path")
+
+    monkeypatch.setattr(assembly, "Capture", forbidden)
+    monkeypatch.setattr(assembly, "RequestIO", forbidden)
+    monkeypatch.setattr(assembly, "to_text", forbidden)
+    monkeypatch.setattr(assembly, "export_trace", lambda *args, **kwargs: True)
+    if configured:
+        monkeypatch.setattr(
+            assembly,
+            "langfuse_settings",
+            lambda **kw: LangfuseSettings(
+                public_key="synthetic", secret_key="synthetic", capture_io=False
+            ),
+        )
+
+    async def run():
+        services = await rig.start()
+        try:
+            assert invoke(services)["kind"] == "plan"
+            assert all("capture" not in options for _, options in rig.calls)
+        finally:
+            await services.close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("capture_fails", [False, True])
+def test_request_local_io_captures_without_changing_results_or_jsonl(
+    rig, monkeypatch, capture_fails, capsys, caplog
+):
+    from threading import Event
+
+    from beautyads.settings import LangfuseSettings
+
+    exported, done = [], Event()
+    monkeypatch.setattr(
+        assembly,
+        "langfuse_settings",
+        lambda **kw: LangfuseSettings(public_key="synthetic", secret_key="synthetic"),
+    )
+    monkeypatch.setattr(assembly, "_DESIGN_DIR", rig.tmp_path / "design")
+    if capture_fails:
+
+        def broken(*args, **kwargs):
+            raise RuntimeError("SYNTHETIC_CAPTURE_DIAGNOSTIC")
+
+        monkeypatch.setattr(assembly, "Capture", broken)
+
+    def export(record, *, settings, io=None):
+        exported.append((record, io))
+        done.set()
+        return True
+
+    monkeypatch.setattr(assembly, "export_trace", export)
+
+    async def run():
+        services = await rig.start(with_image_enabled=True)
+        try:
+            result = invoke(services, with_image=True)
+            assert result["kind"] == "plan" and result["plans"][0]["image"]["ok"]
+            assert done.wait(5)
+            return result
+        finally:
+            await services.close()
+
+    result = asyncio.run(run())
+    record, io = exported[0]
+    assert io.message == "synthetic" and io.claim_choice == {"mode": "none"}
+    assert io.result is result
+    assert all("capture" not in options for _, options in rig.calls)
+    if capture_fails:
+        assert io.captures == ()
+    else:
+        assert len(io.captures) == len(rig.calls)
+        for capture, (name, options) in zip(io.captures, rig.calls, strict=True):
+            assert capture.ended_at.tzinfo is UTC
+            assert capture.purpose == options.get("purpose", "image-plan")
+            if name == "image":
+                assert capture.input == options["prompt"]
+                assert json.loads(capture.output) == {"mime": "image/png", "size": 17}
+                assert "PNG" not in capture.output and "base64" not in capture.output
+            else:
+                assert json.loads(capture.input) == options["messages"]
+                response = json.loads(capture.output)
+                if name == "chat":
+                    assert set(response) == {"text", "tool_calls"}
+                    for tool in response["tool_calls"]:
+                        assert tool["name"] == "find_example_creatives"
+                        assert json.loads(tool["arguments"]) == {
+                            "category": "mask_pack"
+                        }
+                else:
+                    assert isinstance(response, dict)
+        assert {capture.purpose for capture in io.captures} == {
+            "supervisor",
+            "research",
+            "plan",
+            "evaluate",
+            "image-plan",
+        }
+    local = rig.settings.ledger_path.with_name("traces.jsonl").read_text()
+    assert local == record.model_dump_json() + "\n"
+    assert all(
+        key not in record.model_dump()
+        for key in ("message", "messages", "input", "output", "captures")
+    )
+    assert (
+        "합성" not in local and "image_brief" not in local and "rationale" not in local
+    )
+    assert "SYNTHETIC_CAPTURE_DIAGNOSTIC" not in caplog.text + str(capsys.readouterr())
+
+
+def test_io_switch_and_capture_failure_preserve_calls_results_ledger_and_trace_bytes(
+    rig, monkeypatch
+):
+    from copy import deepcopy
+    from threading import Event
+
+    from beautyads.agents import research, supervisor
+    from beautyads.obs import trace
+    from beautyads.settings import LangfuseSettings
+
+    monkeypatch.setattr(assembly, "datetime", SimpleNamespace(now=lambda tz: COLLECTED))
+    monkeypatch.setattr(assembly, "monotonic", lambda: 0)
+    monkeypatch.setattr(supervisor, "_utcnow", lambda: COLLECTED)
+    monkeypatch.setattr(research, "uuid4", lambda: SimpleNamespace(hex="c" * 32))
+    monkeypatch.setattr(assembly, "uuid4", lambda: SimpleNamespace(hex="a" * 32))
+    monkeypatch.setattr(trace, "uuid4", lambda: SimpleNamespace(hex="b" * 32))
+    monkeypatch.setattr(assembly, "_DESIGN_DIR", rig.tmp_path / "design")
+    done = Event()
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("SYNTHETIC_CAPTURE_DIAGNOSTIC")
+
+    def export(record, *, settings, io=None):
+        done.set()
+        return True
+
+    monkeypatch.setattr(assembly, "Capture", broken)
+    monkeypatch.setattr(assembly, "export_trace", export)
+
+    async def run():
+        snapshots = []
+        for mode in (None, False, True):
+            done.clear()
+            config = (
+                None
+                if mode is None
+                else LangfuseSettings(
+                    public_key="synthetic", secret_key="synthetic", capture_io=mode
+                )
+            )
+            monkeypatch.setattr(
+                assembly, "langfuse_settings", lambda config=config, **kw: config
+            )
+            rig.calls.clear()
+            rig.settings.ledger_path.unlink(missing_ok=True)
+            local_trace = rig.settings.ledger_path.with_name("traces.jsonl")
+            local_trace.unlink(missing_ok=True)
+            services = await rig.start(with_image_enabled=True)
+            try:
+                result = invoke(services, with_image=True)
+                if mode is not None:
+                    assert done.wait(5)
+                snapshots.append(
+                    (
+                        deepcopy(rig.calls),
+                        result,
+                        rig.settings.ledger_path.read_bytes(),
+                        local_trace.read_bytes(),
+                    )
+                )
+            finally:
+                await services.close()
+        assert snapshots[0] == snapshots[1] == snapshots[2]
+
+    asyncio.run(run())

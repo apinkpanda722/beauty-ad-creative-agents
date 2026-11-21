@@ -22,6 +22,7 @@ HEADINGS = (
     "한 줄로 시연 환경 띄우기",
     "시연 구성과 비용",
     "장면별 절차",
+    "Langfuse 확인 기록",
     "촬영 안내",
     "촬영 전 점검 목록",
     "리허설 확인",
@@ -67,18 +68,103 @@ def test_demo_sections_scenes_and_normal_flow():
         assert forbidden not in demo
     rehearsal = demo.split("## 리허설 확인", 1)[1]
     checks = re.findall(r"^- \[ \] (.+)$", rehearsal, re.MULTILINE)
-    assert len(checks) == 10
+    assert len(checks) == 16
     assert all("결과 기록:" in check for check in checks)
     assert "사용자가 live로" in rehearsal
+    numbered = re.findall(r"^- .*?[①-⑯].*$", rehearsal, re.MULTILINE)
+    assert numbered == [f"- [ ] {check}" for check in checks]
+    assert [check[0] for check in checks] == list("①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯")
 
 
 @pytest.mark.parametrize(
     "relative", ["DEMO.md", "README.md", "docs/portfolio/DETAIL_PAGE.md"]
 )
-def test_langfuse_claim_is_conditional(relative):
+def test_langfuse_claim_has_user_confirmation(relative):
     claims = [line for line in read(relative).splitlines() if "관측했다" in line]
-    assert claims, "keep the reviewable, conditional wording"
-    assert all("[Langfuse 타임라인 확인 후 사용]" in line for line in claims)
+    assert claims, "zero checked observation claims must fail"
+    assert all("[Langfuse 타임라인 확인 후 사용]" not in line for line in claims)
+    assert all(
+        "에이전트별 지연과 비용을 Langfuse에서 관측했다." in line for line in claims
+    )
+    record = read("DEMO.md").split("## Langfuse 확인 기록\n", 1)[1].split("\n## ", 1)[0]
+    for required in ("2026-11-21", "31.65", "$0.0618", "단계별 지연", "호출별 비용"):
+        assert required in record
+    for exaggerated in ("항상", "모든 요청", "완벽"):
+        assert exaggerated not in record
+    if relative != "DEMO.md":
+        assert all(
+            '(확인 기록: DEMO.md "Langfuse 확인 기록")' in line for line in claims
+        )
+
+
+def test_langfuse_confirmation_records_new_screen_and_keeps_step6_pending():
+    demo = read("DEMO.md")
+    record = demo.split("## Langfuse 확인 기록\n", 1)[1].split("\n## ", 1)[0]
+    for required in (
+        "사용자(화면 확인)",
+        "실제 시연 요청 1건",
+        "7b 구조",
+        "make obs-up",
+        "http://127.0.0.1:3001",
+        "make obs-check",
+        "합성 trace 통과",
+        "docs/results/",
+        "측정값이 아님",
+        "7d step 2",
+        "새 구조 확인(2026-11-21, 사용자 화면 확인)",
+        "22.08초",
+        "$0.0488",
+        "`sk-`, `Bearer`, `AIza`",
+        "step 6 반영 후 재확인 필요",
+    ):
+        assert required in record
+    assert "결과 기록: ______" not in record
+    scene = demo.split("### 장면 7.", 1)[1].split("\n## ", 1)[0]
+    for required in (
+        "ask",
+        "supervisor",
+        "research",
+        "planning #1",
+        "evaluation #1",
+        "planning #2",
+        "evaluation #2",
+        "image",
+        "요약",
+        "프롬프트",
+        "응답",
+        "4,000자",
+        "키·토큰 가림",
+        "BEAUTYADS_LANGFUSE_IO=0",
+    ):
+        assert required in scene
+    rehearsal = demo.split("## 리허설 확인", 1)[1]
+    ninth = next(line for line in rehearsal.splitlines() if line.startswith("- [ ] ⑨"))
+    assert "충족됨(2026-11-21, 확인 기록 참조)" in ninth
+    eleventh = next(
+        line for line in rehearsal.splitlines() if line.startswith("- [ ] ⑪")
+    )
+    for required in (
+        "통과(2026-11-21, 사용자 live 확인)",
+        "step 6 반영 후 재확인 필요",
+        "22.08초",
+        "$0.0488",
+    ):
+        assert required in eleventh
+    assert "결과 기록: ______" not in eleventh
+
+
+def test_image_review_items_explain_each_check_and_record_live_results():
+    rehearsal = read("DEMO.md").split("## 리허설 확인", 1)[1]
+    assert "같은 요청을 여러 번" in rehearsal
+    items = re.findall(r"^- \[ \] ([⑫-⑯] .+)$", rehearsal, re.MULTILINE)
+    assert len(items) == 5, "zero checked human review items must fail"
+    assert [item[0] for item in items] == list("⑫⑬⑭⑮⑯")
+    for item in items:
+        assert re.match(r"[⑫-⑯] \*\*.+:\*\*", item)
+        for element in ("뜻", "판정", "예시", "기록"):
+            assert element in item
+        assert "결과 기록: 2026-11-21 사용자 live 확인" in item
+        assert "결과 기록: ______" not in item
 
 
 def test_detail_numbers_have_closed_kinds_and_existing_sources():

@@ -1,0 +1,92 @@
+{
+  "project": "beauty-ad-creative-agents",
+  "phase": "7d-quality-fixes",
+  "steps": [
+    {
+      "step": 1,
+      "name": "design-quality",
+      "status": "completed",
+      "started_at": "2026-11-21T11:58:26+0900",
+      "summary": "이미지 스타일 접미사, 막의 가장자리 확장, 최종 배경 대비 재측정과 테스트·변경 기록 추가. make verify 통과(Python 6331개·웹 125개), 패키지 설치 없음.",
+      "completed_at": "2026-11-21T12:06:56+0900",
+      "usage": {
+        "input_tokens": 2371866,
+        "cached_input_tokens": 2245120,
+        "output_tokens": 12670,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 2,
+      "name": "langfuse-spans",
+      "status": "completed",
+      "started_at": "2026-11-21T12:07:06+0900",
+      "summary": "호출 시각 기반 기획·평가·시안 span 분리, rework_count metadata와 합성 점검·회귀 테스트 갱신. make verify 통과(Python 6340개·웹 125개), 패키지 설치 없음.",
+      "completed_at": "2026-11-21T12:14:41+0900",
+      "usage": {
+        "input_tokens": 1318087,
+        "cached_input_tokens": 1244032,
+        "output_tokens": 12390,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 3,
+      "name": "langfuse-io",
+      "status": "completed",
+      "started_at": "2026-11-21T12:14:47+0900",
+      "summary": "Langfuse 요약·호출별 IO, 가림·길이 제한·환경 스위치 구현. make verify 통과(Python 6388개·웹 125개), 패키지 설치 없음. 승인안과 달리 동결 호출 경로 보존을 위해 llm/ 대신 assembly 경계에서 수집하며, 재시도로 원장 항목이 수집분보다 많으면 일부 호출의 IO가 누락될 수 있음.",
+      "completed_at": "2026-11-21T12:27:37+0900",
+      "usage": {
+        "input_tokens": 3814905,
+        "cached_input_tokens": 3728896,
+        "output_tokens": 23073,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 4,
+      "name": "docs-release",
+      "status": "completed",
+      "started_at": "2026-11-21T12:28:06+0900",
+      "summary": "Langfuse 확인 기록과 문구 해제, 리허설 16개 항목, CONTRACTS·PHASES 기록 및 문서 테스트 갱신. 새 화면·이미지 검수는 미확인 유지. make verify 통과(Python 6390개·웹 125개), 패키지 설치 없음.",
+      "completed_at": "2026-11-21T12:34:50+0900",
+      "usage": {
+        "input_tokens": 1377079,
+        "cached_input_tokens": 1291392,
+        "output_tokens": 9413,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 5,
+      "name": "image-prompt-refine",
+      "status": "completed",
+      "started_at": "2026-11-21T13:18:24+0900",
+      "summary": "IMAGE_STYLE_CLAUSE를 지정 문구로 교체해 병·튜브 구분과 얼굴 방향·스포이트 중복 방지 지시를 보완하고 테스트·변경 기록 추가. make verify 통과(Python 6402개·웹 125개), 패키지 설치 없음.",
+      "completed_at": "2026-11-21T13:23:43+0900",
+      "usage": {
+        "input_tokens": 1342506,
+        "cached_input_tokens": 1257088,
+        "output_tokens": 4611,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 6,
+      "name": "langfuse-stage-inputs",
+      "status": "completed",
+      "started_at": "2026-11-21T13:23:51+0900",
+      "summary": "research·planning·evaluation·image span 입력과 최종 이미지 프롬프트 연결 및 회귀 테스트 추가. 기존 output·ask·supervisor 동작 유지, make verify 통과(Python 6414개·웹 125개), 패키지 설치 없음.",
+      "completed_at": "2026-11-21T13:30:50+0900",
+      "usage": {
+        "input_tokens": 1388344,
+        "cached_input_tokens": 1309440,
+        "output_tokens": 9915,
+        "attempts": 1
+      }
+    }
+  ],
+  "created_at": "2026-11-21T11:58:26+0900",
+  "completed_at": "2026-11-21T13:30:50+0900"
+}
