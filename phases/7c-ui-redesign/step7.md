@@ -11,7 +11,7 @@
 
 **설계 결정**
 - 새 `src/beautyads/api/plans.py`의 `register_plans(app)`와 `app.py`에서 등록(기존 등록 방식과 같은 위치·형식).
-- **`GET /plans`**: `resolve_tenant` → `list_feedback(tenant_id, limit=200)`(최신순) → plan_id별 **첫 행(최신 피드백)**만 남기고 `approved`인 것만 → 각각 `get_plan(tenant_id, plan_id)`(없으면 건너뜀). 응답 항목: `plan_id`, `title`, `hook_text`, `hook_type`, `angle`, `format`, `claimed_efficacy`, `scenes`, `copy_lines`, `evidence_ids`, `has_image`(payload `image`가 유효한 `image_reference`인지), `decided_at`(피드백 `created_at`), `reason`. 값은 payload의 `plan`에서 **허용 키만** 골라 복사한다(`report`·이미지 해시·파일 경로는 응답에 넣지 않음). 반려로 바뀐 plan(최신이 rejected)은 빠진다. 한계(최근 피드백 200건)는 코드 상수와 DEMO.md 기록용 주석으로 남긴다.
+- **`GET /plans`**: `resolve_tenant` → `list_feedback(tenant_id, limit=200)`(최신순) → plan_id별 **첫 행(최신 피드백)**만 남기고 `approved`인 것만 → 각각 `get_plan(tenant_id, plan_id)`(없으면 건너뜀). 응답 본문은 `{"plans": [항목…]}`(최신 승인 순, 다른 키 없음)이고 응답 항목: `plan_id`, `title`, `hook_text`, `hook_type`, `angle`, `format`, `claimed_efficacy`, `scenes`, `copy_lines`, `evidence_ids`, `has_image`(payload `image`가 유효한 `image_reference`인지), `decided_at`(피드백 `created_at`), `reason`. 값은 payload의 `plan`에서 **허용 키만** 골라 복사한다(`report`·이미지 해시·파일 경로는 응답에 넣지 않음). 반려로 바뀐 plan(최신이 rejected)은 빠진다. 한계(최근 피드백 200건)는 코드 상수와 DEMO.md 기록용 주석으로 남긴다.
 - **`GET /plans/{plan_id}/image`**: (1) `plan_id`가 `^[0-9a-f]{32}$`가 아니면 `404 PLAN_NOT_FOUND`(경로 이탈 문자열 포함, 파일 시스템에 닿기 전에 거부), (2) `resolve_tenant`, (3) `get_plan(tenant_id, plan_id)`가 `None`이거나 `record.tenant_id != tenant_id`면 `404 PLAN_NOT_FOUND`(다른 작업 공간의 plan은 존재 여부도 알리지 않음), (4) `image_reference(payload["image"])`가 `None`이면 `404 DESIGN_NOT_FOUND`, (5) 파일 경로는 기존 `design`과 **같은 규칙**으로 만든 뒤 `is_relative_to(root)` 검사 + **심볼릭 링크 거부**(`path.is_symlink()` 또는 root 아래 경로 중 링크 하나라도 있으면 404), (6) 읽기 실패 404, (7) 응답 헤더 `Cache-Control: no-store`, `Content-Type`은 기존과 같이 `composed.mime` 또는 `image.mime`. 경로 계산은 `ask.py`의 로직을 **공통 헬퍼로 추출**해 두 라우트가 쓰게 하되 기존 `/design/...` 라우트의 동작·상태 코드는 바뀌지 않아야 한다(심볼릭 링크 거부는 새 라우트에만 적용).
 
 **만드는 파일 → 읽는 파일 (새 칸)**
@@ -43,7 +43,7 @@
 
 **테스트(합성 데이터, 서비스·키·네트워크·`.env` 없음)**
 - `tests/test_api_plans.py`(가짜 저장소·임시 `design_dir`, 실제 `data/design` 읽기 금지): 
-  (1) 목록: 최신 피드백이 approved인 plan만, rejected로 바뀐 plan·피드백 없는 plan은 제외, 다른 테넌트의 plan은 포함되지 않음, 응답 키는 허용 목록(`report`·`sha256`·경로 없음),
+  (1) 목록(본문 키는 정확히 `["plans"]`): 최신 피드백이 approved인 plan만, rejected로 바뀐 plan·피드백 없는 plan은 제외, 다른 테넌트의 plan은 포함되지 않음, 응답 키는 허용 목록(`report`·`sha256`·경로 없음),
   (2) **다른 작업 공간의 plan_id로 이미지 요청 → 404 `PLAN_NOT_FOUND`**(존재하는 plan_id로도), 
   (3) **허용되지 않은 `X-Tenant-Id` → 기존 `resolve_tenant`와 같은 거부**, 
   (4) **경로 이탈 입력 거부**: `plan_id`에 `../`, `..%2f`, 절대 경로(`/etc/passwd`), 32자 아닌 값, 대문자 16진수 → 모두 404이고 `get_plan`이 호출되지 않는다(가짜 저장소 호출 횟수 단언),
@@ -95,3 +95,4 @@ make verify   # lint + pytest + pnpm lint·typecheck·test 통과
 - `/design/{request_key}/{index}` 라우트의 응답·상태 코드·헤더를 바꾸거나 그 기존 테스트를 수정하지 마라. 이유: 헬퍼 추출은 동작 불변이어야 한다.
 - 도구 입력이나 쿼리 문자열에서 `tenant_id`를 받지 마라. 이유: `tenant_id`는 세션에서만 나온다(ADR-009).
 - 응답이나 로그에 이미지 해시·파일 시스템 경로·예외 문자열을 싣지 마라. 이유: 로컬 경로·내부 값은 HTTP 경계를 넘지 않는다.
+- 엔드포인트를 `GET /plans`·`GET /plans/{plan_id}/image` 외에 추가하지 마라. `app.py`는 라우터 등록 한 줄만 바꾸고 이 밖의 `src/` 변경이 필요하면 구현하지 말고 `blocked`로 멈춰 `reason`에 적어라. 이유: 승인된 서버 변경 범위(테넌트 격리·plan_id 정규식 `^[0-9a-f]{32}$`·경로 이탈·심볼릭 링크 거부는 테스트로 고정한다).
