@@ -1,6 +1,7 @@
 """Request IO projections use synthetic bodies and never contact services."""
 
 import json
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -108,6 +109,7 @@ def synthetic_io():
         "checks_passed": True,
         "final_passed": False,
         "low_items": ["fit"],
+        "failed_check_codes": ["SYNTHETIC_CHECK"],
         "rationale": private,
         "unknown": private,
     }
@@ -127,10 +129,15 @@ def synthetic_io():
                 "hook_type": "question",
                 "angle": "how_to",
                 "format": "demo",
-                "goal": private,
+                "goal": "합성 목표",
+                "category": "serum_ampoule",
+                "skin_concern": "dryness",
+                "output": "both",
+                "unknown": private,
             },
             "handoff": {
                 "conclusion": "합성 결론",
+                "evidence_ids": ["youtube:synthetic", "youtube:other"],
                 "result_counts": [
                     {
                         "tool": "find_example_creatives",
@@ -142,9 +149,29 @@ def synthetic_io():
                 "unknown": private,
             },
             "plans": [
-                {"plan": plan, "attempts": [attempt, attempt]},
-                {"plan": plan, "attempts": [attempt]},
+                {
+                    "plan": plan,
+                    "attempts": [attempt, attempt],
+                    "unknown_count": 0,
+                    "efficacy_status": {"hydration": "supported"},
+                },
+                {
+                    "plan": plan,
+                    "attempts": [attempt],
+                    "unknown_count": 1,
+                    "efficacy_status": {"hydration": "unsupported"},
+                },
             ],
+            "claim_choice": {
+                "mode": "select",
+                "claims": ["hydration"],
+                "requested_claim": "hydration",
+                "unknown": private,
+            },
+            "available_efficacy": ["hydration"],
+            "profile": {"forbidden_terms": [private]},
+            "feedback": private,
+            "raw_tool_outputs": private,
             "unknown": private,
         },
         captures=(),
@@ -180,29 +207,87 @@ def test_allowlisted_projections_and_final_attempt_only():
         }
     }
     assert stages["research"] == {
+        "input": {
+            "목표": "합성 목표",
+            "카테고리": "serum_ampoule",
+            "효능": "hydration",
+            "훅 유형": "question",
+            "소구": "how_to",
+            "형식": "demo",
+            "피부 고민": "dryness",
+            "산출 형식": "both",
+        },
         "output": {
             "도구": ["find_example_creatives"],
             "결과 건수": [
                 {"tool": "find_example_creatives", "row_count": 3, "shown_count": 2}
             ],
             "결론": "합성 결론",
-        }
+        },
     }
     assert "planning #1" not in stages or "output" not in stages["planning #1"]
-    assert stages["planning #2"] == stages["planning #3"] == {"output": summary}
+    planning_input = {
+        "소구": "how_to",
+        "요청 효능": "hydration",
+        "효능 선택": {
+            "mode": "select",
+            "claims": ["hydration"],
+            "requested_claim": "hydration",
+        },
+        "확인된 효능": ["hydration"],
+        "근거 소재 수": 2,
+    }
+    assert stages["planning #1"] == {"input": planning_input}
+    assert stages["planning #2"] == {
+        "input": {
+            **planning_input,
+            "재작업": {
+                "코드 검사 실패": ["SYNTHETIC_CHECK"],
+                "재검토 항목": ["fit"],
+            },
+        },
+        "output": summary,
+    }
+    assert stages["planning #3"] == {"input": planning_input, "output": summary}
     for k in (1, 2, 3):
         assert stages[f"evaluation #{k}"] == {
+            "input": {
+                "코드 검사": {
+                    "통과": True,
+                    "실패 코드": ["SYNTHETIC_CHECK"],
+                },
+                **(
+                    {
+                        "기획안": summary,
+                        "근거 연결 없음": 0 if k == 2 else 1,
+                        "효능 상태": {
+                            "hydration": "supported" if k == 2 else "unsupported"
+                        },
+                    }
+                    if k in (2, 3)
+                    else {}
+                ),
+            },
             "output": {
                 "점수": {"fit": 2, "differentiation": 3},
                 "통과": False,
                 "코드 검사": True,
                 "재검토 항목": ["fit"],
-            }
+            },
         }
-    assert stages["image"] == {"input": "합성 장면"}
+    assert stages["image"] == {"input": {"장면 묘사": "합성 장면"}}
     wire = json.dumps([incoming, outgoing, stages], ensure_ascii=False)
     assert all(
-        value not in wire for value in ("SYNTHETIC_NOT_ALLOWED", "rationale", "unknown")
+        value not in wire
+        for value in (
+            "SYNTHETIC_NOT_ALLOWED",
+            "rationale",
+            "unknown",
+            "profile",
+            "feedback",
+            "forbidden_terms",
+            "raw_tool_outputs",
+        )
     )
 
 
@@ -214,6 +299,122 @@ def test_missing_result_fields_are_skipped(result):
     assert trace_input(io) == {"요청": "합성 요청"}
     assert "결과" not in trace_output(io)
     assert stage_io(io) == {}
+
+
+@pytest.mark.parametrize("brief", [None, {}, {"claim": None, "angle": ""}])
+def test_research_missing_brief_values_do_not_create_input(brief):
+    io = RequestIO(
+        "합성 요청", None, {"brief": brief, "handoff": {"conclusion": "합성"}}, ()
+    )
+    assert stage_io(io)["research"] == {"output": {"결론": "합성"}}
+
+
+def test_research_partial_brief_without_handoff():
+    io = RequestIO(
+        "합성 요청",
+        None,
+        {
+            "brief": {
+                "goal": "합성 목표",
+                "claim": None,
+                "angle": "",
+                "max_tool_calls": 6,
+            }
+        },
+        (),
+    )
+    assert stage_io(io)["research"] == {"input": {"목표": "합성 목표"}}
+
+
+def test_rework_uses_immediately_previous_attempt_and_resets_for_each_plan():
+    io = RequestIO(
+        "합성 요청",
+        None,
+        {
+            "plans": [
+                {
+                    "attempts": [
+                        {"failed_check_codes": ["FIRST"], "low_items": ["fit"]},
+                        {
+                            "failed_check_codes": ["SECOND"],
+                            "low_items": ["differentiation"],
+                        },
+                        {"failed_check_codes": [], "low_items": []},
+                    ]
+                },
+                {"attempts": [{"failed_check_codes": [], "low_items": []}]},
+            ]
+        },
+        (),
+    )
+    stages = stage_io(io)
+    assert "planning #1" not in stages
+    assert stages["planning #2"]["input"] == {
+        "재작업": {
+            "코드 검사 실패": ["FIRST"],
+            "재검토 항목": ["fit"],
+        }
+    }
+    assert stages["planning #3"]["input"] == {
+        "재작업": {
+            "코드 검사 실패": ["SECOND"],
+            "재검토 항목": ["differentiation"],
+        }
+    }
+    assert "planning #4" not in stages
+
+
+def test_stage_inputs_do_not_fill_missing_result_fields_from_request():
+    io = RequestIO(
+        "합성 요청",
+        {"mode": "select"},
+        {
+            "plans": [
+                {
+                    "attempts": [
+                        {"checks_passed": False, "failed_check_codes": ["CHECK"]}
+                    ]
+                },
+            ]
+        },
+        (),
+    )
+    assert stage_io(io) == {
+        "evaluation #1": {
+            "input": {
+                "코드 검사": {"통과": False, "실패 코드": ["CHECK"]},
+            },
+            "output": {"코드 검사": False},
+        }
+    }
+
+
+@pytest.mark.parametrize("image_count", [0, 1, 2])
+def test_image_inputs_use_only_image_captures_in_capture_order(image_count):
+    captures = tuple(
+        Capture(purpose, START, prompt, "합성 출력")
+        for purpose, prompt in (
+            ("supervisor", "일반 호출"),
+            ("image-plan", "첫 최종 프롬프트"),
+            ("research", "일반 호출"),
+            ("plan", "일반 호출"),
+            ("image-other", "둘째 최종 프롬프트"),
+            ("evaluate", "일반 호출"),
+        )
+        if not purpose.startswith("image")
+        or prompt in ("첫 최종 프롬프트", "둘째 최종 프롬프트")[:image_count]
+    )
+    io = replace(synthetic_io(), captures=captures)
+    io.result["plans"][1]["plan"] = {"image_brief": "둘째 합성 장면"}
+    stages = stage_io(io)
+    first = {"장면 묘사": "합성 장면"}
+    second = {"장면 묘사": "둘째 합성 장면"}
+    if image_count >= 1:
+        first["이미지 프롬프트"] = "첫 최종 프롬프트"
+    if image_count == 2:
+        second["이미지 프롬프트"] = "둘째 최종 프롬프트"
+    assert stages["image"] == stages["image #1"] == {"input": first}
+    assert stages["image #2"] == {"input": second}
 
 
 def test_match_by_purpose_nearest_unused_and_five_second_boundary():

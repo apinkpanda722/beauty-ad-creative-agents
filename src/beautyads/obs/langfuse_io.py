@@ -110,6 +110,64 @@ def trace_output(io: RequestIO) -> dict:
     return outgoing
 
 
+def _research_input(brief):
+    selected = _select(
+        brief,
+        (
+            ("goal", "목표"),
+            ("category", "카테고리"),
+            ("claim", "효능"),
+            ("hook_type", "훅 유형"),
+            ("angle", "소구"),
+            ("format", "형식"),
+            ("skin_concern", "피부 고민"),
+            ("output", "산출 형식"),
+        ),
+    )
+    return {key: value for key, value in selected.items() if value not in (None, "")}
+
+
+def _planning_input(result, previous):
+    incoming = _select(result.get("brief"), (("angle", "소구"), ("claim", "요청 효능")))
+    if "claim_choice" in result:
+        incoming["효능 선택"] = _select(
+            result.get("claim_choice"),
+            ((name, name) for name in ("mode", "claims", "requested_claim")),
+        )
+    incoming.update(_select(result, (("available_efficacy", "확인된 효능"),)))
+    evidence_ids = _mapping(result.get("handoff")).get("evidence_ids")
+    if isinstance(evidence_ids, (list, tuple)):
+        incoming["근거 소재 수"] = len(evidence_ids)
+    if previous is not None:
+        rework = _select(
+            previous,
+            (("failed_check_codes", "코드 검사 실패"), ("low_items", "재검토 항목")),
+        )
+        if rework:
+            incoming["재작업"] = rework
+    return incoming
+
+
+def _evaluation_input(attempt, item, final):
+    incoming = {}
+    checks = _select(
+        attempt, (("checks_passed", "통과"), ("failed_check_codes", "실패 코드"))
+    )
+    if checks:
+        incoming["코드 검사"] = checks
+    if final:
+        plan = _mapping(item.get("plan"))
+        if plan:
+            incoming["기획안"] = _plan_summary(plan)
+        incoming.update(
+            _select(
+                item,
+                (("unknown_count", "근거 연결 없음"), ("efficacy_status", "효능 상태")),
+            )
+        )
+    return incoming
+
+
 def stage_io(io: RequestIO) -> dict:
     result = _mapping(io.result)
     stages = {}
@@ -144,16 +202,25 @@ def stage_io(io: RequestIO) -> dict:
         )
     if research:
         stages["research"] = {"output": research}
+    incoming = _research_input(result.get("brief"))
+    if incoming:
+        stages.setdefault("research", {})["input"] = incoming
     ordinal = 0
     image_briefs = []
     for item in _rows(result.get("plans")):
         item = _mapping(item)
         plan = _mapping(item.get("plan"))
         attempts = _rows(item.get("attempts"))
+        previous = None
         for index, attempt in enumerate(attempts):
             ordinal += 1
+            incoming = _planning_input(result, previous)
+            if incoming:
+                stages[f"planning #{ordinal}"] = {"input": incoming}
             if index == len(attempts) - 1 and plan:
-                stages[f"planning #{ordinal}"] = {"output": _plan_summary(plan)}
+                stages.setdefault(f"planning #{ordinal}", {})["output"] = _plan_summary(
+                    plan
+                )
             attempt = _mapping(attempt)
             evaluation = _select(
                 attempt, (("final_passed", "통과"), ("checks_passed", "코드 검사"))
@@ -177,12 +244,23 @@ def stage_io(io: RequestIO) -> dict:
                 ]
             if evaluation:
                 stages[f"evaluation #{ordinal}"] = {"output": evaluation}
+            incoming = _evaluation_input(attempt, item, index == len(attempts) - 1)
+            if incoming:
+                stages.setdefault(f"evaluation #{ordinal}", {})["input"] = incoming
+            previous = attempt
         if "image_brief" in plan:
             image_briefs.append(plan.get("image_brief"))
-    if image_briefs:
-        stages["image"] = {"input": image_briefs[0]}
-        for index, brief in enumerate(image_briefs, 1):
-            stages[f"image #{index}"] = {"input": brief}
+    image_captures = iter(
+        capture for capture in io.captures if capture.purpose.startswith("image")
+    )
+    for index, brief in enumerate(image_briefs, 1):
+        incoming = {"장면 묘사": brief}
+        capture = next(image_captures, None)
+        if capture is not None:
+            incoming["이미지 프롬프트"] = capture.input
+        if index == 1:
+            stages["image"] = {"input": incoming}
+        stages[f"image #{index}"] = {"input": incoming}
     return stages
 
 

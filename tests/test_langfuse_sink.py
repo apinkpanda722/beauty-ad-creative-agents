@@ -730,6 +730,100 @@ def test_io_export_failure_never_emits_diagnostics(capsys, caplog):
     assert PRIVATE not in caplog.text + str(capsys.readouterr())
 
 
+def test_stage_inputs_attach_to_batch_and_pass_existing_sanitization():
+    from dataclasses import replace
+
+    from test_langfuse_io import synthetic_io
+
+    from beautyads.obs.langfuse_io import Capture
+
+    secret = "sk-" + "synthetic_" * 3
+    payload = secret + " 한국어 " + "가" * 4100
+    io = replace(
+        synthetic_io(),
+        captures=(Capture("image-plan", at(10), payload, "합성 출력"),),
+    )
+    io.result["brief"]["goal"] = payload
+    io.result["brief"]["angle"] = payload
+    io.result["claim_choice"]["requested_claim"] = payload
+    io.result["plans"][0]["attempts"][0]["failed_check_codes"] = [payload]
+    io.result["plans"][0]["plan"]["title"] = payload
+    io.result["plans"][0]["plan"]["image_brief"] = payload
+    io.result["plans"][0]["efficacy_status"] = {secret: payload}
+    bodies = io_batch(timeline_record(), io, configured())
+    spans = {
+        body["name"]: body
+        for body in bodies
+        if "startTime" in body and "model" not in body
+    }
+    clipped = (
+        "[가림] 한국어 "
+        + "가" * (4000 - len("[가림] 한국어 \n(생략됨)"))
+        + "\n(생략됨)"
+    )
+    assert spans["research"]["input"] == {
+        "목표": clipped,
+        "카테고리": "serum_ampoule",
+        "효능": "hydration",
+        "훅 유형": "question",
+        "소구": clipped,
+        "형식": "demo",
+        "피부 고민": "dryness",
+        "산출 형식": "both",
+    }
+    assert spans["planning #1"]["input"] == {
+        "소구": clipped,
+        "요청 효능": "hydration",
+        "효능 선택": {
+            "mode": "select",
+            "claims": ["hydration"],
+            "requested_claim": clipped,
+        },
+        "확인된 효능": ["hydration"],
+        "근거 소재 수": 2,
+    }
+    assert spans["evaluation #1"]["input"] == {
+        "코드 검사": {"통과": True, "실패 코드": [clipped]},
+    }
+    assert spans["evaluation #2"]["input"]["기획안"]["제목"] == clipped
+    assert spans["evaluation #2"]["input"]["효능 상태"] == {"[가림]": clipped}
+    assert spans["image"]["input"] == {"장면 묘사": clipped, "이미지 프롬프트": clipped}
+
+    def strings(value):
+        if isinstance(value, str):
+            yield value
+        elif isinstance(value, dict):
+            for key, item in value.items():
+                yield key
+                yield from strings(item)
+        elif isinstance(value, list):
+            for item in value:
+                yield from strings(item)
+
+    assert all(len(text) <= 4000 for text in strings(bodies))
+    wire = json.dumps(bodies, default=str, ensure_ascii=False)
+    assert all(
+        value not in wire
+        for value in (secret, "SYNTHETIC_NOT_ALLOWED", "rationale", "unknown")
+    )
+
+
+@pytest.mark.parametrize("with_io,capture_io", [(False, True), (True, False)])
+def test_disabled_stage_inputs_never_project_io(monkeypatch, with_io, capture_io):
+    from test_langfuse_io import synthetic_io
+
+    def forbidden(io):
+        pytest.fail("disabled IO projected stage inputs")
+
+    monkeypatch.setattr("beautyads.obs.langfuse_sink.stage_io", forbidden)
+    bodies = io_batch(
+        timeline_record(),
+        synthetic_io() if with_io else None,
+        configured().model_copy(update={"capture_io": capture_io}),
+    )
+    assert all("input" not in body and "output" not in body for body in bodies)
+
+
 def test_io_sanitizes_even_metadata_strings_and_leaves_unmatched_calls_empty():
     from dataclasses import replace
 
