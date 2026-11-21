@@ -57,8 +57,17 @@
         "output_tokens": 9413,
         "attempts": 1
       }
+    },
+    {
+      "step": 5,
+      "name": "image-prompt-refine",
+      "status": "pending"
+    },
+    {
+      "step": 6,
+      "name": "langfuse-stage-inputs",
+      "status": "pending"
     }
   ],
-  "created_at": "2026-11-21T11:58:26+0900",
-  "completed_at": "2026-11-21T12:34:51+0900"
+  "created_at": "2026-11-21T11:58:26+0900"
 }
