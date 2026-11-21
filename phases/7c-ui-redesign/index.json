@@ -129,6 +129,11 @@
       }
     },
     {
+      "step": 15,
+      "name": "shell-plan-fixes",
+      "status": "pending"
+    },
+    {
       "step": 5,
       "name": "graph-core",
       "status": "pending"
