@@ -19,7 +19,16 @@
     {
       "step": 2,
       "name": "ui-kit",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-21T14:11:53+0900",
+      "summary": "공통 UI 9종·index.ts 내보내기·토큰 기반 ui.css·접근성 테스트 추가 완료; make verify 통과(Python 6414개·웹 148개), 패키지 설치·기존 단언 교체 없음.",
+      "completed_at": "2026-11-21T14:22:20+0900",
+      "usage": {
+        "input_tokens": 1530485,
+        "cached_input_tokens": 1460864,
+        "output_tokens": 17695,
+        "attempts": 1
+      }
     },
     {
       "step": 3,
