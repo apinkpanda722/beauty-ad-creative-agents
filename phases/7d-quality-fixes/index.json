@@ -33,7 +33,16 @@
     {
       "step": 3,
       "name": "langfuse-io",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-21T12:14:47+0900",
+      "summary": "Langfuse 요약·호출별 IO, 가림·길이 제한·환경 스위치 구현. make verify 통과(Python 6388개·웹 125개), 패키지 설치 없음. 승인안과 달리 동결 호출 경로 보존을 위해 llm/ 대신 assembly 경계에서 수집하며, 재시도로 원장 항목이 수집분보다 많으면 일부 호출의 IO가 누락될 수 있음.",
+      "completed_at": "2026-11-21T12:27:37+0900",
+      "usage": {
+        "input_tokens": 3814905,
+        "cached_input_tokens": 3728896,
+        "output_tokens": 23073,
+        "attempts": 1
+      }
     },
     {
       "step": 4,
