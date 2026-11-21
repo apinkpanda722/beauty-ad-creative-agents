@@ -1,5 +1,5 @@
 import { parseSseStream } from "./sse";
-import type { ApiErrorBody, ClaimChoice, GraphFragment, SseFrame } from "./types";
+import type { ApiErrorBody, ClaimChoice, GraphFragment, SavedPlan, SseFrame } from "./types";
 
 export type GraphExploreResponse = Pick<GraphFragment, "nodes" | "edges"> & { truncated: boolean };
 
@@ -111,6 +111,22 @@ export async function getSchema(tenantId: string): Promise<import("./types").Sch
 export async function getDesignImage(tenantId: string, requestKey: string, index: number): Promise<Blob> {
   const response = await requireSuccess(await fetch(
     `/api/design/${encodeURIComponent(requestKey)}/${encodeURIComponent(String(index))}`,
+    { headers: { "X-Tenant-Id": tenantId } },
+  ));
+  return response.blob();
+}
+
+export async function getSavedPlans(tenantId: string): Promise<SavedPlan[]> {
+  const response = await requireSuccess(await fetch("/api/plans", {
+    headers: { "X-Tenant-Id": tenantId },
+  }));
+  const body: { plans?: SavedPlan[] } = await response.json();
+  return body.plans ?? [];
+}
+
+export async function getPlanImage(tenantId: string, planId: string): Promise<Blob> {
+  const response = await requireSuccess(await fetch(
+    `/api/plans/${encodeURIComponent(planId)}/image`,
     { headers: { "X-Tenant-Id": tenantId } },
   ));
   return response.blob();

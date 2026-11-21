@@ -186,3 +186,14 @@ export type GraphFragment = {
   edges: { source: string; target: string; type: string }[];
   missing: string[];
 };
+
+// api/plans.py projects only present plan fields and adds approval metadata.
+export type SavedPlan = Partial<Pick<Plan,
+  "title" | "hook_text" | "hook_type" | "angle" | "format" | "claimed_efficacy"
+  | "scenes" | "copy_lines" | "evidence_ids"
+>> & {
+  plan_id: string;
+  has_image: boolean;
+  decided_at: string;
+  reason: string;
+};

@@ -92,7 +92,7 @@ it("renders exactly five ordered navigation items and switches the current page 
       if (index === 1) {
         expect(screen.getByRole("heading", { name: "아직 근거 소재가 없습니다" })).toBeTruthy();
         expect(screen.getByRole("button", { name: "광고 기획으로" })).toBeTruthy();
-      } else if (index === 2) expect(screen.getByText("준비 중")).toBeTruthy();
+      } else if (index === 2) expect(screen.getByText("상단 바에서 작업 공간을 선택하세요.")).toBeTruthy();
       else { expect(screen.getByRole("heading", { name: "아직 실행한 요청이 없습니다" })).toBeTruthy(); expect(screen.queryByText("준비 중")).toBeNull(); }
     } else if (index === 3) {
       expect(screen.getByText("상단 바에서 작업 공간을 선택하세요.")).toBeTruthy();

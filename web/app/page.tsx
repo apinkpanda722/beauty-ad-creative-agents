@@ -9,6 +9,7 @@ import { OpenGraphPathContext } from "../components/graph/context";
 import { AppShell } from "../components/shell/AppShell";
 import type { View } from "../components/shell/AppShell";
 import { EvidencePage } from "../components/evidence/EvidencePage";
+import { SavedPage } from "../components/saved/SavedPage";
 import { WorkspaceChip } from "../components/shell/WorkspaceChip";
 import { getWorkspaces } from "../lib/api";
 import { latestGraphIds } from "../lib/graph";
@@ -58,7 +59,7 @@ function WorkspaceContent({ view, setView, data, failed }: {
       {view === "history" && <HistoryPage workspaces={data?.workspaces ?? []} selectedTurnId={selectedTurnId}
         onSelectTurn={id => { setSelectedTurnId(id); setHistoryOrigin(null); }} onPlan={() => setView("plan")}
         origin={historyOrigin} onReturn={() => { setHistoryOrigin(null); setView("plan"); }} />}
-      {view === "saved" && <section className="gs-placeholder"><h1>저장한 기획</h1><p>준비 중</p></section>}
+      {view === "saved" && <SavedPage tenantId={state.tenantId} onPlan={() => setView("plan")} />}
       {failed ? <p role="alert">API 서버에 연결하지 못했습니다. 서버가 실행 중인지 확인하세요.</p>
         : data ? <>
           <div hidden={view !== "plan"}><PlanPage workspaces={data.workspaces} imageEnabled={data.image_enabled} /></div>
