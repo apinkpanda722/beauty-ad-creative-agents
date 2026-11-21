@@ -159,7 +159,16 @@
     {
       "step": 5,
       "name": "graph-core",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-21T20:00:19+0900",
+      "summary": "스키마·근거 경로 탭, 줌 한계·독립 필터·한글 표시·기획 복귀 구현 완료. 승인 교체: G1 Creative→광고 소재(한글화), G2 사이드바 클릭→스키마 탭 클릭(근거 경로 이동). make verify 통과(Python 6,415개·웹 342개), 패키지 설치 없음.",
+      "completed_at": "2026-11-21T20:13:09+0900",
+      "usage": {
+        "input_tokens": 3308015,
+        "cached_input_tokens": 3213312,
+        "output_tokens": 24377,
+        "attempts": 1
+      }
     },
     {
       "step": 6,
