@@ -291,7 +291,9 @@ def test_image_style_and_no_text_instructions_are_exact():
     assert IMAGE_STYLE_CLAUSE == (
         "장면은 훅 문구를 가장 잘 보여 주는 하나의 순간으로 고르고 기본은 사용 장면이다(손등이나 볼에 제품을 바르는 손과 피부 클로즈업). "
         "얼굴 전체를 정면으로 잡는 구도와 병이나 튜브를 코나 입에 대는 구도는 그리지 않는다. "
-        "용기가 나오면 내용물이 보여야 한다(맑은 물처럼 보이는 투명 액체 금지, 세럼은 약간 점성이 있는 연한 색 액체와 스포이트나 펌프 형태, 튜브는 닫힌 튜브). "
+        "유리병 용기는 내용물이 보여야 한다(맑은 물처럼 투명한 액체 금지, 세럼은 약간 점성이 있는 연한 색 액체와 스포이트 형태). "
+        "튜브는 전체가 불투명한 단색 소재의 닫힌 튜브이며 내용물이 비쳐 보이지 않고(내용물은 손가락 끝에 덜어낸 모습으로만 보인다) 튜브 끝을 얼굴 쪽으로 향하게 하거나 얼굴에 대지 않는다. "
+        "같은 제품은 화면에 한 개만 그리고 스포이트를 든 손이 있으면 병 안에 스포이트를 또 그리지 않는다. "
         "제품을 얼굴에 직접 대거나 문지르지 말고 손가락 끝에 덜어 바르는 모습으로 그린다. 인물이 나오면 한국인 모델이다."
     )
     assert IMAGE_NO_TEXT_CLAUSE == (
@@ -302,6 +304,45 @@ def test_image_style_and_no_text_instructions_are_exact():
     assert IMAGE_PROMPT_SUFFIX == IMAGE_STYLE_CLAUSE + " " + IMAGE_NO_TEXT_CLAUSE
 
 
+@pytest.mark.parametrize(
+    "phrase",
+    [
+        "유리병 용기는 내용물이 보여야 한다",
+        "튜브는 전체가 불투명한 단색 소재의 닫힌 튜브",
+        "내용물이 비쳐 보이지 않고",
+        "튜브 끝을 얼굴 쪽으로 향하게 하거나 얼굴에 대지 않는다",
+        "같은 제품은 화면에 한 개만 그리고",
+        "스포이트를 든 손이 있으면 병 안에 스포이트를 또 그리지 않는다",
+    ],
+)
+def test_image_style_includes_container_and_dropper_instructions(phrase):
+    from beautyads.agents.design_images import IMAGE_STYLE_CLAUSE
+
+    assert phrase in IMAGE_STYLE_CLAUSE
+
+
+@pytest.mark.parametrize("phrase", ["튜브는 닫힌 튜브", "스포이트나 펌프 형태"])
+def test_image_style_excludes_replaced_container_instructions(phrase):
+    from beautyads.agents.design_images import IMAGE_STYLE_CLAUSE
+
+    assert phrase not in IMAGE_STYLE_CLAUSE
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "장면은 훅 문구를 가장 잘 보여 주는 하나의 순간으로 고르고 기본은 사용 장면이다(손등이나 볼에 제품을 바르는 손과 피부 클로즈업).",
+        "얼굴 전체를 정면으로 잡는 구도와 병이나 튜브를 코나 입에 대는 구도는 그리지 않는다.",
+        "제품을 얼굴에 직접 대거나 문지르지 말고 손가락 끝에 덜어 바르는 모습으로 그린다.",
+        "인물이 나오면 한국인 모델이다.",
+    ],
+)
+def test_image_style_preserves_usage_and_model_instructions(sentence):
+    from beautyads.agents.design_images import IMAGE_STYLE_CLAUSE
+
+    assert sentence in IMAGE_STYLE_CLAUSE
+
+
 @pytest.mark.parametrize("brief", [None, "SYNTH_SCENE (REMOVE)", "가" * 3000])
 def test_style_suffix_survives_cleaning_and_long_scenes(brief):
     from beautyads.agents.design_images import IMAGE_PROMPT_SUFFIX
@@ -310,7 +351,7 @@ def test_style_suffix_survives_cleaning_and_long_scenes(brief):
     assert prompt.endswith(IMAGE_PROMPT_SUFFIX)
     assert len(prompt) <= 2000
     assert "(손등이나 볼에 제품을 바르는 손과 피부 클로즈업)" in prompt
-    assert "(맑은 물처럼 보이는 투명 액체 금지," in prompt
+    assert "(맑은 물처럼 투명한 액체 금지," in prompt
     assert "REMOVE" not in prompt
     if brief is None:
         assert prompt == IMAGE_PROMPT_SUFFIX
