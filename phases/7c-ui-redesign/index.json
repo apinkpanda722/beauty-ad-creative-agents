@@ -145,7 +145,16 @@
     {
       "step": 16,
       "name": "history-verify-polish",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-21T19:39:30+0900",
+      "summary": "실행 기록 3탭·단계별 시도 줄·검증 카드·원천 표 아코디언·공통 간격 토큰 구현 완료. 승인 단언 대응: T1 desire 원문→이상형 제시형; T2·T6~T9 평가 탭·사유→단계의 정확한 시도 줄·사유 비표시·비용 탭 유지; T3 영문 칩·중복 건수·상시 원천 표→한글 칩·중복 건수 제거·접힌 표; T4 question 단건→요약 1개+패턴 2개; T5·T10 옛 패턴 용어→새 열 제목·비교 불가; T11·T12 비교 제목·열→조회수 상위·하위 25% 제목·광고 수. make verify 통과(Python 6,412개·웹 328개), 패키지 설치 없음.",
+      "completed_at": "2026-11-21T19:59:07+0900",
+      "usage": {
+        "input_tokens": 3326290,
+        "cached_input_tokens": 3200768,
+        "output_tokens": 22738,
+        "attempts": 1
+      }
     },
     {
       "step": 5,
