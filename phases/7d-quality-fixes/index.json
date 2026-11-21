@@ -61,7 +61,16 @@
     {
       "step": 5,
       "name": "image-prompt-refine",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-21T13:18:24+0900",
+      "summary": "IMAGE_STYLE_CLAUSE를 지정 문구로 교체해 병·튜브 구분과 얼굴 방향·스포이트 중복 방지 지시를 보완하고 테스트·변경 기록 추가. make verify 통과(Python 6402개·웹 125개), 패키지 설치 없음.",
+      "completed_at": "2026-11-21T13:23:43+0900",
+      "usage": {
+        "input_tokens": 1342506,
+        "cached_input_tokens": 1257088,
+        "output_tokens": 4611,
+        "attempts": 1
+      }
     },
     {
       "step": 6,
