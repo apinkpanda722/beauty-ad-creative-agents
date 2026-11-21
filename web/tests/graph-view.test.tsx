@@ -2,7 +2,9 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { GraphPanel } from "../components/GraphPanel";
 import { SchemaView } from "../components/SchemaView";
-import { GraphCanvas, GraphLegend } from "../components/GraphCanvas";
+import { GraphCanvas } from "../components/GraphCanvas";
+import { fragmentToElements, LAYER_COLORS, type GraphElement } from "../lib/graph";
+import { taxonomyNames } from "../lib/taxonomy";
 import { NodeDetail } from "../components/NodeDetail";
 import { ResultsView } from "../components/results/ResultsView";
 import Page from "../app/page";
@@ -27,7 +29,9 @@ it("loads fragment, creates cose canvas, shows missing and node details, and des
   await act(async () => resolve(new Response(JSON.stringify(fragment))));
   await waitFor(() => expect(cy.create).toHaveBeenCalledTimes(1));
   expect(screen.getByText("그래프에 아직 없는 소재 1건")).toBeTruthy();
-  expect(screen.getByLabelText("그래프 범례")).toBeTruthy();
+  expect(screen.queryByLabelText("그래프 범례")).toBeNull();
+  expect(screen.getByRole("group", { name: "층 필터" })).toBeTruthy();
+  expect(screen.getByRole("group", { name: "노드 종류 필터" })).toBeTruthy();
   const options = cy.create.mock.calls[0][0]; expect(options.container).toBe(screen.getByLabelText("그래프 캔버스"));
   expect(options.layout.name).toBe("cose"); expect(options.elements).toHaveLength(1);
   expect(cy.on.mock.calls[0].slice(0, 2)).toEqual(["tap", "node"]);
@@ -130,23 +134,51 @@ it("switches page tabs, preserves conversation and opens the command graph with 
   fireEvent.click(screen.getByRole("button", { name: "광고 기획" })); expect(screen.getByText("합성 응답")).toBeTruthy();
 });
 
-it("renders separate layer and node kind legend groups", () => {
-  render(<GraphLegend />);
-  const legend = screen.getByLabelText("그래프 범례");
-  expect(within(legend).getAllByRole("heading").map(node => node.textContent)).toEqual(["층", "노드 종류"]);
-  expect(within(legend).getAllByRole("list").map(list => Array.from(list.children).map(node => node.textContent))).toEqual([
-    ["1층 · 제품 지식", "2층 · 광고 관찰", "3층 · 피드백"], ["제품", "광고 소재"],
-  ]);
+it("merges the legend colors into the layer and kind filters", async () => {
+  const input: SchemaResponse = { ...schema, labels: [
+    { label: "Creative", layer: 2, name_ko: "광고 소재" }, { label: "Product", layer: 1, name_ko: "제품" }, { label: "Feedback", layer: 3, name_ko: "피드백" },
+  ] };
+  const path: GraphFragment = { nodes: input.labels.map(label => ({ id: label.label, label: label.label, name: label.name_ko, props: {} })), edges: [], missing: [] };
+  vi.stubGlobal("fetch", vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(url === "/api/graph/schema" ? input : path)))));
+  const view = render(<SchemaView tenantId="synthetic" />);
+  await waitFor(() => expect(cy.create).toHaveBeenCalledTimes(1));
+  const layerButtons = within(screen.getByRole("group", { name: "층 필터" })).getAllByRole("button");
+  expect(layerButtons.map(button => button.textContent)).toEqual(["1층 · 제품 지식", "2층 · 광고 관찰", "3층 · 피드백"]);
+  for (const [index, layer] of ([1, 2, 3] as const).entries()) {
+    const dot = layerButtons[index].querySelector<HTMLElement>('span[aria-hidden="true"].gs-graph-dot');
+    expect(dot).toBeTruthy(); expect(dot!.style.backgroundColor).toBe(rgb(LAYER_COLORS[layer]));
+  }
+  expect(screen.queryByLabelText("그래프 범례")).toBeNull();
+  for (const title of ["층", "노드 종류"]) expect(screen.queryByRole("heading", { name: title, level: 4 })).toBeNull();
+  view.unmount();
+  render(<GraphPanel tenantId="synthetic" ids={["youtube:a"]} />);
+  await waitFor(() => expect(cy.create).toHaveBeenCalledTimes(2));
+  for (const button of within(screen.getByRole("group", { name: "층 필터" })).getAllByRole("button")) expect(button.querySelector(".gs-graph-dot")).toBeNull();
+  const chips = within(screen.getByRole("group", { name: "노드 종류 필터" })).getAllByRole("button");
+  expect(chips.map(button => button.textContent)).toEqual(["광고 소재", "제품", "피드백"]);
+  const nodes = fragmentToElements(path, taxonomyNames(input)).filter(element => element.group === "nodes");
+  for (const [index, label] of ["Creative", "Product", "Feedback"].entries()) {
+    const dot = chips[index].querySelector<HTMLElement>('span[aria-hidden="true"].gs-graph-dot');
+    expect(dot).toBeTruthy(); expect(dot!.style.backgroundColor).toBe(rgb(nodes.find(node => node.data.label === label)!.data.color));
+  }
+  expect(screen.queryByLabelText("그래프 범례")).toBeNull();
+  for (const title of ["층", "노드 종류"]) expect(screen.queryByRole("heading", { name: title, level: 4 })).toBeNull();
 });
-it("uses smaller labels and spreads cose nodes with built-in layout options", async () => {
+it("uses readable label sizes, outlines and edge pills and spreads cose nodes with built-in layout options", async () => {
   render(<GraphCanvas elements={[]} onNodeClick={vi.fn()} />);
   await waitFor(() => expect(cy.create).toHaveBeenCalledTimes(1));
   const options = cy.create.mock.calls[0][0];
   const node = options.style.find((item: { selector: string }) => item.selector === "node").style;
   const edge = options.style.find((item: { selector: string }) => item.selector === "edge").style;
-  expect(node["font-size"]).toBeGreaterThanOrEqual(9); expect(node["font-size"]).toBeLessThanOrEqual(10);
+  expect(node["font-size"]).toBe(12);
   expect(node["text-margin-y"]).toBeGreaterThanOrEqual(0); expect(node["text-margin-y"]).toBeLessThan(7);
-  expect(edge["font-size"]).toBe(7);
+  expect(edge["font-size"]).toBe(11);
+  expect(node["text-outline-width"]).toBeGreaterThan(0); expect(node["text-outline-opacity"]).toBe(1);
+  expect(edge["text-background-opacity"]).toBe(1); expect(edge["text-background-shape"]).toBe("roundrectangle");
+  expect(parseFloat(edge["text-background-padding"])).toBeGreaterThanOrEqual(2); expect(parseFloat(edge["text-background-padding"])).toBeLessThanOrEqual(3);
+  expect(edge["arrow-scale"]).toBeGreaterThanOrEqual(1); expect(edge["target-arrow-shape"]).toBe("triangle");
+  expect(edge["curve-style"]).toBe("unbundled-bezier"); expect(edge.width).toBeGreaterThan(1.5);
+  expect(options.layout.fit).toBe(true); expect(options.layout.padding).toBeGreaterThanOrEqual(40);
   expect(options.layout.name).toBe("cose");
   expect(options.layout.nodeRepulsion).toBeGreaterThan(2048);
   expect(options.layout.idealEdgeLength).toBeGreaterThan(32);
@@ -193,4 +225,90 @@ it("localizes detail keys, platforms and taxonomy values without changing the so
     expect(within(detail).getByText("값")).toBeTruthy(); expect(within(detail).getAllByText(text).length).toBeGreaterThan(0);
     expect(detail.textContent).not.toContain(value); expect(JSON.stringify(input)).toBe(before);
   }
+});
+
+function rgb(hex: string) {
+  return `rgb(${[1, 3, 5].map(start => parseInt(hex.slice(start, start + 2), 16)).join(", ")})`;
+}
+function canvasStyles() {
+  return cy.create.mock.calls.at(-1)![0].style as { selector: string; style: Record<string, unknown> }[];
+}
+it("fits the initial breadthfirst layout with label padding and extra spacing", async () => {
+  render(<GraphCanvas elements={[]} layout="breadthfirst" onNodeClick={vi.fn()} />);
+  await waitFor(() => expect(cy.create).toHaveBeenCalledTimes(1));
+  const options = cy.create.mock.calls[0][0];
+  expect(options.layout.name).toBe("breadthfirst"); expect(options.layout.fit).toBe(true);
+  expect(options.layout.padding).toBeGreaterThanOrEqual(40); expect(options.layout.spacingFactor).toBeGreaterThan(1);
+});
+it("registers hover after tap and zoom and dims only outside the closed neighborhood", async () => {
+  const keep = { id: "합성 이웃" };
+  const addClass = vi.fn(), removeClass = vi.fn(), not = vi.fn(() => ({ addClass }));
+  const elements = vi.fn(() => ({ not, removeClass }));
+  cy.create.mockReturnValue({ on: cy.on, destroy: cy.destroy, elements });
+  render(<GraphCanvas elements={[]} onNodeClick={vi.fn()} />);
+  await waitFor(() => expect(cy.create).toHaveBeenCalledTimes(1));
+  expect(cy.on.mock.calls.map(call => call[0])).toEqual(["tap", "zoom", "mouseover", "mouseout"]);
+  expect(cy.on.mock.calls[0].slice(0, 2)).toEqual(["tap", "node"]);
+  const over = cy.on.mock.calls.find(call => call[0] === "mouseover")!;
+  const out = cy.on.mock.calls.find(call => call[0] === "mouseout")!;
+  expect(over[1]).toBe("node"); expect(out[1]).toBe("node");
+  expect(elements).not.toHaveBeenCalled();
+  const closedNeighborhood = vi.fn(() => keep);
+  act(() => over[2]({ target: { closedNeighborhood } }));
+  expect(closedNeighborhood).toHaveBeenCalledTimes(1); expect(not).toHaveBeenCalledExactlyOnceWith(keep);
+  expect(addClass).toHaveBeenCalledExactlyOnceWith("gs-dim"); expect(removeClass).not.toHaveBeenCalled();
+  act(() => out[2]());
+  expect(elements).toHaveBeenCalledTimes(2); expect(removeClass).toHaveBeenCalledExactlyOnceWith("gs-dim");
+  expect(canvasStyles().find(item => item.selector === ".gs-dim")!.style.opacity).toBe(0.3);
+});
+it("skips absent ResizeObserver and does not manually fit or resize during initialization", async () => {
+  vi.stubGlobal("ResizeObserver", undefined);
+  const fit = vi.fn(), resize = vi.fn();
+  cy.create.mockReturnValue({ on: cy.on, destroy: cy.destroy, zoom: () => 1, fit, resize });
+  render(<GraphCanvas elements={[]} onNodeClick={vi.fn()} />);
+  await waitFor(() => expect(cy.create).toHaveBeenCalledTimes(1));
+  expect(fit).not.toHaveBeenCalled(); expect(resize).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "화면에 맞춤" }));
+  expect(fit).toHaveBeenCalledTimes(1); expect(resize).not.toHaveBeenCalled();
+});
+it.each([true, false])("observes container size without fitting and disconnects, resize available: %s", async available => {
+  let notify!: () => void;
+  const observe = vi.fn(), disconnect = vi.fn(), resize = vi.fn(), fit = vi.fn();
+  vi.stubGlobal("ResizeObserver", class {
+    constructor(callback: () => void) { notify = callback; }
+    observe = observe; disconnect = disconnect;
+  });
+  cy.create.mockReturnValue({ on: cy.on, destroy: cy.destroy, fit, ...(available ? { resize } : {}) });
+  const { unmount } = render(<GraphCanvas elements={[]} onNodeClick={vi.fn()} />);
+  await waitFor(() => expect(observe).toHaveBeenCalledExactlyOnceWith(screen.getByLabelText("그래프 캔버스")));
+  expect(resize).not.toHaveBeenCalled(); expect(fit).not.toHaveBeenCalled();
+  act(() => notify()); expect(resize).toHaveBeenCalledTimes(available ? 1 : 0); expect(fit).not.toHaveBeenCalled();
+  unmount(); expect(disconnect).toHaveBeenCalledTimes(1);
+});
+it("scales degree nodes with the actual minimum and maximum without changing default nodes", async () => {
+  const elements: GraphElement[] = [3, 0, 1].map((degree, index) => ({ group: "nodes", data: { ...fragment.nodes[0], id: String(index), displayName: "합성", color: LAYER_COLORS[2], layer: 2, degree } }));
+  render(<GraphCanvas elements={elements} onNodeClick={vi.fn()} />);
+  await waitFor(() => expect(cy.create).toHaveBeenCalledTimes(1));
+  const style = canvasStyles().find(item => item.selector === "node[degree]")!.style;
+  expect(style.width).toBe("mapData(degree, 0, 3, 24, 56)"); expect(style.height).toBe(style.width);
+  const base = canvasStyles().find(item => item.selector === "node")!.style;
+  expect(base.width).toBe(28); expect(base.height).toBe(28);
+  expect(base["border-color"]).toBe("data(borderColor)"); expect(base["border-width"]).toBe(1.5);
+});
+it.each([{ degrees: [] }, { degrees: [2, 2] }, { degrees: [undefined, undefined] }])("omits degree mapping for uniform or missing degrees: %j", async ({ degrees }) => {
+  const elements: GraphElement[] = degrees.map((degree, index) => ({ group: "nodes", data: { ...fragment.nodes[0], id: String(index), displayName: "합성", color: LAYER_COLORS[2], layer: 2, ...(degree === undefined ? {} : { degree }) } }));
+  render(<GraphCanvas elements={elements} onNodeClick={vi.fn()} />);
+  await waitFor(() => expect(cy.create).toHaveBeenCalledTimes(1));
+  expect(canvasStyles().find(item => item.selector === "node[degree]")).toBeUndefined();
+});
+it("counts displayed nodes only and updates to zero with an empty canvas", async () => {
+  const elements = fragmentToElements({ ...fragment, nodes: [...fragment.nodes, { ...fragment.nodes[0], id: "second" }], edges: [{ source: fragment.nodes[0].id, target: "second", type: "PROMOTES" }] }, taxonomyNames());
+  const onNodeClick = vi.fn();
+  const { rerender } = render(<GraphCanvas elements={elements} onNodeClick={onNodeClick} />);
+  await waitFor(() => expect(cy.create).toHaveBeenCalledTimes(1));
+  expect(screen.getByText("2개 표시").className).toBe("gs-graph-count");
+  expect(screen.queryByText(/개 중/)).toBeNull();
+  rerender(<GraphCanvas elements={[]} onNodeClick={onNodeClick} />);
+  await waitFor(() => expect(cy.create).toHaveBeenCalledTimes(2));
+  expect(screen.getByText("0개 표시")).toBeTruthy();
 });

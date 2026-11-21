@@ -27,8 +27,10 @@ export function latestGraphIds(turns: readonly { commands: readonly UiCommand[] 
   return null;
 }
 
-export const LAYER_COLORS = { 1: "#427c69", 2: "#527cac", 3: "#8961a8" } as const;
-export const LABEL_COLORS: Record<string, string> = { Creative: "#365d89", Product: "#286550" };
+export const LAYER_COLORS = { 1: "#1D9E75", 2: "#378ADD", 3: "#7F77DD" } as const;
+export const LAYER_BORDER_COLORS = { 1: "#0F6E56", 2: "#185FA5", 3: "#534AB7" } as const;
+export const LABEL_COLORS: Record<string, string> = { Brand: "#7F77DD", Product: "#1D9E75", Efficacy: "#EF9F27", Creative: "#378ADD", Other: "#888780" };
+export const LABEL_BORDER_COLORS: Record<string, string> = { Brand: "#534AB7", Product: "#0F6E56", Efficacy: "#854F0B", Creative: "#185FA5", Other: "#5F5E5A" };
 export const GRAPH_LEGEND = [
   { title: "층", items: [
     { name: "1층 · 제품 지식", color: LAYER_COLORS[1] },
@@ -36,23 +38,29 @@ export const GRAPH_LEGEND = [
     { name: "3층 · 피드백", color: LAYER_COLORS[3] },
   ] },
   { title: "노드 종류", items: [
+    { name: "브랜드", color: LABEL_COLORS.Brand },
     { name: "제품", color: LABEL_COLORS.Product },
+    { name: "효능", color: LABEL_COLORS.Efficacy },
     { name: "광고 소재", color: LABEL_COLORS.Creative },
+    { name: "그 밖", color: LABEL_COLORS.Other },
   ] },
 ];
 const OBSERVATION_LABELS = new Set(["Creative", "Hook", "Angle", "Format", "Talent", "CtaType"]);
 export type GraphElement =
-  | { group: "nodes"; data: GraphNode & { displayName: string; layer: number; color: string } }
+  | { group: "nodes"; data: GraphNode & { displayName: string; layer: number; color: string; borderColor?: string; degree?: number } }
   | { group: "edges"; data: { id: string; source: string; target: string; type: string; typeName: string } };
 
-function nodeElement(node: GraphNode, displayName: string, layer: number): GraphElement {
+function nodeElement(node: GraphNode, displayName: string, layer: number, colorBy: "layer" | "kind"): Extract<GraphElement, { group: "nodes" }> {
   return { group: "nodes", data: { ...node, displayName, layer,
-    color: LABEL_COLORS[node.label] ?? LAYER_COLORS[layer as keyof typeof LAYER_COLORS] } };
+    color: colorBy === "layer" ? LAYER_COLORS[layer as keyof typeof LAYER_COLORS] : LABEL_COLORS[node.label] ?? LABEL_COLORS.Other,
+    borderColor: colorBy === "layer" ? LAYER_BORDER_COLORS[layer as keyof typeof LAYER_BORDER_COLORS] : LABEL_BORDER_COLORS[node.label] ?? LABEL_BORDER_COLORS.Other } };
 }
 function edgeElement(source: string, target: string, type: string): GraphElement {
   return { group: "edges", data: { id: `edge:${JSON.stringify([source, target, type])}`, source, target, type, typeName: RELATIONSHIP_NAMES[type] ?? type } };
 }
 export function fragmentToElements(fragment: GraphFragment, names: TaxonomyNames): GraphElement[] {
+  const degrees = new Map<string, number>();
+  for (const edge of fragment.edges) for (const id of [edge.source, edge.target]) degrees.set(id, (degrees.get(id) ?? 0) + 1);
   return [
     ...fragment.nodes.map(node => {
       const value = typeof node.props.value === "string" ? node.props.value : node.name ?? "";
@@ -66,14 +74,16 @@ export function fragmentToElements(fragment: GraphFragment, names: TaxonomyNames
         case "CtaType": name = ctaName(value); break;
       }
       const layer = node.label === "Feedback" ? 3 : OBSERVATION_LABELS.has(node.label) ? 2 : 1;
-      return nodeElement(node, name !== value ? name : node.name ?? value, layer);
+      const element = nodeElement(node, name !== value ? name : node.name ?? value, layer, "kind");
+      element.data.degree = degrees.get(node.id) ?? 0;
+      return element;
     }),
     ...fragment.edges.map(edge => edgeElement(edge.source, edge.target, edge.type)),
   ];
 }
 export function schemaToElements(schema: SchemaResponse): GraphElement[] {
   return [
-    ...schema.labels.map(label => nodeElement({ id: label.label, label: label.label, name: label.name_ko, props: {} }, label.name_ko, label.layer)),
+    ...schema.labels.map(label => nodeElement({ id: label.label, label: label.label, name: label.name_ko, props: {} }, label.name_ko, label.layer, "layer")),
     ...schema.relationships.map(edge => edgeElement(edge.from, edge.to, edge.type)),
   ];
 }

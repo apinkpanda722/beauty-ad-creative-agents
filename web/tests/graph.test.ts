@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { ApiError, getGraphFragment } from "../lib/api";
-import { fragmentToElements, schemaToElements, LAYER_COLORS, LABEL_COLORS, GRAPH_LEGEND } from "../lib/graph";
+import { fragmentToElements, schemaToElements, LAYER_COLORS, LAYER_BORDER_COLORS, LABEL_COLORS, LABEL_BORDER_COLORS, GRAPH_LEGEND } from "../lib/graph";
 import { taxonomyNames } from "../lib/taxonomy";
 import type { GraphFragment, SchemaResponse } from "../lib/types";
 
@@ -103,4 +103,44 @@ it("adds translated relationship names while retaining raw types and unknown nam
   expect(edges.map(edge => [edge.data.type, edge.data.typeName])).toEqual([["USES_HOOK", "훅 사용"], ["CLAIMS", "주장"], ["SYNTHETIC_UNKNOWN", "SYNTHETIC_UNKNOWN"]]);
   expect(schemaToElements(schema).filter(element => element.group === "edges").map(edge => edge.data.typeName)).toEqual(["홍보", "피드백 대상"]);
   expect(JSON.stringify(input)).toBe(snapshot);
+});
+
+it("exports the exact approved layer and kind fill and border palettes", () => {
+  expect(LAYER_COLORS).toEqual({ 1: "#1D9E75", 2: "#378ADD", 3: "#7F77DD" });
+  expect(LAYER_BORDER_COLORS).toEqual({ 1: "#0F6E56", 2: "#185FA5", 3: "#534AB7" });
+  expect(LABEL_COLORS).toEqual({ Brand: "#7F77DD", Product: "#1D9E75", Efficacy: "#EF9F27", Creative: "#378ADD", Other: "#888780" });
+  expect(LABEL_BORDER_COLORS).toEqual({ Brand: "#534AB7", Product: "#0F6E56", Efficacy: "#854F0B", Creative: "#185FA5", Other: "#5F5E5A" });
+});
+it("colors every schema node by layer including a brand instead of by kind", () => {
+  const input: SchemaResponse = { ...schema, labels: [...schema.labels, { label: "Brand", layer: 1, name_ko: "브랜드" }] };
+  const nodes = schemaToElements(input).filter(element => element.group === "nodes");
+  for (const label of input.labels) {
+    const node = nodes.find(node => node.data.id === label.label)!;
+    expect(node.data.color).toBe(LAYER_COLORS[label.layer as 1 | 2 | 3]);
+    expect(node.data.borderColor).toBe(LAYER_BORDER_COLORS[label.layer as 1 | 2 | 3]);
+    expect(node.data.degree).toBeUndefined();
+  }
+  expect(nodes.find(node => node.data.label === "Brand")!.data.color).not.toBe(LABEL_COLORS.Brand);
+});
+it("colors fragment kinds and counts incident endpoints including isolated and self-linked nodes", () => {
+  const input: GraphFragment = {
+    nodes: ["Brand", "Product", "Efficacy", "Creative", "Hook", "Angle"].map(label => ({ id: label, label, name: "합성", props: {} })),
+    edges: [{ source: "Brand", target: "Product", type: "OWNS" }, { source: "Product", target: "Efficacy", type: "HAS_EFFICACY" }, { source: "Creative", target: "Product", type: "PROMOTES" }, { source: "Hook", target: "Hook", type: "ABOUT" }], missing: [],
+  };
+  const nodes = fragmentToElements(input, taxonomyNames()).filter(element => element.group === "nodes");
+  for (const [label, kind, degree] of [["Brand", "Brand", 1], ["Product", "Product", 3], ["Efficacy", "Efficacy", 1], ["Creative", "Creative", 1], ["Hook", "Other", 2], ["Angle", "Other", 0]] as const) {
+    const node = nodes.find(node => node.data.id === label)!;
+    expect(node.data.color).toBe(LABEL_COLORS[kind]);
+    expect(node.data.borderColor).toBe(LABEL_BORDER_COLORS[kind]);
+    expect(node.data.degree).toBe(degree);
+  }
+});
+it("keeps fragment and schema JSON unchanged when adding presentation fields", () => {
+  const beforeFragment = JSON.stringify(fragment), beforeSchema = JSON.stringify(schema);
+  fragmentToElements(fragment, taxonomyNames(schema)); schemaToElements(schema);
+  expect(JSON.stringify(fragment)).toBe(beforeFragment); expect(JSON.stringify(schema)).toBe(beforeSchema);
+});
+it("lists the five kind colors with their Korean names in explicit order", () => {
+  expect(GRAPH_LEGEND[1].items.map(item => item.name)).toEqual(["브랜드", "제품", "효능", "광고 소재", "그 밖"]);
+  expect(GRAPH_LEGEND[1].items.map(item => item.color)).toEqual([LABEL_COLORS.Brand, LABEL_COLORS.Product, LABEL_COLORS.Efficacy, LABEL_COLORS.Creative, LABEL_COLORS.Other]);
 });

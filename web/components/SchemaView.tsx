@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError, getSchema } from "../lib/api";
 import { schemaToElements } from "../lib/graph";
 import type { GraphNode, SchemaResponse } from "../lib/types";
-import { GraphCanvas, GraphLegend } from "./GraphCanvas";
+import { GraphCanvas } from "./GraphCanvas";
 import { NodeDetail } from "./NodeDetail";
 import { GraphFilters, useGraphFilters } from "./graph/GraphFilters";
 import { taxonomyNames } from "../lib/taxonomy";
@@ -32,7 +32,7 @@ function SchemaContent({ tenantId }: { tenantId: string }) {
   return <section className="result-section" aria-label="전체 스키마"><h2>전체 스키마</h2>
     {state.status === "loading" ? <p role="status">스키마를 불러오는 중입니다.</p>
       : state.status === "error" ? <div role="alert"><p>{state.code}</p><button type="button" onClick={() => { setState({ status: "loading" }); setSelected(null); setAttempt(value => value + 1); }}>다시 시도</button></div>
-        : state.schema.labels.length ? <><GraphLegend /><p className="gs-graph-note">3층 피드백은 이 작업 공간의 데이터입니다.</p><GraphFilters {...filters} /><div className="graph-layout gs-graph-layout"><GraphCanvas elements={filters.elements} layout="breadthfirst" onNodeClick={select} /><NodeDetail node={filters.elements.some(element => element.group === "nodes" && element.data.id === selected?.id) ? selected : null} names={taxonomyNames(schema)} /></div></>
+        : state.schema.labels.length ? <><p className="gs-graph-note">3층 피드백은 이 작업 공간의 데이터입니다.</p><GraphFilters {...filters} colorBy="layer" /><div className="graph-layout gs-graph-layout"><GraphCanvas elements={filters.elements} layout="breadthfirst" onNodeClick={select} /><NodeDetail node={filters.elements.some(element => element.group === "nodes" && element.data.id === selected?.id) ? selected : null} names={taxonomyNames(schema)} /></div></>
           : <p>표시할 노드가 없습니다</p>}
   </section>;
 }

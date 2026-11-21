@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, it } from "vitest";
+import { LAYER_COLORS, LAYER_BORDER_COLORS, LABEL_COLORS, LABEL_BORDER_COLORS } from "../lib/graph";
 
 const css = readFileSync(join(process.cwd(), "app/tokens.css"), "utf8");
 const colors = {
@@ -60,4 +61,13 @@ it("keeps white platform glyphs readable against every gradient stop and TikTok"
 });
 it("keeps the amber model warning readable on its weak background", () => {
   expect(contrast(tokenColor("--gs-warn", "#92400E"), tokenColor("--gs-warn-weak", "#FFFBEB"))).toBeGreaterThanOrEqual(4.5);
+});
+it("keeps graph borders above nontext contrast and each fill palette distinct", () => {
+  const background = tokenColor("--gs-bg", colors["--gs-bg"]);
+  const layers = [1, 2, 3] as const;
+  const kinds = ["Brand", "Product", "Efficacy", "Creative", "Other"];
+  for (const color of [...layers.map(layer => LAYER_BORDER_COLORS[layer]), ...kinds.map(kind => LABEL_BORDER_COLORS[kind])]) expect(contrast(color, background)).toBeGreaterThanOrEqual(3);
+  for (const fills of [layers.map(layer => LAYER_COLORS[layer]), kinds.map(kind => LABEL_COLORS[kind])]) {
+    for (let i = 0; i < fills.length; i++) for (let j = i + 1; j < fills.length; j++) expect(fills[i]).not.toBe(fills[j]);
+  }
 });

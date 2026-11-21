@@ -5,7 +5,7 @@ import { ApiError, getGraphNeighbors, getGraphOverview, getSchema, type GraphExp
 import { fragmentToElements } from "../../lib/graph";
 import { ctaName, talentName, taxonomyNames } from "../../lib/taxonomy";
 import type { GraphNode, SchemaResponse } from "../../lib/types";
-import { GraphCanvas, GraphLegend } from "../GraphCanvas";
+import { GraphCanvas } from "../GraphCanvas";
 import { NodeDetail } from "../NodeDetail";
 import { Button } from "../ui";
 import { GraphFilters, useGraphFilters } from "./GraphFilters";
@@ -103,7 +103,7 @@ function DataView({ tenantId }: { tenantId: string }) {
       {state.status === "loading" ? <p role="status">그래프를 불러오는 중입니다.</p>
         : state.status === "error" ? <RequestError error={state.error} retry={() => { setState({ status: "loading" }); setAttempt(value => value + 1); }} />
           : <>{data?.truncated && <p className="gs-graph-note">일부만 표시합니다. 표시 상한을 넘는 노드는 보이지 않습니다.</p>}
-            {state.data.nodes.length ? <><GraphLegend /><GraphFilters {...filters} />
+            {state.data.nodes.length ? <><GraphFilters {...filters} colorBy="kind" />
               <div className="graph-layout gs-graph-layout"><GraphCanvas elements={filters.elements} onNodeClick={select} />
                 <div><NodeDetail node={selectedNode} names={names} />
                   {selectedNode && <p className="gs-graph-note"><Button variant="secondary" disabled={expanded.includes(selectedNode.id) || expansion.status === "loading"} onClick={() => { void expand(selectedNode.id); }}>이웃 펼치기</Button></p>}

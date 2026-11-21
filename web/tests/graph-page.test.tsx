@@ -9,7 +9,7 @@ import { GRAPH_TABS } from "../components/graph/tabs";
 import { GraphPanel } from "../components/GraphPanel";
 import { SchemaView } from "../components/SchemaView";
 import { getGraphFragment, getSchema, getWorkspaces, postChatAsk } from "../lib/api";
-import { fragmentToElements, schemaToElements } from "../lib/graph";
+import { fragmentToElements, schemaToElements, LAYER_COLORS } from "../lib/graph";
 import { taxonomyNames } from "../lib/taxonomy";
 import type { GraphFragment, SchemaResponse, SseFrame } from "../lib/types";
 
@@ -139,4 +139,38 @@ it("uses independent responsive graph geometry and reduced motion", () => {
   expect(css).toContain("--gs-graph-height"); expect(css).toMatch(/height:\s*var\(--gs-graph-height\)/);
   expect(css).toMatch(/prefers-reduced-motion:\s*reduce/);
   expect(css).toMatch(/\.gs-graph-filter-group\s*\{[^}]*display:\s*flex/);
+});
+it("uses token-based compact filters, counts and bottom-right controls without a separate legend", () => {
+  const css = readFileSync(join(process.cwd(), "app/graph.css"), "utf8");
+  const globals = readFileSync(join(process.cwd(), "app/globals.css"), "utf8");
+  const controls = css.match(/\.gs-graph-controls\s*\{([^}]+)\}/)![1];
+  expect(controls).toMatch(/bottom:\s*var\(--gs-space-3\)/); expect(controls).toMatch(/right:\s*var\(--gs-space-3\)/);
+  expect(controls).not.toMatch(/\btop\s*:/);
+  for (const name of ["segmented", "chip", "dot", "count"]) {
+    const rule = css.match(new RegExp(`\\.gs-graph-${name}\\s*\\{([^}]+)\\}`))![1];
+    expect(rule).toContain("var(--gs-"); expect(rule).not.toMatch(/#[0-9a-f]{3,8}\b/i);
+    expect(rule).not.toMatch(/\b\d+(?:px|rem)\b/);
+  }
+  expect(css).not.toMatch(/#[0-9a-f]{3,8}\b/i);
+  expect(css).not.toMatch(/graph-legend|그래프 범례/); expect(globals).not.toContain(".graph-legend");
+  expect(css).toMatch(/\.gs-graph-filters\s*\{[^}]*margin-block:\s*var\(--gs-space-2\)/);
+  expect(css).toMatch(/\.gs-graph-chip\s*\{[^}]*font-size:\s*var\(--gs-text-xs\)/);
+  expect(css).toMatch(/\.gs-graph-chip\s*\{[^}]*padding:\s*var\(--gs-space-1\) var\(--gs-space-2\)/);
+  expect(css).toMatch(/\.gs-graph-chips\s*\{[^}]*gap:\s*var\(--gs-space-1\)/);
+});
+it("keeps schema layer and kind dots tied to original layer colors even when hidden", async () => {
+  render(<SchemaView tenantId="synthetic" />);
+  await waitFor(() => expect(cy.create).toHaveBeenCalledTimes(1));
+  const layers = screen.getByRole("group", { name: "층 필터" }), kinds = screen.getByRole("group", { name: "노드 종류 필터" });
+  expect(layers.classList.contains("gs-graph-segmented")).toBe(true); expect(kinds.classList.contains("gs-graph-chips")).toBe(true);
+  const rgb = (hex: string) => `rgb(${[1, 3, 5].map(start => parseInt(hex.slice(start, start + 2), 16)).join(", ")})`;
+  for (const [index, layer] of ([1, 2, 3] as const).entries()) expect(within(layers).getAllByRole("button")[index].querySelector<HTMLElement>(".gs-graph-dot")!.style.backgroundColor).toBe(rgb(LAYER_COLORS[layer]));
+  for (const label of schema.labels) {
+    const chip = within(kinds).getByRole("button", { name: label.name_ko });
+    expect(chip.classList.contains("gs-graph-chip")).toBe(true);
+    expect(chip.querySelector<HTMLElement>('span[aria-hidden="true"].gs-graph-dot')!.style.backgroundColor).toBe(rgb(LAYER_COLORS[label.layer as 1 | 2 | 3]));
+    fireEvent.click(chip);
+    expect(chip.querySelector<HTMLElement>(".gs-graph-dot")!.style.backgroundColor).toBe(rgb(LAYER_COLORS[label.layer as 1 | 2 | 3]));
+    fireEvent.click(chip);
+  }
 });

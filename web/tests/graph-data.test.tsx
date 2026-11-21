@@ -6,7 +6,7 @@ import { DataTab } from "../components/graph/DataTab";
 import { GraphPage } from "../components/graph/GraphPage";
 import { GRAPH_TABS } from "../components/graph/tabs";
 import { ApiError, getGraphNeighbors, getGraphOverview, getSchema, type GraphExploreResponse } from "../lib/api";
-import type { GraphElement } from "../lib/graph";
+import { LABEL_COLORS, type GraphElement } from "../lib/graph";
 import type { SchemaResponse } from "../lib/types";
 
 vi.mock("../lib/api", async original => ({ ...await original<typeof import("../lib/api")>(), getGraphOverview: vi.fn(), getGraphNeighbors: vi.fn(), getSchema: vi.fn() }));
@@ -151,4 +151,21 @@ it("maps brand display names, preserves product names and wire objects, and fall
     if (index === 2) { expect(panel.textContent).toContain("Synthetic Original"); expect(panel.textContent).toContain("조선미녀"); expect(panel.textContent).not.toContain("정보 없음"); }
   }
   expect(JSON.stringify(data)).toBe(snapshot);
+});
+it("shows kind color dots only on data chips and preserves them when a kind is hidden", async () => {
+  vi.mocked(getGraphOverview).mockResolvedValue({ ...overview, nodes: [brand, product, efficacy] });
+  render(<DataTab tenantId="synthetic" />); await ready();
+  const layers = screen.getByRole("group", { name: "층 필터" }), kinds = screen.getByRole("group", { name: "노드 종류 필터" });
+  expect(layers.querySelector(".gs-graph-dot")).toBeNull(); expect(layers.classList.contains("gs-graph-segmented")).toBe(true);
+  expect(within(kinds).getAllByRole("button").map(button => button.textContent)).toEqual(["브랜드", "제품", "효능"]);
+  for (const [name, label] of [["브랜드", "Brand"], ["제품", "Product"], ["효능", "Efficacy"]]) {
+    const chip = within(kinds).getByRole("button", { name });
+    const expected = `rgb(${[1, 3, 5].map(start => parseInt(LABEL_COLORS[label].slice(start, start + 2), 16)).join(", ")})`;
+    expect(chip.classList.contains("gs-graph-chip")).toBe(true);
+    expect(chip.querySelector<HTMLElement>('span[aria-hidden="true"].gs-graph-dot')!.style.backgroundColor).toBe(expected);
+    fireEvent.click(chip); expect(chip.getAttribute("aria-pressed")).toBe("false");
+    expect(chip.querySelector<HTMLElement>(".gs-graph-dot")!.style.backgroundColor).toBe(expected);
+    fireEvent.click(chip);
+  }
+  expect(screen.queryByLabelText("그래프 범례")).toBeNull();
 });
