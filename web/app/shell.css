@@ -59,8 +59,6 @@ body {
 .gs-shell :focus-visible { outline-color: var(--gs-accent); }
 
 .gs-content { width: 100%; min-width: 0; max-width: calc(var(--gs-content-width) + var(--gs-space-8) * 2); margin: 0 auto; padding: var(--gs-space-8); }
-.gs-placeholder { padding: var(--gs-space-8); border: var(--gs-border-width) solid var(--gs-border); border-radius: var(--gs-radius-lg); background: var(--gs-surface); }
-.gs-placeholder p { color: var(--gs-text-muted); }
 
 @media (width < 880px) {
   .gs-shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto 1fr; }

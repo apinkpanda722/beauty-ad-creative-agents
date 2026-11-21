@@ -64,12 +64,35 @@ def test_demo_sections_scenes_and_normal_flow():
         assert forbidden not in demo
     rehearsal = demo.split("## 리허설 확인", 1)[1]
     checks = re.findall(r"^- \[ \] (.+)$", rehearsal, re.MULTILINE)
-    assert len(checks) == 16
+    assert len(checks) == 27
     assert all("결과 기록:" in check for check in checks)
     assert "사용자가 live로" in rehearsal
-    numbered = re.findall(r"^- .*?[①-⑯].*$", rehearsal, re.MULTILINE)
+    numbered = re.findall(r"^- .*?[①-⑳㉑-㉗].*$", rehearsal, re.MULTILINE)
     assert numbered == [f"- [ ] {check}" for check in checks]
-    assert [check[0] for check in checks] == list("①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯")
+    assert [check[0] for check in checks] == [chr(0x2460 + i) for i in range(20)] + [
+        chr(0x3251 + i) for i in range(7)
+    ]
+
+
+def test_ui_review_items_explain_each_field_and_leave_results_pending():
+    rehearsal = read("DEMO.md").split("## 리허설 확인", 1)[1]
+    assert "⑰~㉗은 7c UI 개편 확인이며 PR·병합 조건이 아니다" in rehearsal
+    items = re.findall(r"^- \[ \] ([⑰-⑳㉑-㉗] .+)$", rehearsal, re.MULTILINE)
+    assert len(items) == 11, "zero checked UI review items must fail"
+    assert [item[0] for item in items] == list("⑰⑱⑲⑳㉑㉒㉓㉔㉕㉖㉗")
+    for item in items:
+        assert re.match(r"[⑰-⑳㉑-㉗] \*\*.+:\*\*", item)
+        for element in ("뜻 —", "판정 —", "예시 —", "기록 방법 —"):
+            assert element in item
+        criteria = item.split("판정 —", 1)[1].split("예시 —", 1)[0]
+        assert "(1)" in criteria and "(2)" in criteria
+        fields = re.findall(r"\((\d+)\) ([^()]+)", criteria)
+        assert [int(number) for number, _ in fields] == list(range(1, len(fields) + 1))
+        for _, criterion in fields:
+            assert ":" in criterion and "O" in criterion and "X" in criterion
+        assert "칸 번호별 O/X와 한 줄 메모" in item
+        assert "결과 기록: ______" in item
+        assert "결과 기록: 2026-11-21 사용자 live 확인" not in item
 
 
 @pytest.mark.parametrize(
