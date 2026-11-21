@@ -95,4 +95,4 @@ make verify   # lint + pytest + pnpm lint·typecheck·test 통과
 - `/design/{request_key}/{index}` 라우트의 응답·상태 코드·헤더를 바꾸거나 그 기존 테스트를 수정하지 마라. 이유: 헬퍼 추출은 동작 불변이어야 한다.
 - 도구 입력이나 쿼리 문자열에서 `tenant_id`를 받지 마라. 이유: `tenant_id`는 세션에서만 나온다(ADR-009).
 - 응답이나 로그에 이미지 해시·파일 시스템 경로·예외 문자열을 싣지 마라. 이유: 로컬 경로·내부 값은 HTTP 경계를 넘지 않는다.
-- 엔드포인트를 `GET /plans`·`GET /plans/{plan_id}/image` 외에 추가하지 마라. `app.py`는 라우터 등록 한 줄만 바꾸고 이 밖의 `src/` 변경이 필요하면 구현하지 말고 `blocked`로 멈춰 `reason`에 적어라. 이유: 승인된 서버 변경 범위(테넌트 격리·plan_id 정규식 `^[0-9a-f]{32}$`·경로 이탈·심볼릭 링크 거부는 테스트로 고정한다).
+- 엔드포인트를 `GET /plans`·`GET /plans/{plan_id}/image` 외에 추가하지 마라. `app.py`는 `register_plans` import 한 줄과 등록 호출 한 줄(기존 `register_graph`와 같은 위치·형식)만 추가하고 이 밖의 `src/` 변경이 필요하면 구현하지 말고 `blocked`로 멈춰 `reason`에 적어라. 이유: 승인된 서버 변경 범위(테넌트 격리·plan_id 정규식 `^[0-9a-f]{32}$`·경로 이탈·심볼릭 링크 거부는 테스트로 고정한다).
