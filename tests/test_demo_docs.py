@@ -97,7 +97,7 @@ def test_langfuse_claim_has_user_confirmation(relative):
         )
 
 
-def test_langfuse_confirmation_keeps_new_screen_review_pending():
+def test_langfuse_confirmation_records_new_screen_and_keeps_step6_pending():
     demo = read("DEMO.md")
     record = demo.split("## Langfuse 확인 기록\n", 1)[1].split("\n## ", 1)[0]
     for required in (
@@ -111,10 +111,14 @@ def test_langfuse_confirmation_keeps_new_screen_review_pending():
         "docs/results/",
         "측정값이 아님",
         "7d step 2",
-        "미확인",
-        "결과 기록: ______",
+        "새 구조 확인(2026-11-21, 사용자 화면 확인)",
+        "22.08초",
+        "$0.0488",
+        "`sk-`, `Bearer`, `AIza`",
+        "step 6 반영 후 재확인 필요",
     ):
         assert required in record
+    assert "결과 기록: ______" not in record
     scene = demo.split("### 장면 7.", 1)[1].split("\n## ", 1)[0]
     for required in (
         "ask",
@@ -139,11 +143,17 @@ def test_langfuse_confirmation_keeps_new_screen_review_pending():
     eleventh = next(
         line for line in rehearsal.splitlines() if line.startswith("- [ ] ⑪")
     )
-    assert "미확인" in eleventh
-    assert "결과 기록: ______" in eleventh
+    for required in (
+        "통과(2026-11-21, 사용자 live 확인)",
+        "step 6 반영 후 재확인 필요",
+        "22.08초",
+        "$0.0488",
+    ):
+        assert required in eleventh
+    assert "결과 기록: ______" not in eleventh
 
 
-def test_image_review_items_explain_each_pending_human_check():
+def test_image_review_items_explain_each_check_and_record_live_results():
     rehearsal = read("DEMO.md").split("## 리허설 확인", 1)[1]
     assert "같은 요청을 여러 번" in rehearsal
     items = re.findall(r"^- \[ \] ([⑫-⑯] .+)$", rehearsal, re.MULTILINE)
@@ -153,7 +163,8 @@ def test_image_review_items_explain_each_pending_human_check():
         assert re.match(r"[⑫-⑯] \*\*.+:\*\*", item)
         for element in ("뜻", "판정", "예시", "기록"):
             assert element in item
-        assert "결과 기록: ______" in item
+        assert "결과 기록: 2026-11-21 사용자 live 확인" in item
+        assert "결과 기록: ______" not in item
 
 
 def test_detail_numbers_have_closed_kinds_and_existing_sources():

@@ -353,6 +353,7 @@
 - **구성 참고(실측 아님)**: [Langfuse v3.225.11 공식 compose](https://github.com/langfuse/langfuse/blob/v3.225.11/docker-compose.yml)의 DB·ClickHouse·Redis·S3 환경 변수 이름과 MinIO 버킷 디렉터리 초기화 방식을 따른다. 이 저장소의 고정 이미지 구성 기동은 **미확인**이다.
 
 - **사용자 화면 확인(2026-11-21)**: 실제 시연 요청 1건의 Langfuse 타임라인과 비용 화면에서 요청 1건 약 31.65초·$0.0618, 단계별 지연과 호출별 비용이 보였다(7b 구조, 사용자 관측값). ingestion 이벤트의 시간·cost_details가 타임라인에 반영되는 것은 이 확인으로 **확인됨**. 7d 이후 새 span 구조·입력·출력 화면은 **미확인**(사용자 확인 후 갱신).
+- **새 구조 화면 확인(2026-11-21, 사용자 화면 확인)**: 실제 요청 trace에서 `supervisor`·`research`·`planning #1`·`evaluation #1`·`image`가 별도 span으로 나뉘고 `image-plan` 호출이 `image` span 아래에 있으며, `ask`의 입력·출력과 호출 단위 입력·출력이 채워진 것을 확인했다(사용자 관측값). 단계 span의 입력은 7d step 6 반영 후 재확인 필요.
 
 ## Neo4j (2026-11-12 실측, 임시 컨테이너, 끝난 뒤 삭제)
 
