@@ -131,7 +131,16 @@
     {
       "step": 15,
       "name": "shell-plan-fixes",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-21T19:30:09+0900",
+      "summary": "탭 닫기·선택/포커스·공통 기하·기록 복귀·사이드바 접기·근거 필터 두 줄 구현 완료. make verify 통과(Python 6,412개·웹 308개), 패키지 설치 없음. 승인 단언 교체: R1 ×→빈 텍스트(SVG 전환), R2 전체→전체 브랜드(브랜드 필터 복원).",
+      "completed_at": "2026-11-21T19:39:10+0900",
+      "usage": {
+        "input_tokens": 2906528,
+        "cached_input_tokens": 2793344,
+        "output_tokens": 14787,
+        "attempts": 1
+      }
     },
     {
       "step": 5,
