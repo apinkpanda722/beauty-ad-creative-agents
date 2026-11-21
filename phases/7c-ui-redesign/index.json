@@ -243,10 +243,8 @@
     {
       "step": 18,
       "name": "charts-cost-tables",
-      "status": "blocked",
+      "status": "pending",
       "started_at": "2026-11-21T23:05:46+0900",
-      "blocked_reason": "지시 충돌: “`ProgressTracker`의 `costUsd`·`costLabel` props와 `.gs-progress-cost` 표시, `TurnCard`의 비용 전달, `PlanResult`의 `cost` prop·`CostDetail`·`.gs-cost-line` `useEffect`, `ResultsView`의 `cost` 전달과 기획안이 없을 때의 `CostDetail`을 모두 지운다.”와 “아래 \"교체 단언\" 표에 적힌 것만 기존 단언을 바꾸고 그 밖의 기존 단언은 수정하지 않는다.”가 충돌합니다. web/tests/results.test.tsx의 승인 목록 밖 테스트 `renders ordered command components in PlanPage with schema success=%s and display_text only`가 `getByLabelText(\"합성 비용\")`과 `$0.010` 표시를 필수로 검사합니다. 최소 교체 승인 필요: 해당 테스트의 비용 노드를 순서 검사에서 제외하고 금액 비표시 단언으로 교체하되 나머지 순서·행동 단언은 유지해야 합니다. make verify는 중단했으며 AC 통과를 확인하지 않았습니다.",
-      "blocked_at": "2026-11-21T23:10:48+0900",
       "usage": {
         "input_tokens": 1994901,
         "cached_input_tokens": 1865088,
