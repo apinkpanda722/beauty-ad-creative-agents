@@ -47,6 +47,29 @@ export function insightColumnName(tool: string, key: string): string {
 }
 export function insightValue(value: string, names: TaxonomyNames): string { return displayValue(value, names); }
 
+export function insightTotal(rows: readonly Record<string, unknown>[]): number | null {
+  const total = rows[0]?.total;
+  return typeof total === "number" && Number.isInteger(total) && total >= 0 && rows.every(row => row.total === total) ? total : null;
+}
+export function isOtherCategory(label: string, names: TaxonomyNames): boolean {
+  return label === "other" || insightValue(label, names).startsWith("기타");
+}
+function numericCount(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+export function sortInsightRows<T extends Record<string, unknown>>(tool: string, rows: readonly T[], names: TaxonomyNames): T[] {
+  const other = (row: T) => typeof row.value === "string" && isOtherCategory(row.value, names) ? 1 : 0;
+  const primary = (row: T) => numericCount(tool === "top_vs_bottom_axis" ? row.n_top : row.creatives ?? row.count);
+  const secondary = (row: T) => tool === "top_vs_bottom_axis" ? numericCount(row.n_bottom) : 0;
+  return rows.map((row, index) => ({ row, index })).sort((a, b) => other(a.row) - other(b.row) || primary(b.row) - primary(a.row) || secondary(b.row) - secondary(a.row) || a.index - b.index).map(item => item.row);
+}
+export function sortModelRows<T extends { label: string; count: number; total: number }>(rows: readonly T[], names: TaxonomyNames): T[] {
+  return rows.map((row, index) => ({ row, index })).sort((a, b) => Number(isOtherCategory(a.row.label, names)) - Number(isOtherCategory(b.row.label, names)) || numericCount(b.row.count) - numericCount(a.row.count) || a.index - b.index).map(item => item.row);
+}
+export function insightLimitNote(tool: string): string | null {
+  return tool === "top_vs_bottom_axis" ? "상위 25% 광고 수가 많은 분류부터 5개까지 표시합니다." : null;
+}
+
 export const AXIS_TABS = [
   { value: "hook", label: "훅" },
   { value: "angle", label: "소구" },

@@ -469,6 +469,17 @@ def _run_evidence_tool(tool, inputs, ctx, graph) -> ToolResult:
     if operation == "rows":
         bands = split_top_bottom(rows, mature_before=params["mature_before"])
         rows = [row.model_dump() for row in bands.rows]
+
+        def sort_key(row):
+            top, bottom = row.get("n_top"), row.get("n_bottom")
+            return (
+                1 if row.get("value") == "other" else 0,
+                -top if type(top) is int else 0,
+                -bottom if type(bottom) is int else 0,
+                str(row.get("value")),
+            )
+
+        rows = sorted(rows, key=sort_key)
         band_summary = " " + bands.summary
     evidence_ids = [
         value

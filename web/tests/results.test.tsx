@@ -768,3 +768,42 @@ it("merges marketer distributions in one card while keeping embedded regions and
   expect(screen.getByRole("meter", { name: "이상형 제시형" }).getAttribute("aria-valuenow")).toBe("1");
   expect(JSON.stringify(commands)).toBe(snapshot);
 });
+
+it("softens backdrop edges underneath the unmasked main image using surface-token bands", () => {
+  const css = readFileSync(join(process.cwd(), "app/results.css"), "utf8");
+  const main = css.match(/\.gs-design-image img\s*\{([^}]*)\}/)![1];
+  const backdrop = css.match(/\.gs-design-image img\.gs-design-backdrop\s*\{([^}]*)\}/)![1];
+  expect(backdrop).toContain("blur(32px)"); expect(backdrop).toContain("brightness(0.78)"); expect(backdrop).toContain("scale(1.2)");
+  expect(main).not.toContain("mask-image"); expect(main).toContain("position: relative");
+  const layer = (rule: string) => Number(rule.match(/z-index:\s*(\d+)/)?.[1]);
+  for (const [pseudo, direction, edge] of [["before", "bottom", "top"], ["after", "top", "bottom"]]) {
+    const rule = css.match(new RegExp(`\\.gs-design-image::${pseudo}\\s*\\{([^}]*)\\}`))![1];
+    expect(rule).toContain("height: 14%"); expect(rule).toContain("position: absolute"); expect(rule).toContain("inset-inline: 0");
+    expect(rule).toContain("pointer-events: none"); expect(rule).toContain(`linear-gradient(to ${direction}, var(--gs-surface), transparent)`);
+    expect(rule).toContain(`${edge}: 0`); expect(rule).not.toMatch(/#[0-9a-f]{3,8}\b/i);
+    expect(layer(rule)).toBeGreaterThan(layer(backdrop)); expect(layer(rule)).toBeLessThan(layer(main));
+  }
+  expect(css.match(/object-fit:\s*cover/g)).toHaveLength(1);
+});
+it("uses shared tokens for insight totals and comparison column emphasis", () => {
+  const css = readFileSync(join(process.cwd(), "app/results.css"), "utf8");
+  const rule = (name: string) => css.match(new RegExp(`\\.${name}\\s*\\{([^}]*)\\}`))![1];
+  expect(rule("gs-insight-head")).toContain("display: flex"); expect(rule("gs-insight-head")).toContain("justify-content: space-between");
+  expect(rule("gs-insight-head")).toContain("align-items: baseline"); expect(rule("gs-insight-head")).toContain("gap: var(--gs-space-3)");
+  expect(rule("gs-insight-total")).toContain("color: var(--gs-text-muted)"); expect(rule("gs-insight-total")).toContain("font-size: var(--gs-text-sm)");
+  expect(rule("gs-col-primary")).toContain("font-weight: 700"); expect(rule("gs-col-muted")).toContain("color: var(--gs-text-muted)");
+});
+it("adds comparison column spans and a limit note without sorting standalone rows", () => {
+  const rows = [{ n_bottom: 1, n_top: 1, value: "other", count: 2 }, { n_bottom: 5, n_top: 3, value: "question", count: 8 }];
+  const snapshot = JSON.stringify(rows);
+  render(<DistributionChart data={{ tool: "top_vs_bottom_axis", rows }} names={names} />);
+  const table = screen.getByRole("table");
+  expect(within(table).getAllByRole("columnheader").map(node => node.textContent)).toEqual(["분류", "상위 25% 광고 수", "하위 25% 광고 수", "건수"]);
+  expect(within(table).getAllByRole("row").slice(1).map(row => within(row).getAllByRole("cell")[0].textContent)).toEqual(["기타", names.valueName("question")]);
+  expect([...table.querySelectorAll(".gs-col-primary")].map(node => node.textContent)).toEqual(["상위 25% 광고 수", "1", "3"]);
+  expect([...table.querySelectorAll(".gs-col-muted")].map(node => node.textContent)).toEqual(["하위 25% 광고 수", "1", "5"]);
+  const title = screen.getByRole("heading");
+  expect(title.nextElementSibling?.textContent).toBe("같은 플랫폼·브랜드 안에서 조회수 상위 25%와 하위 25% 광고가 각 방식을 쓴 광고 수입니다.");
+  expect(title.nextElementSibling?.nextElementSibling?.textContent).toBe("상위 25% 광고 수가 많은 분류부터 5개까지 표시합니다.");
+  expect(JSON.stringify(rows)).toBe(snapshot);
+});
