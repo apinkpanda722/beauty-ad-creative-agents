@@ -29,7 +29,15 @@
   - 근거(2026-11-22): `data/raw`·`data/interim`·`data/design`은 추적하지 않는다. 추적되는 이미지·영상 파일은 없고(Pretendard `.otf` 2개 제외) 생성 시안 이미지도 없다. `data/evalset/`(질문 47·정답 47·요청 30·격리 요청 200)는 근거 소재를 플랫폼 ID(YouTube 72개·Instagram 27개)로 참조하며, `docs/results/`에는 플랫폼 URL·ID가 없다. `tests/fixtures/contracts/`의 72개 파일은 실제 API 응답 기록이고 공개 게시물 원문 일부(캡션·자막·제목), 썸네일 주소(이미지 파일은 없음), 계정·채널 이름을 포함한다.
   - 이 변경에서: [README의 데이터 고지](../README.md#데이터-고지)와 `tests/fixtures/contracts/README.md`에 권리 고지를 추가했고, 쇼핑몰 응답 기록(`mall_cafe24_image_only.html`)의 업체 이메일·전화번호는 가짜 값(`shop@example.com`, `000-0000-0000`)으로 바꿨다(이력에는 원래 값이 남아 있다). 나머지 수집 콘텐츠는 유지하고 데이터 고지로 처리한다.
 
-- [ ] **C6 — 실존 기관·인물명.** 이 프로젝트는 공식 브랜드 계정의 실제 광고를 분석하므로 실제 브랜드·계정 이름이 데이터와 결과 문서에 나온다. 사용자가 준비한 이름 목록으로 검색하는 점검은 하지 않았다(미확인).
+- [ ] **C6 — 실존 기관·인물명.** 사용자가 준비한 이름 목록으로 저장소 파일을 검색하고 발견 위치만 기록한다. 이 프로젝트는 공식 브랜드 계정의 실제 광고를 분석하므로 실제 브랜드·계정 이름이 데이터와 결과 문서에 나오며, 이는 이 항목의 검색 대상이 아니다.
+  - 부분 확인(2026-11-22): 사용자 이름 목록(전 직장·본명 등 범주)은 받지 못해 그 범주는 검색하지 못했다. 대신 공개 문서와 메타데이터에서 파생되는 식별자 5개 범주(작성자 이름, 원격 계정 핸들, A·B `pyproject.toml`의 작성자 표기, 이메일 식별자, 옛 GitHub Primary 이메일 도메인)를 현재 추적 파일과 이력 전체(모든 ref)에서 검색했다. 값은 적지 않는다.
+    - 작성자 이름: `LICENSE`, `README.md`, `pyproject.toml`, 이 문서(저작권자·작성자 공개 신원 표기)에만 있다.
+    - 원격 계정 핸들: `README.md`(A·B 링크)와 이 문서(클론 주소)에만 있다.
+    - A·B의 작성자 표기: 이 문서에만 있다.
+    - 이메일 식별자: `pyproject.toml`(`authors`)에만 있다.
+    - 옛 Primary 이메일 도메인: 0건(현재 파일·이력 모두).
+    - 이력에만 남은 파일(현재 트리에는 없는 위치)은 5개 범주 모두 0개다.
+  - 남은 일: 사용자 이름 목록이 있으면 같은 방식으로 검색해 이 항목을 완료한다.
 
 - [x] **C7 — 공개 신원.** 작성자 이름·이메일과 원격 계정을 확인한다. 이력 재작성은 하지 않는다.
   - 근거(2026-11-22): 모든 631 commits의 작성자는 같은 이름(Tommy Lee)과 같은 gmail 도메인 주소이고, 커밋터 598개가 같은 신원이며 나머지 33개는 GitHub 웹 병합 커밋(`noreply`)이다. `Co-Authored-By` 트레일러는 210개 커밋에 있다. `pyproject.toml`의 `authors`도 같은 이름·주소다. 커밋 작성자와 트레일러는 그대로 둔다(A·B와 같은 방식).
@@ -44,10 +52,11 @@
 - [x] **C10 — CI 시크릿.** `.github/workflows/*.yml`의 시크릿 사용과 fork PR 노출 위험을 확인한다.
   - 근거(2026-11-22): 워크플로는 `verify.yml` 하나이고 `push`·`pull_request`에서 돌며 `pull_request_target`이 없다. `permissions: contents: read`, `secrets.` 참조 0개, 외부 액션 4개가 모두 커밋 SHA로 고정되어 있다. 저장소 Secrets 설정 화면은 확인하지 못했다(사용자 몫).
 
-- [ ] **C11 — 새 클론 검증.** 별도 디렉터리에 클론한 뒤 고정 의존성을 설치하고 `.env`·`data/` 없이 `make verify`가 통과하는지 확인한다. 이 점검에서는 하지 않았다(미확인, 사용자 실행).
+- [x] **C11 — 새 클론 검증.** 별도 디렉터리에 클론한 뒤 고정 의존성을 설치하고 `.env`·수집 데이터 없이 `make verify`가 통과하는지 확인한다. 실제 서비스 호출은 하지 않는다.
+  - 근거(2026-11-22): 임시 빈 폴더(`/tmp`)에 `gh repo clone`으로 `main`(`996a65c`)을 받아 `.env`를 만들지 않고 키·네트워크 설정 없이 `uv sync --locked`, `make web-install`, `make verify`를 순서대로 실행했고 모두 종료 코드 0이었다. `make verify`는 ruff(All checks passed, 322 files already formatted), pytest 6,535 passed, 웹 31 files·449 tests passed였다. 클론에는 추적 파일만 있었고(`data/`는 `evalset`·`manifest`뿐) 실행 뒤에도 작업 트리가 깨끗했다. 검증에 쓴 클론은 저장소 밖(`/tmp`)에 있었고 이 저장소에는 포함되지 않는다.
 
   ```bash
-  git clone https://github.com/apinkpanda722/beauty-ad-creative-agents.git beauty-ad-creative-agents-public-check
+  gh repo clone apinkpanda722/beauty-ad-creative-agents beauty-ad-creative-agents-public-check
   cd beauty-ad-creative-agents-public-check
   uv sync --locked
   make web-install
@@ -65,6 +74,6 @@
 
 ## 사용자가 남은 일
 
-- C6 이름 목록 검색, C11 새 클론 검증, 저장소 Secrets 설정 확인.
-- C7의 `authors` 이름 통일 여부.
+- C6 이름 목록 검색(사용자 이름 목록이 필요하다), 저장소 Secrets 설정 확인.
+- C7의 `authors` 이름 통일 여부(A·B는 다른 표기, C는 저작권 표기와 같은 이름).
 - 이 변경이 병합된 뒤 저장소를 public으로 바꾸는 일.
