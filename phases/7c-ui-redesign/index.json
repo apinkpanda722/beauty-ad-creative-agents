@@ -143,6 +143,11 @@
       }
     },
     {
+      "step": 16,
+      "name": "history-verify-polish",
+      "status": "pending"
+    },
+    {
       "step": 5,
       "name": "graph-core",
       "status": "pending"
