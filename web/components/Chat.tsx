@@ -1,10 +1,8 @@
 "use client";
 
-import { useEffect, useReducer, useRef, useState } from "react";
-import { ApiError, postChatAsk } from "../lib/api";
+import { useRef, useState } from "react";
 import { examples } from "../lib/examples";
-import { initialState, reducer } from "../lib/reducer";
-import type { Action, Turn } from "../lib/reducer";
+import { useSession } from "../lib/session";
 import type { Workspace } from "../lib/types";
 import { TurnView } from "./TurnView";
 import { WorkspacePicker } from "./WorkspacePicker";
@@ -12,61 +10,27 @@ import { CommandTenantContext } from "./CommandSlot";
 import { FeedbackSession } from "./FeedbackBar";
 
 export function Chat({ workspaces, imageEnabled, onWorkspaceChange }: { workspaces: Workspace[]; imageEnabled: boolean; onWorkspaceChange?: (tenantId: string | null) => void }) {
-  const [state, dispatch] = useReducer(reducer, initialState);
+  const { state, start, send: sendRequest, cancel, retry, selectWorkspace } = useSession();
   const [message, setMessage] = useState("");
   const [withImage, setWithImage] = useState(true);
-  const controller = useRef<AbortController | null>(null);
   const composing = useRef(false);
   const busy = state.activeTurnId !== null;
-  useEffect(() => () => { controller.current?.abort(); controller.current = null; }, []);
-
-  async function run(turn: Turn, tenantId: string) {
-    const request = new AbortController();
-    controller.current = request;
-    const current = () => controller.current === request && !request.signal.aborted;
-    try {
-      const response = await postChatAsk({ tenantId, message: turn.message,
-        ...(turn.threadId ? { threadId: turn.threadId } : {}),
-        ...(turn.claimChoice ? { claimChoice: turn.claimChoice } : {}),
-        ...(turn.withImage !== undefined ? { withImage: turn.withImage } : {}), signal: request.signal });
-      if (!current()) return;
-      dispatch({ type: "thread_received", turnId: turn.id, threadId: response.threadId });
-      for await (const frame of response.events) {
-        if (!current()) break;
-        dispatch({ type: "stream_event", turnId: turn.id, frame });
-      }
-    } catch (error) {
-      if (current()) dispatch({ type: "request_failed", turnId: turn.id,
-        error: { code: error instanceof ApiError ? error.code ?? `HTTP_${error.status}` : "STREAM_ENDED_EARLY" } });
-    } finally {
-      if (current()) { controller.current = null; dispatch({ type: "stream_ended", turnId: turn.id }); }
-    }
-  }
-  function start(action: Action) {
-    if (controller.current || !state.tenantId) return;
-    const next = reducer(state, action);
-    const turn = next.turns.at(-1);
-    if (!turn || next === state) return;
-    dispatch(action);
-    void run(turn, state.tenantId);
-  }
   function send() {
     if (!message.trim() || busy || composing.current) return;
-    start({ type: "request_started", message, ...(imageEnabled ? { withImage } : {}) });
+    sendRequest(message, imageEnabled ? withImage : undefined);
     setMessage("");
   }
   return <CommandTenantContext.Provider value={state.tenantId}><FeedbackSession key={state.tenantId}>
     <WorkspacePicker workspaces={workspaces} value={state.tenantId} onChange={tenantId => {
       if (state.tenantId === tenantId) return;
-      controller.current?.abort(); controller.current = null;
-      dispatch({ type: "workspace_selected", tenantId }); setMessage(""); setWithImage(true);
+      selectWorkspace(tenantId); setMessage(""); setWithImage(true);
       onWorkspaceChange?.(tenantId);
     }} />
     <section className="conversation" aria-label="대화">
       {state.turns.map(turn => <TurnView key={turn.id} turn={turn} busy={busy}
         onChoice={(choice, label) => start({ type: "choice_submitted", turnId: turn.id, choice, label })}
-        onCancel={() => dispatch({ type: "stopped", turnId: turn.id })}
-        onRetry={() => start({ type: "retry_requested", turnId: turn.id })} />)}
+        onCancel={() => cancel(turn.id)}
+        onRetry={() => retry(turn.id)} />)}
     </section>
     <form className="composer" onSubmit={e => { e.preventDefault(); send(); }}>
       <div className="examples" aria-label="예시 요청">

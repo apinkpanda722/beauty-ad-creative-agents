@@ -1,0 +1,74 @@
+body {
+  font-family: var(--font-pretendard), system-ui, sans-serif;
+  color: var(--gs-text);
+  background: var(--gs-bg);
+}
+
+.gs-shell {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  min-height: 100dvh;
+  font-size: var(--gs-text-base);
+}
+
+.gs-topbar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gs-space-6);
+  margin: 0;
+  padding: var(--gs-space-4) var(--gs-space-6);
+  border-bottom: 1px solid var(--gs-border);
+  background: var(--gs-bg);
+}
+
+.gs-logo { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--gs-space-2); }
+.gs-logo strong { color: var(--gs-accent); font-size: var(--gs-text-lg); }
+.gs-logo span { color: var(--gs-text-muted); font-size: var(--gs-text-sm); }
+.gs-workspace-slot { color: var(--gs-text-muted); font-size: var(--gs-text-sm); }
+
+.gs-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gs-space-2);
+  padding: var(--gs-space-6) var(--gs-space-3);
+  border-right: 1px solid var(--gs-border);
+  background: var(--gs-surface);
+}
+
+.gs-sidebar button {
+  position: relative;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: var(--gs-radius-sm);
+  padding: var(--gs-space-3) var(--gs-space-4);
+  color: var(--gs-text-muted);
+  background: transparent;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.gs-sidebar button:hover { background: var(--gs-accent-weak); }
+.gs-sidebar button[aria-current="page"] { color: var(--gs-accent); background: var(--gs-accent-weak); font-weight: 600; }
+.gs-sidebar button[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  border-radius: var(--gs-radius-sm);
+  background: var(--gs-accent);
+}
+.gs-shell :focus-visible { outline-color: var(--gs-accent); }
+
+.gs-content { width: 100%; min-width: 0; max-width: none; margin: 0; padding: var(--gs-space-8); }
+.gs-placeholder { padding: var(--gs-space-8); border: 1px solid var(--gs-border); border-radius: var(--gs-radius-lg); background: var(--gs-surface); }
+.gs-placeholder p { color: var(--gs-text-muted); }
+
+@media (width < 880px) {
+  .gs-shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto 1fr; }
+  .gs-topbar { flex-wrap: wrap; gap: var(--gs-space-3); padding: var(--gs-space-4); }
+  .gs-sidebar { flex-direction: row; overflow-x: auto; padding: var(--gs-space-2); border-right: 0; border-bottom: 1px solid var(--gs-border); }
+  .gs-content { padding: var(--gs-space-4); }
+}

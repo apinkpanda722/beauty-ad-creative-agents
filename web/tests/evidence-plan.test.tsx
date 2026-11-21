@@ -11,6 +11,7 @@ import { TurnView } from "../components/TurnView";
 import { StepBar } from "../components/StepBar";
 import { CommandSlot, CommandTenantContext } from "../components/CommandSlot";
 import { initialState, reducer } from "../lib/reducer";
+import { SessionProvider } from "../lib/session";
 import { deriveStages } from "../lib/stages";
 import { PLAN_INTRO_TEXT } from "../lib/text";
 import { CostLine } from "../components/CostLine";
@@ -166,7 +167,7 @@ it.each([true, false])("renders ordered command components in Chat with schema s
   const frames: SseFrame[] = [...commands.map(data => ({ event: "ui_command" as const, data })), { event: "token", data: { text: "합성 숨긴 원문", display_text: "합성 화면 문장" } }];
   const bytes = new TextEncoder().encode(frames.map(f => `event: ${f.event}\ndata: ${JSON.stringify(f.data)}\n\n`).join(""));
   const fetch = vi.fn().mockImplementation((url: string) => Promise.resolve(url === "/api/graph/schema" ? new Response(JSON.stringify(success ? schema : { detail: "GRAPH_UNAVAILABLE" }), { status: success ? 200 : 503 }) : new Response(new ReadableStream({ start(c) { c.enqueue(bytes); c.close(); } })))); vi.stubGlobal("fetch", fetch);
-  render(<Chat workspaces={[{ tenant_id: "synthetic", display_name: "합성 공간", brand: null, product_name: null }]} imageEnabled={false} />);
+  render(<Chat workspaces={[{ tenant_id: "synthetic", display_name: "합성 공간", brand: null, product_name: null }]} imageEnabled={false} />, { wrapper: SessionProvider });
   fireEvent.change(screen.getByLabelText("작업 공간"), { target: { value: "synthetic" } }); fireEvent.change(screen.getByLabelText("요청"), { target: { value: "합성 요청" } }); fireEvent.click(screen.getByRole("button", { name: "전송" }));
   await screen.findByText("합성 화면 문장"); await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
   const nodes = [screen.getByText("합성 화면 문장"), screen.getByRole("region", { name: "근거 소재" }), screen.getByRole("heading", { name: "합성 기획" }), screen.getByRole("heading", { name: "합성 두 번째 기획" }), screen.getByRole("region", { name: "분포" }), screen.getByRole("region", { name: "검증된 집계(도구가 센 값)" }), screen.getByText(/합성 비용.*\$0.0100/)];

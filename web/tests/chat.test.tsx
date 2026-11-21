@@ -5,6 +5,7 @@ import { ClarifyCard } from "../components/ClarifyCard";
 import { getWorkspaces } from "../lib/api";
 import type { Clarification, SseFrame, WorkspacesResponse } from "../lib/types";
 import Page from "../app/page";
+import { SessionProvider } from "../lib/session";
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 const workspaces: WorkspacesResponse = {
@@ -25,7 +26,7 @@ function response(frames: SseFrame[], thread = "synthetic:thread") {
 function setup(frames: SseFrame[], imageEnabled = false) {
   const fetch = vi.fn().mockImplementation(() => Promise.resolve(response(frames)));
   vi.stubGlobal("fetch", fetch);
-  render(<Chat workspaces={workspaces.workspaces} imageEnabled={imageEnabled} />);
+  render(<Chat workspaces={workspaces.workspaces} imageEnabled={imageEnabled} />, { wrapper: SessionProvider });
   return fetch;
 }
 function selectWorkspace(value = "test-isntree") {
