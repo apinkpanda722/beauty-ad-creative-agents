@@ -201,7 +201,16 @@
     {
       "step": 8,
       "name": "saved-ui",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-21T22:00:09+0900",
+      "summary": "저장 기획 API 헬퍼·카드 목록·상세 패널·시안 이미지·재진입 갱신 구현 완료. make verify 통과(Python 6,511개·웹 376개), 패키지 설치 없음. 승인된 S1만 준비 중→작업 공간 선택 안내로 교체(실제 화면 전환 반영).",
+      "completed_at": "2026-11-21T22:16:34+0900",
+      "usage": {
+        "input_tokens": 1998705,
+        "cached_input_tokens": 1904000,
+        "output_tokens": 17899,
+        "attempts": 1
+      }
     },
     {
       "step": 9,
