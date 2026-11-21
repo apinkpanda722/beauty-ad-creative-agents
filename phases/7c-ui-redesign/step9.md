@@ -105,6 +105,7 @@ make verify   # lint + pytest + pnpm lint·typecheck·test 통과
 - 제품 이름 문자열(`Gyeol Studio`, `결 스튜디오`)을 `web/lib/brand.ts` 밖에 리터럴로 쓰지 마라(테스트 파일 제외 불가: 가드 테스트가 `web/` 소스 전체를 검사한다). 이유: 이름은 한 곳에서만 바꾼다(확정 설계 조건 1).
 - 교체 단언 표(D1·D2) 밖의 기존 단언을 수정·삭제·약화하지 마라. 충돌이 나면 구현하지 말고 `blocked`로 멈춰 최소 교체안을 `reason`에 적어라. 이유: 승인된 교체만 허용된다.
 - 서버 코드(`src/`)를 수정하지 마라. 실행 기록·그래프·저장한 기획 화면을 이 step에서 새로 만들지 마라. 이유: 구현은 앞 step에서 끝났다.
+- `docs/portfolio/DETAIL_PAGE.md`의 수치 표(`| 값 | 종류 | 기준일 | 측정 조건 | 출처 |`)에 행을 추가·수정하지 마라(`tests/test_demo_docs.py`가 5칸·종류·출처 형식을 검사한다). `docs/PHASES.md`의 기존 행(특히 `| 58 |` P7 결정 행)과 `docs/TROUBLESHOOTING_LOG.md`를 수정하지 마라. 이유: 문서 가드 테스트가 기존 행의 형식을 단언한다.
 - 참조가 남아 있는 파일·규칙을 삭제하지 마라(`rg`로 확인). 스크린샷·이미지 파일을 만들지 마라. 사용자 live 결과를 지어내지 말고 ⑰~㉗의 결과 기록은 `______`로 둬라. 이유: 화면 촬영과 확인은 사용자가 한다.
 - `web/tests`의 기존 단언이 읽는 CSS 규칙(`results.css`·`plan.css`·`shell.css`·`graph.css`·`saved.css`·`history.css`·`tokens.css`)을 지우지 마라. 이유: CSS 구조 검사 테스트가 있다.
 - `web/app`·`web/components`·`web/lib` 소스에 `examples`·`.examples`·`예시 요청` 문자열을 쓰지 마라. 이유: `tests/test_demo_docs.py`의 예시 칩 금지 가드.

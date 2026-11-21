@@ -2,7 +2,7 @@
 
 ## 설계 검토 기록
 
-**목적(독립·삭제 가능 step)**: 지식 그래프 **데이터 탭**과 서버의 읽기 전용 탐색 엔드포인트 2개를 만든다. 이 step을 건너뛰어도 step 5까지의 화면은 그대로 동작해야 한다(탭이 목록에 나타나지 않을 뿐). 서버 변경은 `GET /graph/overview`·`GET /graph/neighbors`뿐이다(새 패키지·live 호출 없음). **기존 단언은 하나도 교체하지 않는다**(충돌 점검 결과 없음: 새 탭은 `tabs.tsx` 배열 한 줄이고 step 5의 탭 단언은 `GRAPH_TABS`와 비교한다). 충돌이 나면 구현하지 말고 `blocked`로 멈춰 최소 교체안을 `reason`에 적어라.
+**목적(독립·삭제 가능 step)**: 지식 그래프 **데이터 탭**과 서버의 읽기 전용 탐색 엔드포인트 2개를 만든다. 이 step을 건너뛰어도 step 5까지의 화면은 그대로 동작해야 한다(탭이 목록에 나타나지 않을 뿐). 서버 변경은 `GET /graph/overview`·`GET /graph/neighbors`뿐이다(새 패키지·live 호출 없음). **교체 단언은 아래 표 G3 한 건뿐**이고 그 밖의 기존 단언은 수정하지 않는다(step 5가 만든 `graph-page.test.tsx`의 탭 id 목록 단언은 데이터 탭이 생기면 성립할 수 없다). 표 밖에서 충돌을 발견하면 구현하지 말고 `blocked`로 멈춰 최소 교체안을 `reason`에 적어라.
 
 **코드를 열어 확인한 사실**
 - `src/beautyads/api/graph_routes.py`의 `register_graph`가 `/graph/fragment`·`/graph/schema`·`/workspaces`를 등록하고 앞 둘은 `resolve_tenant(X-Tenant-Id, allowed_tenants)`를 먼저 호출한다. `/graph/fragment`는 `services.graph_fragment is None`이면 `503 GRAPH_UNAVAILABLE`, 질의 예외는 본문 없이 `500 GRAPH_QUERY_FAILED`(`# noqa: BLE001` 주석 포함 형식)이다.
@@ -17,6 +17,12 @@
 - 라우트(`graph_routes.py`): `GET /graph/overview`, `GET /graph/neighbors?id=`. 둘 다 `resolve_tenant`를 먼저 호출하고(검사 실패 시 거부), `id`는 검증(길이 상한 300, 제어 문자 없음, 허용 라벨 접두, 아니면 `422 GRAPH_ID_INVALID`), 그래프가 없으면 `503 GRAPH_UNAVAILABLE`, 질의 오류는 본문 없이 `500 GRAPH_QUERY_FAILED`(기존 `/graph/fragment`와 같은 처리). `app.py`의 `Assembly`에 필드 `graph_overview: Callable | None = None`·`graph_neighbors: Callable | None = None`을 **추가만** 하고 `assembly.py`는 기존 `graph_fragment`와 같은 방식으로 두 함수를 **주입만** 추가한다(시작 시 질의 없음).
 - 웹: `web/lib/api.ts`에 `getGraphOverview(tenantId)`·`getGraphNeighbors(tenantId, id)`(기존 `getGraphFragment` 형식, `X-Tenant-Id` 헤더, `id`는 `encodeURIComponent`, 오류는 `ApiError(status, code)`)와 응답 타입 `GraphExploreResponse`(`Pick<GraphFragment, "nodes" | "edges"> & { truncated: boolean }`, `web/lib/types.ts`의 기존 `GraphFragment`를 import해 `api.ts`에서 내보낸다; `types.ts`는 수정하지 않는다. `GraphEdge`라는 별도 타입은 없다). `web/components/graph/DataTab.tsx`: 탭 위 문장 `공용 카탈로그(브랜드·제품·효능)를 먼저 보여 주고, 노드를 선택해 연결된 이웃을 펼칩니다.`(`<p class="gs-graph-note">`), 범례·`GraphFilters`·캔버스·`NodeDetail`을 step 5와 같은 레이아웃(`graph.css`의 같은 클래스)으로 그린다. 노드를 선택하면 `NodeDetail` 아래에 `이웃 펼치기` 버튼이 나타나고(이미 펼친 노드는 비활성) 누르면 `getGraphNeighbors`를 그 id로 호출해 결과를 **id로 중복 제거해 병합**한다. `truncated`이면 `일부만 표시합니다. 표시 상한을 넘는 노드는 보이지 않습니다.` 문구. 로딩 `role="status"`, 오류 `role="alert"`(상태·코드 표시)와 `다시 시도`, 빈 응답은 `표시할 노드가 없습니다`. 한글 이름 표시는 `fragmentToElements`·`NodeDetail`을 재사용한다(영문 라벨·관계·속성 키 노출 없음). `tabs.tsx`의 `GRAPH_TABS`에 `{ id: "data", label: "데이터", render: ... }`를 **`schema` 다음, `path` 앞**에 한 줄 추가한다(`GraphPage.tsx`는 수정하지 않는다).
 - 새 시각 기준: 간격·색은 토큰, 처음 보는 용어에 뜻(탭 위 문장), 필터는 기준마다 줄을 나눈 step 5의 `GraphFilters` 재사용, 폭은 사이드바 폭 토큰을 참조하지 않는 `graph.css` 클래스만 사용, 모션은 `prefers-reduced-motion`에서 정지.
+
+**교체 단언(조언 세션 승인 범위: step 5 탭 목록에 데이터 탭이 추가되는 직접 결과. 이 표 밖의 기존 단언을 수정하지 마라)**
+
+| # | 파일·행 | 이전 | 이후 |
+|---|---|---|---|
+| G3 | `web/tests/graph-page.test.tsx` 47행(`it("uses the single tab registry in order, starts with schema and mounts only the active view")`) | `expect(GRAPH_TABS.map(tab => tab.id)).toEqual(["schema", "path"]);` | `expect(GRAPH_TABS.map(tab => tab.id)).toEqual(["schema", "data", "path"]);`(정확 일치·순서 유지). 같은 테스트의 46행 탭 이름 목록이 `GRAPH_TABS` 라벨과 같다는 단언과 그 밖의 단언은 수정하지 않는다. 114행의 `기획 탭` 개수 2는 광고 기획 탭이라 무관하다 |
 
 **만드는 파일 → 읽는 파일 (새 칸)**
 
@@ -41,10 +47,10 @@
 
 ## 작업
 
-**수정할 파일**: `src/beautyads/graph/explore_queries.py`, `src/beautyads/api/graph_routes.py`, `src/beautyads/api/app.py`(`Assembly` 필드 추가만), `src/beautyads/api/assembly.py`(주입만), `tests/test_graph_explore.py`, `tests/test_api_graph_explore.py`, `web/lib/api.ts`, `web/components/graph/{DataTab.tsx,tabs.tsx}`, `web/tests/graph-data.test.tsx`
+**수정할 파일**: `src/beautyads/graph/explore_queries.py`, `src/beautyads/api/graph_routes.py`, `src/beautyads/api/app.py`(`Assembly` 필드 추가만), `src/beautyads/api/assembly.py`(주입만), `tests/test_graph_explore.py`, `tests/test_api_graph_explore.py`, `web/lib/api.ts`, `web/components/graph/{DataTab.tsx,tabs.tsx}`, `web/tests/graph-data.test.tsx`, `web/tests/graph-page.test.tsx`(G3 한 줄만)
 
 열람 금지 경로: `data/interim/`, `data/design/`, `.env`
-수정 허용 경로: `src/beautyads/graph/explore_queries.py`, `src/beautyads/api/graph_routes.py`, `src/beautyads/api/app.py`(`Assembly` 필드 추가만), `src/beautyads/api/assembly.py`(주입만), `tests/test_graph_explore.py`, `tests/test_api_graph_explore.py`, `web/lib/api.ts`, `web/components/graph/{DataTab.tsx,tabs.tsx}`, `web/tests/graph-data.test.tsx`
+수정 허용 경로: `src/beautyads/graph/explore_queries.py`, `src/beautyads/api/graph_routes.py`, `src/beautyads/api/app.py`(`Assembly` 필드 추가만), `src/beautyads/api/assembly.py`(주입만), `tests/test_graph_explore.py`, `tests/test_api_graph_explore.py`, `web/lib/api.ts`, `web/components/graph/{DataTab.tsx,tabs.tsx}`, `web/tests/graph-data.test.tsx`, `web/tests/graph-page.test.tsx`(G3 한 줄만)
 열람 금지의 범위: 이 금지는 **Codex 세션이 해당 경로의 파일을 직접 열람·출력·인용하는 것**에 대한 것이다. 이 step의 코드가 런타임에 그 경로를 다루는 것은 대상이 아니다. 테스트는 임시 디렉터리와 합성 데이터만 쓴다.
 
 **1.** `graph/explore_queries.py`(고정 Cypher 상수, 파라미터 검증, 응답 변환). **2.** `app.py`에 필드 추가, `graph_routes.py`에 라우트 2개, `assembly.py`에 주입. **3.** 웹 API 함수·`DataTab`·`tabs.tsx` 한 줄. **4.** 테스트(아래).
@@ -52,7 +58,7 @@
 **테스트(합성 데이터, 서비스·키·네트워크·`.env` 없음)**
 - `tests/test_graph_explore.py`(가짜 neo4j 세션·행 픽스처만, 실제 연결 금지): (1) `overview` 변환은 노드 상한 60을 넘기지 않고 `truncated`를 표시, (2) **`Feedback` 라벨 행이 입력에 섞여 있어도 응답 노드·엣지에 없다**(질의 문자열 상수에 `Feedback` 제외 조건이 있는지도 단언), (3) `neighbors`는 id 형식이 틀리거나 허용 라벨이 아니거나 300자를 넘거나 제어 문자가 있으면 `ValueError`, (4) 상한 50, (5) 노드 필드가 `{id,label,name,props}`이고 id·값 형식이 `build_fragment`와 같다(같은 입력 행에서 같은 id), (6) 라벨별 질의 상수가 허용 라벨마다 하나씩 있고 id 문자열이 질의 문자열에 들어 있지 않다(파라미터로만 전달). (6b) **관계 유형 가드**: `explore_queries.py`의 모든 Cypher 상수에서 `[:TYPE` 패턴으로 찾은 관계 유형이 `ONTOLOGY_RELATIONSHIPS`의 유형 집합의 부분집합이고 비어 있지 않다(테스트가 직접 정규식으로 찾는다).
 - `tests/test_api_graph_explore.py`(`TestClient`, 가짜 assembly): (7) 허용되지 않은 `X-Tenant-Id`는 거부(기존 `resolve_tenant` 동작과 같은 상태 코드), (8) 주입이 없으면 `503 GRAPH_UNAVAILABLE`, (9) id 형식 오류 `422 GRAPH_ID_INVALID`, (10) 내부 오류 시 `500 GRAPH_QUERY_FAILED`이고 본문에 예외 문자열이 없다, (11) 기존 `/graph/fragment`·`/graph/schema`·`/workspaces` 응답과 `tests/test_api_graph.py`·`tests/test_api_assembly.py`의 기존 단언은 수정 없이 통과.
-- `web/tests/graph-data.test.tsx`(새): (12) 데이터 탭은 `GRAPH_TABS`에 있을 때만 표시되고 탭 순서가 `스키마`·`데이터`·`근거 경로`다, (13) 노드 선택 후 `이웃 펼치기`가 `getGraphNeighbors`를 그 id로 호출하고 결과를 중복 없이 병합(캔버스 `elements` 개수로 단언), (14) `truncated`이면 안내 문구, (15) 오류 시 상태·코드와 `다시 시도`, (16) 영문 라벨·관계 유형이 화면에 없다(`Product`·`OWNS` 등), (17) 필터 그룹 두 개가 step 5와 같은 이름으로 있다, (18) `web/lib/api.ts`: 두 함수가 `X-Tenant-Id`를 보내고 `id`를 인코딩하며 오류를 `ApiError(code)`로 전달.
+- `web/tests/graph-data.test.tsx`(새): (12) 데이터 탭이 `GRAPH_TABS`에 있고 탭 리스트 `지식 그래프 보기`의 탭 이름이 정확히 `["스키마", "데이터", "근거 경로"]` 순서이며 데이터 탭 패널에도 뜻 한 문장(`공용 카탈로그(브랜드·제품·효능)를 먼저 보여 주고, 노드를 선택해 연결된 이웃을 펼칩니다.`)이 있다, (13) 노드 선택 후 `이웃 펼치기`가 `getGraphNeighbors`를 그 id로 호출하고 결과를 중복 없이 병합(캔버스 `elements` 개수로 단언), (14) `truncated`이면 안내 문구, (15) 오류 시 상태·코드와 `다시 시도`, (16) 영문 라벨·관계 유형이 화면에 없다(`Product`·`OWNS` 등), (17) 필터 그룹 두 개가 step 5와 같은 이름으로 있다, (18) `web/lib/api.ts`: 두 함수가 `X-Tenant-Id`를 보내고 `id`를 인코딩하며 오류를 `ApiError(code)`로 전달.
 - 해시 시드·집합·딕셔너리 순회 순서에 기대는 새 단언을 만들지 마라(리스트와 명시적 순서로 단언).
 - 해시 시드·집합·딕셔너리 순회 순서에 기대는 새 단언을 만들지 마라(리스트와 명시적 순서로 단언).
 
@@ -92,7 +98,7 @@ make verify   # lint + pytest + pnpm lint·typecheck·test 통과
 - `pnpm add`·`uv add`·그 밖의 패키지 설치와 `package.json`·`pnpm-lock.yaml` 수정을 하지 마라. 이유: 이번 phase의 새 패키지는 승인된 `pretendard@1.3.9` 하나뿐이다.
 - 모델·유료 API를 호출하거나 `make live-slice`, `make live-collect`, `make live-pilot`, `make live-analyze`, `make live-tiktok`, `make live-tiktok-analyze`, `make live-graph`, `make live-products`, `make live-ingredient-catalog`, `make live-cert-recheck`, `make live-cq`, `make live-product-identify`, `make live-agent`, `make live-agents`, `make live-evidence`, `make live-compare`, `make live-evalset`, `make live-e2e5`, `make live-e3`, `make live-isolation`, `make serve`, `make demo-up`, `make db-up`, `make obs-up`을 실행하지 마라. `.env`를 열거나 출력하지 마라. 테스트는 합성 데이터와 가짜 환경만 쓴다. 이유: 실제 호출과 사람이 보는 확인은 사용자가 한다(AGENTS.md CRITICAL).
 - 제품 이름 문자열(`Gyeol Studio`, `결 스튜디오`)을 `web/lib/brand.ts` 밖에 리터럴로 쓰지 마라(테스트 파일 제외 불가: 가드 테스트가 `web/` 소스 전체를 검사한다). 이유: 이름은 한 곳에서만 바꾼다(확정 설계 조건 1).
-- 기존 단언을 수정·삭제·약화하지 마라(이 step은 교체 단언이 없다). 충돌이 나면 구현하지 말고 `blocked`로 멈춰 최소 교체안을 `reason`에 적어라. 이유: 승인된 교체가 없다.
+- 교체 단언 표(G3) 밖의 기존 단언을 수정·삭제·약화하지 마라. 충돌이 나면 구현하지 말고 `blocked`로 멈춰 최소 교체안을 `reason`에 적어라. 이유: 승인된 교체만 허용된다.
 - `graph/fragment_queries.py`·`graph/ontology_view.py`·적재 코드·`store/`·`web/lib/types.ts`·`web/components/graph/GraphPage.tsx`를 수정하지 마라. 이유: 기존 읽기·적재 경로와 화면 틀은 불변이고 이 step은 새 읽기 전용 질의와 탭 한 줄만 더한다.
 - 응답에 `Feedback` 노드나 작업 공간 범위 데이터를 포함하지 마라(질의와 변환 양쪽에서 제외). 이유: 제품 노드만 공용 카탈로그이고 피드백만 작업 공간 범위다(확정 사항, ADR-009).
 - Cypher를 요청 입력으로 받거나 라벨·id를 이어 붙여 조립하지 마라(라벨별 고정 상수 + 검증된 파라미터). 이유: 에이전트·사용자에게 Cypher를 쓰게 하지 않는다.
