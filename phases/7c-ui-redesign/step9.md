@@ -29,10 +29,10 @@
 
 ## 작업
 
-**수정할 파일**: `web/lib/history.ts`, `web/components/history/*`, `web/app/{history,globals}.css`, 옛 `web/components/*`와 사용되지 않는 `web/lib/*`(참조 0 확인 후 삭제), `web/components/shell/*`(항목 정리만), `DEMO.md`, `README.md`, `docs/PHASES.md`, `docs/portfolio/DETAIL_PAGE.md`, `tests/test_demo_docs.py`, `web/tests/{history,history-page}.test.ts*`
+**수정할 파일**: `web/lib/history.ts`, `web/components/history/*`, `web/app/{history,globals}.css`, 옛 `web/components/*`와 사용되지 않는 `web/lib/*`(참조 0 확인 후 삭제), `web/components/shell/*`(항목 정리만), `web/app/page.tsx`(실행 기록 연결, 남은 준비 중 자리표시 제거), `DEMO.md`, `README.md`, `docs/PHASES.md`, `docs/portfolio/DETAIL_PAGE.md`, `tests/test_demo_docs.py`, `web/tests/{history,history-page}.test.ts*`
 
 열람 금지 경로: `data/interim/`, `data/design/`, `.env`
-수정 허용 경로: `web/lib/history.ts`, `web/components/history/*`, `web/app/{history,globals}.css`, 옛 `web/components/*`와 사용되지 않는 `web/lib/*`(참조 0 확인 후 삭제), `web/components/shell/*`(항목 정리만), `DEMO.md`, `README.md`, `docs/PHASES.md`, `docs/portfolio/DETAIL_PAGE.md`, `tests/test_demo_docs.py`, `web/tests/{history,history-page}.test.ts*`
+수정 허용 경로: `web/lib/history.ts`, `web/components/history/*`, `web/app/{history,globals}.css`, 옛 `web/components/*`와 사용되지 않는 `web/lib/*`(참조 0 확인 후 삭제), `web/components/shell/*`(항목 정리만), `web/app/page.tsx`(실행 기록 연결, 남은 준비 중 자리표시 제거), `DEMO.md`, `README.md`, `docs/PHASES.md`, `docs/portfolio/DETAIL_PAGE.md`, `tests/test_demo_docs.py`, `web/tests/{history,history-page}.test.ts*`
 열람 금지의 범위: 이 금지는 **Codex 세션이 해당 경로의 파일을 직접 열람·출력·인용하는 것**에 대한 것이다. 이 step의 코드가 런타임에 그 경로를 다루는 것은 대상이 아니다. 테스트는 임시 디렉터리와 합성 데이터만 쓴다.
 
 **1.** `web/lib/history.ts`·`web/components/history/*`·`web/app/history.css`. **2.** 옛 파일·규칙 정리(참조 0 확인 후). **3.** 문서 4곳과 `tests/test_demo_docs.py` 갱신.

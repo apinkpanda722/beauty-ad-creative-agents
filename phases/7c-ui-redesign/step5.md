@@ -13,7 +13,7 @@
 - 색은 기존 `LAYER_COLORS`·`LABEL_COLORS`를 유지(범례와 일치). 캔버스 높이는 화면에 맞춰 가변.
 - **근거 경로 탭**: 세션의 **가장 최근 결과의 `show_graph_fragment` 근거 id**를 쓴다. 결과가 없으면 `EmptyState`("광고 기획에서 요청을 실행하면 근거 경로가 표시됩니다"). 기존 `GraphPanel`의 로딩·오류·재시도·`missing` 문구 동작을 유지한다.
 - **스키마 탭**: `getSchema` 결과의 `schemaToElements`. 피드백 라벨도 스키마에는 표시(3층, 작업 공간 범위 데이터임을 범례에 표시).
-- `TurnCard`의 "근거 그래프 열기" 버튼은 지식 그래프 > 근거 경로 탭으로 이동(`AppShell`의 `view` 변경 + 탭 선택)으로 바꾼다.
+- `TurnCard`의 "근거 그래프 열기" 버튼은 지식 그래프 > 근거 경로 탭으로 이동(`web/app/page.tsx`가 가진 `view` 상태 변경 + 탭 선택, 이 연결은 `session` 또는 콜백 props로 전달)으로 바꾼다.
 
 **만드는 파일 → 읽는 파일 (새 칸)**
 
@@ -35,13 +35,13 @@
 
 ## 작업
 
-**수정할 파일**: `web/components/graph/*`, `web/app/graph.css`, `web/lib/graph.ts`, `web/lib/session.tsx`(`latestGraphIds`만), `web/components/plan/TurnCard.tsx`(버튼 이동만), `web/components/shell/AppShell.tsx`, 옛 `web/components/{GraphCanvas,GraphPanel,SchemaView,NodeDetail}.tsx`(삭제), `web/tests/{graph,graph-view}.test.ts*`
+**수정할 파일**: `web/components/graph/*`, `web/app/graph.css`, `web/lib/graph.ts`, `web/lib/session.tsx`(`latestGraphIds`만), `web/components/plan/TurnCard.tsx`(버튼 이동만), `web/app/page.tsx`(본문 연결), 옛 `web/components/{GraphCanvas,GraphPanel,SchemaView,NodeDetail}.tsx`(삭제), `web/tests/{graph,graph-view}.test.ts*`, `web/app/page.tsx`(옛 `SchemaView` import 제거만, 지식 그래프 본문은 `AppShell`이 연결)
 
 열람 금지 경로: `data/interim/`, `data/design/`, `.env`
-수정 허용 경로: `web/components/graph/*`, `web/app/graph.css`, `web/lib/graph.ts`, `web/lib/session.tsx`(`latestGraphIds`만), `web/components/plan/TurnCard.tsx`(버튼 이동만), `web/components/shell/AppShell.tsx`, 옛 `web/components/{GraphCanvas,GraphPanel,SchemaView,NodeDetail}.tsx`(삭제), `web/tests/{graph,graph-view}.test.ts*`
+수정 허용 경로: `web/components/graph/*`, `web/app/graph.css`, `web/lib/graph.ts`, `web/lib/session.tsx`(`latestGraphIds`만), `web/components/plan/TurnCard.tsx`(버튼 이동만), `web/app/page.tsx`(본문 연결), 옛 `web/components/{GraphCanvas,GraphPanel,SchemaView,NodeDetail}.tsx`(삭제), `web/tests/{graph,graph-view}.test.ts*`, `web/app/page.tsx`(옛 `SchemaView` import 제거만, 지식 그래프 본문은 `AppShell`이 연결)
 열람 금지의 범위: 이 금지는 **Codex 세션이 해당 경로의 파일을 직접 열람·출력·인용하는 것**에 대한 것이다. 이 step의 코드가 런타임에 그 경로를 다루는 것은 대상이 아니다. 테스트는 임시 디렉터리와 합성 데이터만 쓴다.
 
-**1.** `web/lib/graph.ts`에 `ZOOM_LIMITS` 추가(기존 export는 그대로). **2.** `web/components/graph/*` 재작성(옛 `GraphCanvas`·`GraphPanel`·`SchemaView`·`NodeDetail` 삭제). **3.** `AppShell`의 지식 그래프 본문 연결, `TurnCard`의 버튼 이동 동작.
+**1.** `web/lib/graph.ts`에 `ZOOM_LIMITS` 추가(기존 export는 그대로). **2.** `web/components/graph/*` 재작성(옛 `GraphCanvas`·`GraphPanel`·`SchemaView`·`NodeDetail` 삭제). **3.** `web/app/page.tsx`의 지식 그래프 본문 연결(옛 `SchemaView` 렌더와 "대화"·"전체 스키마" 임시 탭 제거), `TurnCard`의 버튼 이동 동작.
 
 **테스트(합성 데이터, 서비스·키·네트워크·`.env` 없음)**
 - `web/tests/graph.test.ts`: 기존 단언 유지 + (1) `ZOOM_LIMITS`가 `{min:0.3,max:2.5}`이고 `min < max`.

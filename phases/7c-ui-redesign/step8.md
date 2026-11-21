@@ -24,13 +24,13 @@
 
 ## 작업
 
-**수정할 파일**: `web/lib/api.ts`, `web/lib/types.ts`, `web/lib/session.tsx`(`feedbackVersion`만), `web/components/saved/*`, `web/components/results/FeedbackBar.tsx`(갱신 신호만), `web/app/saved.css`, `web/components/shell/AppShell.tsx`, `web/tests/{api,saved}.test.ts*`
+**수정할 파일**: `web/lib/api.ts`, `web/lib/types.ts`, `web/lib/session.tsx`(`feedbackVersion`만), `web/components/saved/*`, `web/components/results/FeedbackBar.tsx`(갱신 신호만), `web/app/saved.css`, `web/app/page.tsx`(본문 연결), `web/tests/{api,saved}.test.ts*`
 
 열람 금지 경로: `data/interim/`, `data/design/`, `.env`
-수정 허용 경로: `web/lib/api.ts`, `web/lib/types.ts`, `web/lib/session.tsx`(`feedbackVersion`만), `web/components/saved/*`, `web/components/results/FeedbackBar.tsx`(갱신 신호만), `web/app/saved.css`, `web/components/shell/AppShell.tsx`, `web/tests/{api,saved}.test.ts*`
+수정 허용 경로: `web/lib/api.ts`, `web/lib/types.ts`, `web/lib/session.tsx`(`feedbackVersion`만), `web/components/saved/*`, `web/components/results/FeedbackBar.tsx`(갱신 신호만), `web/app/saved.css`, `web/app/page.tsx`(본문 연결), `web/tests/{api,saved}.test.ts*`
 열람 금지의 범위: 이 금지는 **Codex 세션이 해당 경로의 파일을 직접 열람·출력·인용하는 것**에 대한 것이다. 이 step의 코드가 런타임에 그 경로를 다루는 것은 대상이 아니다. 테스트는 임시 디렉터리와 합성 데이터만 쓴다.
 
-**1.** `web/lib/api.ts` 함수 2개와 `types.ts`의 `SavedPlan` 타입(서버 응답 키와 일치). **2.** `web/components/saved/*`, `web/app/saved.css`. **3.** `AppShell`의 저장한 기획 본문 연결, `FeedbackBar` 저장 성공 시 세션의 `feedbackVersion` 증가(동작 외 변경 금지).
+**1.** `web/lib/api.ts` 함수 2개와 `types.ts`의 `SavedPlan` 타입(서버 응답 키와 일치). **2.** `web/components/saved/*`, `web/app/saved.css`. **3.** `web/app/page.tsx`의 저장한 기획 본문 연결, `FeedbackBar` 저장 성공 시 세션의 `feedbackVersion` 증가(동작 외 변경 금지).
 
 **테스트(합성 데이터, 서비스·키·네트워크·`.env` 없음)**
 - `web/tests/api.test.ts`: 기존 단언 유지 + (1) `getSavedPlans`는 `X-Tenant-Id`를 보내고 오류 시 `ApiError(code)`, (2) `getPlanImage`는 `Blob`을 반환하고 `PLAN_NOT_FOUND`·`DESIGN_NOT_FOUND`를 `ApiError`로 전달.

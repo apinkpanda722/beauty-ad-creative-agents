@@ -47,10 +47,8 @@
     {
       "step": 4,
       "name": "results",
-      "status": "blocked",
+      "status": "pending",
       "started_at": "2026-11-21T14:36:04+0900",
-      "blocked_reason": "선점검에서 수정 범위 충돌을 확인했습니다. 요구사항: “`CommandSlot.tsx`는 `ResultsView`로 대체하고 삭제(스키마 이름 조회 로직 `getSchema`·`taxonomyNames`는 `ResultsView`로 옮김).” 제한: “수정 허용 경로: `web/lib/evidence.ts`, `web/components/results/*`, `web/components/evidence/*`, `web/app/{results,evidence}.css`, `web/components/plan/PlanPage.tsx`(결과 연결), `web/components/shell/AppShell.tsx`(본문 연결), 옛 `web/components/{PlanCard,EvidenceCards,CommandSlot,PatternAlignment,DistributionChart,AggregatesPanel,CostLine,DesignImage,FeedbackBar}.tsx`(삭제), `web/tests/{evidence,results}.test.ts*`, `web/tests/evidence-plan.test.tsx`(results로 교체)”. 허용 목록 밖의 web/components/plan/TurnCard.tsx와 web/tests/graph-view.test.tsx가 CommandSlot을 import하고, web/components/NodeDetail.tsx가 삭제 대상 EvidenceCards의 safeLink를 import합니다. 삭제 후 빌드와 기존 테스트를 유지하려면 이 세 파일의 import·연결 수정도 허용해야 합니다. 코드 수정 및 검증 실행 없이 중단했습니다.",
-      "blocked_at": "2026-11-21T14:37:39+0900",
       "usage": {
         "input_tokens": 104434,
         "cached_input_tokens": 57984,
