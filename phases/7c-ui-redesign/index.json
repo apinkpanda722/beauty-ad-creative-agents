@@ -173,7 +173,16 @@
     {
       "step": 6,
       "name": "graph-data",
-      "status": "pending"
+      "status": "blocked",
+      "started_at": "2026-11-21T20:13:18+0900",
+      "blocked_reason": "선점검에서 기존 단언과 충돌을 확인하여 코드 수정 없이 중단했습니다. 지시의 「`tabs.tsx`의 `GRAPH_TABS`에 `{ id: \"data\", label: \"데이터\", render: ... }`를 **`schema` 다음, `path` 앞**에 한 줄 추가한다」와 「기존 단언을 수정·삭제·약화하지 마라(이 step은 교체 단언이 없다)」가 충돌합니다. web/tests/graph-page.test.tsx에는 `expect(GRAPH_TABS.map(tab => tab.id)).toEqual([\"schema\", \"path\"]);`가 있어 데이터 탭 추가 시 실패합니다. 필요한 최소 교체안은 이 단언의 기대값만 `[\"schema\", \"data\", \"path\"]`로 변경하여 정확한 탭 구성·순서 검증을 유지하는 것입니다. 해당 파일 수정 승인이 필요합니다.",
+      "blocked_at": "2026-11-21T20:15:25+0900",
+      "usage": {
+        "input_tokens": 378818,
+        "cached_input_tokens": 305024,
+        "output_tokens": 2066,
+        "attempts": 1
+      }
     },
     {
       "step": 7,
