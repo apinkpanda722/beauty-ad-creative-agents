@@ -1,0 +1,10 @@
+{
+  "project": "beauty-ad-creative-agents",
+  "phase": "7d-quality-fixes",
+  "steps": [
+    { "step": 1, "name": "design-quality", "status": "pending" },
+    { "step": 2, "name": "langfuse-spans", "status": "pending" },
+    { "step": 3, "name": "langfuse-io", "status": "pending" },
+    { "step": 4, "name": "docs-release", "status": "pending" }
+  ]
+}
