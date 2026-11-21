@@ -60,7 +60,6 @@
 .gs-aggregates section + section { margin-top: var(--gs-section-gap); padding-top: var(--gs-section-gap); border-top: var(--gs-border-width) solid var(--gs-border); }
 .gs-aggregates dl > div { display: flex; flex-wrap: wrap; gap: var(--gs-space-2); }
 .gs-aggregates dd { margin-left: 0; }
-.gs-cost-line { font-size: var(--gs-text-sm); text-align: right; font-variant-numeric: tabular-nums; }
 .gs-plan-result a { color: var(--gs-accent); }
 .gs-plan-result :focus-visible, .gs-result-section :focus-visible { outline: 2px solid var(--gs-accent); outline-offset: 3px; }
 
@@ -78,3 +77,19 @@
 .gs-history-link { display: inline-block; color: var(--gs-accent); font-size: var(--gs-text-sm); }
 
 .gs-insight-note { color: var(--gs-text-muted); font-size: var(--gs-text-sm); margin-block: var(--gs-space-2); }
+
+.gs-insight-card { padding: var(--gs-card-padding); margin-bottom: var(--gs-section-gap); }
+.gs-insight-card .gs-distribution { padding: 0; margin: 0; border: 0; border-radius: 0; background: transparent; }
+.gs-insight-charts { display: grid; gap: var(--gs-space-6); align-items: start; }
+.gs-insight-with-model { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.gs-insight-charts > div { min-width: 0; }
+.gs-model-charts { display: grid; gap: var(--gs-section-gap); }
+.gs-model-chart { color: var(--gs-warn); }
+.gs-model-chart h4 { margin: 0 0 var(--gs-space-2); font-size: var(--gs-text-sm); }
+.gs-model-chart .gs-badge-warn { background: var(--gs-warn-weak); }
+.gs-model-chart meter { accent-color: var(--gs-warn); }
+.gs-model-chart meter::-webkit-meter-optimum-value { background: var(--gs-warn); }
+.gs-model-chart meter::-moz-meter-bar { background: var(--gs-warn); }
+@media (width < 700px) {
+  .gs-insight-with-model { grid-template-columns: minmax(0, 1fr); }
+}

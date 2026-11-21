@@ -1,13 +1,12 @@
 "use client";
 import { useEffect, useId, useRef, useState } from "react";
-import type { EvaluationAttempt, EvidenceCard, PatternData, PlanView, UiCommand } from "../../lib/types";
+import type { EvaluationAttempt, EvidenceCard, PatternData, PlanView } from "../../lib/types";
 import { taxonomyNames } from "../../lib/taxonomy";
 import type { TaxonomyNames } from "../../lib/taxonomy";
 import { PatternAlignment, PatternSummary } from "./PatternAlignment";
 import { ScoreLabel } from "./ScoreLabel";
 import { DesignImage } from "./DesignImage";
 import { FeedbackBar } from "./FeedbackBar";
-import { CostDetail } from "./CostDetail";
 import { Badge, Button, Card, Tooltip } from "../ui";
 import { koreanBrand } from "../../lib/workspace";
 import { displayValue } from "../../lib/localize";
@@ -16,10 +15,9 @@ import { EvidenceChip } from "../evidence/EvidenceCardView";
 import "../../app/results.css";
 type DisplayAttempt = Omit<EvaluationAttempt, "scores"> & { scores?: Record<string, unknown> | null };
 function checkLabel(value: boolean | null | undefined) { return value == null ? "미실행" : value ? "통과" : "실패"; }
-export function PlanResult({ data, tenantId, names = taxonomyNames(), evidenceAnchors = {}, evidenceCards = [], cost, onOpenHistory }: {
+export function PlanResult({ data, tenantId, names = taxonomyNames(), evidenceAnchors = {}, evidenceCards = [], onOpenHistory }: {
   data: PlanView; tenantId: string | null; names?: TaxonomyNames; evidenceAnchors?: Record<string, string>;
   evidenceCards?: readonly EvidenceCard[];
-  cost?: Extract<UiCommand, { kind: "show_cost" }>["data"];
   onOpenHistory?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -37,10 +35,6 @@ export function PlanResult({ data, tenantId, names = taxonomyNames(), evidenceAn
   const scores = (["differentiation", "fit"] as const).flatMap(key => typeof latest?.scores?.[key] === "number" ? [{ name: key, value: latest.scores[key] }] : []);
 
   const reasons = unknownReasons(data.unknown_codes, data.unknown_count);
-  useEffect(() => {
-    // CostDetail keeps its established output and direct-child placement.
-    expandedRef.current?.querySelectorAll(".gs-cost-line").forEach(node => node.classList.add("gs-footnote"));
-  }, [cost]);
   useEffect(() => () => { if (frame.current !== undefined) cancelAnimationFrame(frame.current); clearTimeout(timer.current); }, []);
   function toggle() {
     if (frame.current !== undefined) cancelAnimationFrame(frame.current);
@@ -91,7 +85,6 @@ export function PlanResult({ data, tenantId, names = taxonomyNames(), evidenceAn
     {(plan.evidence_ids?.length ?? 0) > 0 && <section className="gs-detail-card" aria-label="기획안 근거"><h4>근거 소재 목록</h4><ul className="gs-evidence-chips">{plan.evidence_ids?.map((id, i) => <li key={i}>{evidenceAnchors[id] ? <a href={`#${evidenceAnchors[id]}`} aria-label={id}><EvidenceChip key={id} id={id} card={evidenceCards.find(card => card.evidence_id === id)} /></a> : `근거 소재 ${i + 1}`}</li>)}</ul></section>}
     <p className="muted gs-footnote gs-footnote-first">{data.disclaimer}</p>
     {data.design_disclaimer && <p className="muted gs-footnote">{data.design_disclaimer}</p>}
-    <CostDetail data={cost} />
     </div></div>
   </Card>;
 }

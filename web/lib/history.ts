@@ -1,3 +1,4 @@
+import type { UiCommand } from "./types";
 import type { Turn } from "./reducer";
 import { deriveProgress, deriveStages } from "./stages";
 
@@ -28,4 +29,8 @@ export function historyDuration(milliseconds: number | null) {
 export function historyTime(startedAt: number | null) {
   // Session timestamps use performance.now(), relative to this browser's time origin.
   return startedAt === null ? null : new Date(performance.timeOrigin + startedAt).toISOString();
+}
+
+export function totalCost(cost: Extract<UiCommand, { kind: "show_cost" }>["data"]): number {
+  return cost.text_spent_usd + (cost.image_cost_usd ?? 0);
 }

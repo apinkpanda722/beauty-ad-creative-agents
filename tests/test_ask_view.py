@@ -659,11 +659,87 @@ def test_cost_command_uses_only_request_text_cost(spent, maximum):
         "label": "텍스트 모델 비용(이미지 제외)",
         "text_spent_usd": float(spent),
         "max_text_cost_usd": float(maximum),
+        "image_cost_usd": None,
     }
     assert type(data["text_spent_usd"]) is type(data["max_text_cost_usd"]) is float
     json.dumps(data, allow_nan=False)
     data["text_spent_usd"] = 99
     assert raw["limits"]["text_spent_usd"] == spent
+
+
+@pytest.mark.parametrize("costs", [[0.0336], [0.0336, 0.04], [0]])
+def test_successful_image_costs_are_summed_without_exposing_reference_cost(costs):
+    from beautyads.api.ask_view import image_reference
+
+    raw = result()
+    raw["limits"] = {"text_spent_usd": 0.1, "max_text_cost_usd": 0.3}
+    template = raw["plans"][0]
+    raw["plans"] = [
+        {
+            **deepcopy(template),
+            "image": {**template["image"], "ok": True, "cost_usd": cost},
+        }
+        for cost in costs
+    ]
+    before = deepcopy(raw)
+    view = build_view(raw, plan_ids=["id"] * len(costs), hydrate=None)
+    data = command(view, "show_cost")
+    assert type(data["image_cost_usd"]) is float
+    assert data["image_cost_usd"] == sum(costs)
+    json.dumps(view.ui_commands, allow_nan=False)
+    for item in raw["plans"]:
+        reference = image_reference(item["image"])
+        assert "cost_usd" not in reference
+        assert list(reference) == ["request_key", "index", "mime", "size", "sha256"]
+    assert raw == before
+
+
+@pytest.mark.parametrize(
+    "image",
+    [
+        None,
+        {},
+        {"ok": False, "cost_usd": 0.0336},
+        {"ok": True},
+        *[
+            {"ok": True, "cost_usd": value}
+            for value in [
+                True,
+                False,
+                float("nan"),
+                float("inf"),
+                -float("inf"),
+                -0.1,
+                "0.03",
+                None,
+            ]
+        ],
+    ],
+)
+def test_invalid_or_missing_image_costs_are_ignored(image):
+    raw = result()
+    raw["limits"] = {"text_spent_usd": 0.1, "max_text_cost_usd": 0.3}
+    raw["plans"][0]["image"] = image
+    before = deepcopy(raw)
+    view = build_view(raw, plan_ids=["id"], hydrate=None)
+    assert command(view, "show_cost")["image_cost_usd"] is None
+    json.dumps(view.ui_commands, allow_nan=False)
+    assert raw == before
+
+
+def test_invalid_image_cost_does_not_discard_a_valid_image_cost():
+    raw = result()
+    raw["limits"] = {"text_spent_usd": 0.1, "max_text_cost_usd": 0.3}
+    raw["plans"] = [
+        {"image": {"ok": False, "cost_usd": 10}},
+        {"image": {"ok": True, "cost_usd": 0.0336}},
+    ]
+    before = deepcopy(raw)
+    data = command(build_view(raw, plan_ids=[], hydrate=None), "show_cost")
+    assert data["image_cost_usd"] == 0.0336
+    assert type(data["image_cost_usd"]) is float
+    json.dumps(data, allow_nan=False)
+    assert raw == before
 
 
 @pytest.mark.parametrize("field", ["text_spent_usd", "max_text_cost_usd"])

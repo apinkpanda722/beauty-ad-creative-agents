@@ -111,7 +111,7 @@ export type UiCommand =
     }
   | {
       kind: "show_cost";
-      data: { label: string; text_spent_usd: number; max_text_cost_usd: number };
+      data: { label: string; text_spent_usd: number; max_text_cost_usd: number; image_cost_usd?: number | null };
     };
 
 export type SseFrame =

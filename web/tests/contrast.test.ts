@@ -58,3 +58,6 @@ it("keeps white platform glyphs readable against every gradient stop and TikTok"
   const white = tokenColor("--gs-platform-on-color", "#FFFFFF");
   for (const [token, value] of [["--gs-platform-instagram-from", "#6D28D9"], ["--gs-platform-instagram-via", "#BE185D"], ["--gs-platform-instagram-to", "#C2410C"], ["--gs-platform-tiktok-bg", "#111827"]]) expect(contrast(tokenColor(token, value), white)).toBeGreaterThanOrEqual(4.5);
 });
+it("keeps the amber model warning readable on its weak background", () => {
+  expect(contrast(tokenColor("--gs-warn", "#92400E"), tokenColor("--gs-warn-weak", "#FFFBEB"))).toBeGreaterThanOrEqual(4.5);
+});

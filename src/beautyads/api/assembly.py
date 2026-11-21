@@ -553,6 +553,7 @@ async def assemble_full(
                                 "size": saved.size,
                                 "sha256": saved.sha256,
                             }
+                            reference["cost_usd"] = outcome.cost_usd
                             try:
                                 composed = compose_design(
                                     outcome.image_bytes,

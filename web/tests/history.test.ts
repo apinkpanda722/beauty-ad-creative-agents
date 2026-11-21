@@ -28,3 +28,12 @@ it("preserves planning/evaluation counts and reworks using existing stage deriva
   expect([result.planningCount, result.evaluationCount, result.reworks]).toEqual([2, 2, 1]);
   expect(result.progress.map(stage => [stage.id, stage.durationMs, stage.reworks])).toEqual([["supervisor", 1000, 0], ["research", 1000, 0], ["plan_eval", 5000, 1], ["image", 1000, 0]]);
 });
+
+it("adds only the supplied optional image cost to text cost", async () => {
+  const { totalCost } = await import("../lib/history");
+  const cost = { label: "합성", text_spent_usd: .012345, max_text_cost_usd: 1 };
+  expect(totalCost(cost)).toBe(.012345);
+  expect(totalCost({ ...cost, image_cost_usd: null })).toBe(.012345);
+  expect(totalCost({ ...cost, image_cost_usd: .0336 })).toBeCloseTo(.045945, 6);
+  expect(totalCost({ ...cost, text_spent_usd: .0123, image_cost_usd: .0336 })).toBeCloseTo(.0459, 6);
+});

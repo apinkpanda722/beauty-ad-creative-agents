@@ -9,8 +9,8 @@ import "../../app/plan.css";
 const labels = { pending: "대기", running: "진행 중", done: "완료", failed: "실패" };
 const monotonicClock = () => performance.now();
 
-export function ProgressTracker({ stepEvents, turnStatus, times, costUsd, costLabel = "텍스트 모델 비용(이미지 제외)", clock = monotonicClock }: {
-  stepEvents: StepEvent[]; turnStatus: TurnStatus; times?: ProgressTimes; costUsd?: number; costLabel?: string; clock?: () => number;
+export function ProgressTracker({ stepEvents, turnStatus, times, clock = monotonicClock }: {
+  stepEvents: StepEvent[]; turnStatus: TurnStatus; times?: ProgressTimes; clock?: () => number;
 }) {
   const [startedAt] = useState(clock);
   const [elapsed, setElapsed] = useState(0);
@@ -41,7 +41,6 @@ export function ProgressTracker({ stepEvents, turnStatus, times, costUsd, costLa
         </span>
       </li>)}
     </ol>
-    {costUsd !== undefined && <span className="gs-progress-cost" aria-label={costLabel}>${costUsd.toFixed(3)}</span>}
     {!running && elapsedText}
   </section>;
 }

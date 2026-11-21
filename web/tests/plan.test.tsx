@@ -340,7 +340,7 @@ it("starts with three input rows, grows without a scrollbar, and only describes 
   fireEvent.keyDown(input, { key: "Enter", keyCode: 229 });
   expect(input.value).toBe("합성 입력");
 });
-it("renders arrival durations and the same turn's optional text cost in the progress row", () => {
+it("renders arrival durations and shows no cost in the progress row", () => {
   const base = reducer({ ...initialState, tenantId: "synthetic" }, { type: "request_started", message: "합성 요청" }).turns[0];
   const turn = { ...base, startedAt: 100, stepAt: [1700], stepEvents: [{ agent: "supervisor", phase: "end", status: "ok" }] };
   const props = { busy: false, onChoice: vi.fn(), onCancel: vi.fn(), onRetry: vi.fn() };
@@ -348,10 +348,9 @@ it("renders arrival durations and the same turn's optional text cost in the prog
   expect(screen.getByText("1.6s")).toBeTruthy();
   expect(screen.queryByLabelText("텍스트 모델 비용(이미지 제외)")).toBeNull();
   rerender(<TurnCard turn={{ ...turn, commands: [{ kind: "show_cost", data: { label: "텍스트 모델 비용(이미지 제외)", text_spent_usd: .062, max_text_cost_usd: 1 } }] }} {...props} />);
-  const cost = screen.getByLabelText("텍스트 모델 비용(이미지 제외)");
-  expect(cost.textContent).toBe("$0.062");
-  expect(cost.closest("section")).toBe(screen.getByLabelText("진행 단계"));
-  expect(screen.getAllByText("$0.062")).toHaveLength(1);
+  expect(screen.queryByLabelText("텍스트 모델 비용(이미지 제외)")).toBeNull();
+  expect(document.querySelector(".gs-progress-cost")).toBeNull();
+  expect(screen.queryByText("$0.062")).toBeNull();
 });
 
 it("timestamps requests and SSE arrivals with the injected session clock, including retries and choices", async () => {

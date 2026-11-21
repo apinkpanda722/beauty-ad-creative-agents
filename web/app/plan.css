@@ -30,8 +30,7 @@
 .gs-stages [data-status="failed"] .gs-stage-icon::before { content: "✕"; }
 .gs-stages [data-status="failed"] .gs-stage-copy { color: var(--gs-danger); }
 .gs-rework-badge { padding: var(--gs-space-1) var(--gs-space-2); border-radius: var(--gs-radius-sm); background: var(--gs-surface); font-size: var(--gs-text-xs); }
-.gs-stage-duration, .gs-progress-cost { font-variant-numeric: tabular-nums; }
-.gs-progress-cost { margin-left: auto; font-weight: 600; }
+.gs-stage-duration { font-variant-numeric: tabular-nums; }
 .gs-progress-elapsed { color: var(--gs-text-muted); font-size: var(--gs-text-xs); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .gs-progress-choice, .gs-clarify-summary { color: var(--gs-accent); font-size: var(--gs-text-sm); }
 .gs-clarify-summary { padding: var(--gs-space-2) var(--gs-space-3); background: var(--gs-accent-weak); border-radius: var(--gs-radius-md); }

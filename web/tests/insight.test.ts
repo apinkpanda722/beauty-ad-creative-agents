@@ -42,3 +42,26 @@ it("specializes comparison columns while leaving generic column names intact", (
   expect(insightColumnName("top_vs_bottom_axis", "creatives")).toBe(columnName("creatives"));
   expect(columnName("n_top")).toBe("상위 25%");
 });
+
+it("detects only a nonempty unmixed distribution axis", async () => {
+  const { insightAxis, AXIS_TABS } = await import("../lib/insight");
+  expect(insightAxis(["question", "problem", "other"])).toBe("hook");
+  expect(insightAxis(["how_to", "desire"])).toBe("angle");
+  expect(insightAxis(["demo", "studio_film"])).toBe("format");
+  for (const values of [["other"], ["question", "how_to"], [], ["unknown"]]) expect(insightAxis(values)).toBeNull();
+  expect(AXIS_TABS).toEqual([{ value: "hook", label: "훅" }, { value: "angle", label: "소구" }, { value: "format", label: "형식" }, { value: "other", label: "그 외" }]);
+});
+it("parses only complete explicit model fractions without guessing", async () => {
+  const { parseModelBreakdown } = await import("../lib/insight");
+  expect(parseModelBreakdown("question 3/7; problem 2/7")).toEqual([{ label: "question", count: 3, total: 7 }, { label: "problem", count: 2, total: 7 }]);
+  expect(parseModelBreakdown("한글 분류 1/2")).toEqual([{ label: "한글 분류", count: 1, total: 2 }]);
+  expect(parseModelBreakdown("question 0/2")).toEqual([{ label: "question", count: 0, total: 2 }]);
+  for (const value of ["3/7", "question 3/0", "question 8/7", "question 3/7;", "question 3/7, problem 2/7", "question  3/7", "question -1/7", "question 1.5/7", "", 7, {}, undefined]) expect(parseModelBreakdown(value)).toBeNull();
+});
+it("matches model axis names exactly", async () => {
+  const { modelAxis } = await import("../lib/insight");
+  for (const name of ["오프닝 유형", "훅"]) expect(modelAxis(name)).toBe("hook");
+  for (const name of ["스토리 소재", "소구", "메시지 유형"]) expect(modelAxis(name)).toBe("angle");
+  expect(modelAxis("형식")).toBe("format");
+  for (const name of ["오프닝", "훅 유형", " 훅", "훅 ", "오프닝  유형"]) expect(modelAxis(name)).toBeNull();
+});

@@ -46,3 +46,32 @@ export function insightColumnName(tool: string, key: string): string {
   return columnName(key);
 }
 export function insightValue(value: string, names: TaxonomyNames): string { return displayValue(value, names); }
+
+export const AXIS_TABS = [
+  { value: "hook", label: "훅" },
+  { value: "angle", label: "소구" },
+  { value: "format", label: "형식" },
+  { value: "other", label: "그 외" },
+] as const;
+export function insightAxis(values: string[]): "hook" | "angle" | "format" | null {
+  if (!values.some(value => value !== "other")) return null;
+  const index = axes.findIndex(axis => values.every(value => axis.values.includes(value)));
+  return (["hook", "angle", "format"] as const)[index] ?? null;
+}
+export function parseModelBreakdown(value: unknown): { label: string; count: number; total: number }[] | null {
+  if (typeof value !== "string") return null;
+  const rows = [];
+  for (const part of value.split(";")) {
+    const match = /^([^\s/](?:[^/]*[^\s/])?) ([0-9]+)\/([0-9]+)$/.exec(part.trim());
+    if (!match) return null;
+    const count = Number(match[2]), total = Number(match[3]);
+    if (!Number.isSafeInteger(count) || !Number.isSafeInteger(total) || total <= 0 || count > total) return null;
+    rows.push({ label: match[1], count, total });
+  }
+  return rows;
+}
+export function modelAxis(name: string): "hook" | "angle" | "format" | null {
+  if (["오프닝 유형", "훅"].includes(name)) return "hook";
+  if (["스토리 소재", "소구", "메시지 유형"].includes(name)) return "angle";
+  return name === "형식" ? "format" : null;
+}

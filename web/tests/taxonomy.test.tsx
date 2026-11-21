@@ -44,7 +44,7 @@ it("uses the same desire name in chart rows, source rows and pattern facts witho
   const base = reducer({ ...initialState, tenantId: "synthetic" }, { type: "request_started", message: "합성" }).turns[0];
   const history = render(<HistoryDetail turn={{ ...base, status: "done", commands: [{ kind: "show_plan", data }, { kind: "show_distribution", data: distribution }] }} names={names} workspace="합성" onBack={vi.fn()} />);
   fireEvent.click(within(history.container).getByRole("tab", { name: "검증" }));
-  fireEvent.click(within(history.container).getByRole("button", { name: "원천 데이터 보기 (1)" }));
+  fireEvent.click(within(history.container).getByRole("button", { name: "표로 보기" }));
   const table = within(history.container).getByRole("table", { name: "시장 인사이트 원천 데이터" });
   expect(within(table).getByText("이상형 제시형")).toBeTruthy();
   for (const view of [chart, facts, history]) expect(view.container.textContent).not.toContain("욕구");
