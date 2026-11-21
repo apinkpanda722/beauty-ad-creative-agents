@@ -33,14 +33,16 @@
     {
       "step": 3,
       "name": "plan-main",
-      "status": "pending",
+      "status": "completed",
       "started_at": "2026-11-21T14:22:20+0900",
       "usage": {
-        "input_tokens": 159931,
-        "cached_input_tokens": 105472,
-        "output_tokens": 1184,
+        "input_tokens": 2785640,
+        "cached_input_tokens": 2700800,
+        "output_tokens": 20857,
         "attempts": 1
-      }
+      },
+      "summary": "PlanPage·입력 폼·CSS 진행창·확인 질문 요약 교체, 기존 CommandSlot 유지, 예시 칩 삭제 완료. 기존 chat 행동 단언→plan 동등 단언, 완료 중복→1회 표시, 선택 표시→버튼 없는 요약으로 대응. 칩 삭제에 따라 승인된 문서 결합 검사→DEMO 문장 유지·소스 금지 가드로 교체. make verify 통과(Python 6,412개·웹 155개), 패키지 설치 없음.",
+      "completed_at": "2026-11-21T14:36:04+0900"
     },
     {
       "step": 4,
