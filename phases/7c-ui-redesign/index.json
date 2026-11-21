@@ -215,14 +215,16 @@
     {
       "step": 9,
       "name": "history-cleanup",
-      "status": "pending",
+      "status": "completed",
       "started_at": "2026-11-21T22:16:45+0900",
       "usage": {
-        "input_tokens": 428312,
-        "cached_input_tokens": 355200,
-        "output_tokens": 2279,
+        "input_tokens": 4100357,
+        "cached_input_tokens": 3944064,
+        "output_tokens": 15315,
         "attempts": 1
-      }
+      },
+      "summary": "문서 4곳·리허설 ⑰~㉗·정리 테스트 완료. D1 16→27, D2 번호 두 구간·정확 순서로 교체(항목 추가 대응), 나머지 기존 단언 유지. 소스 import 그래프·JSX className 정확 토큰 검사; 삭제 파일 없음(모두 참조됨). 미사용 클래스 삭제: workspace-picker, composer, turn, user-message, step-bar, badge, options, composer-actions, claim-chip, evidence-grid, evidence-card, evidence-thumbnail, source-icon, evidence-body, metric-row, analysis-badges, analysis-badge, plan-checks, pattern-panel, feedback-bar, unknown-badge, aggregates-panel, distribution-row, table-scroll, design-image, cost-line, view-tabs 및 shell의 .gs-placeholder·.gs-placeholder p. make verify 통과(Python 6,512개·웹 379개), 패키지 설치 없음.",
+      "completed_at": "2026-11-21T22:31:13+0900"
     }
   ],
   "created_at": "2026-11-21T14:00:50+0900"
