@@ -73,6 +73,11 @@
       }
     },
     {
+      "step": 11,
+      "name": "cost-restore",
+      "status": "pending"
+    },
+    {
       "step": 5,
       "name": "graph-core",
       "status": "pending"
