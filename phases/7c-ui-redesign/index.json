@@ -187,14 +187,16 @@
     {
       "step": 7,
       "name": "saved-api",
-      "status": "pending",
+      "status": "completed",
       "started_at": "2026-11-21T20:29:24+0900",
       "usage": {
-        "input_tokens": 166814,
-        "cached_input_tokens": 110208,
-        "output_tokens": 1376,
+        "input_tokens": 1853017,
+        "cached_input_tokens": 1749632,
+        "output_tokens": 12931,
         "attempts": 1
-      }
+      },
+      "summary": "저장 기획 목록·plan_id 이미지 API와 공통 경로 헬퍼 구현, 테넌트 격리·경로 이탈·심볼릭 링크 거부 테스트 49개 추가. 기존 /design 동작·테스트 유지, make verify 통과(Python 6,511개·웹 352개), 패키지 설치 없음.",
+      "completed_at": "2026-11-21T20:39:32+0900"
     },
     {
       "step": 8,
