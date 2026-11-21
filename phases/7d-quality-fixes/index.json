@@ -19,7 +19,16 @@
     {
       "step": 2,
       "name": "langfuse-spans",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-21T12:07:06+0900",
+      "summary": "호출 시각 기반 기획·평가·시안 span 분리, rework_count metadata와 합성 점검·회귀 테스트 갱신. make verify 통과(Python 6340개·웹 125개), 패키지 설치 없음.",
+      "completed_at": "2026-11-21T12:14:41+0900",
+      "usage": {
+        "input_tokens": 1318087,
+        "cached_input_tokens": 1244032,
+        "output_tokens": 12390,
+        "attempts": 1
+      }
     },
     {
       "step": 3,
