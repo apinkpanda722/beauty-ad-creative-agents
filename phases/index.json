@@ -57,7 +57,8 @@
     },
     {
       "dir": "7c-ui-redesign",
-      "status": "pending"
+      "status": "blocked",
+      "blocked_at": "2026-11-21T14:23:57+0900"
     }
   ]
 }
