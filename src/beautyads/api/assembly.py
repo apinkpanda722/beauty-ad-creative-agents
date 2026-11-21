@@ -53,6 +53,14 @@ from beautyads.graph.evidence_queries import (
     product_unit_price_parameters,
     product_unit_price_query,
 )
+from beautyads.graph.explore_queries import (
+    build_neighbors,
+    build_overview,
+    neighbors_parameters,
+    neighbors_query,
+    overview_parameters,
+    overview_query,
+)
 from beautyads.graph.fragment_queries import (
     build_fragment,
     fragment_parameters,
@@ -292,6 +300,17 @@ async def assemble_full(
                 params = fragment_parameters(ids)
                 rows = graph_connection.run(fragment_query(), params).records
                 return build_fragment(params["ids"], rows)
+
+            def graph_overview():
+                rows = graph_connection.run(
+                    overview_query(), overview_parameters()
+                ).records
+                return build_overview(rows)
+
+            def graph_neighbors(identifier):
+                params = neighbors_parameters(identifier)
+                rows = graph_connection.run(neighbors_query(identifier), params).records
+                return build_neighbors(rows)
 
             def hydrate(ids):
                 try:
@@ -703,6 +722,8 @@ async def assemble_full(
                 design_dir=_DESIGN_DIR,
                 image_enabled=with_image_enabled,
                 graph_fragment=graph_fragment,
+                graph_overview=graph_overview,
+                graph_neighbors=graph_neighbors,
                 product_names=product_names,
                 close=stack.aclose,
             )

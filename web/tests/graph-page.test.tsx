@@ -44,7 +44,7 @@ function latestElements() { return cy.create.mock.calls.at(-1)![0].elements as R
 it("uses the single tab registry in order, starts with schema and mounts only the active view", async () => {
   render(<Harness pathIds={["youtube:a"]} />);
   expect(within(screen.getByRole("tablist", { name: "지식 그래프 보기" })).getAllByRole("tab").map(tab => tab.textContent)).toEqual(GRAPH_TABS.map(tab => tab.label));
-  expect(GRAPH_TABS.map(tab => tab.id)).toEqual(["schema", "path"]);
+  expect(GRAPH_TABS.map(tab => tab.id)).toEqual(["schema", "data", "path"]);
   expect(screen.getByRole("tab", { selected: true }).textContent).toBe("스키마");
   expect(screen.getByText("광고 지식이 어떻게 연결되어 있는지 노드(점)와 관계(선)로 살펴봅니다.")).toBeTruthy();
   expect(screen.getByText("그래프에 어떤 종류의 노드와 관계가 있는지 보여 줍니다. 층은 1층 제품 지식, 2층 광고에서 관찰한 값, 3층 승인·반려 피드백입니다.").className).toBe("gs-graph-note");

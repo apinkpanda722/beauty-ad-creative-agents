@@ -42,6 +42,8 @@ class Assembly:
     design_dir: Path = Path("data/design")
     image_enabled: bool = False
     graph_fragment: Callable | None = None
+    graph_overview: Callable | None = None
+    graph_neighbors: Callable | None = None
     product_names: Mapping[str, str] = field(default_factory=dict)
 
 

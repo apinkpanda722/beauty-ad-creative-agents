@@ -1,5 +1,7 @@
 import { parseSseStream } from "./sse";
-import type { ApiErrorBody, ClaimChoice, SseFrame } from "./types";
+import type { ApiErrorBody, ClaimChoice, GraphFragment, SseFrame } from "./types";
+
+export type GraphExploreResponse = Pick<GraphFragment, "nodes" | "edges"> & { truncated: boolean };
 
 export class ApiError extends Error {
   constructor(public status: number, public code: string | null) {
@@ -129,6 +131,21 @@ export async function getGraphFragment(tenantId: string, ids: string[]): Promise
   if (ids.length < 1 || ids.length > 30) throw new ApiError(422, "GRAPH_IDS_INVALID");
   const response = await requireSuccess(await fetch(
     `/api/graph/fragment?ids=${ids.map(id => encodeURIComponent(id)).join(",")}`,
+    { headers: { "X-Tenant-Id": tenantId } },
+  ));
+  return response.json();
+}
+
+export async function getGraphOverview(tenantId: string): Promise<GraphExploreResponse> {
+  const response = await requireSuccess(await fetch("/api/graph/overview", {
+    headers: { "X-Tenant-Id": tenantId },
+  }));
+  return response.json();
+}
+
+export async function getGraphNeighbors(tenantId: string, id: string): Promise<GraphExploreResponse> {
+  const response = await requireSuccess(await fetch(
+    `/api/graph/neighbors?id=${encodeURIComponent(id)}`,
     { headers: { "X-Tenant-Id": tenantId } },
   ));
   return response.json();
