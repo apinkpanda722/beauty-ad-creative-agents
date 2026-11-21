@@ -59,6 +59,11 @@
       "completed_at": "2026-11-21T14:49:07+0900"
     },
     {
+      "step": 10,
+      "name": "visual-align",
+      "status": "pending"
+    },
+    {
       "step": 5,
       "name": "graph-core",
       "status": "pending"
