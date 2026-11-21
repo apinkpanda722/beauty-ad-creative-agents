@@ -2,9 +2,35 @@
   "project": "beauty-ad-creative-agents",
   "phase": "7d-quality-fixes",
   "steps": [
-    { "step": 1, "name": "design-quality", "status": "pending" },
-    { "step": 2, "name": "langfuse-spans", "status": "pending" },
-    { "step": 3, "name": "langfuse-io", "status": "pending" },
-    { "step": 4, "name": "docs-release", "status": "pending" }
-  ]
+    {
+      "step": 1,
+      "name": "design-quality",
+      "status": "completed",
+      "started_at": "2026-11-21T11:58:26+0900",
+      "summary": "이미지 스타일 접미사, 막의 가장자리 확장, 최종 배경 대비 재측정과 테스트·변경 기록 추가. make verify 통과(Python 6331개·웹 125개), 패키지 설치 없음.",
+      "completed_at": "2026-11-21T12:06:56+0900",
+      "usage": {
+        "input_tokens": 2371866,
+        "cached_input_tokens": 2245120,
+        "output_tokens": 12670,
+        "attempts": 1
+      }
+    },
+    {
+      "step": 2,
+      "name": "langfuse-spans",
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "name": "langfuse-io",
+      "status": "pending"
+    },
+    {
+      "step": 4,
+      "name": "docs-release",
+      "status": "pending"
+    }
+  ],
+  "created_at": "2026-11-21T11:58:26+0900"
 }
