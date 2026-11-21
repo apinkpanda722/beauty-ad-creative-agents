@@ -242,25 +242,38 @@ def _contrasts(image, box) -> tuple[float, float]:
     return 1.05 / (high + 0.05), (low + 0.05) / (_luminance(DARK_TEXT) + 0.05)
 
 
-def _scrim(patch, *, alpha, color, edge):
-    """Fade from the outside image edge to zero across this region only."""
+def scrim_region(region: Box, size: tuple[int, int], element: str) -> Box:
+    """Extend horizontally and, for headline/product, to the outer image edge."""
+    width, height = size
+    return (
+        0,
+        0 if element == "headline" else region[1],
+        width,
+        height if element == "product" else region[3],
+    )
+
+
+def _scrim(patch, *, alpha, color, edge, inner):
+    """Keep the inner region's fade and continue its endpoints to the image edge."""
     mask = Image.new("L", patch.size, 0)
     draw = ImageDraw.Draw(mask)
+    top, bottom = inner
     for y in range(patch.height):
-        fraction = y / max(1, patch.height - 1)
+        fraction = min(1, max(0, (y - top) / max(1, bottom - top - 1)))
         strength = 1 - fraction if edge == "top" else fraction
         draw.line((0, y, patch.width - 1, y), fill=round(255 * alpha * strength))
     background = "black" if color == "white" else "white"
     return Image.composite(Image.new("RGB", patch.size, background), patch, mask)
 
 
-def _contrast_style(original, *, box, region, edge):
-    patch = original.crop(region)
+def _contrast_style(original, *, box, region, edge, element):
+    expanded = scrim_region(region, original.size, element)
+    patch = original.crop(expanded)
     local_box = (
-        box[0] - region[0],
-        box[1] - region[1],
-        box[2] - region[0],
-        box[3] - region[1],
+        box[0] - expanded[0],
+        box[1] - expanded[1],
+        box[2] - expanded[0],
+        box[3] - expanded[1],
     )
     white, dark = _contrasts(patch, local_box)
     if white >= MIN_CONTRAST_RATIO:
@@ -271,7 +284,13 @@ def _contrast_style(original, *, box, region, edge):
     index = 0 if color == "white" else 1
     for step in range(1, round(SCRIM_MAX_ALPHA / SCRIM_STEP) + 1):
         alpha = min(SCRIM_MAX_ALPHA, round(step * SCRIM_STEP, 10))
-        adjusted = _scrim(patch, alpha=alpha, color=color, edge=edge)
+        adjusted = _scrim(
+            patch,
+            alpha=alpha,
+            color=color,
+            edge=edge,
+            inner=(region[1] - expanded[1], region[3] - expanded[1]),
+        )
         contrast = _contrasts(adjusted, local_box)[index]
         if contrast >= MIN_CONTRAST_RATIO:
             break
@@ -279,8 +298,19 @@ def _contrast_style(original, *, box, region, edge):
 
 
 def _draw(
-    image, *, original, text, region, filename, directory, max_lines, font_ratio, edge
+    image,
+    *,
+    original,
+    text,
+    region,
+    filename,
+    directory,
+    max_lines,
+    font_ratio,
+    edge,
+    element,
 ):
+    """Lay out text and paste its scrim; defer glyphs until all scrims are ready."""
     lines, font, size, spacing = _fit(
         text,
         directory=directory,
@@ -315,10 +345,31 @@ def _draw(
         max(box[3] for box in boxes),
     )
     color, alpha, contrast, patch = _contrast_style(
-        original, box=box, region=region, edge=edge
+        original, box=box, region=region, edge=edge, element=element
     )
     if patch is not None:
-        image.paste(patch, (left, top))
+        expanded = scrim_region(region, original.size, element)
+        image.paste(patch, expanded[:2])
+    return {
+        "box": box,
+        "size": size,
+        "lines": tuple(lines),
+        "contrast": contrast,
+        "scrim": alpha,
+        "color": color,
+        "drawing": {
+            "region": region,
+            "positions": positions,
+            "lines": lines,
+            "font": font,
+            "size": size,
+            "color": color,
+        },
+    }
+
+
+def _draw_text(image, *, region, positions, lines, font, size, color):
+    left, top, right, bottom = region
     # Clip blurred shadows to the text region so the central artwork stays intact.
     shadow = Image.new("RGBA", (right - left, bottom - top), (0, 0, 0, 0))
     draw = ImageDraw.Draw(shadow)
@@ -344,14 +395,6 @@ def _draw(
             fill=TEXT_COLOR if color == "white" else DARK_TEXT,
         )
     image.paste(patch, (left, top))
-    return {
-        "box": box,
-        "size": size,
-        "lines": tuple(lines),
-        "contrast": contrast,
-        "scrim": alpha,
-        "color": color,
-    }
 
 
 def compose_design(
@@ -396,6 +439,7 @@ def compose_design(
                 max_lines=max_lines,
                 font_ratio=ratio,
                 edge=edge,
+                element=name,
             )
             if texts[name]
             else {
@@ -407,6 +451,14 @@ def compose_design(
                 "color": None,
             }
         )
+    # Measure the final background after every scrim, before any shadow or glyph.
+    for item in elements.values():
+        if item["box"] is not None and item["scrim"] > 0:
+            index = 0 if item["color"] == "white" else 1
+            item["contrast"] = _contrasts(image, item["box"])[index]
+    for item in elements.values():
+        if item["box"] is not None:
+            _draw_text(image, **item["drawing"])
     headline, product, cta = (elements[name] for name in ("headline", "product", "cta"))
     contrasts = [
         item["contrast"] for item in elements.values() if item["box"] is not None

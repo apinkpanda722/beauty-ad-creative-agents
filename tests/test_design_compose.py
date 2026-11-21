@@ -591,3 +591,144 @@ def test_scrim_uses_smallest_step_and_correct_edge_fade(fonts):
                 assert patch.getpixel((region[0], inner_y)) == original.getpixel(
                     (region[0], inner_y)
                 )
+
+
+def test_scrim_constants_and_expanded_regions_are_fixed():
+    assert compose.MIN_CONTRAST_RATIO == 3.0
+    assert compose.SCRIM_MAX_ALPHA == 0.5
+    assert compose.SCRIM_STEP == 0.05
+    assert compose.MARGIN_RATIO == 0.05
+    size = (512, 1024)
+    regions = compose.layout_regions(*size)
+    for name, region in regions.items():
+        expected = (
+            0,
+            0 if name == "headline" else region[1],
+            size[0],
+            size[1] if name == "product" else region[3],
+        )
+        assert compose.scrim_region(region, size, name) == expected
+
+
+@pytest.mark.parametrize("size", [(512, 1024), (1024, 1024)])
+@pytest.mark.parametrize("with_cta", [False, True])
+def test_scrims_reach_image_edges_without_seams_and_measure_final_background(
+    fonts, monkeypatch, size, with_cta
+):
+    directory, _ = fonts
+    names = ("headline", "product", "cta") if with_cta else ("headline", "product")
+    options = {
+        "headline": "Synthetic headline",
+        "product_line": "brand  serum",
+        "cta": "Details",
+        "with_cta": with_cta,
+        "font_dir": directory,
+    }
+    # Uniform bright pixels correctly select dark text without a scrim.
+    bright = synthetic_background(size, 240)
+    baseline = compose.compose_design(bright, **options)
+    assert baseline.headline_color == "dark" and baseline.headline_scrim == 0
+    # Mixed luminance only in the glyph boxes requires a scrim. Keep the bright
+    # border uniform so adjacent-pixel checks detect mask seams, not source noise.
+    with (
+        Image.open(BytesIO(bright)) as source,
+        Image.open(BytesIO(synthetic_background(size, "complex_noise"))) as noise,
+    ):
+        before = source.copy()
+        for name in names:
+            box = getattr(baseline, name + "_box")
+            before.paste(noise.crop(box), box[:2])
+    stream = BytesIO()
+    before.save(stream, format="PNG")
+    data = stream.getvalue()
+    measured, events = [], []
+    original_contrasts = compose._contrasts
+    original_text = compose.ImageDraw.ImageDraw.text
+
+    def record_contrasts(image, box):
+        if image.size == size:
+            measured.append((image.copy(), box))
+            events.append("measure")
+        return original_contrasts(image, box)
+
+    def record_text(self, *args, **kwargs):
+        events.append("text")
+        return original_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(compose, "_contrasts", record_contrasts)
+    monkeypatch.setattr(compose.ImageDraw.ImageDraw, "text", record_text)
+    value = compose.compose_design(data, **options)
+    assert len(measured) == len(names)
+    assert events[: len(names)] == ["measure"] * len(names)
+    assert "text" in events[len(names) :]
+    intermediate = measured[0][0]
+    assert all(image.tobytes() == intermediate.tobytes() for image, _ in measured)
+    assert value.contrast_adjusted is True
+    assert value.min_contrast >= compose.MIN_CONTRAST_RATIO
+    contrasts = []
+    for name in names:
+        assert getattr(value, name + "_scrim") > 0
+        assert getattr(value, name + "_color") == "white"
+        contrast = measured_contrast(
+            intermediate, getattr(value, name + "_box"), "white"
+        )
+        assert getattr(value, name + "_contrast") == pytest.approx(contrast)
+        contrasts.append(contrast)
+    assert value.min_contrast == pytest.approx(min(contrasts))
+    # Independently reconstruct every expanded row on the original background.
+    expected = before.copy()
+    regions = compose.layout_regions(*size)
+    for name in names:
+        region = regions[name]
+        start = 0 if name == "headline" else region[1]
+        stop = size[1] if name == "product" else region[3]
+        alpha = getattr(value, name + "_scrim")
+        for y in range(start, stop):
+            fraction = min(1, max(0, (y - region[1]) / (region[3] - region[1] - 1)))
+            fade = 1 - fraction if name == "headline" else fraction
+            opacity = round(255 * alpha * fade) / 255
+            for x in range(size[0]):
+                expected.putpixel(
+                    (x, y),
+                    tuple(round(v * (1 - opacity)) for v in before.getpixel((x, y))),
+                )
+    assert intermediate.tobytes() == expected.tobytes()
+    with Image.open(BytesIO(value.png_bytes)) as after:
+        assert after.getpixel((0, 0))[0] < 240
+        assert after.getpixel((0, size[1] - 1))[0] < 240
+        for name in names:
+            left, top, right, bottom = regions[name]
+            y = top + 1
+            for x1, x2 in ((left - 1, left), (right - 1, right)):
+                assert (
+                    max(
+                        abs(a - b)
+                        for a, b in zip(
+                            after.getpixel((x1, y)),
+                            after.getpixel((x2, y)),
+                            strict=True,
+                        )
+                    )
+                    <= 1
+                )
+            if name == "headline":
+                assert after.getpixel((0, top - 1)) == after.getpixel((0, top))
+                assert after.getpixel((0, bottom - 1)) == (240,) * 3
+                assert after.getpixel((0, bottom + 1)) == (240,) * 3
+            elif name == "product":
+                assert after.getpixel((0, bottom - 1)) == after.getpixel((0, bottom))
+                if not with_cta:
+                    assert after.getpixel((0, top - 1)) == (240,) * 3
+                else:
+                    # The preceding row belongs to CTA, not the product scrim.
+                    assert after.getpixel((0, top - 1)) == expected.getpixel(
+                        (0, top - 1)
+                    )
+                assert after.getpixel((0, top)) == (240,) * 3
+            else:
+                # CTA expands horizontally, never vertically into its neighbors.
+                assert after.getpixel((0, top - 1)) == (240,) * 3
+                assert after.getpixel((0, bottom)) == (240,) * 3
+        center = (0, size[1] // 4, size[0], size[1] * 3 // 4)
+        assert after.crop(center).tobytes() == before.crop(center).tobytes()
+    assert value.png_bytes == compose.compose_design(data, **options).png_bytes

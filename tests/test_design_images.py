@@ -238,7 +238,7 @@ def test_composed_rejects_invalid_index_without_writing(tmp_path, index):
     ],
 )
 def test_single_cut_prompt_removes_all_quoted_copy_and_video_scenes(quotes):
-    from beautyads.agents.design_images import IMAGE_NO_TEXT_CLAUSE
+    from beautyads.agents.design_images import IMAGE_NO_TEXT_CLAUSE, IMAGE_PROMPT_SUFFIX
 
     value = plan(
         image_brief=f"SYNTH_VISUAL {quotes} (SYNTH_COMMENT)",
@@ -247,7 +247,7 @@ def test_single_cut_prompt_removes_all_quoted_copy_and_video_scenes(quotes):
         copy_lines=["SYNTH_COPY"],
     )
     prompt = image_prompt(value)
-    assert prompt == "SYNTH_VISUAL\n" + IMAGE_NO_TEXT_CLAUSE
+    assert prompt == "SYNTH_VISUAL\n" + IMAGE_PROMPT_SUFFIX
     for marker in (
         "SYNTH_QUOTE_",
         "SYNTH_SCENE_X",
@@ -265,9 +265,9 @@ def test_single_cut_prompt_removes_all_quoted_copy_and_video_scenes(quotes):
     [None, '"ONLY_COPY"', "“ONLY_COPY”\n「MORE_COPY」", "(COMMENT)\nNote: META"],
 )
 def test_empty_scene_leaves_only_fixed_image_instruction(brief):
-    from beautyads.agents.design_images import IMAGE_NO_TEXT_CLAUSE
+    from beautyads.agents.design_images import IMAGE_PROMPT_SUFFIX
 
-    assert image_prompt(plan(image_brief=brief)) == IMAGE_NO_TEXT_CLAUSE
+    assert image_prompt(plan(image_brief=brief)) == IMAGE_PROMPT_SUFFIX
 
 
 @pytest.mark.parametrize(
@@ -275,7 +275,44 @@ def test_empty_scene_leaves_only_fixed_image_instruction(brief):
     ["(don't render)", '[remove "note]', "（remove “note）", "<remove 「note>"],
 )
 def test_quote_markers_inside_annotations_do_not_remove_scene_body(comment):
-    from beautyads.agents.design_images import IMAGE_NO_TEXT_CLAUSE
+    from beautyads.agents.design_images import IMAGE_PROMPT_SUFFIX
 
     prompt = image_prompt(plan(image_brief=f"{comment} SYNTH_VISUAL_AFTER"))
-    assert prompt == "SYNTH_VISUAL_AFTER\n" + IMAGE_NO_TEXT_CLAUSE
+    assert prompt == "SYNTH_VISUAL_AFTER\n" + IMAGE_PROMPT_SUFFIX
+
+
+def test_image_style_and_no_text_instructions_are_exact():
+    from beautyads.agents.design_images import (
+        IMAGE_NO_TEXT_CLAUSE,
+        IMAGE_PROMPT_SUFFIX,
+        IMAGE_STYLE_CLAUSE,
+    )
+
+    assert IMAGE_STYLE_CLAUSE == (
+        "장면은 훅 문구를 가장 잘 보여 주는 하나의 순간으로 고르고 기본은 사용 장면이다(손등이나 볼에 제품을 바르는 손과 피부 클로즈업). "
+        "얼굴 전체를 정면으로 잡는 구도와 병이나 튜브를 코나 입에 대는 구도는 그리지 않는다. "
+        "용기가 나오면 내용물이 보여야 한다(맑은 물처럼 보이는 투명 액체 금지, 세럼은 약간 점성이 있는 연한 색 액체와 스포이트나 펌프 형태, 튜브는 닫힌 튜브). "
+        "제품을 얼굴에 직접 대거나 문지르지 말고 손가락 끝에 덜어 바르는 모습으로 그린다. 인물이 나오면 한국인 모델이다."
+    )
+    assert IMAGE_NO_TEXT_CLAUSE == (
+        "하나의 구도로 단일 컷만 그린다(콜라주·그리드·스토리보드·여러 컷 금지). "
+        "이미지에는 글자·자막·카피·로고·브랜드·제품명·라벨 문구를 넣지 않는다. "
+        "제품은 무라벨 일반 병·튜브·패키지의 형태로만 묘사한다."
+    )
+    assert IMAGE_PROMPT_SUFFIX == IMAGE_STYLE_CLAUSE + " " + IMAGE_NO_TEXT_CLAUSE
+
+
+@pytest.mark.parametrize("brief", [None, "SYNTH_SCENE (REMOVE)", "가" * 3000])
+def test_style_suffix_survives_cleaning_and_long_scenes(brief):
+    from beautyads.agents.design_images import IMAGE_PROMPT_SUFFIX
+
+    prompt = image_prompt(plan(image_brief=brief))
+    assert prompt.endswith(IMAGE_PROMPT_SUFFIX)
+    assert len(prompt) <= 2000
+    assert "(손등이나 볼에 제품을 바르는 손과 피부 클로즈업)" in prompt
+    assert "(맑은 물처럼 보이는 투명 액체 금지," in prompt
+    assert "REMOVE" not in prompt
+    if brief is None:
+        assert prompt == IMAGE_PROMPT_SUFFIX
+    elif len(brief) > 2000:
+        assert len(prompt) == 2000
