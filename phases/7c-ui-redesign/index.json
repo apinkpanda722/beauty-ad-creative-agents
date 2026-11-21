@@ -47,14 +47,16 @@
     {
       "step": 4,
       "name": "results",
-      "status": "pending",
+      "status": "completed",
       "started_at": "2026-11-21T14:36:04+0900",
       "usage": {
-        "input_tokens": 104434,
-        "cached_input_tokens": 57984,
-        "output_tokens": 1060,
+        "input_tokens": 2366248,
+        "cached_input_tokens": 2256000,
+        "output_tokens": 19397,
         "attempts": 1
-      }
+      },
+      "summary": "PlanResult·ResultsView와 플랫폼별 근거 화면(자사 배지·필터·모노그램·중복 제거) 완료; 기존 행동 단언 96줄을 새 구조로 유지, 재개 지시로 shell의 ‘준비 중’→빈 상태·행동 버튼 단언 교체; make verify 통과(Python 6,412개·웹 182개), 패키지 설치 없음. 자사 판별은 슬러그 정규화 기준이며 한글 별칭은 불일치, 실데이터 일치는 미검증.",
+      "completed_at": "2026-11-21T14:49:07+0900"
     },
     {
       "step": 5,
