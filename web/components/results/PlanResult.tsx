@@ -9,17 +9,17 @@ import { FeedbackBar } from "./FeedbackBar";
 import { CostDetail } from "./CostDetail";
 import { Badge, Button, Card } from "../ui";
 import { koreanBrand } from "../../lib/workspace";
-import { displayValue, localizeText, scoreNames } from "../../lib/localize";
-import { unknownExplanation, unknownNames, unknownReasons } from "../../lib/unknown";
+import { displayValue, scoreNames } from "../../lib/localize";
+import { unknownExplanation, unknownReasons } from "../../lib/unknown";
 import { EvidenceChip } from "../evidence/EvidenceCardView";
 import "../../app/results.css";
-const statusNames: Record<string, string> = { done: "완료", needs_review: "검토 필요", failed: "실패" };
 type DisplayAttempt = Omit<EvaluationAttempt, "scores"> & { scores?: Record<string, unknown> | null };
 function checkLabel(value: boolean | null | undefined) { return value == null ? "미실행" : value ? "통과" : "실패"; }
-export function PlanResult({ data, tenantId, names = taxonomyNames(), evidenceAnchors = {}, evidenceCards = [], cost }: {
+export function PlanResult({ data, tenantId, names = taxonomyNames(), evidenceAnchors = {}, evidenceCards = [], cost, onOpenHistory }: {
   data: PlanView; tenantId: string | null; names?: TaxonomyNames; evidenceAnchors?: Record<string, string>;
   evidenceCards?: readonly EvidenceCard[];
   cost?: Extract<UiCommand, { kind: "show_cost" }>["data"];
+  onOpenHistory?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [visible, setVisible] = useState(false);
@@ -74,6 +74,7 @@ export function PlanResult({ data, tenantId, names = taxonomyNames(), evidenceAn
     </header>
       <PatternSummary data={data.pattern_alignment as PatternData} />
       <p className="gs-quality-summary">{quality}</p>
+      {onOpenHistory && <a className="gs-history-link" href="#history" onClick={event => { event.preventDefault(); onOpenHistory(); }}>검증 상세 보기 →</a>}
       <div className="gs-plan-actions">
         {tenantId && <FeedbackBar key={data.plan_id} tenantId={tenantId} planId={data.plan_id} />}
         <Button variant="ghost" size="sm" className="gs-plan-toggle" aria-expanded={expanded} aria-controls={expandedId} onClick={toggle}>전체 보기 <span className="gs-toggle-arrow">→</span></Button>
@@ -88,21 +89,8 @@ export function PlanResult({ data, tenantId, names = taxonomyNames(), evidenceAn
       const status = data.efficacy_status[claim];
       return <Badge key={i} variant={status === "supported" ? "success" : "warn"} label={`${names.claimName(claim)} · ${status === "supported" ? "확인됨" : status === "unsupported" ? "근거가 뒷받침하지 않음" : "근거 연결 없음"}`} />;
     })}</div></section>}
-    <section className="gs-plan-checks gs-detail-card" aria-label="검사 결과">
-      <Badge className={data.unknown_count > 0 ? "attention" : "clear"} variant={data.unknown_count > 0 ? "warn" : "success"} label={`근거 연결 없음 ${data.unknown_count}건`} />
-      {Object.keys(data.unknown_codes).length > 0 && <ul>{Object.keys(data.unknown_codes).map(code => <li key={code}>{Object.hasOwn(unknownNames, code) ? unknownNames[code] : code}</li>)}</ul>}
-      <p className="code-result">코드 검사: {data.passed ? "통과" : "실패"}</p>
-      <p className="evaluation-status">평가 상태: {Object.hasOwn(statusNames, data.status) ? statusNames[data.status] : data.status}</p>
-    </section>
     <PatternAlignment data={data.pattern_alignment as PatternData} label={data.pattern_alignment_label} names={names} />
     {(plan.evidence_ids?.length ?? 0) > 0 && <section className="gs-detail-card" aria-label="기획안 근거"><h4>근거 소재 목록</h4><ul className="gs-evidence-chips">{plan.evidence_ids?.map((id, i) => <li key={i}>{evidenceAnchors[id] ? <a href={`#${evidenceAnchors[id]}`} aria-label={id}><EvidenceChip key={id} id={id} card={evidenceCards.find(card => card.evidence_id === id)} /></a> : `근거 소재 ${i + 1}`}</li>)}</ul></section>}
-    <details><summary>평가 시도 보기 · 되돌림 {Math.max(0, attempts.length - 1)}회</summary><ol>{attempts.map((attempt, i) => <li key={i}>
-      <strong>시도 {attempt.attempt}</strong><p>시도 코드 검사: {checkLabel(attempt.checks_passed)} · 최종 판정: {checkLabel(attempt.final_passed)}</p>
-      {attempt.scores && <ul>{Object.entries(attempt.scores).filter(([, score]) => typeof score === "number").map(([key, score]) => <li key={key}>{Object.hasOwn(scoreNames, key) ? `${scoreNames[key]} (${key})` : key}: {String(score)}</li>)}</ul>}
-      {typeof attempt.scores?.rationale === "string" && <p>사유: {localizeText(attempt.scores.rationale, names)}</p>}
-      {(attempt.low_items?.length ?? 0) > 0 && <p className="muted">재검토 항목: {attempt.low_items?.map(key => Object.hasOwn(scoreNames, key) ? scoreNames[key] : key).join(", ")}</p>}
-      {attempt.cost_usd != null && <small>시도 텍스트 비용 ${attempt.cost_usd.toFixed(4)}</small>}
-    </li>)}</ol></details>
     <p className="muted gs-footnote gs-footnote-first">{data.disclaimer}</p>
     {data.design_disclaimer && <p className="muted gs-footnote">{data.design_disclaimer}</p>}
     <CostDetail data={cost} />

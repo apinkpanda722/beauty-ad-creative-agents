@@ -1,3 +1,4 @@
+import type { ComponentProps } from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -7,7 +8,7 @@ import { EvidencePage } from "../components/evidence/EvidencePage";
 import Page from "../app/page";
 import { EvidenceSummary } from "../components/evidence/EvidenceSummary";
 import { PlanResult } from "../components/results/PlanResult";
-import { AggregatesPanel } from "../components/results/AggregatesPanel";
+import { HistoryDetail } from "../components/history/HistoryDetail";
 import { DistributionChart } from "../components/results/DistributionChart";
 import { DesignImage } from "../components/results/DesignImage";
 import { FeedbackBar, FeedbackSession } from "../components/results/FeedbackBar";
@@ -40,6 +41,15 @@ const plan: PlanView = {
 const aggregates: Extract<UiCommand, { kind: "show_aggregates" }>["data"] = { label: "모델 작성값 · 검증되지 않음", verified_counts: [{ tool: "synthetic_tool", row_count: 5, shown_count: 3, count_label: "합성 도구 건수" }], model_written: [{ name: "synthetic_model", value: "합성 모델 값" }], removed: ["synthetic_removed"] };
 const image = { request_key: "synthetic/key", index: 0, mime: "image/png" as const, size: 1, sha256: "a".repeat(64) };
 const names = taxonomyNames(schema);
+
+function Audit({ commands, names }: { commands: UiCommand[]; names?: ComponentProps<typeof HistoryDetail>["names"] }) {
+  const base = reducer({ ...initialState, tenantId: "synthetic" }, { type: "request_started", message: "합성 검증 요청" }).turns[0];
+  return <HistoryDetail turn={{ ...base, status: "done", commands }} workspace="합성 공간" onBack={vi.fn()} names={names} />;
+}
+function PlanWithAudit(props: ComponentProps<typeof PlanResult>) {
+  return <><PlanResult {...props} /><Audit commands={[{ kind: "show_plan", data: props.data }]} names={props.names} /></>;
+}
+function selectAuditTab(label: string) { fireEvent.click(screen.getByRole("tab", { name: label })); return screen.getByRole("tabpanel", { name: label }); }
 
 function TestWorkspace() {
   const { state, selectWorkspace } = useSession();
@@ -130,7 +140,8 @@ it("connects the evidence navigation to session cards, own-brand summaries and t
 });
 
 it("renders separate code checks, evaluation state, unknown badge, neutral pattern and raw taxonomy fallback", () => {
-  const { container, rerender } = render(<PlanResult data={plan} tenantId="synthetic" evidenceAnchors={{ [card.evidence_id!]: "synthetic-anchor" }} />);
+  const { container, rerender } = render(<PlanWithAudit data={plan} tenantId="synthetic" evidenceAnchors={{ [card.evidence_id!]: "synthetic-anchor" }} />);
+  selectAuditTab("검증");
   expect(screen.getByText("근거 연결 없음 0건").className).toContain("clear");
   expect(screen.getByText("코드 검사: 통과")).toBeTruthy();
   expect(screen.getByText("평가 상태: 검토 필요")).toBeTruthy();
@@ -140,9 +151,11 @@ it("renders separate code checks, evaluation state, unknown badge, neutral patte
   expandAll();
   expect(screen.getByRole("link", { name: card.evidence_id! }).getAttribute("href")).toBe("#synthetic-anchor");
   expect(screen.queryByRole("link", { name: "youtube:absent" })).toBeNull();
+  selectAuditTab("평가");
   expect(screen.getByText(/되돌림 0회/)).toBeTruthy();
   expect(screen.getByText(/차별성 \(differentiation\): 2/)).toBeTruthy();
-  rerender(<PlanResult data={{ ...plan, unknown_count: 3, unknown_codes: { CERT_REQUIRED_UNVERIFIED: 1, EFFICACY_UNKNOWN: 1, SYNTHETIC_UNKNOWN: 1 }, passed: false, status: "failed" }} tenantId="synthetic" names={names} />);
+  rerender(<PlanWithAudit data={{ ...plan, unknown_count: 3, unknown_codes: { CERT_REQUIRED_UNVERIFIED: 1, EFFICACY_UNKNOWN: 1, SYNTHETIC_UNKNOWN: 1 }, passed: false, status: "failed" }} tenantId="synthetic" names={names} />);
+  selectAuditTab("검증");
   expect(screen.getByText("근거 연결 없음 3건").className).toContain("attention");
   expect(screen.getByText("인증 연결 없음").textContent).toBe("인증 연결 없음");
   expect(screen.getByText("효능 근거 연결 없음").textContent).toBe("효능 근거 연결 없음");
@@ -153,7 +166,8 @@ it("renders separate code checks, evaluation state, unknown badge, neutral patte
   expect(screen.getAllByText("soothing · 근거 연결 없음")).toHaveLength(2);
 });
 it("keeps aggregate provenance in three distinct blocks, including removed-only and empty", () => {
-  const { rerender, container } = render(<AggregatesPanel data={aggregates} />);
+  const { rerender } = render(<Audit commands={[{ kind: "show_aggregates", data: aggregates }]} />);
+  selectAuditTab("검증");
   const verified = screen.getByRole("region", { name: "검증된 집계(도구가 센 값)" });
   expect(within(verified).getByText("합성 도구 건수")).toBeTruthy();
   expect(verified.textContent).not.toMatch(/synthetic_model|합성 모델 값/);
@@ -162,11 +176,11 @@ it("keeps aggregate provenance in three distinct blocks, including removed-only 
   expect(model.textContent).toContain("합성 모델 값");
   expect(model.textContent).not.toMatch(/확인됨|검증됨/);
   expect(screen.getByRole("region", { name: "제외된 값" }).textContent).toContain("synthetic_removed");
-  rerender(<AggregatesPanel data={{ ...aggregates, verified_counts: [], model_written: [] }} />);
+  rerender(<Audit commands={[{ kind: "show_aggregates", data: { ...aggregates, verified_counts: [], model_written: [] } }]} />);
   expect(screen.getByText("synthetic_removed")).toBeTruthy();
   expect(screen.queryByRole("region", { name: "모델 작성값" })).toBeNull();
-  rerender(<AggregatesPanel data={{ ...aggregates, verified_counts: [], model_written: [], removed: [] }} />);
-  expect(container.innerHTML).toBe("");
+  rerender(<Audit commands={[{ kind: "show_aggregates", data: { ...aggregates, verified_counts: [], model_written: [], removed: [] } }]} />);
+  expect(screen.getByRole("tabpanel", { name: "검증" }).innerHTML).toBe("");
 });
 it("shows all six analysis attributes using schema and closed maps, raw unknown values and neutral absent analysis", () => {
   const labeled = { ...card, hook_type: "question", angle: "how_to", format: "demo", talent: "ordinary_person", cta_type: "shop_now", claims: ["hydration", "synthetic_claim"] };
@@ -264,8 +278,9 @@ it.each([true, false])("renders ordered command components in PlanPage with sche
   render(<><TestWorkspace /><PlanPage workspaces={[{ tenant_id: "synthetic", display_name: "합성 공간", brand: null, product_name: null }]} imageEnabled={false} /></>, { wrapper: SessionProvider });
   fireEvent.click(screen.getByRole("button", { name: "작업 공간" })); fireEvent.click(await screen.findByRole("option", { name: /합성 공간/ })); fireEvent.change(screen.getByLabelText("요청"), { target: { value: "합성 요청" } }); fireEvent.click(screen.getByRole("button", { name: "기획하기" }));
   await screen.findByText("합성 화면 문장"); await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
-  const nodes = [screen.getByLabelText("합성 비용"), screen.getByText("합성 화면 문장"), screen.getByRole("heading", { name: "합성 기획" }), screen.getByRole("heading", { name: "합성 두 번째 기획" }), screen.getByRole("region", { name: "근거 소재" }), screen.getByRole("region", { name: "분포" }), screen.getByRole("region", { name: "검증된 집계(도구가 센 값)" })];
+  const nodes = [screen.getByLabelText("합성 비용"), screen.getByText("합성 화면 문장"), screen.getByRole("heading", { name: "합성 기획" }), screen.getByRole("heading", { name: "합성 두 번째 기획" }), screen.getByRole("region", { name: "근거 소재" }), screen.getByRole("region", { name: "분포" })];
   for (let i = 1; i < nodes.length; i++) expect(nodes[i - 1].compareDocumentPosition(nodes[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.getAllByRole("link", { name: "검증 상세 보기 →" })).toHaveLength(1);
   expect(screen.getByLabelText("합성 비용").textContent).toBe("$0.010");
   expandAll();
   expect(screen.queryByText("합성 숨긴 원문")).toBeNull(); expect(screen.getByRole("link", { name: card.evidence_id! }).getAttribute("href")).toBe(`#${screen.getByRole("region", { name: "근거 소재" }).querySelector("article")!.id}`);
@@ -352,15 +367,12 @@ it("shows only the choice status, hides unavailable/stopped stages and preserves
     expect(screen.getAllByRole("img").map(node => node.getAttribute("aria-label"))).toEqual(stages.map(stage => labels[stage.status]));
   }
 });
-it("keeps evaluation attempts collapsed initially and reveals every attempt's checks, scores, review items and costs", () => {
+it("keeps evaluation attempts in the inactive detail tab and reveals every attempt's checks, scores, review items and costs", () => {
   const attempts = [...plan.attempts, { attempt: 2, scores: { differentiation: 4, fit: 5 }, low_items: ["fit"], checks_passed: false, final_passed: false, cost_usd: .012345 }];
-  const { container } = render(<PlanResult data={{ ...plan, attempts }} tenantId={null} />);
-  expandAll();
-  const details = container.querySelector("details")!;
-  expect(details).toBeTruthy(); expect(details.hasAttribute("open")).toBe(false);
-  const summary = screen.getByText("평가 시도 보기 · 되돌림 1회");
-  expect(summary.tagName).toBe("SUMMARY"); fireEvent.click(summary);
-  expect(details.open).toBe(true);
+  render(<Audit commands={[{ kind: "show_plan", data: { ...plan, attempts } }]} />);
+  expect(screen.getByText("평가 시도 보기 · 되돌림 1회").closest("[hidden]")).toBeTruthy();
+  const details = selectAuditTab("평가");
+  expect(within(details).getByText("평가 시도 보기 · 되돌림 1회").closest("[hidden]")).toBeNull();
   const items = details.querySelector("ol")!.children;
   expect(items).toHaveLength(2);
   expect(items[0].textContent).toContain("시도 1");
@@ -385,24 +397,25 @@ it("orders plan sections, disclaimer, image and feedback after the folded attemp
   const expanded = root.querySelector<HTMLElement>(".gs-plan-expanded")!;
   expect(expanded.hidden).toBe(true);
   expect(Array.from(expanded.children).map(node => node.getAttribute("aria-label") ?? node.tagName)).toEqual([
-    "장면 구성", "카피", "주장 효능", "검사 결과", "경쟁사 패턴 반영", "기획안 근거", "DETAILS", "P",
+    "장면 구성", "카피", "주장 효능", "경쟁사 패턴 반영", "기획안 근거", "P",
   ]);
-  expect(expanded.children[7].textContent).toBe(plan.disclaimer);
+  expect(expanded.children[5].textContent).toBe(plan.disclaimer);
   expect(screen.getByText("합성 장면")).toBeTruthy();
   expect(screen.queryByRole("region", { name: "장면 구성" })).toBeNull();
   const toggle = screen.getByRole("button", { name: "전체 보기 →" });
   fireEvent.click(toggle);
   expect(toggle.getAttribute("aria-expanded")).toBe("true");
   expect(expanded.hidden).toBe(false);
-  for (const label of ["장면 구성", "카피", "주장 효능", "검사 결과", "경쟁사 패턴 반영", "기획안 근거"]) expect(screen.getByRole("region", { name: label })).toBeTruthy();
+  for (const label of ["장면 구성", "카피", "주장 효능", "경쟁사 패턴 반영", "기획안 근거"]) expect(screen.getByRole("region", { name: label })).toBeTruthy();
   expect(screen.getByText("합성 카피")).toBeTruthy();
-  expect(screen.getByText("평가 시도 보기 · 되돌림 0회")).toBeTruthy();
+  expect(screen.queryByText("평가 시도 보기 · 되돌림 0회")).toBeNull();
+  expect(screen.queryByRole("region", { name: "검사 결과" })).toBeNull();
   fireEvent.click(toggle);
   expect(expanded.hidden).toBe(true);
 });
 
 it("shows a compact horizontal plan summary with a placeholder and preserves every detail in the DOM", () => {
-  const { container } = render(<PlanResult data={{ ...plan, plan_id: "synthetic", unknown_count: 1, unknown_codes: { EFFICACY_UNKNOWN: 1 }, design_disclaimer: "합성 시안 고지" }} names={names} tenantId="synthetic" />);
+  const { container } = render(<PlanWithAudit data={{ ...plan, plan_id: "synthetic", unknown_count: 1, unknown_codes: { EFFICACY_UNKNOWN: 1 }, design_disclaimer: "합성 시안 고지" }} names={names} tenantId="synthetic" />);
   expect(screen.getByText("시안 이미지").closest(".gs-plan-media")).toBeTruthy();
   expect(screen.getAllByText("합성 효능 · 확인됨")).toHaveLength(2);
   expect(screen.getByText("근거 연결 없음 1건")).toBeTruthy();
@@ -410,6 +423,9 @@ it("shows a compact horizontal plan summary with a placeholder and preserves eve
   for (const name of ["승인", "반려", "전체 보기 →"]) expect(screen.getByRole("button", { name })).toBeTruthy();
   expect((screen.getByLabelText("피드백 사유") as HTMLInputElement).tagName).toBe("INPUT");
   for (const text of ["합성 장면", "합성 카피", "주장 효능", "효능 근거 연결 없음", "코드 검사: 통과", "평가 상태: 검토 필요", plan.pattern_alignment_label, "근거 소재 목록", "평가 시도 보기 · 되돌림 0회", plan.disclaimer, "합성 시안 고지"]) expect(screen.getByText(text).closest("[hidden]")).toBeTruthy();
+  const verification = selectAuditTab("검증");
+  for (const text of ["근거 연결 없음 1건", "효능 근거 연결 없음", "코드 검사: 통과", "평가 상태: 검토 필요"]) expect(within(verification).getByText(text).closest("[hidden]")).toBeNull();
+  expect(within(selectAuditTab("평가")).getByText("평가 시도 보기 · 되돌림 0회").closest("[hidden]")).toBeNull();
   expect(container.querySelector(".gs-plan-summary .gs-result-badges")).toBeTruthy();
   expandAll();
   for (const text of ["합성 장면", "합성 카피", "합성 시안 고지"]) expect(screen.getByText(text).closest("[hidden]")).toBeNull();
@@ -475,7 +491,7 @@ it("shows cost and cap directly without a plan and places them last", () => {
   expect(screen.getAllByText(restoredCostText)).toHaveLength(1);
   expect(screen.getAllByText(restoredCapText)).toHaveLength(1);
   rerender(<ResultsView commands={[restoredCost, { kind: "show_aggregates", data: aggregates }]} />);
-  expect(screen.getByRole("region", { name: "검증된 집계(도구가 센 값)" }).compareDocumentPosition(screen.getByText(restoredCostText)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.getByRole("link", { name: "검증 상세 보기 →" }).compareDocumentPosition(screen.getByText(restoredCostText)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(screen.getByText(restoredCostText).compareDocumentPosition(screen.getByText(restoredCapText)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
 
@@ -546,7 +562,7 @@ it("uses the image's natural aspect ratio without cropping and resets to a place
   fireEvent.error(img); expect(media.style.aspectRatio).toBe("1 / 1");
 });
 it("shows Korean brand, review reasons with a tooltip and the original check details", () => {
-  const { container, rerender } = render(<PlanResult data={{ ...plan, product_display: { brand: "beauty_of_joseon", display_name: "조선미녀 평가 작업 공간", product_name: "합성 제품" }, unknown_count: 4, unknown_codes: { EFFICACY_UNKNOWN: 1, CERT_REQUIRED_UNVERIFIED: 3 } }} tenantId={null} />);
+  const { container, rerender } = render(<PlanWithAudit data={{ ...plan, product_display: { brand: "beauty_of_joseon", display_name: "조선미녀 평가 작업 공간", product_name: "합성 제품" }, unknown_count: 4, unknown_codes: { EFFICACY_UNKNOWN: 1, CERT_REQUIRED_UNVERIFIED: 3 } }} tenantId={null} />);
   const summary = container.querySelector(".gs-plan-summary")!;
   expect(summary.querySelector("header small")!.textContent).toBe("기획안 · 조선미녀 · 합성 제품");
   expect(summary.textContent).not.toMatch(/beauty_of_joseon|작업 공간/);
@@ -555,10 +571,11 @@ it("shows Korean brand, review reasons with a tooltip and the original check det
   expect(badge.title).toBe(explanation);
   expect(document.getElementById(badge.getAttribute("aria-describedby")!)!.textContent).toBe(explanation);
   expect(screen.getByRole("tooltip", { hidden: true }).textContent).toBe(explanation);
+  selectAuditTab("검증");
   const checks = container.querySelector('[aria-label="검사 결과"]') as HTMLElement;
   expect(within(checks).getByText("근거 연결 없음 4건")).toBeTruthy();
   expect(within(checks).getByText("인증 연결 없음").tagName).toBe("LI");
-  rerender(<PlanResult data={plan} tenantId={null} />);
+  rerender(<PlanWithAudit data={plan} tenantId={null} />);
   expect(screen.getByText("확인 필요 0건")).toBeTruthy();
   expect(container.querySelector("header small")!.textContent).toBe("기획안 · 브랜드 정보 없음");
 });
@@ -618,16 +635,17 @@ it("keeps evidence link names and anchors while displaying thumbnail chips with 
 it("styles disclaimer, image notice and the unmodified cost lines as one footnote block", () => {
   const { container } = render(<PlanResult data={{ ...plan, design_disclaimer: "합성 고지" }} tenantId={null} cost={restoredCost.data} />);
   const expanded = container.querySelector(".gs-plan-expanded")!;
-  expect(expanded.children[7].textContent).toBe(plan.disclaimer);
-  for (const node of Array.from(expanded.children).slice(7)) expect(node.classList.contains("gs-footnote")).toBe(true);
-  expect(Array.from(expanded.children).slice(7).map(node => node.textContent)).toEqual([plan.disclaimer, "합성 고지", restoredCostText, restoredCapText]);
+  expect(expanded.children[5].textContent).toBe(plan.disclaimer);
+  for (const node of Array.from(expanded.children).slice(5)) expect(node.classList.contains("gs-footnote")).toBe(true);
+  expect(Array.from(expanded.children).slice(5).map(node => node.textContent)).toEqual([plan.disclaimer, "합성 고지", restoredCostText, restoredCapText]);
 });
 it("localizes rationale only when displaying it, preserving numeric scores and the input object", () => {
   const scores = { differentiation: 3, fit: 4, rationale: "how_to 대비 differentiation, fit. profit youtube:how_to" };
   const data = { ...plan, attempts: [{ attempt: 1, checks_passed: true, scores }] };
   const snapshot = JSON.stringify(data);
-  render(<PlanResult data={data} tenantId={null} names={names} />); expandAll();
+  render(<PlanWithAudit data={data} tenantId={null} names={names} />); expandAll();
   expect(screen.getByText("품질 검사 통과 · 평가 차별성 3/5, 요청 적합성 4/5")).toBeTruthy();
+  selectAuditTab("평가");
   expect(screen.getByText("차별성 (differentiation): 3")).toBeTruthy(); expect(screen.getByText("요청 적합성 (fit): 4")).toBeTruthy();
   const rationale = screen.getByText("사유: 합성 소구 대비 차별성, 요청 적합성. profit youtube:how_to");
   expect(rationale.tagName).toBe("P"); expect(screen.queryByText(/^rationale:/)).toBeNull();
@@ -654,4 +672,16 @@ it("renders market insights with Korean titles and columns, without tool caption
   expect(within(region).getAllByRole("meter")).toHaveLength(2);
   const css = readFileSync(join(process.cwd(), "app/results.css"), "utf8");
   expect(css).toMatch(/accent-color:\s*var\(--gs-accent\)/);
+});
+
+it("keeps only marketer summaries, insight, pattern facts and one verification link in results", () => {
+  const { container } = render(<ResultsView commands={[{ kind: "show_plan", data: plan }, { kind: "show_distribution", data: { tool: "synthetic", rows: [{ value: "합성 분포", creatives: 1 }] } }, { kind: "show_aggregates", data: aggregates }]} />);
+  expandAll();
+  expect(screen.getByText("품질 검사 통과 · 평가 차별성 2/5, 요청 적합성 3/5")).toBeTruthy();
+  expect(screen.getByRole("region", { name: "분포" })).toBeTruthy();
+  expect(within(screen.getByRole("region", { name: "경쟁사 패턴 반영" })).getByRole("table")).toBeTruthy();
+  expect(screen.getAllByRole("link", { name: "검증 상세 보기 →" })).toHaveLength(1);
+  expect(screen.queryByRole("region", { name: "검사 결과" })).toBeNull();
+  expect(container.querySelector("details")).toBeNull();
+  expect(screen.queryByRole("region", { name: "검증된 집계(도구가 센 값)" })).toBeNull();
 });

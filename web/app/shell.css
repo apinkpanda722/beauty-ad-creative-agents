@@ -81,3 +81,11 @@ body {
 .gs-workspace-menu [role="option"] { padding: var(--gs-space-2) var(--gs-space-3); border-radius: var(--gs-radius-md); cursor: pointer; }
 .gs-workspace-menu [role="option"]:hover, .gs-workspace-menu [role="option"]:focus, .gs-workspace-menu [aria-selected="true"] { color: var(--gs-accent); background: var(--gs-accent-weak); }
 .gs-workspace-menu small { display: block; margin-top: var(--gs-space-2); padding: var(--gs-space-2); color: var(--gs-text-muted); font-size: var(--gs-text-xs); }
+
+.gs-nav-group { display: flex; flex-direction: column; gap: var(--gs-space-2); }
+.gs-nav-group + .gs-nav-group { margin-top: var(--gs-space-6); }
+.gs-nav-group-label { padding: var(--gs-space-2) var(--gs-space-4); color: var(--gs-text-muted); font-size: var(--gs-text-xs); }
+@media (width < 880px) {
+  .gs-nav-group { flex-direction: row; align-items: center; }
+  .gs-nav-group + .gs-nav-group { margin-top: 0; margin-left: var(--gs-space-4); }
+}

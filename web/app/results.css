@@ -75,3 +75,5 @@
 @media (prefers-reduced-motion: reduce) {
   .gs-plan-accordion, .gs-toggle-arrow, .gs-plan-result .gs-button { transition: none; animation: none; }
 }
+
+.gs-history-link { display: inline-block; color: var(--gs-accent); font-size: var(--gs-text-sm); }

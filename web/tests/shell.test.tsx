@@ -11,7 +11,7 @@ vi.mock("../lib/api", async original => ({
   ...await original<typeof import("../lib/api")>(),
   getWorkspaces: vi.fn(), getSchema: vi.fn(), postChatAsk: vi.fn(),
 }));
-const labels = ["광고 기획", "근거 소재", "지식 그래프", "실행 기록", "저장한 기획"];
+const labels = ["광고 기획", "근거 소재", "저장한 기획", "지식 그래프", "실행 기록·검증"];
 beforeEach(() => {
   vi.mocked(getWorkspaces).mockResolvedValue({ workspaces: [
     { tenant_id: "synthetic-workspace", display_name: "합성 공간", brand: "합성 브랜드", product_name: "합성 제품" },
@@ -28,6 +28,9 @@ it("renders exactly five ordered navigation items and switches the current page 
   const nav = screen.getByRole("navigation", { name: "주요 화면" });
   const items = within(nav).getAllByRole("button");
   expect(items.map(item => item.textContent)).toEqual(labels);
+  expect(within(nav).getAllByRole("group").map(group => group.getAttribute("aria-label"))).toEqual(["작업", "관리"]);
+  expect(within(within(nav).getByRole("group", { name: "작업" })).getAllByRole("button").map(item => item.textContent)).toEqual(labels.slice(0, 3));
+  expect(within(within(nav).getByRole("group", { name: "관리" })).getAllByRole("button").map(item => item.textContent)).toEqual(labels.slice(3));
   expect(items.every(item => item.querySelector("svg[aria-hidden=true]"))).toBe(true);
   expect(items[0].classList.contains("gs-nav-pill")).toBe(true);
   expect(screen.getAllByRole("heading", { name: "광고 기획" })).toHaveLength(1);
@@ -41,19 +44,20 @@ it("renders exactly five ordered navigation items and switches the current page 
     expect(screen.queryByRole("tab", { name: "전체 스키마" })).toBeNull();
     expect(screen.queryAllByRole("tablist", { name: "기획 탭" })).toHaveLength(index === 0 ? 1 : 0);
     expect(items.map(item => item.getAttribute("aria-current"))).toEqual(labels.map((_, i) => i === index ? "page" : null));
-    if ([1, 3, 4].includes(index)) {
+    if ([1, 2, 4].includes(index)) {
       expect(screen.getByRole("heading", { name: labels[index] })).toBeTruthy();
       if (index === 1) {
         expect(screen.getByRole("heading", { name: "아직 근거 소재가 없습니다" })).toBeTruthy();
         expect(screen.getByRole("button", { name: "광고 기획으로" })).toBeTruthy();
-      } else expect(screen.getByText("준비 중")).toBeTruthy();
-    } else if (index === 2) {
+      } else if (index === 2) expect(screen.getByText("준비 중")).toBeTruthy();
+      else { expect(screen.getByRole("heading", { name: "아직 실행한 요청이 없습니다" })).toBeTruthy(); expect(screen.queryByText("준비 중")).toBeNull(); }
+    } else if (index === 3) {
       expect(screen.getByText("상단 바에서 작업 공간을 선택하세요.")).toBeTruthy();
     } else expect(screen.getByRole("region", { name: "대화" })).toBeTruthy();
   }
   fireEvent.click(screen.getByRole("button", { name: "작업 공간" }));
   fireEvent.click(screen.getByRole("option", { name: /합성 공간/ }));
-  fireEvent.click(items[2]);
+  fireEvent.click(items[3]);
   expect(await screen.findByText("표시할 노드가 없습니다")).toBeTruthy();
   expect(getSchema).toHaveBeenCalledExactlyOnceWith("synthetic-workspace");
 });
@@ -82,7 +86,7 @@ it("keeps the same running turn and stream across navigation, including results 
   fireEvent.click(screen.getByRole("button", { name: "광고 기획" }));
   expect(screen.getByText("합성 진행 요청")).toBe(turn);
   expect((screen.getByLabelText("요청") as HTMLTextAreaElement).disabled).toBe(true);
-  fireEvent.click(screen.getByRole("button", { name: "실행 기록" }));
+  fireEvent.click(screen.getByRole("button", { name: "실행 기록·검증" }));
   await act(async () => { finish(); await gate; });
   fireEvent.click(screen.getByRole("button", { name: "광고 기획" }));
   expect(screen.getAllByText("합성 진행 요청")).toHaveLength(1);
