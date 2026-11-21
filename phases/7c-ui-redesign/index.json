@@ -89,14 +89,16 @@
     {
       "step": 12,
       "name": "main-polish",
-      "status": "pending",
+      "status": "completed",
       "started_at": "2026-11-21T16:29:29+0900",
       "usage": {
-        "input_tokens": 251053,
-        "cached_input_tokens": 177024,
-        "output_tokens": 1430,
+        "input_tokens": 3155883,
+        "cached_input_tokens": 3037184,
+        "output_tokens": 25198,
         "attempts": 1
-      }
+      },
+      "summary": "탭별 독립 스레드·새 기획/닫기·확인 요약, 3줄 자동확장 입력창·진행 강조·시안 시간 비표시 완료. make verify 통과(Python 6,412개·웹 226개), 패키지 설치 없음. 단언 교체: 1줄→3줄·스크롤 제어, 펄스→회전·shimmer, 버튼 목록→탭 버튼 포함, tablist 없음→옛 탭 없음·기획 탭 1개. 재개 지시에 따라 results의 li 전체 라벨 단언→라벨 개수·순서와 상태·경과 문구 각각 엄격 검증.",
+      "completed_at": "2026-11-21T17:12:38+0900"
     },
     {
       "step": 13,
