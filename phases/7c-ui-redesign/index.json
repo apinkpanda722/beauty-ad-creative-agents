@@ -117,7 +117,16 @@
     {
       "step": 14,
       "name": "history-verify",
-      "status": "pending"
+      "status": "completed",
+      "started_at": "2026-11-21T17:34:02+0900",
+      "summary": "실행 기록 목록·상세 4탭·결과 링크·사이드바 그룹 구현 완료. 단언 대응: 기존 내비 순서→작업/관리 그룹 순서, 결과 검사·평가·집계→상세 탭의 동일 문구·수치, 평가 details 접힘→비활성 탭 hidden·선택 후 표시, 결과 자식 순서·면책 위치→이동 후 순서·위치. 비용·상한·아코디언 검증 유지. make verify 통과(Python 6,412개·웹 288개), 패키지 설치 없음.",
+      "completed_at": "2026-11-21T17:46:57+0900",
+      "usage": {
+        "input_tokens": 4490065,
+        "cached_input_tokens": 4355712,
+        "output_tokens": 25716,
+        "attempts": 1
+      }
     },
     {
       "step": 5,
