@@ -52,7 +52,8 @@
     },
     {
       "dir": "7d-quality-fixes",
-      "status": "pending"
+      "status": "completed",
+      "completed_at": "2026-11-21T12:34:51+0900"
     }
   ]
 }
