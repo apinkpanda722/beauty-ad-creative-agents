@@ -173,14 +173,16 @@
     {
       "step": 6,
       "name": "graph-data",
-      "status": "pending",
+      "status": "completed",
       "started_at": "2026-11-21T20:13:18+0900",
       "usage": {
-        "input_tokens": 378818,
-        "cached_input_tokens": 305024,
-        "output_tokens": 2066,
+        "input_tokens": 3207973,
+        "cached_input_tokens": 3113216,
+        "output_tokens": 23162,
         "attempts": 1
-      }
+      },
+      "summary": "데이터 탭·읽기 전용 개요/이웃 API 2개 구현, Feedback 이중 제외·상한·중복 병합 검증 완료. make verify 통과(Python 6,462개·웹 352개), 패키지 설치 없음. 승인된 G3만 데이터 탭 추가에 따라 [schema,path]→[schema,data,path]로 교체.",
+      "completed_at": "2026-11-21T20:29:06+0900"
     },
     {
       "step": 7,
