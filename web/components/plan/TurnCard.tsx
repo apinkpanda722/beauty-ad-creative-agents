@@ -1,11 +1,11 @@
 "use client";
-import { useContext, useState } from "react";
+import { useContext } from "react";
 import type { Turn } from "../../lib/reducer";
 import type { ClaimChoice } from "../../lib/types";
 import { PLAN_INTRO_TEXT } from "../../lib/text";
 import { ClarifyCard } from "./ClarifyCard";
 import { ResultsView, CommandTenantContext } from "../results/ResultsView";
-import { GraphPanel } from "../GraphPanel";
+import { OpenGraphPathContext } from "../graph/context";
 import { Notice } from "../Notice";
 import { ProgressTracker } from "./ProgressTracker";
 import { ClarifySummary } from "./ClarifySummary";
@@ -14,7 +14,7 @@ export function TurnCard({ turn, busy, onChoice, onCancel, onRetry, choiceLabel 
   onCancel: () => void; onRetry: () => void;
 }) {
   const tenantId = useContext(CommandTenantContext);
-  const [graphIds, setGraphIds] = useState<string[] | null>(null);
+  const openGraphPath = useContext(OpenGraphPathContext);
   const displayText = turn.commands.some(command => command.kind === "show_plan")
     ? turn.displayText.split("\n").filter(line => line !== PLAN_INTRO_TEXT).join("\n")
     : turn.displayText;
@@ -23,8 +23,7 @@ export function TurnCard({ turn, busy, onChoice, onCancel, onRetry, choiceLabel 
     <p className="gs-user-message">{turn.message}</p>
     <ProgressTracker stepEvents={turn.stepEvents} turnStatus={turn.status} times={{ startedAt: turn.startedAt, stepAt: turn.stepAt }} costUsd={cost?.data.text_spent_usd} costLabel={cost?.data.label} />
     {displayText && <p className="gs-answer answer">{displayText}</p>}
-    <ResultsView commands={turn.commands} onOpenGraph={tenantId ? setGraphIds : undefined} />
-    {tenantId && graphIds && <GraphPanel tenantId={tenantId} ids={graphIds} />}
+    <ResultsView commands={turn.commands} onOpenGraph={tenantId ? openGraphPath ?? undefined : undefined} />
     {turn.clarification && turn.status === "needs_choice" && !turn.choiceLabel
       ? <ClarifyCard clarification={turn.clarification} disabled={busy} onSubmit={onChoice} onCancel={onCancel} />
       : (turn.clarification || choiceLabel) && <ClarifySummary label={choiceLabel ?? "선택 완료"} />}

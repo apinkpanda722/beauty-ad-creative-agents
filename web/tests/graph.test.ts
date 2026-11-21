@@ -78,3 +78,29 @@ it("groups the legend into layers and node kinds without losing any colors", () 
   expect(GRAPH_LEGEND[0].items.map(item => item.color)).toEqual(Object.values(LAYER_COLORS));
   expect(new Set(GRAPH_LEGEND[1].items.map(item => item.color))).toEqual(new Set(Object.values(LABEL_COLORS)));
 });
+
+it("exports fixed zoom limits and a Korean creative label", async () => {
+  const { ZOOM_LIMITS, NODE_LABEL_NAMES } = await import("../lib/graph");
+  expect(ZOOM_LIMITS).toEqual({ min: 0.3, max: 2.5 });
+  expect(ZOOM_LIMITS.min).toBeLessThan(ZOOM_LIMITS.max);
+  expect(NODE_LABEL_NAMES.Creative).toBe("광고 소재");
+});
+it("finds the last graph command across all turns without mutating input", async () => {
+  const { latestGraphIds } = await import("../lib/graph");
+  const graph = (ids: string[]): import("../lib/types").UiCommand => ({ kind: "show_graph_fragment", data: { evidence_ids: ids } });
+  const input = [{ commands: [graph(["youtube:a"]), graph(["youtube:b"])] }, { commands: [graph(["youtube:c", "youtube:d"])] }, { commands: [] }];
+  const snapshot = JSON.stringify(input);
+  expect(latestGraphIds(input)).toEqual(["youtube:c", "youtube:d"]);
+  expect(latestGraphIds(input.slice(0, 1))).toEqual(["youtube:b"]);
+  expect(latestGraphIds([])).toBeNull(); expect(latestGraphIds([{ commands: [] }])).toBeNull();
+  expect(latestGraphIds([{ commands: [graph([])] }])).toEqual([]);
+  expect(JSON.stringify(input)).toBe(snapshot);
+});
+it("adds translated relationship names while retaining raw types and unknown names", () => {
+  const input = { ...fragment, edges: [...fragment.edges, { source: "creative:youtube:a", target: "Hook:synthetic_hook", type: "SYNTHETIC_UNKNOWN" }] };
+  const snapshot = JSON.stringify(input);
+  const edges = fragmentToElements(input, taxonomyNames(schema)).filter(element => element.group === "edges");
+  expect(edges.map(edge => [edge.data.type, edge.data.typeName])).toEqual([["USES_HOOK", "훅 사용"], ["CLAIMS", "주장"], ["SYNTHETIC_UNKNOWN", "SYNTHETIC_UNKNOWN"]]);
+  expect(schemaToElements(schema).filter(element => element.group === "edges").map(edge => edge.data.typeName)).toEqual(["홍보", "피드백 대상"]);
+  expect(JSON.stringify(input)).toBe(snapshot);
+});

@@ -6,6 +6,7 @@ import { taxonomyNames } from "../lib/taxonomy";
 import type { GraphFragment, GraphNode, SchemaResponse } from "../lib/types";
 import { GraphCanvas, GraphLegend } from "./GraphCanvas";
 import { NodeDetail } from "./NodeDetail";
+import { GraphFilters, useGraphFilters } from "./graph/GraphFilters";
 
 type FragmentState = { status: "loading" } | { status: "error"; code: string } | { status: "ready"; fragment: GraphFragment; schema: SchemaResponse };
 export function GraphPanel({ tenantId, ids }: { tenantId: string; ids: string[] }) {
@@ -26,12 +27,13 @@ function FragmentView({ tenantId, ids }: { tenantId: string; ids: string[] }) {
   const fragment = state.status === "ready" ? state.fragment : null;
   const schema = state.status === "ready" ? state.schema : null;
   const elements = useMemo(() => fragment ? fragmentToElements(fragment, taxonomyNames(schema)) : [], [fragment, schema]);
+  const filters = useGraphFilters(elements);
   const select = useCallback((id: string) => setSelected(fragment?.nodes.find(node => node.id === id) ?? null), [fragment]);
   return <section className="result-section graph-panel" aria-label="근거 그래프"><h3>근거 그래프</h3>
     {state.status === "loading" ? <p role="status">그래프를 불러오는 중입니다.</p>
       : state.status === "error" ? <div role="alert"><p>{state.code}</p><button type="button" onClick={() => { setState({ status: "loading" }); setSelected(null); setAttempt(value => value + 1); }}>다시 시도</button></div>
         : <>{state.fragment.missing.length > 0 && <p className="muted">그래프에 아직 없는 소재 {state.fragment.missing.length}건</p>}
-          {state.fragment.nodes.length ? <><GraphLegend /><div className="graph-layout"><GraphCanvas elements={elements} onNodeClick={select} /><NodeDetail node={selected} /></div></>
+          {state.fragment.nodes.length ? <><GraphLegend /><p className="gs-graph-note">3층 피드백은 이 작업 공간의 데이터입니다.</p><GraphFilters {...filters} /><div className="graph-layout gs-graph-layout"><GraphCanvas elements={filters.elements} onNodeClick={select} /><NodeDetail node={filters.elements.some(element => element.group === "nodes" && element.data.id === selected?.id) ? selected : null} names={taxonomyNames(schema)} /></div></>
             : <p>표시할 노드가 없습니다</p>}</>}
   </section>;
 }

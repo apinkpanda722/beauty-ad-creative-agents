@@ -92,7 +92,7 @@ it("destroys and replaces canvas when elements change", async () => {
 it.each(["https://example.test/a", "http://example.test/a", "javascript:alert(1)", "data:text/html,synthetic"])("renders only server props and safe URL links: %s", url => {
   render(<NodeDetail node={{ ...fragment.nodes[0], props: { url, synthetic_flag: false, synthetic_nested: { count: 2 } } }} />);
   const detail = screen.getByRole("complementary", { name: "노드 상세" });
-  for (const text of ["Creative", "합성 노드", "synthetic_flag", "false", "synthetic_nested"]) expect(detail.textContent).toContain(text);
+  for (const text of ["광고 소재", "합성 노드", "synthetic_flag", "false", "synthetic_nested"]) expect(detail.textContent).toContain(text);
   expect(detail.textContent).not.toContain("latest_view_count"); expect(detail.textContent).not.toContain("creative:youtube:a");
   const link = within(detail).queryByRole("link");
   if (url.startsWith("http")) { expect(link?.getAttribute("href")).toBe(url); expect(link?.getAttribute("rel")).toBe("noopener noreferrer"); }
@@ -124,7 +124,7 @@ it("switches page tabs, preserves conversation and opens the command graph with 
   await screen.findByText("합성 응답"); fireEvent.click(screen.getByRole("button", { name: "근거 그래프 보기" }));
   await waitFor(() => expect(cy.create).toHaveBeenCalledTimes(1));
   expect(fetch).toHaveBeenCalledWith("/api/graph/fragment?ids=youtube%3Aa", { headers: { "X-Tenant-Id": "synthetic" } });
-  fireEvent.click(screen.getByRole("button", { name: "지식 그래프" }));
+  fireEvent.click(screen.getByRole("tab", { name: "스키마" }));
   expect(screen.getByRole("button", { name: "지식 그래프" }).getAttribute("aria-current")).toBe("page");
   await waitFor(() => expect(cy.create).toHaveBeenCalledTimes(2));
   fireEvent.click(screen.getByRole("button", { name: "광고 기획" })); expect(screen.getByText("합성 응답")).toBeTruthy();
@@ -151,4 +151,46 @@ it("uses smaller labels and spreads cose nodes with built-in layout options", as
   expect(options.layout.nodeRepulsion).toBeGreaterThan(2048);
   expect(options.layout.idealEdgeLength).toBeGreaterThan(32);
   expect(options.layout.nodeOverlap).toBeGreaterThan(4);
+});
+
+it("sets zoom bounds, clamps button changes, follows zoom events and fits the graph", async () => {
+  const { ZOOM_LIMITS } = await import("../lib/graph");
+  let level = 1;
+  const zoom = vi.fn((value?: number) => { if (value !== undefined) level = value; return level; });
+  const fit = vi.fn();
+  cy.create.mockReturnValue({ on: cy.on, destroy: cy.destroy, zoom, fit });
+  render(<GraphCanvas elements={[]} onNodeClick={vi.fn()} />);
+  await waitFor(() => expect(cy.create).toHaveBeenCalledTimes(1));
+  const options = cy.create.mock.calls[0][0];
+  expect(options.minZoom).toBe(ZOOM_LIMITS.min); expect(options.maxZoom).toBe(ZOOM_LIMITS.max); expect(options.wheelSensitivity).toBe(0.2);
+  expect(cy.on.mock.calls[0].slice(0, 2)).toEqual(["tap", "node"]);
+  const changed = cy.on.mock.calls.find(call => call[0] === "zoom")![1];
+  const plus = screen.getByRole("button", { name: "확대" }) as HTMLButtonElement;
+  const minus = screen.getByRole("button", { name: "축소" }) as HTMLButtonElement;
+  for (const name of ["확대", "축소", "화면에 맞춤"]) expect(screen.getByRole("button", { name }).querySelector('svg[aria-hidden="true"]')).toBeTruthy();
+  act(() => { level = 2.49; changed(); }); fireEvent.click(plus);
+  expect(level).toBe(ZOOM_LIMITS.max); expect(plus.disabled).toBe(true); expect(minus.disabled).toBe(false);
+  act(() => { level = 0.31; changed(); }); fireEvent.click(minus);
+  expect(level).toBe(ZOOM_LIMITS.min); expect(minus.disabled).toBe(true); expect(plus.disabled).toBe(false);
+  act(() => { level = 1; changed(); }); expect(minus.disabled).toBe(false);
+  fireEvent.click(screen.getByRole("button", { name: "화면에 맞춤" })); expect(fit).toHaveBeenCalledTimes(1);
+  expect(screen.getByLabelText("그래프 캔버스").style.height).toBe("");
+  expect(options.style.find((item: { selector: string }) => item.selector === "edge").style.label).toBe("data(typeName)");
+});
+it("localizes detail keys, platforms and taxonomy values without changing the source", async () => {
+  const { taxonomyNames } = await import("../lib/taxonomy");
+  const names = taxonomyNames({ ...schema, taxonomy: { ...schema.taxonomy, hook_type: [{ value: "synthetic_hook", name: "합성 훅 이름", definition: "합성" }] } });
+  const node = { ...fragment.nodes[0], props: { source: "youtube", url: "https://example.test/a", latest_view_count: 42, synthetic_unknown: false } };
+  const snapshot = JSON.stringify(node);
+  const { rerender } = render(<NodeDetail node={node} names={names} />);
+  const detail = screen.getByRole("complementary", { name: "노드 상세" });
+  for (const text of ["광고 소재", "원본 링크", "조회수", "출처", "YouTube", "synthetic_unknown", "false"]) expect(detail.textContent).toContain(text);
+  expect(detail.textContent).not.toMatch(/Creative|latest_view_count/);
+  expect(JSON.stringify(node)).toBe(snapshot);
+  for (const [label, value, text] of [["Hook", "synthetic_hook", "합성 훅 이름"], ["Angle", "desire", "이상형 제시형"]]) {
+    const input = { id: "synthetic", label, name: value, props: { value } }; const before = JSON.stringify(input);
+    rerender(<NodeDetail node={input} names={names} />);
+    expect(within(detail).getByText("값")).toBeTruthy(); expect(within(detail).getAllByText(text).length).toBeGreaterThan(0);
+    expect(detail.textContent).not.toContain(value); expect(JSON.stringify(input)).toBe(before);
+  }
 });
