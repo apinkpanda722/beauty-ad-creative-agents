@@ -187,7 +187,16 @@
     {
       "step": 7,
       "name": "saved-api",
-      "status": "pending"
+      "status": "blocked",
+      "started_at": "2026-11-21T20:29:24+0900",
+      "blocked_reason": "“새 `src/beautyads/api/plans.py`의 `register_plans(app)`와 `app.py`에서 등록(기존 등록 방식과 같은 위치·형식).”과 “`app.py`는 라우터 등록 한 줄만 바꾸고 이 밖의 `src/` 변경이 필요하면 구현하지 말고 `blocked`로 멈춰 `reason`에 적어라.”가 충돌합니다. 기존 방식은 import와 등록 호출을 각각 작성하므로 app.py에 최소 두 줄 추가가 필요합니다. 필요한 import 한 줄도 수정 범위에 허용해 주세요.",
+      "blocked_at": "2026-11-21T20:31:11+0900",
+      "usage": {
+        "input_tokens": 166814,
+        "cached_input_tokens": 110208,
+        "output_tokens": 1376,
+        "attempts": 1
+      }
     },
     {
       "step": 8,
