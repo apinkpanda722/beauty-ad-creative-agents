@@ -50,7 +50,7 @@
 - `/web/app/page.tsx`, `/web/app/layout.tsx`, `/web/app/{tokens,shell,ui,plan,results,evidence}.css`, `/web/lib/{stages,reducer,session,types,evidence,brand,format,taxonomy}.ts*`
 - `/web/components/shell/*`, `/web/components/plan/*`, `/web/components/results/*`, `/web/components/evidence/*`, `/web/components/ui/*`, `/web/components/WorkspacePicker.tsx`, `/web/components/{SchemaView,NodeDetail,GraphPanel}.tsx`(읽기 전용)
 - `/web/tests/{plan,shell,results,stages,reducer,evidence,contrast,ui,brand}.test.ts*`
-- 사용자 제공 캡처 2장(`/Users/taserlee/Desktop/스크린샷 2026-11-21 오후 3.07.06.png`: 현재 화면, `/Users/taserlee/Desktop/스크린샷 2026-11-21 오후 3.08.49.png`: 승인 시안). 열람 가능하면 레이아웃·밀도 기준으로 참고하고 색은 따르지 않는다.
+- 사용자 제공 캡처 2장(`~/Desktop/스크린샷 2026-11-21 오후 3.07.06.png`: 현재 화면, `~/Desktop/스크린샷 2026-11-21 오후 3.08.49.png`: 승인 시안). 열람 가능하면 레이아웃·밀도 기준으로 참고하고 색은 따르지 않는다.
 
 이전 step에서 만들어진 코드를 꼼꼼히 읽고, 설계 의도를 이해한 뒤 작업하라.
 

@@ -3,6 +3,7 @@ name = "beautyads"
 version = "0.1.0"
 description = "뷰티 광고 크리에이티브를 분석해 근거가 달린 기획안을 만드는 멀티에이전트 프로젝트"
 readme = "README.md"
+license = "MIT"
 authors = [
     { name = "Tommy Lee", email = "iih907@gmail.com" }
 ]

@@ -432,7 +432,7 @@ def test_hook_call_failure_reason_is_logged_without_urls(call_kwargs, caplog):
 @pytest.mark.parametrize(
     "secret",
     [
-        "AIzaSyA1234567890abcdefghijklmnopqrstuv",
+        "AIza" + "X" * 35,
         "key=SYNTHETIC_QUERY_KEY_123",
         "api_key: SYNTHETIC_HEADER_VALUE",
         "x-goog-api-key: SYNTHETIC_GOOG_VALUE",
