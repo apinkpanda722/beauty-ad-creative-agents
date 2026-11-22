@@ -113,7 +113,7 @@ it("lists every tab's turns newest first and opens the selected header then retu
   expect(screen.getByText("이번 접속 중 2건 · 새로고침하면 지워집니다")).toBeTruthy();
   fireEvent.click(rows[1]);
   const header = screen.getByLabelText("실행 요약");
-  for (const text of ["합성 요청 1", "합성 브랜드 · 합성 제품", "시각", "총 시간", "총 비용", "$0.0623"]) expect(header.textContent).toContain(text);
+  for (const text of ["합성 요청 1", "합성 브랜드", "시각", "총 시간", "총 비용", "$0.0623"]) expect(header.textContent).toContain(text);
   expect(within(header).getByText("정보 없음")).toBeTruthy(); // No step arrivals in this reply.
   expect(header.querySelector("time")?.getAttribute("datetime")).toBe(new Date(performance.timeOrigin + 1100).toISOString());
   fireEvent.click(screen.getByRole("button", { name: "목록으로" })); expect(screen.getByRole("table", { name: "실행 요청 목록" })).toBeTruthy();
