@@ -87,8 +87,8 @@
 .gs-insight-charts { display: grid; gap: var(--gs-space-6); align-items: start; }
 .gs-insight-with-model { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .gs-insight-charts > div { min-width: 0; }
+.gs-insight-charts .gs-insight-note { margin-top: var(--gs-space-12); padding-top: var(--gs-space-6); border-top: var(--gs-border-width) solid var(--gs-border); }
 .gs-model-charts { display: grid; gap: var(--gs-section-gap); }
-.gs-model-chart { color: var(--gs-warn); }
 .gs-model-chart h4 { margin: 0 0 var(--gs-space-2); font-size: var(--gs-text-sm); }
 .gs-model-chart .gs-badge-warn { background: var(--gs-warn-weak); }
 .gs-model-chart meter { accent-color: var(--gs-warn); }

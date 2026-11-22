@@ -31,8 +31,6 @@ fieldset { margin-top: 1rem; border: 1px solid #b5bdc2; border-radius: .4rem; pa
 .clear { background: #e8f1ee; color: #285346; }
 .attention { background: #fff0d8; color: #734713; border: 1px solid #c2904a; }
 .code-result, .evaluation-status { display: block; margin: .6rem 0; }
-.model-block dl > div { display: flex; gap: .8rem; flex-wrap: wrap; }
-.model-block dd { margin: 0; }
 table { width: 100%; border-collapse: collapse; font-size: .85rem; }
 caption { text-align: left; color: #565e64; margin-bottom: .6rem; }
 th, td { padding: .6rem; text-align: left; border-bottom: 1px solid #dce1e3; }

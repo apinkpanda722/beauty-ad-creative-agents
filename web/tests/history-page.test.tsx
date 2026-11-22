@@ -132,10 +132,11 @@ it("renders recorded durations and rework counts in the stage table, with only a
   expect(within(image).getByRole("img", { name: "완료" })).toBeTruthy();
   expect(within(image).getAllByRole("cell")[2].textContent).toBe(""); expect(image.querySelector("time")).toBeNull(); expect(image.textContent).not.toMatch(/초|정보 없음/);
 });
-it("moves checks, verified insight charts, model values and removed values into labeled blocks with identical chart source values", () => {
+it("moves checks, verified insight charts and removed values into labeled blocks and hides model values, with identical chart source values", () => {
   detail(); const panel = tab("검증");
-  for (const text of ["근거 연결 없음 2건", "인증 연결 없음", "효능 근거 연결 없음", "코드 검사: 실패", "평가 상태: 검토 필요", "검증됨", "미검증", "제외됨", "합성 모델 항목", "42", "합성 제외 항목"]) expect(within(panel).getByText(text)).toBeTruthy();
-  expect(within(panel).getByText("검증됨").className).toContain("gs-badge-success"); expect(within(panel).getByText("미검증").className).toContain("gs-badge-warn"); expect(within(panel).getByText("제외됨").className).toContain("gs-badge-neutral");
+  for (const text of ["근거 연결 없음 2건", "인증 연결 없음", "효능 근거 연결 없음", "코드 검사: 실패", "평가 상태: 검토 필요", "검증됨", "제외됨", "합성 제외 항목"]) expect(within(panel).getByText(text)).toBeTruthy();
+  for (const text of ["미검증", "합성 모델 항목", "42"]) expect(within(panel).queryByText(text)).toBeNull();
+  expect(within(panel).getByText("검증됨").className).toContain("gs-badge-success"); expect(within(panel).getByText("제외됨").className).toContain("gs-badge-neutral");
   expect(within(panel).queryByText("전체 10건 · 표시 2건")).toBeNull();
   expect(within(panel).queryByText("합성 전체 10건 중 2건 표시")).toBeNull();
   expect(panel.querySelectorAll(".gs-source-chip")).toHaveLength(0);
@@ -245,7 +246,7 @@ it("toggles the active axis table in each insight card with localized titles and
     { kind: "show_distribution" as const, data: { tool: "compare_axis_by_category", rows: [{ value: "question", creatives: 2 }] } },
   ] };
   render(<HistoryDetail turn={input} workspace="합성" onBack={vi.fn()} names={taxonomyNames(schema)} />); const panel = tab("검증");
-  const cards = [within(panel).getByRole("region", { name: "경쟁사 광고 분포" }), within(panel).getByRole("region", { name: "조회수 상위·하위 25% 광고 비교" })];
+  const cards = [within(panel).getByRole("region", { name: "시장 광고 분포" }), within(panel).getByRole("region", { name: "조회수 상위·하위 25% 광고 비교" })];
   const toggles = cards.map(card => within(card).getByRole("button", { name: "표로 보기" }));
   const contents = toggles.map(toggle => document.getElementById(toggle.getAttribute("aria-controls")!)!);
   expect(toggles.map(toggle => toggle.getAttribute("aria-expanded"))).toEqual(["false", "false"]);
@@ -261,7 +262,7 @@ it("toggles the active axis table in each insight card with localized titles and
   expect(contents.map(content => content.hidden)).toEqual([false, false]);
   expect(toggles.map(toggle => toggle.textContent)).toEqual(["표 접기", "표 접기"]);
   expect(within(panel).getAllByRole("table", { name: "시장 인사이트 원천 데이터" })).toHaveLength(2);
-  expect(within(panel).getAllByRole("heading", { level: 3 }).map(node => node.textContent)).toEqual(["검증된 집계(도구가 센 값)", "경쟁사 광고 분포", "조회수 상위·하위 25% 광고 비교"]);
+  expect(within(panel).getAllByRole("heading", { level: 3 }).map(node => node.textContent)).toEqual(["검증된 집계(도구가 센 값)", "시장 광고 분포", "조회수 상위·하위 25% 광고 비교"]);
   expect(panel.querySelector(".gs-source-chip")).toBeNull();
   expect(panel.textContent).not.toMatch(/top_vs_bottom_axis|compare_axis_by_category/);
 });
@@ -302,7 +303,7 @@ it.each([false, true])("hides source content immediately for zero duration or re
   fireEvent.click(toggle); expect(content.hidden).toBe(true);
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
-it("localizes only aggregate display names and values and keeps raw tool names in attributes", () => {
+it("does not render model-written names and values and leaves the input unchanged", () => {
   const data = { label: "모델 작성값 · 검증되지 않음", verified_counts: [
     { tool: "top_vs_bottom_axis", row_count: 10, shown_count: 2, count_label: "합성 건수" },
     { tool: "unknown_tool", row_count: 2, shown_count: 1, count_label: "합성 다른 건수" },
@@ -310,9 +311,8 @@ it("localizes only aggregate display names and values and keeps raw tool names i
   const inputSchema = { ...schema, taxonomy: { ...schema.taxonomy, hook_type: [{ value: "person_first", name: "인물 먼저 제시형", definition: "합성" }], format: [{ value: "ugc_style", name: "일반인 후기형", definition: "합성" }] }, claims: [{ value: "sun_protection", name: "자외선 차단" }] };
   const snapshot = JSON.stringify({ data, inputSchema });
   const { container } = render(<AggregatesPanel data={data} names={taxonomyNames(inputSchema)} />);
-  expect(screen.getByText("자외선 차단 훅")).toBeTruthy();
-  expect(screen.getByText("인물 먼저 제시형 소구 사용법 형식 일반인 후기형")).toBeTruthy();
-  expect(screen.getByText("unknown_name")).toBeTruthy(); expect(screen.getByText("unknown_value")).toBeTruthy();
+  expect(container.innerHTML).toBe("");
+  for (const text of ["자외선 차단 훅", "인물 먼저 제시형 소구 사용법 형식 일반인 후기형", "unknown_name", "unknown_value"]) expect(screen.queryByText(text)).toBeNull();
   expect(container.textContent).not.toMatch(/전체 10건 · 표시 2건|sun_protection|hook_type|person_first|ugc_style/);
   expect(JSON.stringify({ data, inputSchema })).toBe(snapshot);
 });
@@ -361,7 +361,7 @@ it("omits nonnumeric score fields individually without changing the server attem
   expect(JSON.stringify(data)).toBe(snapshot);
 });
 
-it("places only strict named model breakdowns beside verified charts without mutating aggregates", () => {
+it("does not draw model breakdowns or list items beside verified charts and leaves aggregates unchanged", () => {
   const data = { ...aggregate.data, model_written: [
     { name: " 오프닝 유형 ", value: "question 3/7; problem 2/7" },
     { name: "합성 모델 항목", value: 42 }, { name: "알 수 없는 축", value: "question 1/7" },
@@ -370,25 +370,21 @@ it("places only strict named model breakdowns beside verified charts without mut
   const snapshot = JSON.stringify(input);
   render(<HistoryDetail turn={{ ...turn, commands: input }} workspace="합성" onBack={vi.fn()} names={taxonomyNames({ ...schema, taxonomy: { ...schema.taxonomy, hook_type: [...schema.taxonomy.hook_type, { value: "problem", name: "문제 제시형", definition: "합성" }] } })} />);
   const panel = tab("검증");
-  const chart = within(panel).getByRole("region", { name: "모델 작성값 차트" });
-  expect(within(chart).getByText("미검증").className).toContain("gs-badge-warn");
-  expect(within(chart).getAllByRole("meter").map(node => [node.getAttribute("aria-label"), node.getAttribute("value"), node.getAttribute("max")])).toEqual([["질문형", "3", "7"], ["문제 제시형", "2", "7"]]);
-  for (const text of ["3/7", "2/7"]) expect(within(chart).getByText(text)).toBeTruthy();
-  const axisPanel = chart.closest('[role="tabpanel"]')! as HTMLElement;
-  expect(within(axisPanel).getByRole("region", { name: "분포" }).parentElement?.parentElement).toBe(chart.parentElement?.parentElement);
-  const model = within(panel).getByRole("region", { name: "모델 작성값" });
-  for (const text of ["합성 모델 항목", "42", "알 수 없는 축", "질문형 1/7"]) expect(within(model).getByText(text)).toBeTruthy();
-  expect(within(model).queryByText("오프닝 유형")).toBeNull();
+  expect(within(panel).queryByRole("region", { name: "모델 작성값 차트" })).toBeNull();
+  expect(within(panel).queryByRole("region", { name: "모델 작성값" })).toBeNull();
+  expect(within(panel).getAllByRole("meter").map(node => [node.getAttribute("aria-label"), node.getAttribute("value")])).toEqual([["질문형", "4"]]);
+  for (const text of ["3/7", "2/7", "합성 모델 항목", "42", "알 수 없는 축", "질문형 1/7", "오프닝 유형"]) expect(within(panel).queryByText(text)).toBeNull();
   expect(within(panel).queryByRole("region", { name: "시장 인사이트 원천" })).toBeNull();
   expect(within(panel).queryByText("시장 인사이트 원천")).toBeNull();
   expect(within(panel).queryByRole("button", { name: /원천 데이터 보기/ })).toBeNull();
   expect(JSON.stringify(input)).toBe(snapshot);
 });
-it("keeps parsed model values in the list when the competitor card is absent", () => {
+it("does not list model values when the competitor card is absent", () => {
   render(<HistoryDetail turn={{ ...turn, commands: [{ kind: "show_distribution", data: distribution }, { kind: "show_aggregates", data: { ...aggregate.data, model_written: [{ name: "훅", value: "question 3/7" }] } }] }} workspace="합성" onBack={vi.fn()} names={taxonomyNames(schema)} />);
   const panel = tab("검증");
   expect(within(panel).queryByRole("region", { name: "모델 작성값 차트" })).toBeNull();
-  expect(within(within(panel).getByRole("region", { name: "모델 작성값" })).getByText("질문형 3/7")).toBeTruthy();
+  expect(within(panel).queryByRole("region", { name: "모델 작성값" })).toBeNull();
+  expect(within(panel).queryByText("질문형 3/7")).toBeNull();
 });
 function tableCells(table: HTMLElement) { return within(table).getAllByRole("row").slice(1).map(row => within(row).getAllByRole("cell").map(cell => cell.textContent)); }
 it("uses first supplied text and image costs in the summary and itemized table with a calculated remainder", () => {

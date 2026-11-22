@@ -93,6 +93,11 @@ export function parseModelBreakdown(value: unknown): { label: string; count: num
   }
   return rows;
 }
+// Bar rows are the rows DistributionChart draws: a string value with a non-negative integer creatives count.
+export function insightShown(rows: readonly Record<string, unknown>[]): { rows: number; count: number } {
+  const bars = rows.filter(row => typeof row.value === "string" && typeof row.creatives === "number" && Number.isInteger(row.creatives) && row.creatives >= 0);
+  return { rows: bars.length, count: bars.reduce((sum, row) => sum + (row.creatives as number), 0) };
+}
 export function modelAxis(name: string): "hook" | "angle" | "format" | null {
   if (["오프닝 유형", "훅"].includes(name)) return "hook";
   if (["스토리 소재", "소구", "메시지 유형"].includes(name)) return "angle";

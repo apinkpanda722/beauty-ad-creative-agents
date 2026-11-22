@@ -14,8 +14,8 @@ afterEach(cleanup);
 it("merges three axes in one card with fixed tab order and the first tab selected", () => {
   const snapshot = JSON.stringify(distributions);
   const { container } = render(<InsightPanel distributions={distributions} names={names} />);
-  expect(screen.getAllByRole("heading").map(node => node.textContent)).toEqual(["경쟁사 광고 분포"]);
-  const tabs = within(screen.getByRole("tablist", { name: "경쟁사 광고 분포 축" })).getAllByRole("tab");
+  expect(screen.getAllByRole("heading").map(node => node.textContent)).toEqual(["시장 광고 분포"]);
+  const tabs = within(screen.getByRole("tablist", { name: "시장 광고 분포 축" })).getAllByRole("tab");
   expect(tabs.map(node => node.textContent)).toEqual(["훅", "소구", "형식"]);
   expect(tabs.map(node => node.getAttribute("aria-selected"))).toEqual(["true", "false", "false"]);
   expect(screen.getByRole("region", { name: "분포" }).getAttribute("data-tool")).toBe("compare_axis_by_category");
@@ -35,7 +35,7 @@ it("omits absent axes, keeps repeated distributions in the same axis and uses ot
 });
 it("separates comparison in its own card with one explanation and unchanged columns", () => {
   render(<InsightPanel distributions={[...distributions, { tool: "top_vs_bottom_axis", rows: [{ value: "question", n_top: 3, n_bottom: 1 }] }]} names={names} />);
-  expect(screen.getAllByRole("heading").map(node => node.textContent)).toEqual(["경쟁사 광고 분포", "조회수 상위·하위 25% 광고 비교"]);
+  expect(screen.getAllByRole("heading").map(node => node.textContent)).toEqual(["시장 광고 분포", "조회수 상위·하위 25% 광고 비교"]);
   expect(screen.getAllByText(insightDescription("top_vs_bottom_axis")!)).toHaveLength(1);
   const card = screen.getByRole("region", { name: "조회수 상위·하위 25% 광고 비교" });
   expect(within(card).getAllByRole("columnheader").map(node => node.textContent)).toEqual(["분류", "상위 25% 광고 수", "하위 25% 광고 수"]);
@@ -49,7 +49,7 @@ it("shows independently collapsed verification tables for only the active axis",
   const input = [...distributions, { tool: "top_vs_bottom_axis", rows: [{ value: "question", n_top: 3, n_bottom: 1 }] }];
   const snapshot = JSON.stringify(input);
   render(<InsightPanel distributions={input} names={names} variant="verification" />);
-  const cards = [screen.getByRole("region", { name: "경쟁사 광고 분포" }), screen.getByRole("region", { name: "조회수 상위·하위 25% 광고 비교" })];
+  const cards = [screen.getByRole("region", { name: "시장 광고 분포" }), screen.getByRole("region", { name: "조회수 상위·하위 25% 광고 비교" })];
   const toggles = cards.map(card => within(card).getByRole("button", { name: "표로 보기" }));
   const contents = toggles.map(toggle => document.getElementById(toggle.getAttribute("aria-controls")!)!);
   expect(toggles.map(toggle => toggle.getAttribute("aria-expanded"))).toEqual(["false", "false"]);
@@ -67,8 +67,8 @@ it("shows independently collapsed verification tables for only the active axis",
 });
 it("labels known and unknown tools only in card headings and keeps raw tool attributes", () => {
   render(<InsightPanel distributions={[{ tool: "top_vs_bottom_axis", rows: [{ value: "question", n_top: 1, n_bottom: 0 }] }, { tool: "unknown_tool", rows: [{ value: "other", creatives: 2 }] }]} names={names} />);
-  expect(screen.getAllByRole("heading").map(node => node.textContent)).toEqual(["경쟁사 광고 분포", "조회수 상위·하위 25% 광고 비교"]);
-  expect(within(screen.getByRole("region", { name: "경쟁사 광고 분포" })).getByRole("tab").textContent).toBe("그 외");
+  expect(screen.getAllByRole("heading").map(node => node.textContent)).toEqual(["시장 광고 분포", "조회수 상위·하위 25% 광고 비교"]);
+  expect(within(screen.getByRole("region", { name: "시장 광고 분포" })).getByRole("tab").textContent).toBe("그 외");
   expect(screen.getAllByRole("region", { name: "분포" }).map(node => node.getAttribute("data-tool"))).toEqual(["unknown_tool", "top_vs_bottom_axis"]);
   expect(document.body.textContent).not.toMatch(/unknown_tool|top_vs_bottom_axis/);
 });
@@ -83,8 +83,8 @@ it.each(["result", "verification"] as const)("shows only a consistent active-axi
   const { container, rerender } = render(<InsightPanel distributions={input} names={names} variant={variant} />);
   const total = () => container.querySelector(".gs-insight-head > .gs-insight-total");
   expect(total()?.tagName).toBe("SPAN"); expect(total()?.textContent).toBe("총 1,234건");
-  expect(total()?.previousElementSibling).toBe(screen.getByRole("heading", { name: "경쟁사 광고 분포" }));
-  expect(screen.getAllByRole("heading").map(node => node.textContent)).toEqual(["경쟁사 광고 분포"]);
+  expect(total()?.previousElementSibling).toBe(screen.getByRole("heading", { name: "시장 광고 분포" }));
+  expect(screen.getAllByRole("heading").map(node => node.textContent)).toEqual(["시장 광고 분포"]);
   fireEvent.click(screen.getByRole("tab", { name: "소구" })); expect(total()?.textContent).toBe("총 27건");
   fireEvent.click(screen.getByRole("tab", { name: "훅" })); expect(total()?.textContent).toBe("총 1,234건");
   expect(JSON.stringify(input)).toBe(snapshot);
