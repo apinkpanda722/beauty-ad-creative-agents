@@ -57,7 +57,8 @@ it("loads workspace metadata with no headers and renders API failure", async () 
   expect(fetch).toHaveBeenCalledExactlyOnceWith("/api/workspaces");
   render(<Page />);
   fireEvent.click(screen.getByRole("button", { name: "작업 공간" }));
-  expect(await screen.findByRole("option", { name: /합성 공간 A.*합성 제품 A/ })).toBeTruthy();
+  expect(await screen.findByRole("option", { name: "합성 공간 A" })).toBeTruthy();
+  expect(screen.queryByRole("option", { name: /합성 제품/ })).toBeNull();
   cleanup();
   fetch.mockRejectedValue(new TypeError("synthetic"));
   render(<Page />);
@@ -71,7 +72,7 @@ it("enables input only after workspace selection and has no preset request butto
   expect(screen.queryByLabelText("예시 요청")).toBeNull();
   expect(existsSync(join(process.cwd(), "lib/examples.ts"))).toBe(false);
   expect((screen.getByLabelText("요청") as HTMLTextAreaElement).value).toBe("");
-  expect(screen.getAllByRole("button").map(button => button.textContent)).toEqual(["합성 공간 A · 합성 제품 A", "", "+ 새 기획", "기획하기"]);
+  expect(screen.getAllByRole("button").map(button => button.textContent)).toEqual(["합성 공간 A", "", "+ 새 기획", "기획하기"]);
   const close = screen.getByRole("button", { name: "기획 1 닫기" });
   expect(close.getAttribute("aria-label")).toBe("기획 1 닫기");
   expect(close.querySelectorAll('svg[aria-hidden="true"]')).toHaveLength(1);
