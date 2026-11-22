@@ -4,7 +4,7 @@ import { useId, useState } from "react";
 import type { UiCommand } from "../../lib/types";
 import { taxonomyNames, type TaxonomyNames } from "../../lib/taxonomy";
 import { localizeText } from "../../lib/localize";
-import { AXIS_TABS, insightAxis, insightColumnName, insightDescription, insightLimitNote, insightTotal, insightValue, sortInsightRows, sortModelRows } from "../../lib/insight";
+import { AXIS_TABS, insightAxis, insightColumnName, insightDescription, insightLimitNote, insightShown, insightTotal, insightValue, sortInsightRows, sortModelRows } from "../../lib/insight";
 import { useGridAccordion } from "../../lib/useGridAccordion";
 import { Badge, Button, DataTable, Tabs } from "../ui";
 import { DistributionChart } from "./DistributionChart";
@@ -32,13 +32,23 @@ function InsightCard({ title, distributions, names, variant, modelCharts, compar
   const tabs = AXIS_TABS.filter(tab => grouped.some(item => item.axis === tab.value) || charts.some(chart => chart.axis === tab.value));
   const active = tabs.find(tab => tab.value === axis) ?? tabs[0];
   const total = comparison ? null : insightTotal(grouped.filter(item => item.axis === active.value).flatMap(item => item.data.rows));
+  // Hook, angle and format hold one label per creative, so the displayed rows should add up to the total.
+  const truncationNote = (tabValue: string) => {
+    if (variant !== "result" || comparison || tabValue === "other") return null;
+    const rows = grouped.filter(item => item.axis === tabValue).flatMap(item => item.data.rows);
+    const tabTotal = insightTotal(rows);
+    const shown = insightShown(rows);
+    return tabTotal !== null && shown.rows > 0 && shown.count < tabTotal
+      ? `분류가 많아 상위 ${shown.rows.toLocaleString("ko-KR")}개만 표시합니다(나머지 ${(tabTotal - shown.count).toLocaleString("ko-KR")}건은 표시하지 않음)` : null;
+  };
   const sourceValue = (value: unknown) => value == null || typeof value === "object" ? "—" : typeof value === "string" ? insightValue(value, names) : String(value);
   return <section className="gs-result-section gs-distribution gs-insight-card" aria-labelledby={titleId}>
     {comparison ? <h3 id={titleId}>{title}</h3> : <div className="gs-insight-head"><h3 id={titleId}>{title}</h3>{total !== null && <span className="gs-insight-total">총 {total.toLocaleString("ko-KR")}건</span>}</div>}
     {comparison && <p className="gs-insight-note">{insightDescription("top_vs_bottom_axis")}</p>}
     {comparison && <p className="gs-insight-note">{insightLimitNote("top_vs_bottom_axis")}</p>}
     <Tabs label={`${title} 축`} value={active.value} onChange={setAxis} items={tabs.map(tab => ({ ...tab, panel: <div className={`gs-insight-charts${charts.some(chart => chart.axis === tab.value) ? " gs-insight-with-model" : ""}`}>
-      <div>{grouped.filter(item => item.axis === tab.value).map(({ data }, index) => <DistributionChart key={index} embedded data={data} names={names} />)}</div>
+      <div>{grouped.filter(item => item.axis === tab.value).map(({ data }, index) => <DistributionChart key={index} embedded data={data} names={names} />)}
+        {truncationNote(tab.value) && <p className="gs-insight-note">{truncationNote(tab.value)}</p>}</div>
       {charts.some(chart => chart.axis === tab.value) && <div className="gs-model-charts">{charts.filter(chart => chart.axis === tab.value).map((chart, index) => <section aria-label="모델 작성값 차트" className="gs-model-chart" key={index}>
         <h4>{chart.label}</h4><Badge variant="warn" label="미검증" />
         {sortModelRows(chart.rows, names).map((row, index) => <div className="gs-distribution-row" key={index}>
@@ -68,7 +78,7 @@ export function InsightPanel({ distributions, names = taxonomyNames(), variant =
   const comparison = distributions.filter(data => data.tool === "top_vs_bottom_axis");
   if (!competitor.length && !comparison.length) return null;
   return <>
-    {competitor.length > 0 && <InsightCard title="경쟁사 광고 분포" distributions={competitor} names={names} variant={variant} modelCharts={modelCharts} />}
+    {competitor.length > 0 && <InsightCard title="시장 광고 분포" distributions={competitor} names={names} variant={variant} modelCharts={modelCharts} />}
     {comparison.length > 0 && <InsightCard title="조회수 상위·하위 25% 광고 비교" comparison distributions={comparison} names={names} variant={variant} modelCharts={[]} />}
   </>;
 }

@@ -193,7 +193,7 @@ it("renders separate code checks, evaluation state, unknown badge, neutral patte
   expect(screen.getByText("평가 상태: 검토 필요")).toBeTruthy();
   const raw = screen.getAllByText("question"); expect(raw).toHaveLength(3);
   expect(raw.filter(node => node.closest(".gs-plan-summary .gs-result-badges"))).toHaveLength(1);
-  expect(raw.filter(node => node.closest('[aria-label="경쟁사 패턴 반영"]'))).toHaveLength(2);
+  expect(raw.filter(node => node.closest('[aria-label="시장 패턴 반영"]'))).toHaveLength(2);
   for (const label of ["같음", "다름", "비교 불가", "비교한 축 2개 중 같은 축 1개", plan.pattern_alignment_label, plan.disclaimer]) expect(screen.getAllByText(label).length).toBeGreaterThan(0);
   expect(container.textContent).not.toMatch(/좋음|나쁨|우수|미달/);
   expandAll();
@@ -214,15 +214,15 @@ it("renders separate code checks, evaluation state, unknown badge, neutral patte
   expect(screen.getAllByText("합성 효능 · 확인됨")).toHaveLength(2);
   expect(screen.getAllByText("soothing · 근거 연결 없음")).toHaveLength(2);
 });
-it("keeps verified charts, model values and removed values in distinct blocks, including removed-only and empty", () => {
+it("keeps verified charts and removed values in distinct blocks and hides model-written values, including removed-only and empty", () => {
   const { rerender } = render(<Audit commands={[{ kind: "show_aggregates", data: aggregates }]} />);
   selectAuditTab("검증");
   expect(screen.queryByRole("region", { name: "검증된 집계(도구가 센 값)" })).toBeNull();
   expect(screen.queryByText("합성 도구 건수")).toBeNull();
-  const model = screen.getByRole("region", { name: "모델 작성값" });
-  expect(within(model).getByText(aggregates.label)).toBeTruthy();
-  expect(model.textContent).toContain("합성 모델 값");
-  expect(model.textContent).not.toMatch(/확인됨|검증됨/);
+  expect(screen.queryByRole("region", { name: "모델 작성값" })).toBeNull();
+  expect(screen.queryByText(aggregates.label)).toBeNull();
+  expect(document.body.textContent).not.toContain("합성 모델 값");
+  expect(screen.queryByText("미검증")).toBeNull();
   expect(screen.getByRole("region", { name: "제외된 값" }).textContent).toContain("synthetic_removed");
   rerender(<Audit commands={[{ kind: "show_aggregates", data: { ...aggregates, verified_counts: [], model_written: [] } }]} />);
   expect(screen.getByText("synthetic_removed")).toBeTruthy();
@@ -232,7 +232,7 @@ it("keeps verified charts, model values and removed values in distinct blocks, i
   rerender(<Audit commands={[{ kind: "show_aggregates", data: aggregates }, { kind: "show_distribution", data: { tool: "compare_axis_by_category", rows: [{ value: "question", creatives: 1 }] } }]} />);
   const verified = screen.getByRole("region", { name: "검증된 집계(도구가 센 값)" });
   expect(within(verified).getByText("검증됨")).toBeTruthy();
-  expect(within(verified).getByRole("heading", { name: "경쟁사 광고 분포" })).toBeTruthy();
+  expect(within(verified).getByRole("heading", { name: "시장 광고 분포" })).toBeTruthy();
 });
 it("shows all six analysis attributes using schema and closed maps, raw unknown values and neutral absent analysis", () => {
   const labeled = { ...card, hook_type: "question", angle: "how_to", format: "demo", talent: "ordinary_person", cta_type: "shop_now", claims: ["hydration", "synthetic_claim"] };
@@ -440,7 +440,7 @@ it("orders plan sections, disclaimer, image and feedback after the folded attemp
   const expanded = root.querySelector<HTMLElement>(".gs-plan-expanded")!;
   expect(expanded.hidden).toBe(true);
   expect(Array.from(expanded.children).map(node => node.getAttribute("aria-label") ?? node.tagName)).toEqual([
-    "장면 구성", "카피", "주장 효능", "경쟁사 패턴 반영", "기획안 근거", "P",
+    "장면 구성", "카피", "주장 효능", "시장 패턴 반영", "기획안 근거", "P",
   ]);
   expect(expanded.children[5].textContent).toBe(plan.disclaimer);
   expect(screen.getByText("합성 장면")).toBeTruthy();
@@ -449,7 +449,7 @@ it("orders plan sections, disclaimer, image and feedback after the folded attemp
   fireEvent.click(toggle);
   expect(toggle.getAttribute("aria-expanded")).toBe("true");
   expect(expanded.hidden).toBe(false);
-  for (const label of ["장면 구성", "카피", "주장 효능", "경쟁사 패턴 반영", "기획안 근거"]) expect(screen.getByRole("region", { name: label })).toBeTruthy();
+  for (const label of ["장면 구성", "카피", "주장 효능", "시장 패턴 반영", "기획안 근거"]) expect(screen.getByRole("region", { name: label })).toBeTruthy();
   expect(screen.getByText("합성 카피")).toBeTruthy();
   expect(screen.queryByText("평가 시도 보기 · 되돌림 0회")).toBeNull();
   expect(screen.queryByRole("region", { name: "검사 결과" })).toBeNull();
@@ -462,7 +462,7 @@ it("shows a compact horizontal plan summary with a placeholder and preserves eve
   expect(screen.getByText("시안 이미지").closest(".gs-plan-media")).toBeTruthy();
   expect(screen.getAllByText("합성 효능 · 확인됨")).toHaveLength(2);
   expect(screen.getByText("근거 연결 없음 1건")).toBeTruthy();
-  expect(screen.getByText("경쟁사 패턴 반영 · 비교한 축 2개 중 같은 축 1개")).toBeTruthy();
+  expect(screen.getByText("시장 패턴 반영 · 비교한 축 2개 중 같은 축 1개")).toBeTruthy();
   for (const name of ["승인", "반려", "전체 보기 →"]) expect(screen.getByRole("button", { name })).toBeTruthy();
   expect((screen.getByLabelText("피드백 사유") as HTMLInputElement).tagName).toBe("INPUT");
   for (const text of ["합성 장면", "합성 카피", "주장 효능", "효능 근거 연결 없음", "코드 검사: 통과", "평가 상태: 검토 필요", plan.pattern_alignment_label, "근거 소재 목록", plan.disclaimer, "합성 시안 고지"]) expect(screen.getByText(text).closest("[hidden]")).toBeTruthy();
@@ -618,8 +618,8 @@ it("cards each detail section, numbers scenes, quotes copies and tabulates neutr
   for (const section of expanded.querySelectorAll(":scope > section")) expect(section.classList.contains("gs-detail-card")).toBe(true);
   expect(screen.getByRole("region", { name: "장면 구성" }).querySelector("ol li")!.textContent).toBe("합성 장면");
   expect(screen.getByText("합성 카피").tagName).toBe("BLOCKQUOTE");
-  const table = within(screen.getByRole("region", { name: "경쟁사 패턴 반영" })).getByRole("table");
-  expect(within(table).getAllByRole("columnheader").map(node => node.textContent)).toEqual(["축", "기획안", "경쟁사 최다 방식", "일치 여부", "시장 내 비중"]);
+  const table = within(screen.getByRole("region", { name: "시장 패턴 반영" })).getByRole("table");
+  expect(within(table).getAllByRole("columnheader").map(node => node.textContent)).toEqual(["축", "기획안", "시장 최다 방식", "일치 여부", "시장 내 비중"]);
   for (const text of ["같음", "다름", "비교 불가"]) expect(within(table).getAllByText(text).every(node => node.textContent === text)).toBe(true);
   expect(within(table).getByText("25.0%")).toBeTruthy();
 });
@@ -682,7 +682,7 @@ it("keeps only marketer summaries, insight, pattern facts and one verification l
   expandAll();
   expect(document.querySelector(".gs-quality-summary")!.textContent).toBe("품질 검사 통과 · AI 평가 차별성 2/5 · 요청 적합성 3/5");
   expect(screen.getByRole("region", { name: "분포" })).toBeTruthy();
-  expect(within(screen.getByRole("region", { name: "경쟁사 패턴 반영" })).getByRole("table")).toBeTruthy();
+  expect(within(screen.getByRole("region", { name: "시장 패턴 반영" })).getByRole("table")).toBeTruthy();
   expect(screen.getAllByRole("link", { name: "검증 상세 보기 →" })).toHaveLength(1);
   expect(screen.queryByRole("region", { name: "검사 결과" })).toBeNull();
   expect(container.querySelector("details")).toBeNull();
@@ -691,8 +691,8 @@ it("keeps only marketer summaries, insight, pattern facts and one verification l
 
 it("explains pattern facts with titled columns and keeps the server calculation label only in checks", () => {
   render(<PlanWithAudit data={plan} tenantId={null} />); expandAll();
-  const panel = screen.getByRole("region", { name: "경쟁사 패턴 반영" });
-  const descriptions = ["경쟁사 최다 방식: 같은 분류의 경쟁사 광고 중 가장 많이 쓰인 방식", "시장 내 비중: 경쟁사 광고 전체 중 기획안과 같은 방식을 쓴 광고의 비율"];
+  const panel = screen.getByRole("region", { name: "시장 패턴 반영" });
+  const descriptions = ["시장 최다 방식: 같은 분류의 시장 광고 중 가장 많이 쓰인 방식", "시장 내 비중: 시장 광고 전체 중 기획안과 같은 방식을 쓴 광고의 비율"];
   const elements = descriptions.map(text => within(panel).getByText(text));
   expect(elements[0]).not.toBe(elements[1]);
   for (const [index, element] of elements.entries()) expect(element.textContent).toBe(descriptions[index]);
@@ -760,7 +760,7 @@ it("merges marketer distributions in one card while keeping embedded regions and
   ];
   const snapshot = JSON.stringify(commands);
   render(<ResultsView commands={commands} />);
-  expect(screen.getAllByRole("heading", { name: "경쟁사 광고 분포" })).toHaveLength(1);
+  expect(screen.getAllByRole("heading", { name: "시장 광고 분포" })).toHaveLength(1);
   expect(screen.getAllByRole("tab").map(node => node.textContent)).toEqual(["훅", "소구"]);
   expect(screen.getByRole("region", { name: "분포" }).getAttribute("data-tool")).toBe("compare_axis_by_category");
   expect(screen.getByRole("meter", { name: "question" }).getAttribute("aria-valuenow")).toBe("2");

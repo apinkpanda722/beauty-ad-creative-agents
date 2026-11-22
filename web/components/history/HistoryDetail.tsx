@@ -6,12 +6,11 @@ import type { EvaluationAttempt, SchemaResponse } from "../../lib/types";
 import { getSchema } from "../../lib/api";
 import { historyDuration, historyTime, summarizeTurn, totalCost } from "../../lib/history";
 import { taxonomyNames, type TaxonomyNames } from "../../lib/taxonomy";
-import { localizeText, scoreNames } from "../../lib/localize";
-import { modelAxis, parseModelBreakdown } from "../../lib/insight";
+import { scoreNames } from "../../lib/localize";
 import { unknownNames } from "../../lib/unknown";
 import { Badge, Button, Card, DataTable, PageHeader, Tabs, Tooltip } from "../ui";
 import { AggregatesPanel } from "../results/AggregatesPanel";
-import { InsightPanel, type ModelChart } from "../results/InsightPanel";
+import { InsightPanel } from "../results/InsightPanel";
 import { ScoreLabel } from "../results/ScoreLabel";
 import { CommandTenantContext } from "../results/ResultsView";
 import "../../app/history.css";
@@ -48,15 +47,7 @@ export function HistoryDetail({ turn, workspace, onBack, onReturn, names: suppli
   const plans = turn.commands.filter(command => command.kind === "show_plan");
   const distributions = turn.commands.filter(command => command.kind === "show_distribution").map(command => command.data);
   const hasCompetitor = distributions.some(data => data.tool !== "top_vs_bottom_axis");
-  const modelCharts: ModelChart[] = [];
-  const aggregates = turn.commands.filter(command => command.kind === "show_aggregates").map(({ data }) => ({ ...data, model_written: data.model_written.filter(item => {
-    const label = localizeText(item.name, names).trim();
-    const axis = modelAxis(label);
-    const rows = parseModelBreakdown(item.value);
-    if (!hasCompetitor || !axis || !rows) return true;
-    modelCharts.push({ axis, label, rows });
-    return false;
-  }) }));
+  const aggregates = turn.commands.filter(command => command.kind === "show_aggregates").map(({ data }) => data);
   const attempts = plans.flatMap(({ data }, planIndex) => (data.attempts as DisplayAttempt[]).map((attempt, index) => ({
     attempt, id: `${planIndex}-${index}`, label: `${plans.length > 1 ? `기획안 ${planIndex + 1} · ` : ""}시도 ${attempt.attempt}`,
   })));
@@ -112,7 +103,7 @@ export function HistoryDetail({ turn, workspace, onBack, onReturn, names: suppli
         </section>)}
         {distributions.length > 0 && <section aria-label="검증된 집계(도구가 센 값)" className="gs-verified-aggregates">
           <h3>검증된 집계(도구가 센 값)</h3><Badge variant="success" label="검증됨" />
-          <InsightPanel distributions={distributions} names={names} variant="verification" modelCharts={modelCharts} />
+          <InsightPanel distributions={distributions} names={names} variant="verification" />
           <p className="gs-insight-note">분류가 많으면 상위 5개만 표시합니다</p>
         </section>}
         {aggregates.map((data, index) => <AggregatesPanel key={index} data={data} names={names} />)}
